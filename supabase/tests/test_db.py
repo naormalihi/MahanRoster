@@ -81,6 +81,8 @@ RANK_TAGS = {
 def seed(c):
     p = synthetic.generate(months=1, soldiers=120, gafim=4, seed=7)
     q = c.execute
+    # the tests use the solver's fictitious catalog instead of the shipped reference data
+    q("truncate populations, day_types, ranks, load_roles, absence_types, exemption_types cascade")
     q("insert into populations (code, name) values ('mandatory','חובה'),('career','קבע'),('officer','קצינים'),('major','רס\"ן ומעלה')")
     q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג')")
     rank_id = {}
