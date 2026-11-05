@@ -1,0 +1,28 @@
+name: db-migrate
+
+# Applies new SQL migrations to the Supabase project.
+# Needs the repository secret SUPABASE_DB_URL: the "Session pooler" connection
+# string from Supabase › Connect (the direct db.<ref> host is IPv6-only).
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**"]
+  workflow_dispatch:
+
+concurrency: db-migrate
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secret
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set"; exit 1; fi
+      - run: sudo apt-get install -y -qq postgresql-client
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: supabase/apply_migrations.sh

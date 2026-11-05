@@ -1,0 +1,100 @@
+/**
+ * The app's only door to data. Two implementations: Supabase (real) and Demo
+ * (in-memory fictitious unit, for previews and screenshots without a backend).
+ */
+
+import type { ExistingSoldier, RosterPlan } from "./roster";
+
+export type Role = "coordinator" | "deputy" | "viewer" | "gaf_commander" | "gaf_rep" | "unit_commander" | "soldier";
+
+export interface Me {
+  userId: string;
+  username: string;
+  roles: Role[];
+  mustChangePassword: boolean;
+}
+
+export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinator") || me.roles.includes("deputy"));
+
+export interface MfaState {
+  /** signed in with password only, and a TOTP factor exists */
+  needsVerify: boolean;
+  /** staff without any TOTP factor yet */
+  needsEnroll: boolean;
+  factorId?: string;
+}
+
+export interface BoardRow {
+  slot_id: string;
+  starts_at: string;
+  ends_at: string;
+  task_name: string;
+  category_name: string | null;
+  color: string | null;
+  performers: string[];
+  reserves: string[];
+  gafim: string[];
+  report_at: string | null;
+  report_place: string | null;
+  briefing_at: string | null;
+  briefing_place: string | null;
+  updated_at: string;
+  changed_after_publish: boolean;
+}
+
+export interface NamedRef {
+  id: string;
+  name: string;
+}
+
+export interface ApplyResult {
+  added: number;
+  updated: number;
+  deactivated: number;
+  gafimCreated: number;
+}
+
+export interface Api {
+  readonly demo: boolean;
+  signIn(username: string, password: string): Promise<void>;
+  signOut(): Promise<void>;
+  me(): Promise<Me | null>;
+  mfaState(): Promise<MfaState>;
+  mfaEnroll(): Promise<{ factorId: string; qrSvg: string; secret: string }>;
+  mfaVerify(factorId: string, code: string): Promise<void>;
+  changePassword(newPassword: string): Promise<void>;
+  board(fromIso: string, toIso: string): Promise<BoardRow[]>;
+  soldiers(): Promise<ExistingSoldier[]>;
+  gafim(): Promise<NamedRef[]>;
+  ranks(): Promise<NamedRef[]>;
+  unitKeyCheck(): Promise<string | null>;
+  setUnitKeyCheck(value: string): Promise<void>;
+  applyRoster(plan: RosterPlan): Promise<ApplyResult>;
+}
+
+/** Username → the synthetic e-mail Supabase Auth stores. No real mailbox exists. */
+export const usernameToEmail = (username: string) => `${username.trim().toLowerCase()}@users.invalid`;
+
+export const USERNAME_RE = /^[a-z0-9._-]{3,32}$/;
+
+export function passwordProblems(pw: string, username: string): string | null {
+  if (pw.length < 10) return "לפחות 10 תווים";
+  if (!/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return "צריכה לכלול אותיות וספרות";
+  if (pw.toLowerCase().includes(username.toLowerCase())) return "אסור שתכיל את שם המשתמש";
+  return null;
+}
+
+let instance: Api | null = null;
+
+export async function getApi(): Promise<Api> {
+  if (instance) return instance;
+  const env = import.meta.env;
+  if (env.VITE_DEMO === "1" || !env.VITE_SUPABASE_URL) {
+    const { DemoApi } = await import("../demo/demoApi");
+    instance = new DemoApi();
+  } else {
+    const { SupabaseApi } = await import("./supabaseApi");
+    instance = new SupabaseApi(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+  }
+  return instance;
+}
