@@ -5,13 +5,14 @@ import { getApi, isStaff, type Api, type Me, type MfaState } from "./api";
  * Where the signed-in user stands:
  *   signedOut → (password) → mfa (staff only) → changePassword (if required) → ready
  */
-export type AuthStage = "loading" | "signedOut" | "mfa" | "changePassword" | "ready";
+export type AuthStage = "loading" | "signedOut" | "mfa" | "changePassword" | "ready" | "error";
 
 interface AuthValue {
   api: Api | null;
   me: Me | null;
   stage: AuthStage;
   mfa: MfaState | null;
+  error: string | null;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -23,9 +24,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [mfa, setMfa] = useState<MfaState | null>(null);
   const [stage, setStage] = useState<AuthStage>("loading");
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const a = api ?? (await getApi());
+    let a = api;
+    if (!a) {
+      try {
+        a = await getApi();
+      } catch (e) {
+        setError((e as Error).message);
+        return setStage("error");
+      }
+    }
     if (!api) setApi(a);
     const who = await a.me();
     setMe(who);
@@ -48,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().catch(() => setStage("signedOut"));
   }, [refresh]);
 
-  return <Ctx.Provider value={{ api, me, stage, mfa, refresh, signOut }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ api, me, stage, mfa, error, refresh, signOut }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {

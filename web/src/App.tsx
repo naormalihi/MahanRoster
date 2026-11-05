@@ -1,4 +1,4 @@
-import { Box, CircularProgress } from "@mui/material";
+import { Alert, Box, CircularProgress } from "@mui/material";
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
@@ -11,11 +11,17 @@ import { BoardPage } from "./pages/BoardPage";
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
 function Gate() {
-  const { stage, me } = useAuth();
+  const { stage, me, error } = useAuth();
   if (stage === "loading")
     return (
       <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
+      </Box>
+    );
+  if (stage === "error")
+    return (
+      <Box sx={{ p: 3, maxWidth: 560, mx: "auto", mt: 6 }}>
+        <Alert severity="error">האפליקציה לא מוגדרת כראוי: {error}</Alert>
       </Box>
     );
   if (stage === "signedOut") return <LoginPage />;
