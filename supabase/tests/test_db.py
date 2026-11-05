@@ -52,13 +52,18 @@ def conn():
     c.close()
 
 
+def _claims(c, user_id, aal="aal2"):
+    c.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(user_id),))
+    c.execute("select set_config('request.jwt.claims', %s, true)", (json.dumps({"sub": str(user_id), "aal": aal}),))
+
+
 @contextmanager
-def session_as(c, user_id, role="authenticated"):
+def session_as(c, user_id, role="authenticated", aal="aal2"):
     """Run statements as a Supabase API role with a given JWT subject, then roll back."""
     with c.transaction():
         c.execute(f"set local role {role}")
         if user_id:
-            c.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(user_id),))
+            _claims(c, user_id, aal)
         yield c
         raise psycopg.Rollback()
 
@@ -176,6 +181,15 @@ def test_staff_see_everything_others_see_nothing(conn, table):
             assert count(cur, f"select count(*) from {table}") == 0, user
 
 
+def test_staff_rights_need_a_second_factor(conn):
+    with session_as(conn, COORD, aal="aal1") as cur:
+        assert count(cur, "select count(*) from soldiers") == 0
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("select public.request_schedule(%s)", (conn.cycle_id,))
+    with session_as(conn, COORD, aal="aal2") as cur:
+        assert count(cur, "select count(*) from soldiers") == 120
+
+
 def test_anon_has_no_table_access(conn):
     with session_as(conn, None, role="anon") as cur:
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
@@ -239,7 +253,7 @@ def test_round_trip_through_the_engine(conn):
     # 1. snapshot + input, as נע"ת
     conn.execute("begin")
     conn.execute("set local role authenticated")
-    conn.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(COORD),))
+    _claims(conn, COORD)
     job = conn.execute("select public.request_schedule(%s)", (cycle,)).fetchone()[0]
     payload = conn.execute("select input from schedule_jobs where id = %s", (job,)).fetchone()[0]
     conn.execute("commit")
@@ -276,7 +290,7 @@ def test_round_trip_through_the_engine(conn):
 
     conn.execute("begin")
     conn.execute("set local role authenticated")
-    conn.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(COORD),))
+    _claims(conn, COORD)
     conn.execute("select public.publish_cycle(%s)", (cycle,))
     conn.execute("commit")
 
