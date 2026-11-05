@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("solve", help="solve a problem file")
     s.add_argument("problem")
     s.add_argument("-o", "--out", required=True)
-    s.add_argument("--time-limit", type=float)
+    s.add_argument("--time-limit", type=float, help="total seconds, split across the months")
     s.add_argument("--workers", type=int)
     s.add_argument("--log", action="store_true")
 
@@ -51,13 +51,13 @@ def main(argv: list[str] | None = None) -> int:
 
     problem = models.load_problem(Path(a.problem).read_text(encoding="utf-8"))
     if a.cmd == "solve":
-        from .solver import solve
+        from .rolling import solve_rolling
 
         if a.time_limit:
             problem.settings.time_limit_seconds = a.time_limit
         if a.workers:
             problem.settings.workers = a.workers
-        sol = solve(problem, log=a.log)
+        sol = solve_rolling(problem, log=a.log)  # month by month; a single month is one model
         Path(a.out).write_text(models.dumps(sol), encoding="utf-8")
         print(f"{sol.status} in {sol.wall_time_seconds}s, {len(sol.assignments)} assignments, {len(sol.unfilled)} unfilled")
         return 0 if sol.status in ("OPTIMAL", "FEASIBLE") else 2

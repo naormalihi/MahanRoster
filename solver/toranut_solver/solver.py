@@ -27,6 +27,7 @@ All quantities are scaled to integers (points × 100) for CP-SAT.
 
 from __future__ import annotations
 
+import os
 import time as _time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -122,6 +123,43 @@ def _personal_conflicts(idx: EligibilityIndex, soldier, slot) -> list[str]:
     probe = replace(slot, is_penalty=False)
     keep = {"exemption", "absence", "date_block", "released", "not_enlisted"}
     return [r for r in idx.check(soldier, probe) if r in keep]
+
+
+def _pool_load(prep: Prepared, members: list[str], by_soldier, slots) -> float:
+    """Scaled points this pool is expected to absorb in the cycle (performer roles only)."""
+    member_set = set(members)
+    load = 0.0
+    seen = set()
+    for sid in members:
+        for kid in by_soldier[sid]:
+            if kid in seen:
+                continue
+            seen.add(kid)
+            elig = prep.eligible[kid]
+            inside = [s for s in elig if s in member_set]
+            if not inside:
+                continue
+            share = len(inside) / len(elig)
+            load += share * slots[kid].performers_needed * sum(prep.pts[s, kid] for s in inside) / len(inside)
+    return load
+
+
+def _thresholds(base: dict[str, int], bound: dict[str, int], pool_load: float, step: int = SCALE) -> range:
+    """Staircase thresholds covering the scores the pool can realistically reach."""
+    lo = min(base.values())
+    level = sorted(base.values())
+    # Water level if the load were spread perfectly from the bottom up.
+    remaining, water = pool_load, lo
+    for i, b in enumerate(level):
+        nxt = level[i + 1] if i + 1 < len(level) else None
+        width = i + 1
+        if nxt is None or remaining <= (nxt - b) * width:
+            water = b + remaining / width
+            break
+        remaining -= (nxt - b) * width
+    hi = min(max(bound.values()), int(water) + 8 * step)
+    start = (lo // step) * step
+    return range(start, hi + step, step)
 
 
 def _minutes(t: datetime, origin: datetime) -> int:
@@ -264,16 +302,26 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             m.Add(e == base[sid] + sum(prep.pts[sid, kid] * x[sid, kid] for kid in by_soldier[sid]))
             expected[sid] = e
         e_max = m.NewIntVar(0, hi_bound, f"Emax_{pool}")
-        total = m.NewIntVar(0, hi_bound * n, f"T_{pool}")
-        m.Add(total == sum(expected[sid] for sid in members))
         for sid in members:
             m.Add(e_max >= expected[sid])
-            # |n·E_s − ΣE| = n·|E_s − mean| – the spread around the pool mean, kept integral.
-            dev = m.NewIntVar(0, hi_bound * n, f"dev_{sid}")
-            m.Add(dev >= n * expected[sid] - total)
-            m.Add(dev >= total - n * expected[sid])
-            objective.append(coef(w.deviation) * dev)
-        objective.append(coef(w.max_score, n) * e_max)
+        objective.append(coef(w.max_score) * e_max)
+
+        # Spread: a convex staircase cost Σ_j max(0, E_s − t_j) over thresholds one point apart.
+        # Its slope grows with the score, so each extra point costs more for a soldier who is
+        # already high – the solver fills from the bottom up ("water filling") without needing
+        # the pool mean as a variable, which keeps the model light.
+        thresholds = _thresholds(base, bound, _pool_load(prep, members, by_soldier, slots))
+        for sid in members:
+            steps_below = 0
+            for t in thresholds:
+                if t <= base[sid]:
+                    steps_below += 1  # max(0, E − t) = E − t: a linear term on E
+                elif t < bound[sid]:
+                    over = m.NewIntVar(0, bound[sid] - t, f"o_{sid}_{t}")
+                    m.Add(over >= expected[sid] - t)
+                    objective.append(coef(w.deviation) * over)
+            if steps_below:
+                objective.append(coef(w.deviation) * steps_below * expected[sid])
 
         # Weekend/holiday units and reserve roles: minimize the maximum in the pool.
         wk_max = m.NewIntVar(0, 10_000, f"WKmax_{pool}")
@@ -285,8 +333,8 @@ def solve(problem: Problem, log: bool = False) -> Solution:
                 >= s.baseline_weekends + sum(prep.wk_units[kid] * x[sid, kid] for kid in by_soldier[sid] if prep.wk_units[kid])
             )
             m.Add(res_max >= s.baseline_reserves + sum(r[sid, kid] for kid in by_soldier[sid] if (sid, kid) in r))
-        objective.append(coef(w.weekend * SCALE, n) * wk_max)
-        objective.append(coef(w.reserve * SCALE, n) * res_max)
+        objective.append(coef(w.weekend * SCALE) * wk_max)
+        objective.append(coef(w.reserve * SCALE) * res_max)
 
     # Spread: consecutive weekends and several duties in one week.
     for sid, kids in by_soldier.items():
@@ -311,21 +359,30 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             if nxt in on:
                 b = m.NewBoolVar(f"cw_{sid}_{fri}")
                 m.Add(b >= on[fri] + on[nxt] - 1)
-                objective.append(coef(w.consecutive_weekends * SCALE, n) * b)
+                objective.append(coef(w.consecutive_weekends * SCALE) * b)
         for key, vars_ in weeks.items():
             if len(vars_) > 1:
                 ex = m.NewIntVar(0, len(vars_), f"wx_{sid}_{key[0]}_{key[1]}")
                 m.Add(ex >= sum(vars_) - 1)
-                objective.append(coef(w.same_week * SCALE, n) * ex)
+                objective.append(coef(w.same_week * SCALE) * ex)
     for sid, c in cross_gaf_terms:
         n = pool_of.get(sid, ("", 1))[1]
-        objective.append(coef(w.cross_gaf_reserve * SCALE, n) * c)
+        objective.append(coef(w.cross_gaf_reserve * SCALE) * c)
 
     m.Minimize(sum(objective))
 
+    # Start from a full, valid greedy schedule.
+    from .greedy import greedy
+
+    start = set(greedy(problem, prep))
+    for key, v in x.items():
+        m.AddHint(v, int((key[0], key[1], ROLE_PERFORMER) in start))
+    for key, v in r.items():
+        m.AddHint(v, int((key[0], key[1], ROLE_RESERVE) in start))
+
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = settings.time_limit_seconds
-    solver.parameters.num_search_workers = settings.workers
+    solver.parameters.num_search_workers = max(1, min(settings.workers, os.cpu_count() or 1))
     solver.parameters.random_seed = settings.random_seed
     solver.parameters.log_search_progress = log
     status = solver.Solve(m)

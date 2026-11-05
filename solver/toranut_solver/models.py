@@ -186,6 +186,9 @@ class Problem:
     date_blocks: list[DateBlock] = field(default_factory=list)
     personal_constraints: list[PersonalConstraint] = field(default_factory=list)
     fixed: list[FixedAssignment] = field(default_factory=list)
+    # Periods a soldier is already committed outside this run (a duty from an earlier
+    # window or an already-published duty), rest included. Treated like an absence.
+    busy: list[Absence] = field(default_factory=list)
 
 
 @dataclass

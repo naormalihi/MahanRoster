@@ -33,6 +33,7 @@ REASON_LABELS = {
     "date_block": "חסימת תאריך",
     "personal_constraint": "אילוץ אישי",
     "penalty_other": "משבצת קנס של חייל אחר",
+    "busy": "משובץ בתורנות סמוכה (כולל מנוחה)",
 }
 
 
@@ -62,6 +63,9 @@ class EligibilityIndex:
         self.absences = defaultdict(list)
         for a in problem.absences:
             self.absences[a.soldier_id].append(a)
+        self.busy = defaultdict(list)
+        for a in problem.busy:
+            self.busy[a.soldier_id].append(a)
         self.blocks = defaultdict(set)
         for b in problem.date_blocks:
             self.blocks[b.soldier_id].add(b.date)
@@ -128,6 +132,8 @@ class EligibilityIndex:
                 break
         if any(_overlaps(slot.starts_at, slot.ends_at, a.starts_at, a.ends_at) for a in self.absences.get(soldier.id, ())):
             reasons.append("absence")
+        if any(_overlaps(slot.starts_at, slot.ends_at, a.starts_at, a.ends_at) for a in self.busy.get(soldier.id, ())):
+            reasons.append("busy")
         if self.blocks.get(soldier.id) and any(d in self.blocks[soldier.id] for d in _days(slot.starts_at, slot.ends_at)):
             reasons.append("date_block")
         for c in self.personal.get(soldier.id, ()):

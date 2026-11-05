@@ -84,3 +84,20 @@ def test_synthetic_month_is_fair_and_valid():
         before = pstdev(s.baseline_score for s in p.soldiers if s.balance_population == pool.population and s.id in active)
         # the schedule must narrow the spread of scores inside each pool
         assert pool.stdev_after < before, pool
+
+
+def test_rolling_keeps_rest_across_months():
+    from toranut_solver.rolling import solve_rolling
+
+    p = problem(
+        [soldier("A", baseline_score=0), soldier("B", baseline_score=5)],
+        [
+            slot("jan", "towers", "2027-01-31T20:00", "2027-02-01T08:00", r=0),
+            slot("feb", "towers", "2027-02-01T10:00", "2027-02-01T18:00", r=0),
+        ],
+        settings=FAST,
+    )
+    sol = solve_rolling(p)
+    who = {a.slot_id: a.soldier_id for a in sol.assignments}
+    assert who["jan"] == "A" and who["feb"] == "B"  # A is still resting on Feb 1st
+    assert violations(p, sol) == []
