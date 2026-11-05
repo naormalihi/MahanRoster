@@ -6,7 +6,7 @@
 --   apply_solver_result(job, result) store the engine output as draft assignments
 --   publish_cycle(cycle)             draft → assigned, the board shows the cycle
 --
--- The engine input matches solver/toranut_solver/models.py (Problem).
+-- The engine input matches solver/mahanroster_solver/models.py (Problem).
 -- =============================================================================
 
 create or replace function app.tz() returns text

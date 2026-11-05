@@ -2,8 +2,8 @@ from datetime import date
 
 import pytest
 
-from toranut_solver.models import LoadRolePeriod, Settings
-from toranut_solver.scoring import day_units, is_night_duty, normalized_points, raw_points, weekend_units
+from mahanroster_solver.models import LoadRolePeriod, Settings
+from mahanroster_solver.scoring import day_units, is_night_duty, normalized_points, raw_points, weekend_units
 
 from .helpers import GUARD, NIGHT, SHABBAT, dt, soldier
 

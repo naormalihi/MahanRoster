@@ -1,9 +1,9 @@
 """Command line.
 
-    python -m toranut_solver generate --months 1 -o problem.json
-    python -m toranut_solver solve problem.json -o solution.json [--time-limit 60]
-    python -m toranut_solver report problem.json solution.json -o report.md
-    python -m toranut_solver verify problem.json solution.json
+    python -m mahanroster_solver generate --months 1 -o problem.json
+    python -m mahanroster_solver solve problem.json -o solution.json [--time-limit 60]
+    python -m mahanroster_solver report problem.json solution.json -o report.md
+    python -m mahanroster_solver verify problem.json solution.json
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from . import models, report, synthetic, verify
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="toranut_solver")
+    ap = argparse.ArgumentParser(prog="mahanroster_solver")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     g = sub.add_parser("generate", help="create a fictitious unit")

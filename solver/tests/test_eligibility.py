@@ -1,7 +1,7 @@
 from datetime import date
 
-from toranut_solver.eligibility import EligibilityIndex
-from toranut_solver.models import Absence, DateBlock, Exemption, PersonalConstraint, TaskType
+from mahanroster_solver.eligibility import EligibilityIndex
+from mahanroster_solver.models import Absence, DateBlock, Exemption, PersonalConstraint, TaskType
 
 from .helpers import DAYDUTY, GUARD, dt, problem, slot, soldier
 

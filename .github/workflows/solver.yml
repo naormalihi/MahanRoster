@@ -21,10 +21,10 @@ jobs:
       - run: pytest -q
       - name: Benchmark – fictitious month
         run: |
-          python -m toranut_solver generate --months 1 -o problem.json
-          python -m toranut_solver solve problem.json -o solution.json --time-limit 120 --workers 2
-          python -m toranut_solver verify problem.json solution.json
-          python -m toranut_solver report problem.json solution.json -o report.md
+          python -m mahanroster_solver generate --months 1 -o problem.json
+          python -m mahanroster_solver solve problem.json -o solution.json --time-limit 120 --workers 2
+          python -m mahanroster_solver verify problem.json solution.json
+          python -m mahanroster_solver report problem.json solution.json -o report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:

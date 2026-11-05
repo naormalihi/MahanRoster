@@ -3,7 +3,7 @@ through the scheduling engine (snapshot → input → solve → apply → publis
 
 Needs a PostgreSQL server (16+) reachable through DATABASE_URL, default
 postgresql://postgres:postgres@localhost:5432/postgres. A throwaway database
-`toranut_test` is created from scratch for the session.
+`mahanroster_test` is created from scratch for the session.
 """
 
 from __future__ import annotations
@@ -23,12 +23,12 @@ from psycopg.types.json import Jsonb
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "solver"))
 
-from toranut_solver import models, synthetic  # noqa: E402
-from toranut_solver.rolling import solve_rolling  # noqa: E402
-from toranut_solver.verify import violations  # noqa: E402
+from mahanroster_solver import models, synthetic  # noqa: E402
+from mahanroster_solver.rolling import solve_rolling  # noqa: E402
+from mahanroster_solver.verify import violations  # noqa: E402
 
 ADMIN_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
-DB = "toranut_test"
+DB = "mahanroster_test"
 
 COORD, DEPUTY_ACTIVE, DEPUTY_EXPIRED, VIEWER, OUTSIDER = (uuid.uuid4() for _ in range(5))
 
@@ -316,7 +316,7 @@ def test_snapshot_uses_appointment_rank_and_qualifying_exemption(conn):
 
 def test_worker_processes_a_queued_job(conn):
     """The Cloud Run worker: claim → solve → verify → apply, through a direct DB connection."""
-    from toranut_solver import worker
+    from mahanroster_solver import worker
 
     cycle = conn.cycle_id
     conn.execute("update settings set value = '20' where key = 'solver_time_limit_seconds'")

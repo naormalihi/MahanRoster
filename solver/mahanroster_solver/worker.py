@@ -4,7 +4,7 @@ Runs as a Cloud Run Job (or a GitHub Actions job) with DATABASE_URL pointing at
 the Supabase Postgres connection string. It processes every queued job and
 exits, so it costs nothing while idle.
 
-    DATABASE_URL=postgresql://... python -m toranut_solver.worker
+    DATABASE_URL=postgresql://... python -m mahanroster_solver.worker
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from . import models
 from .rolling import solve_rolling
 from .verify import violations
 
-log = logging.getLogger("toranut.worker")
+log = logging.getLogger("mahanroster.worker")
 
 
 def claim(conn):

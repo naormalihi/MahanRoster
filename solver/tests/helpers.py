@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from toranut_solver.models import Problem, Settings, Slot, Soldier, TaskType
+from mahanroster_solver.models import Problem, Settings, Slot, Soldier, TaskType
 
 GUARD = TaskType("guard", "שמירה", 1.0, min_rest_hours=12, service_restriction="mandatory", requires_weapon=True)
 SHABBAT = TaskType("guard_shabbat", "שמירה – שבת", 2.5, min_rest_hours=24, is_weekend_type=True)
