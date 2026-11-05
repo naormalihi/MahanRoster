@@ -21,6 +21,26 @@ jobs:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set"; exit 1; fi
+      - name: Describe connection string (no secrets printed)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from urllib.parse import urlsplit, unquote
+          u = urlsplit(os.environ["DATABASE_URL"].strip())
+          pw = unquote(u.password or "")
+          print("scheme:", u.scheme)
+          print("user:", u.username)
+          print("host:", u.hostname, "port:", u.port, "db:", u.path)
+          print("password length:", len(pw), "| only letters/digits:", pw.isalnum(),
+                "| has brackets:", any(c in pw for c in "[]"), "| has spaces:", pw != pw.strip() or " " in pw)
+          if not (u.username or "").startswith("postgres."):
+              print("::warning::user should be postgres.<project-ref> for the Session pooler")
+          if raw := re.search(r":([^:@/]*)@", os.environ["DATABASE_URL"]):
+              if any(c in raw.group(1) for c in "#/?"):
+                  print("::warning::password contains # / or ? – must be percent-encoded")
+          PY
       - run: sudo apt-get install -y -qq postgresql-client
       - name: Apply migrations
         env:
