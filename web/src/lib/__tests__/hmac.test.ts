@@ -30,3 +30,12 @@ describe("soldier key", () => {
     expect(unitKeyProblems("a-long-enough-unit-key")).toBeNull();
   });
 });
+
+import { usernameToEmail } from "../api";
+
+describe("login name", () => {
+  it("maps a username to the synthetic address and keeps a real address", () => {
+    expect(usernameToEmail(" Board ")).toBe("board@users.invalid");
+    expect(usernameToEmail("Naor.Malihi@gmail.com")).toBe("naor.malihi@gmail.com");
+  });
+});

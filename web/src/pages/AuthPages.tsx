@@ -60,7 +60,7 @@ export function LoginPage() {
             </Alert>
           )}
           <TextField
-            label="שם משתמש"
+            label="שם משתמש או אימייל"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"

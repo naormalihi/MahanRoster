@@ -72,8 +72,14 @@ export interface Api {
   applyRoster(plan: RosterPlan): Promise<ApplyResult>;
 }
 
-/** Username → the synthetic e-mail Supabase Auth stores. No real mailbox exists. */
-export const usernameToEmail = (username: string) => `${username.trim().toLowerCase()}@users.invalid`;
+/**
+ * Username → the synthetic e-mail Supabase Auth stores (no real mailbox exists).
+ * A full e-mail address is used as is – for staff accounts created with a real address.
+ */
+export const usernameToEmail = (username: string) => {
+  const u = username.trim().toLowerCase();
+  return u.includes("@") ? u : `${u}@users.invalid`;
+};
 
 export const USERNAME_RE = /^[a-z0-9._-]{3,32}$/;
 
