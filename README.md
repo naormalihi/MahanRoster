@@ -1,4 +1,4 @@
-# מערכת תורנויות
+# MahanRoster – מערכת תורנויות
 
 מערכת לשיבוץ תורנויות ביחידה, לפי האפיון ב-Claude Docs. גרסה 1.0 היא כלי עבודה של נע"ת התורנויות, עם לוח מפורסם לצפייה.
 
@@ -7,21 +7,21 @@
 | תיקייה | מה יש בה | מצב |
 | --- | --- | --- |
 | `solver/` | מנוע השיבוץ (Python + OR-Tools CP-SAT) | אב-טיפוס |
-| `db/` | סכמת Supabase, RLS ופונקציות | בהמשך |
+| `supabase/` | סכמת Supabase, RLS, הגשר למנוע ובדיקות | גרסה ראשונה |
 | `web/` | ממשק React למסכי הנע"ת וללוח המפורסם | בהמשך |
 
 ## מנוע השיבוץ
 
-המנוע מקבל קובץ JSON אחד לכל ריצה (`Problem`) ומחזיר קובץ JSON (`Solution`). אין בו מספרים אישיים ואין מידע רפואי: חיילים מזוהים במזהה אטום בלבד, וכל הנתונים (דרגה מחושבת, אוכלוסיות, ניקוד בסיס, פטורים מאושרים, היעדרויות) מגיעים כבר מחושבים משכבת הנתונים. החוזה המלא מתועד ב-`solver/toranut_solver/models.py`.
+המנוע מקבל קובץ JSON אחד לכל ריצה (`Problem`) ומחזיר קובץ JSON (`Solution`). אין בו מספרים אישיים ואין מידע רפואי: חיילים מזוהים במזהה אטום בלבד, וכל הנתונים (דרגה מחושבת, אוכלוסיות, ניקוד בסיס, פטורים מאושרים, היעדרויות) מגיעים כבר מחושבים משכבת הנתונים. החוזה המלא מתועד ב-`solver/mahanroster_solver/models.py`.
 
 ```bash
 cd solver
 pip install -e ".[dev]"
 
-python -m toranut_solver generate --months 1 -o problem.json      # יחידה פיקטיבית
-python -m toranut_solver solve problem.json -o solution.json
-python -m toranut_solver report problem.json solution.json -o report.md
-python -m toranut_solver verify problem.json solution.json          # 1 = הפרת כלל קשיח
+python -m mahanroster_solver generate --months 1 -o problem.json      # יחידה פיקטיבית
+python -m mahanroster_solver solve problem.json -o solution.json
+python -m mahanroster_solver report problem.json solution.json -o report.md
+python -m mahanroster_solver verify problem.json solution.json          # 1 = הפרת כלל קשיח
 pytest
 ```
 

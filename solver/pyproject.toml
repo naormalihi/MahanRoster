@@ -1,5 +1,5 @@
 [project]
-name = "toranut-solver"
+name = "mahanroster-solver"
 version = "0.1.0"
 description = "Duty-roster scheduling engine (CP-SAT)"
 requires-python = ">=3.11"
@@ -7,13 +7,14 @@ dependencies = ["ortools>=9.10"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+worker = ["psycopg[binary]>=3.2"]
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["toranut_solver*"]
+include = ["mahanroster_solver*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

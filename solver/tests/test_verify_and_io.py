@@ -1,8 +1,8 @@
 import pytest
 
-from toranut_solver import models, synthetic
-from toranut_solver.solver import prepare, solution_from
-from toranut_solver.verify import violations
+from mahanroster_solver import models, synthetic
+from mahanroster_solver.solver import prepare, solution_from
+from mahanroster_solver.verify import violations
 
 from .helpers import problem, slot, soldier
 

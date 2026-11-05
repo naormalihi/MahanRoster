@@ -4,12 +4,12 @@ import pytest
 
 pytest.importorskip("ortools")  # real CP-SAT, or the HiGHS shim from conftest
 
-from toranut_solver import synthetic  # noqa: E402
-from toranut_solver.models import FixedAssignment, Settings  # noqa: E402
+from mahanroster_solver import synthetic  # noqa: E402
+from mahanroster_solver.models import FixedAssignment, Settings  # noqa: E402
 from statistics import pstdev  # noqa: E402
 
-from toranut_solver.solver import prepare, solve  # noqa: E402
-from toranut_solver.verify import violations  # noqa: E402
+from mahanroster_solver.solver import prepare, solve  # noqa: E402
+from mahanroster_solver.verify import violations  # noqa: E402
 
 from .conftest import USING_SHIM  # noqa: E402
 from .helpers import problem, slot, soldier  # noqa: E402
@@ -87,7 +87,7 @@ def test_synthetic_month_is_fair_and_valid():
 
 
 def test_rolling_keeps_rest_across_months():
-    from toranut_solver.rolling import solve_rolling
+    from mahanroster_solver.rolling import solve_rolling
 
     p = problem(
         [soldier("A", baseline_score=0), soldier("B", baseline_score=5)],
