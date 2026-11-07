@@ -113,7 +113,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("soldiers")
         .select(
-          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, range_valid_until, parent_status, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
+          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, range_valid_until, parent_status, home_nightly, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
         ),
     ) as unknown as (Omit<ExistingSoldier, "gaf_name" | "rank_name"> & { gaf: { name: string }; rank: { name: string } | null })[];
     return rows.map(({ gaf, rank, ...s }) => ({ ...s, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
@@ -161,6 +161,7 @@ export class SupabaseApi implements Api {
       career_start_date: r.career_start_date,
       range_valid_until: r.range_valid_until,
       parent_status: r.parent_status,
+      home_nightly: r.home_nightly ?? undefined, // no column in the file: keep / default
       is_active: true,
     });
     if (plan.added.length) maybe(await this.sb.from("soldiers").insert(plan.added.map(toRow)));
@@ -200,6 +201,7 @@ export class SupabaseApi implements Api {
           `id, full_name, service_type, gender, gaf_id, appointment_rank_id, appointment_rank_until, enlistment_date, release_date,
            career_start_date, range_valid_until, is_shachar, shachar_start_date, parent_status, parent_override,
            parent_override_reason, parent_override_until, second_role_signed_at, is_active,
+           home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until,
            gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name),
            soldier_load_roles(load_role_id, valid_from, valid_to, load_roles(name, factor))`,
         )
@@ -490,7 +492,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("slots")
         .select(
-          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, assignments(status)",
+          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, assignments(status)",
         )
         .eq("cycle_id", cycleId)
         .is("cancelled_at", null)
@@ -521,6 +523,8 @@ export class SupabaseApi implements Api {
       performers_needed: d.performers_needed,
       reserves_needed: d.reserves_needed,
       allowed_rank_ids: d.allowed_rank_ids,
+      prefer_home_nightly: d.prefer_home_nightly,
+      daily_hours: d.daily_hours,
       gender: d.gender,
       instructions: d.instructions,
       notes: d.notes,

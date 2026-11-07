@@ -19,8 +19,8 @@ Soft objective, inside each fairness pool (mandatory vs. career):
     expected score E_s = baseline_s + normalized points assigned this cycle
     minimize max E_s, the L1 spread of E_s around the pool mean, the max
     number of weekend/holiday units, the max number of reserve roles,
-    consecutive weekends, several duties in one week, and career reserves
-    from another gaf.
+    consecutive weekends, several duties in one week, career reserves
+    from another gaf, and "ת"ש 7" slots given to soldiers who are not ת"ש 7.
 
 All quantities are scaled to integers (points × 100) for CP-SAT.
 """
@@ -368,6 +368,15 @@ def solve(problem: Problem, log: bool = False) -> Solution:
     for sid, c in cross_gaf_terms:
         n = pool_of.get(sid, ("", 1))[1]
         objective.append(coef(w.cross_gaf_reserve * SCALE) * c)
+    # "ת"ש 7" slots: prefer soldiers who must be home nightly; anyone else costs a penalty.
+    for k in problem.slots:
+        if not k.prefer_home_nightly:
+            continue
+        for sid in prep.eligible[k.id]:
+            if not soldiers[sid].home_nightly:
+                objective.append(coef(w.home_nightly_preference * SCALE) * x[sid, k.id])
+                if (sid, k.id) in r:
+                    objective.append(coef(w.home_nightly_preference * SCALE) * r[sid, k.id])
 
     m.Minimize(sum(objective))
 

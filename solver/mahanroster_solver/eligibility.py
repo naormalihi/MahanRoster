@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 from .models import SERVICE_MANDATORY, Problem, Slot, Soldier, TaskType
-from .scoring import window_overlap_minutes
+from .scoring import parse_window, window_overlap_minutes
 
 REASON_LABELS = {
     "service": "המשימה מוגבלת לחובה או לקבע",
@@ -24,6 +24,7 @@ REASON_LABELS = {
     "qualifying_only": "משרת הורה או פטור מזכה – רק ממלכ\"ת יום",
     "not_qualifying": "ממלכ\"ת יום – רק למשרתי הורה, בעלי פטור מזכה והאוכלוסיות שהוגדרו לה",
     "shachar": "שח\"ר – המשימה לא מסומנת מתאימה לשח\"ר",
+    "home_nightly": "ת\"ש 7 – לא לן בבסיס, והתורנות כוללת שעות לילה",
     "weapon_range": "מטווח לא בתוקף ביום התורנות",
     "not_enlisted": "לפני תאריך הגיוס",
     "released": "אחרי תאריך השחרור",
@@ -45,6 +46,25 @@ def _days(start: datetime, end: datetime) -> list[date]:
         out.append(d)
         d += timedelta(days=1)
     return out
+
+
+def _worked(slot: Slot) -> list[tuple[datetime, datetime]]:
+    """The hours a slot is actually worked: the whole span, or its daily hours on each day."""
+    if not slot.daily_hours:
+        return [(slot.starts_at, slot.ends_at)]
+    t0, t1 = parse_window(slot.daily_hours)
+    out = []
+    for d in _days(slot.starts_at, slot.ends_at):
+        a = datetime.combine(d, t0)
+        b = datetime.combine(d + timedelta(days=1) if t1 <= t0 else d, t1)
+        a, b = max(a, slot.starts_at), min(b, slot.ends_at)
+        if a < b:
+            out.append((a, b))
+    return out
+
+
+def _window_overlap(window: str, slot: Slot) -> float:
+    return sum(window_overlap_minutes(window, a, b) for a, b in _worked(slot))
 
 
 def _overlaps(a0: datetime, a1: datetime, b0: datetime, b1: datetime) -> bool:
@@ -112,6 +132,8 @@ class EligibilityIndex:
             reasons.append("gender")
         if soldier.is_shachar and soldier.service_type == SERVICE_MANDATORY and not task.shachar_compatible:
             reasons.append("shachar")
+        if soldier.home_nightly and _window_overlap(settings.night_window, slot) > 0:
+            reasons.append("home_nightly")
 
         # --- dates of service ----------------------------------------------------
         if task.requires_weapon and (soldier.range_valid_until is None or soldier.range_valid_until < last_day):
@@ -131,9 +153,7 @@ class EligibilityIndex:
                 reasons.append("exemption")
                 break
             by_type = e.excluded_task_type_ids is None or task.id in e.excluded_task_type_ids
-            by_hours = e.restricted_hours is None or window_overlap_minutes(
-                e.restricted_hours, slot.starts_at, slot.ends_at
-            ) > 0
+            by_hours = e.restricted_hours is None or _window_overlap(e.restricted_hours, slot) > 0
             if by_type and by_hours:
                 reasons.append("exemption")
                 break
@@ -148,7 +168,7 @@ class EligibilityIndex:
                 continue
             if c.task_type_id and c.task_type_id != task.id:
                 continue
-            if c.time_window is None or window_overlap_minutes(c.time_window, slot.starts_at, slot.ends_at) > 0:
+            if c.time_window is None or _window_overlap(c.time_window, slot) > 0:
                 reasons.append("personal_constraint")
                 break
         return reasons

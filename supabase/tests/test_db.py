@@ -420,7 +420,7 @@ def test_holidays_are_preloaded(conn):
     assert conn.execute("select count(*) from calendar_days where extract(year from day) = 2035").fetchone()[0] >= 15
 
 
-STATIC_REASONS = {"service", "population", "rank", "gender", "qualifying_only", "not_qualifying", "shachar"}
+STATIC_REASONS = {"service", "population", "rank", "gender", "qualifying_only", "not_qualifying", "shachar", "home_nightly"}
 
 
 def _as_coord(conn, sql, *args):
@@ -443,6 +443,13 @@ def test_potential_matches_the_engine_eligibility(conn):
     for (tid, code) in conn.execute("select id, code from task_types where category_id is null").fetchall():
         cat = conn.execute("insert into duty_categories (name) values (%s) returning id", (f"קט {code}",)).fetchone()[0]
         conn.execute("update task_types set category_id = %s where id = %s", (cat, tid))
+    # a few ת"ש 7 soldiers: one from the file, one by manual override, one override that expired
+    a, b, c = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 3").fetchall()]
+    conn.execute("update soldiers set home_nightly = true where id = %s", (a,))
+    conn.execute("update soldiers set home_nightly_override = true, home_nightly_override_reason = 'x' where id = %s", (b,))
+    conn.execute(
+        "update soldiers set home_nightly = true, home_nightly_override = false, home_nightly_override_reason = 'x', "
+        "home_nightly_override_until = '2000-01-01' where id = %s", (c,))
     _as_coord(conn, "select public.compute_potential(%s)", cycle)
     assert conn.execute("select potential_computed_at is not null from cycles where id = %s", (cycle,)).fetchone()[0]
 
@@ -452,6 +459,8 @@ def test_potential_matches_the_engine_eligibility(conn):
     }
     doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
     problem = models.load_problem(json.dumps(doc))
+    home = {x.id for x in problem.soldiers if x.home_nightly}
+    assert home == {str(a), str(b), str(c)}
     idx = EligibilityIndex(problem)
     mid = datetime.combine(problem.cycle_start + timedelta(days=40), datetime.min.time()).replace(hour=8)
     compared = 0
@@ -560,3 +569,15 @@ def test_slot_rank_list_reaches_the_engine_and_notes_stay_internal(conn):
         assert conn.execute("select count(*) from task_type_aliases").fetchone()[0] == 0
         with pytest.raises(psycopg.Error):
             conn.execute("insert into task_type_aliases (alias, task_type_id) values ('x', %s)", (task,))
+
+
+def test_tash7_slot_flag_and_weight_reach_the_engine(conn):
+    cycle = conn.cycle_id
+    sid = conn.execute("select id from slots where cycle_id = %s order by starts_at limit 1", (cycle,)).fetchone()[0]
+    conn.execute("update slots set prefer_home_nightly = true, daily_hours = '08:00-17:00' where id = %s", (sid,))
+    conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    assert [(x["prefer_home_nightly"], x["daily_hours"]) for x in doc["slots"] if x["id"] == str(sid)] == [(True, "08:00-17:00")]
+    assert doc["settings"]["weights"]["home_nightly_preference"] == 100
+    p = models.load_problem(json.dumps(doc))
+    assert p.settings.weights.home_nightly_preference == 100

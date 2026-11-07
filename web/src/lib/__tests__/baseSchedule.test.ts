@@ -32,7 +32,7 @@ describe("ranks column", () => {
   });
   it("single rank and appointment", () => {
     expect(parseRanks("רס\"ן", RANKS).rankIds).toEqual([id("רס\"ן")]);
-    expect(parseRanks("רס\"ן, סרן במינוי רס\"ן", RANKS)).toEqual({ rankIds: [id("רס\"ן")], unknown: [] });
+    expect(parseRanks("רס\"ן, סרן במינוי רס\"ן", RANKS)).toEqual({ rankIds: [id("רס\"ן")], unknown: [], homeNightly: false });
   });
   it("a list of ranges", () => {
     const r = parseRanks("סמל - רס\"ל, סג\"מ - סגן, קמ\"א", RANKS);
@@ -44,7 +44,11 @@ describe("ranks column", () => {
     const r = parseRanks("רס\"ר-רס\"מ, סרן, קא\"ב", RANKS);
     expect(new Set(r.rankIds)).toEqual(new Set(["רס\"ר", "רס\"מ", "סרן"].map(id)));
     expect(r.unknown).toEqual(["קא\"ב"]);
-    expect(parseRanks("ת\"ש 7", RANKS)).toEqual({ rankIds: null, unknown: ["ת\"ש 7"] });
+  });
+  it("ת\"ש 7 is not a rank: it marks the slot for soldiers home every night", () => {
+    expect(parseRanks("ת\"ש 7", RANKS)).toEqual({ rankIds: null, unknown: [], homeNightly: true });
+    expect(parseRanks("סמל - רס\"ל, תש 7", RANKS).homeNightly).toBe(true);
+    expect(parseRanks("סמל - רס\"ל, תש 7", RANKS).unknown).toEqual([]);
   });
   it("gershayim variants", () => {
     expect(parseRanks("רס״ן", RANKS).rankIds).toEqual([id("רס\"ן")]);
@@ -67,6 +71,15 @@ describe("duties", () => {
   it("gender from the instructions", () => {
     expect(genderHint("תורנות מרלו\"ג, יש להקצות בנים בלבד")).toBe("male");
     expect(genderHint("התייצבות 09:00")).toBeNull();
+  });
+});
+
+describe("daily hours", () => {
+  it("a day duty over several days is worked those hours each day", async () => {
+    const { dailyHours } = await import("../baseSchedule");
+    expect(dailyHours("2026-12-15", "2026-12-22", { default_start_time: "08:00", default_end_time: "17:00" })).toBe("08:00-17:00");
+    expect(dailyHours("2026-12-15", "2026-12-15", { default_start_time: "08:00", default_end_time: "17:00" })).toBeNull();
+    expect(dailyHours("2026-12-15", "2026-12-22", { default_start_time: "13:00", default_end_time: "13:00" })).toBeNull();
   });
 });
 

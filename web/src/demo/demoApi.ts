@@ -120,6 +120,7 @@ export class DemoApi implements Api {
       this.extra.set(id, {
         appointment_rank_id: null, appointment_rank_until: null, is_shachar: false, shachar_start_date: null,
         parent_override: null, parent_override_reason: null, parent_override_until: null, second_role_signed_at: null,
+        home_nightly_override: null, home_nightly_override_reason: null, home_nightly_override_until: null,
         load_roles: [],
       });
     return this.extra.get(id)!;
@@ -143,6 +144,7 @@ export class DemoApi implements Api {
         career_start_date: career ? "2022-08-01" : null,
         range_valid_until: "2027-06-30",
         parent_status: false,
+        home_nightly: i === 8 || i === 21,
         is_active: true,
       });
     }
@@ -255,7 +257,7 @@ export class DemoApi implements Api {
     await delay(400);
     for (const g of plan.unknownGafim) this.gafList.push({ id: `g${this.gafList.length}`, name: g });
     let n = this.soldierList.length;
-    for (const a of plan.added) this.soldierList.push({ ...a, id: `s${n++}`, is_active: true });
+    for (const a of plan.added) this.soldierList.push({ ...a, home_nightly: !!a.home_nightly, id: `s${n++}`, is_active: true });
     for (const u of plan.updated) {
       const s = this.soldierList.find((x) => x.id === u.id)!;
       for (const [k, v] of Object.entries(u.after)) if (v !== null) (s as unknown as Record<string, unknown>)[k] = v;
@@ -272,6 +274,7 @@ export class DemoApi implements Api {
       .map((s) => ({
         ...s,
         gaf_id: this.gafList.find((g) => g.name === s.gaf_name)?.id ?? "",
+        home_nightly: !!s.home_nightly,
         ...this.extraOf(s.id),
       }))
       .sort((a, b) => a.full_name.localeCompare(b.full_name, "he"));
@@ -564,7 +567,7 @@ export class DemoApi implements Api {
     const added: SlotRow[] = slots.map((d) => ({
       id: this.nextId("sl"), task_type_id: d.task_type_id, starts_at: d.starts_at, ends_at: d.ends_at,
       performers_needed: d.performers_needed, reserves_needed: d.reserves_needed, allowed_rank_ids: d.allowed_rank_ids,
-      gender: d.gender, instructions: d.instructions, notes: d.notes, source_line: d.line, assigned: 0,
+      gender: d.gender, instructions: d.instructions, notes: d.notes, source_line: d.line, prefer_home_nightly: d.prefer_home_nightly, daily_hours: d.daily_hours, assigned: 0,
     }));
     this.slotsByCycle.set(cycleId, [...kept, ...added].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
     return { inserted: added.length, deleted: cur.length - kept.length };

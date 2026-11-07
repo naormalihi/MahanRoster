@@ -29,6 +29,10 @@ export interface SoldierDetail {
   parent_override_reason: string | null;
   parent_override_until: string | null;
   second_role_signed_at: string | null;
+  home_nightly: boolean;
+  home_nightly_override: boolean | null;
+  home_nightly_override_reason: string | null;
+  home_nightly_override_until: string | null;
   is_active: boolean;
   load_roles: SoldierLoadRole[];
 }
@@ -46,6 +50,9 @@ export type SoldierPatch = Partial<
     | "parent_override_reason"
     | "parent_override_until"
     | "second_role_signed_at"
+    | "home_nightly_override"
+    | "home_nightly_override_reason"
+    | "home_nightly_override_until"
     | "is_active"
   >
 >;
@@ -83,6 +90,15 @@ export function rangeState(until: string | null, today = todayIso(), warnDays = 
 export function effectiveParent(s: Pick<SoldierDetail, "parent_status" | "parent_override" | "parent_override_until">, today = todayIso()) {
   if (s.parent_override !== null && (!s.parent_override_until || s.parent_override_until >= today)) return s.parent_override;
   return s.parent_status;
+}
+
+/** ת"ש 7 (home every night): a manual override (while in force) wins over the file. */
+export function effectiveHomeNightly(
+  s: Pick<SoldierDetail, "home_nightly" | "home_nightly_override" | "home_nightly_override_until">,
+  today = todayIso(),
+) {
+  if (s.home_nightly_override !== null && (!s.home_nightly_override_until || s.home_nightly_override_until >= today)) return s.home_nightly_override;
+  return s.home_nightly;
 }
 
 export function activeLoadRole(s: Pick<SoldierDetail, "load_roles">, today = todayIso()): SoldierLoadRole | null {

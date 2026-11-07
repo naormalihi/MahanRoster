@@ -36,6 +36,7 @@ import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
   activeLoadRole,
+  effectiveHomeNightly,
   effectiveParent,
   effectiveService,
   rangeState,
@@ -100,6 +101,9 @@ function EditDialog(props: {
     parent_override_reason: s.parent_override_reason,
     parent_override_until: s.parent_override_until,
     second_role_signed_at: s.second_role_signed_at,
+    home_nightly_override: s.home_nightly_override,
+    home_nightly_override_reason: s.home_nightly_override_reason,
+    home_nightly_override_until: s.home_nightly_override_until,
     is_active: s.is_active,
   });
   const [roles, setRoles] = useState<Omit<SoldierLoadRole, "name" | "factor">[]>(
@@ -111,6 +115,7 @@ function EditDialog(props: {
 
   const problems: string[] = [];
   if (p.parent_override !== null && !p.parent_override_reason?.trim()) problems.push("שינוי ידני של משרת הורה מחייב סיבה");
+  if (p.home_nightly_override !== null && !p.home_nightly_override_reason?.trim()) problems.push("שינוי ידני של ת\"ש 7 מחייב סיבה");
   if (p.is_shachar && !p.shachar_start_date) problems.push("שח\"ר מחייב תאריך התחלה");
   if (roles.some((r) => !r.load_role_id || !r.valid_from)) problems.push("לכל תפקיד הקלה צריך סוג ותאריך התחלה");
 
@@ -119,7 +124,11 @@ function EditDialog(props: {
     setBusy(true);
     setError(null);
     try {
-      const patch = { ...p, parent_override_reason: p.parent_override === null ? null : p.parent_override_reason };
+      const patch = {
+        ...p,
+        parent_override_reason: p.parent_override === null ? null : p.parent_override_reason,
+        home_nightly_override_reason: p.home_nightly_override === null ? null : p.home_nightly_override_reason,
+      };
       await api!.updateSoldiers([s.id], patch);
       await api!.setSoldierLoadRoles(s.id, roles);
       props.onSaved();
@@ -131,6 +140,7 @@ function EditDialog(props: {
   }
 
   const parentChoice = p.parent_override === null ? "file" : p.parent_override ? "yes" : "no";
+  const homeChoice = p.home_nightly_override === null ? "file" : p.home_nightly_override ? "yes" : "no";
 
   return (
     <Dialog open onClose={props.onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
@@ -188,6 +198,31 @@ function EditDialog(props: {
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                   <TextField label="סיבה" value={p.parent_override_reason ?? ""} onChange={(e) => set("parent_override_reason", e.target.value)} fullWidth />
                   <DateField label="עד תאריך" value={p.parent_override_until} onChange={(v) => set("parent_override_until", v)} />
+                </Stack>
+              )}
+            </Stack>
+          </Box>
+          <Divider />
+          <Box>
+            <Typography variant="h3" gutterBottom>ת״ש 7 – לינה בבית</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              לפי הקובץ: {s.home_nightly ? "כן" : "לא"}. חייל בת״ש 7 לא ישובץ לתורנות שכוללת שעות לילה, ומקבל עדיפות במשבצות שהבסיס סימן "ת״ש 7".
+            </Typography>
+            <Stack spacing={1.5}>
+              <TextField
+                select
+                label="מקור"
+                value={homeChoice}
+                onChange={(e) => set("home_nightly_override", e.target.value === "file" ? null : e.target.value === "yes")}
+              >
+                <MenuItem value="file">לפי הקובץ</MenuItem>
+                <MenuItem value="yes">בת״ש 7 – ידני</MenuItem>
+                <MenuItem value="no">לא בת״ש 7 – ידני</MenuItem>
+              </TextField>
+              {p.home_nightly_override !== null && (
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <TextField label="סיבה" value={p.home_nightly_override_reason ?? ""} onChange={(e) => set("home_nightly_override_reason", e.target.value)} fullWidth />
+                  <DateField label="עד תאריך" value={p.home_nightly_override_until} onChange={(v) => set("home_nightly_override_until", v)} />
                 </Stack>
               )}
             </Stack>
@@ -430,7 +465,7 @@ export function SoldiersPage() {
                       slotProps={{ input: { "aria-label": "בחירת כל המוצגים" } }}
                     />
                   </TableCell>
-                  {["שם", "דרגה", "גף", "שירות", "מטווח", "הורה", "הקלה", "תפקיד שני", ""].map((h, i) => (
+                  {["שם", "דרגה", "גף", "שירות", "מטווח", "הורה / ת״ש", "הקלה", "תפקיד שני", ""].map((h, i) => (
                     <TableCell key={i}>{h}</TableCell>
                   ))}
                 </TableRow>
@@ -459,6 +494,7 @@ export function SoldiersPage() {
                       <TableCell>
                         {effectiveParent(s) ? "כן" : "—"}
                         {s.parent_override !== null && <Typography component="span" variant="caption" color="text.secondary"> (ידני)</Typography>}
+                        {effectiveHomeNightly(s) && <Chip size="small" variant="outlined" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>{lr ? `${lr.name} ${lr.factor}` : "—"}</TableCell>
                       <TableCell>{fmt(s.second_role_signed_at)}</TableCell>

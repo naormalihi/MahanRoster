@@ -294,6 +294,8 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                         {taskName.get(s.task_type_id)}
                         {s.weekendSwitched && <Chip size="small" label="שבת" sx={{ mr: 0.5 }} />}
                         {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
+                        {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
+                        {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
                       </TableCell>
                       <TableCell title={s.ranksText}>
                         {s.allowed_rank_ids ? s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ") : "לפי סוג התורנות"}
@@ -397,6 +399,8 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void }
                 <TableCell>
                   {taskName.get(s.task_type_id)}
                   {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
+                  {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
+                        {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
                 </TableCell>
                 <TableCell>
                   {s.performers_needed}/{s.reserves_needed}
@@ -414,7 +418,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void }
         </Table>
       </TableContainer>
       <Typography variant="caption" color="text.secondary">
-        ההערות (אנשי קשר וטלפונים) נשמרות למשבצת ולא מוצגות בלוח המפורסם. משבצת שכבר שובצה בה תורנות אי אפשר למחוק מכאן.
+        ת״ש 7 = משבצת שהבסיס ייעד קודם לחיילים שלנים בבית; אם אין מהם זמין, ישובץ כל חייל זכאי. ההערות (אנשי קשר וטלפונים) נשמרות למשבצת ולא מוצגות בלוח המפורסם. משבצת שכבר שובצה בה תורנות אי אפשר למחוק מכאן.
       </Typography>
     </Stack>
   );

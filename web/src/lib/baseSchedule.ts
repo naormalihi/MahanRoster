@@ -64,11 +64,15 @@ export interface ParsedRanks {
   /** null = no restriction from the file (the duty's own range applies) */
   rankIds: string[] | null;
   unknown: string[];
+  /** "ת"ש 7": the slot is meant first for soldiers who must be home nightly */
+  homeNightly: boolean;
 }
 
 export function parseRanks(text: unknown, ranks: RankRef[]): ParsedRanks {
   const raw = cleanName(text);
-  if (!raw || norm(raw).includes("כללהדרגות")) return { rankIds: null, unknown: [] };
+  const tash = /ת"?ש7/;
+  const homeNightly = tash.test(norm(raw));
+  if (!raw || norm(raw).includes("כללהדרגות")) return { rankIds: null, unknown: [], homeNightly };
   const military = ranks.filter((r) => r.sort_order < 50);
   const byName = new Map(military.map((r) => [norm(r.name).replace(/"/g, ""), r]));
   const find = (t: string) => byName.get(norm(t).replace(/"/g, ""));
@@ -76,6 +80,7 @@ export function parseRanks(text: unknown, ranks: RankRef[]): ParsedRanks {
   const unknown: string[] = [];
   for (const part of raw.split(/[,،;\n]+/).map((p) => p.trim()).filter(Boolean)) {
     // "סרן במינוי רס"ן" – the appointment rank is what counts, and the snapshot already uses it
+    if (tash.test(norm(part))) continue; // not a rank: ת"ש 7 (home every night)
     const appointed = part.match(/^(.+?)\s+במינוי\s+(.+)$/);
     const token = appointed ? appointed[2] : part;
     const range = token.split(/\s*[-–]\s*/).filter(Boolean);
@@ -93,7 +98,7 @@ export function parseRanks(text: unknown, ranks: RankRef[]): ParsedRanks {
       else unknown.push(part);
     }
   }
-  return { rankIds: ids.size ? [...ids] : null, unknown };
+  return { rankIds: ids.size ? [...ids] : null, unknown, homeNightly };
 }
 
 export function genderHint(text: unknown): "male" | "female" | null {
@@ -211,6 +216,9 @@ export interface SlotDraft {
   notes: string | null;
   ranksText: string;
   unknownRanks: string[];
+  prefer_home_nightly: boolean;
+  /** multi-day slot of a within-the-day duty: worked these hours each day */
+  daily_hours: string | null;
   weekendSwitched: boolean;
   /** The file and the holiday calendar disagree on whether the duty falls on a holiday. */
   holidayMismatch: "file_only" | "calendar_only" | null;
@@ -225,6 +233,12 @@ export function slotTimes(start: string, end: string, task: Pick<TaskType, "defa
   const et = task.default_end_time ?? "08:00";
   const endDay = end > start || et > st ? end : addDaysIso(end, 1);
   return { starts_at: localTs(start, st), ends_at: localTs(endDay, et) };
+}
+
+/** A duty type that runs within one day (08:00–17:00), over several days, is worked those hours each day. */
+export function dailyHours(start: string, end: string, task: Pick<TaskType, "default_start_time" | "default_end_time">): string | null {
+  const st = task.default_start_time, et = task.default_end_time;
+  return end > start && st && et && et > st ? `${st}-${et}` : null;
 }
 
 export interface BuildResult {
@@ -284,6 +298,8 @@ export function buildSlots(
       notes: r.notes || null,
       ranksText: r.ranksText,
       unknownRanks: ranks.unknown,
+      prefer_home_nightly: ranks.homeNightly,
+      daily_hours: dailyHours(r.start, r.end, task),
       weekendSwitched: taskId !== mapped,
       holidayMismatch,
     });
@@ -304,6 +320,8 @@ export interface SlotRow {
   instructions: string | null;
   notes: string | null;
   source_line: number | null;
+  prefer_home_nightly: boolean;
+  daily_hours: string | null;
   assigned: number; // assignments that are not drafts
 }
 
