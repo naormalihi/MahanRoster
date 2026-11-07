@@ -9,7 +9,7 @@ import { addDaysIso, isoDate } from "./cycles";
 import { TZ } from "./dates";
 import { toIsoDate } from "./roster";
 
-export type BaseField = "population" | "start" | "end" | "duty" | "ranks" | "instructions" | "notes";
+export type BaseField = "population" | "start" | "end" | "duty" | "ranks" | "instructions" | "notes" | "holiday";
 
 const SYNONYMS: Record<BaseField, string[]> = {
   population: ["אוכלוסיה", "אוכלוסייה"],
@@ -19,6 +19,7 @@ const SYNONYMS: Record<BaseField, string[]> = {
   ranks: ["דרגות", "דרגה", "טווחדרגות"],
   instructions: ["הנחיות"],
   notes: ["הערות"],
+  holiday: ["חג"],
 };
 
 /** Quotes and gershayim unified, spaces dropped – for matching names. */
@@ -152,6 +153,8 @@ export interface BaseRow {
   ranksText: string;
   instructions: string;
   notes: string;
+  /** The base's "חג" column: X = not a holiday duty. null when the file has no such column. */
+  holiday: boolean | null;
 }
 
 export function readRows(rows: unknown[][]): { rows: BaseRow[]; errors: { line: number; message: string }[]; header: boolean } {
@@ -180,6 +183,7 @@ export function readRows(rows: unknown[][]): { rows: BaseRow[]; errors: { line: 
       ranksText: cleanName(col(r, "ranks")),
       instructions: String(col(r, "instructions") ?? "").trim(),
       notes: String(col(r, "notes") ?? "").trim(),
+      holiday: h.columns.holiday === undefined ? null : !/^[xX×✗]$/.test(String(col(r, "holiday") ?? "").trim()),
     });
   });
   return { rows: out, errors, header: true };
@@ -208,6 +212,8 @@ export interface SlotDraft {
   ranksText: string;
   unknownRanks: string[];
   weekendSwitched: boolean;
+  /** The file and the holiday calendar disagree on whether the duty falls on a holiday. */
+  holidayMismatch: "file_only" | "calendar_only" | null;
 }
 
 /**
@@ -229,7 +235,15 @@ export interface BuildResult {
 
 export function buildSlots(
   rows: BaseRow[],
-  ctx: { aliases: Alias[]; tasks: TaskType[]; ranks: RankRef[]; weekendIsoDays: number[]; cycle: { start_date: string; end_date: string } },
+  ctx: {
+    aliases: Alias[];
+    tasks: TaskType[];
+    ranks: RankRef[];
+    weekendIsoDays: number[];
+    cycle: { start_date: string; end_date: string };
+    /** holiday and holiday-eve days from the calendar */
+    holidays?: Set<string>;
+  },
 ): BuildResult {
   const unmapped = new Map<string, { duty: string; count: number; population: string }>();
   const slots: SlotDraft[] = [];
@@ -250,6 +264,13 @@ export function buildSlots(
     const taskId = weekendVariant(mapped, r.start, ctx.tasks, ctx.weekendIsoDays);
     const task = ctx.tasks.find((t) => t.id === taskId)!;
     const ranks = parseRanks(r.ranksText, ctx.ranks);
+    let holidayMismatch: SlotDraft["holidayMismatch"] = null;
+    if (r.holiday !== null && ctx.holidays) {
+      let onHoliday = false;
+      for (let d = r.start; d <= r.end; d = addDaysIso(d, 1)) if (ctx.holidays.has(d)) onHoliday = true;
+      if (r.holiday && !onHoliday) holidayMismatch = "file_only";
+      if (!r.holiday && onHoliday) holidayMismatch = "calendar_only";
+    }
     slots.push({
       line: r.line,
       duty: r.duty,
@@ -264,6 +285,7 @@ export function buildSlots(
       ranksText: r.ranksText,
       unknownRanks: ranks.unknown,
       weekendSwitched: taskId !== mapped,
+      holidayMismatch,
     });
   }
   return { slots, unmapped: [...unmapped.values()].sort((a, b) => b.count - a.count), outside };

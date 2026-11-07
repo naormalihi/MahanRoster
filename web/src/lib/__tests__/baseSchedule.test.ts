@@ -89,7 +89,7 @@ describe("the base file", () => {
     ["קצינים ונגדים", "05/07/2026", "05/07/2026", "X", "קצין תורן", "יוסף קטרי", "תמונא", "נועם כהן", "תמונא", "רס\"ר-רס\"מ, סרן, קא\"ב", "התייצבות בשעה 09:00 ברס\"ר", ""],
     ["קצינים ונגדים", "10/07/2026", "10/07/2026", "X", "קצין תורן", "", "", "", "", "רס\"ר-רס\"מ, סרן", "", ""],
     ["קצינים ונגדים", "05/07/2026", "07/07/2026", "X", "ש.ג דרום 7-11", "", "", "", "", "סמל - רס\"ל, סג\"מ - סגן, קמ\"א", "", ""],
-    ["חובה", "01/07/2026", "08/07/2026", "X", "שמירות חובה", "", "", "", "", "כלל הדרגות", "", ""],
+    ["חובה", "13/07/2026", "20/07/2026", "", "שמירות חובה", "", "", "", "", "כלל הדרגות", "", ""],
     ["חובה", "31/02/2026", "", "X", "שמירות חובה", "", "", "", "", "", "", ""],
   ];
   it("finds the header and reads the rows", () => {
@@ -106,6 +106,7 @@ describe("the base file", () => {
       ranks: RANKS,
       weekendIsoDays: [5, 6],
       cycle: { start_date: "2026-06-20", end_date: "2026-12-31" },
+      holidays: new Set(["2026-07-05"]),
     });
     expect(res.outside.map((r) => r.line)).toEqual([2]); // starts before the cycle
     expect(res.unmapped).toEqual([
@@ -116,6 +117,8 @@ describe("the base file", () => {
     expect(res.slots[0].unknownRanks).toEqual(["קא\"ב"]);
     expect(res.slots[1].weekendSwitched).toBe(true);
     expect(res.slots[2].allowed_rank_ids).toBeNull();
+    // X = not a holiday duty; the calendar decides, a disagreement is flagged
+    expect(res.slots.map((s) => s.holidayMismatch)).toEqual(["calendar_only", null, "file_only"]);
   });
 });
 

@@ -58,6 +58,7 @@ interface Refs {
   ranks: RankRef[];
   aliases: Alias[];
   weekend: number[];
+  holidays: Set<string>;
 }
 
 function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) => void; label?: string }) {
@@ -104,7 +105,7 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
   const [msg, setMsg] = useState<string | null>(null);
 
   const result: BuildResult | null = useMemo(
-    () => (rows ? buildSlots(rows, { aliases: refs.aliases, tasks: refs.tasks, ranks: refs.ranks, weekendIsoDays: refs.weekend, cycle }) : null),
+    () => (rows ? buildSlots(rows, { aliases: refs.aliases, tasks: refs.tasks, ranks: refs.ranks, weekendIsoDays: refs.weekend, cycle, holidays: refs.holidays }) : null),
     [rows, refs, cycle],
   );
   const taskName = new Map(refs.tasks.map((t) => [t.id, t.name]));
@@ -157,6 +158,7 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
 
   const unknownRankRows = result?.slots.filter((s) => s.unknownRanks.length) ?? [];
   const switched = result?.slots.filter((s) => s.weekendSwitched).length ?? 0;
+  const holidayMismatch = result?.slots.filter((s) => s.holidayMismatch) ?? [];
   const allMapped = result && result.unmapped.every((u) => mapping[u.duty] !== undefined);
 
   return (
@@ -252,6 +254,20 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                     </List>
                   </>
                 )}
+              </Alert>
+            )}
+            {holidayMismatch.length > 0 && (
+              <Alert severity="info">
+                <b>עמודת "חג" בקובץ לא תואמת את לוח החגים ב-{holidayMismatch.length} משבצות.</b> מקדם החג נקבע לפי לוח החגים (במסך הגדרות); אם הקובץ צודק,
+                עדכן את לוח החגים.
+                <List dense disablePadding>
+                  {holidayMismatch.slice(0, 15).map((s) => (
+                    <ListItem key={s.line} disableGutters sx={{ py: 0 }}>
+                      שורה {s.line} ({s.duty}, {span(s.starts_at, s.ends_at)}):{" "}
+                      {s.holidayMismatch === "file_only" ? "בקובץ – חג, בלוח החגים – לא" : "בלוח החגים – חג, בקובץ – לא"}
+                    </ListItem>
+                  ))}
+                </List>
               </Alert>
             )}
             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420 }}>
@@ -416,11 +432,21 @@ export function SlotsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api!.cycles(), api!.taskTypes(), api!.dutyCategories(), api!.rankRefs(), api!.taskTypeAliases(), api!.scoringSettings()])
-      .then(([c, tasks, categories, ranks, aliases, sc]) => {
+    const y = new Date().getFullYear();
+    Promise.all([
+      api!.cycles(),
+      api!.taskTypes(),
+      api!.dutyCategories(),
+      api!.rankRefs(),
+      api!.taskTypeAliases(),
+      api!.scoringSettings(),
+      api!.calendarDays(`${y - 1}-01-01`, `${y + 2}-12-31`),
+    ])
+      .then(([c, tasks, categories, ranks, aliases, sc, cal]) => {
         setCycles(c);
         setCycleId((id) => id || planningCycle(c, dayKey(new Date()))?.id || "");
-        setRefs({ tasks, categories, ranks, aliases, weekend: sc.weekend_weekdays });
+        const holidays = new Set(cal.filter((d) => d.day_type === "holiday" || d.day_type === "holiday_eve").map((d) => d.day));
+        setRefs({ tasks, categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
       })
       .catch((e) => setError((e as Error).message));
   }, [api]);
