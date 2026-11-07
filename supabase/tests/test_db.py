@@ -418,3 +418,118 @@ def test_holidays_are_preloaded(conn):
     assert rows.get("2026-09-21") == "holiday"  # יום כיפור
     assert rows.get("2027-04-22") == "holiday"  # פסח
     assert conn.execute("select count(*) from calendar_days where extract(year from day) = 2035").fetchone()[0] >= 15
+
+
+STATIC_REASONS = {"service", "population", "rank", "gender", "qualifying_only", "not_qualifying", "shachar"}
+
+
+def _as_coord(conn, sql, *args):
+    conn.execute("begin")
+    conn.execute("set local role authenticated")
+    _claims(conn, COORD)
+    try:
+        return conn.execute(sql, args).fetchall()
+    finally:
+        conn.execute("commit")
+
+
+def test_potential_matches_the_engine_eligibility(conn):
+    from datetime import datetime, timedelta
+
+    from mahanroster_solver.eligibility import EligibilityIndex
+
+    cycle = conn.cycle_id
+    # one category per duty type, so a category cell = that duty
+    for (tid, code) in conn.execute("select id, code from task_types where category_id is null").fetchall():
+        cat = conn.execute("insert into duty_categories (name) values (%s) returning id", (f"קט {code}",)).fetchone()[0]
+        conn.execute("update task_types set category_id = %s where id = %s", (cat, tid))
+    _as_coord(conn, "select public.compute_potential(%s)", cycle)
+    assert conn.execute("select potential_computed_at is not null from cycles where id = %s", (cycle,)).fetchone()[0]
+
+    sql_static = {
+        (str(s), str(t)): set(r)
+        for s, t, r in conn.execute("select soldier_id, task_type_id, reasons from app.potential_static(%s)", (cycle,)).fetchall()
+    }
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    problem = models.load_problem(json.dumps(doc))
+    idx = EligibilityIndex(problem)
+    mid = datetime.combine(problem.cycle_start + timedelta(days=40), datetime.min.time()).replace(hour=8)
+    compared = 0
+    for t in problem.task_types:
+        slot = models.Slot(id="probe", task_type_id=t.id, starts_at=mid, ends_at=mid + timedelta(hours=24))
+        for s in problem.soldiers:
+            py = set(idx.check(s, slot)) & STATIC_REASONS
+            assert sql_static[(s.id, t.id)] == py, (s.id, t.name, sql_static[(s.id, t.id)], py)
+            compared += 1
+    assert compared > 1000
+
+    rows = _as_coord(conn, "select soldier_id, category_id, value, reasons, available_days, cycle_days from public.potential_matrix(%s)", cycle)
+    assert rows and all(0 <= r[2] <= 1 for r in rows)
+    assert all((r[2] > 0) == (r[3] == []) for r in rows)  # a reason exactly when closed
+
+    # the daily count agrees with the matrix: a soldier with value 1 in a category is counted every day
+    daily = _as_coord(conn, "select day, category_id, available from public.potential_daily(%s)", cycle)
+    full = {}
+    for r in rows:
+        if r[2] == 1:
+            full[r[1]] = full.get(r[1], 0) + 1
+    for day, cat, n in daily:
+        assert n >= full.get(cat, 0)
+    some = {}
+    for r in rows:
+        if r[2] > 0:
+            some[r[1]] = some.get(r[1], 0) + 1
+    assert all(n <= some.get(cat, 0) for _, cat, n in daily)
+
+
+def test_potential_availability_absence_and_exemption_scope(conn):
+    cycle = conn.cycle_id
+    start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
+    total = (end - start).days + 1
+    rows = _as_coord(conn, "select soldier_id, category_id, best_task_type_id from public.potential_matrix(%s) where value = 1", cycle)
+    by_soldier = {}
+    for s, c, t in rows:
+        by_soldier.setdefault(s, []).append((c, t))
+    sid, cells = next((s, c) for s, c in by_soldier.items() if len(c) >= 2)
+    (cat_a, task_a), (cat_b, _) = cells[0], cells[1]
+    # make sure the soldier has no other records that cut availability
+    conn.execute("update absences set status = 'cancelled' where soldier_id = %s", (sid,))
+    conn.execute("update exemptions set status = 'cancelled', decision_reason = 'test' where soldier_id = %s", (sid,))
+    vac = conn.execute("select id from absence_types limit 1").fetchone()[0]
+    conn.execute(
+        """insert into absences (soldier_id, absence_type_id, starts_at, ends_at)
+           values (%s, %s, (%s::date)::timestamp at time zone 'Asia/Jerusalem', (%s::date + 30)::timestamp at time zone 'Asia/Jerusalem')""",
+        (sid, vac, start, start),
+    )
+    # an exemption type that maps to one duty only, entered "by type" (no explicit list)
+    et = conn.execute("insert into exemption_types (name) values ('פטור ממופה') returning id").fetchone()[0]
+    conn.execute("insert into exemption_type_duties values (%s, %s, 'excludes')", (et, task_a))
+    conn.execute(
+        """insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+           values (%s, %s, 'full', %s, %s, 'approved', now())""",
+        (sid, et, start, end),
+    )
+    vals = {
+        c: (v, r)
+        for c, v, r in _as_coord(conn, "select category_id, value, reasons from public.potential_matrix(%s) where soldier_id = %s", cycle, sid)
+    }
+    assert float(vals[cat_b][0]) == round((total - 30) / total, 2)  # only the absence
+    assert float(vals[cat_a][0]) == 0 and vals[cat_a][1] == ["unavailable"]  # the mapped exemption closes only that duty
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    mine = [e for e in doc["exemptions"] if e["soldier_id"] == str(sid)]
+    assert mine and mine[0]["excluded_task_type_ids"] == [str(task_a)]
+
+
+def test_potential_overrides_are_staff_only(conn):
+    sid, cat = conn.execute(
+        "select sn.soldier_id, (select id from duty_categories limit 1) from cycle_soldier_snapshot sn where cycle_id = %s limit 1",
+        (conn.cycle_id,),
+    ).fetchone()
+    with session_as(conn, COORD):
+        conn.execute("insert into potential_overrides (cycle_id, soldier_id, category_id, value, reason) values (%s,%s,%s,0.5,'בדיקה')",
+                     (conn.cycle_id, sid, cat))
+        by = conn.execute("select created_by from potential_overrides where soldier_id = %s", (sid,)).fetchone()[0]
+        assert by == COORD
+    with session_as(conn, VIEWER):
+        with pytest.raises(psycopg.Error):
+            conn.execute("select * from public.potential_matrix(%s)", (conn.cycle_id,))
