@@ -371,11 +371,16 @@ export function SchedulePage() {
                 <Button
                   variant="contained"
                   startIcon={<PlayArrowIcon />}
-                  disabled={!!active || !slots?.length || !jobs}
+                  disabled={!!active || !slots?.length || !jobs || cycle.status === "published" || cycle.status === "closed"}
                   onClick={() => setConfirm(true)}
                 >
                   הרצת שיבוץ
                 </Button>
+                {(cycle.status === "published" || cycle.status === "closed") && (
+                  <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 1.5 }}>
+                    המחזור פורסם – שינויים מעכשיו דרך הניהול השוטף.
+                  </Typography>
+                )}
                 {slots && !slots.length && (
                   <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 1.5 }}>
                     קודם צריך לקלוט את לוח הבסיס.

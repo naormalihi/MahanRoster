@@ -586,6 +586,7 @@ def test_tash7_slot_flag_and_weight_reach_the_engine(conn):
 def test_queued_job_dispatch_and_cancel(conn):
     cycle = conn.cycle_id
     conn.execute("update schedule_jobs set status = 'done' where cycle_id = %s and status in ('queued', 'running')", (cycle,))
+    conn.execute("update cycles set status = 'review' where id = %s", (cycle,))  # earlier tests published it
     job = _as_coord(conn, "select public.request_schedule(%s)", cycle)[0][0]
     # no pg_net / vault here: nothing is sent, and the job says so
     assert conn.execute("select params ->> 'dispatch' from schedule_jobs where id = %s", (job,)).fetchone()[0] == "unavailable"
@@ -713,3 +714,13 @@ def test_candidates_match_the_engine_and_manual_changes(conn):
     _as_coord(conn, "select public.remove_assignment(%s, 'בדיקה')", aid)
     assert conn.execute("select count(*) from assignments where id = %s", (aid,)).fetchone()[0] == 0
     assert conn.execute("select count(*) from audit_log where action = 'remove_assignment' and entity_id = %s", (str(aid),)).fetchone()[0] == 1
+
+
+def test_no_full_run_on_a_published_cycle(conn):
+    cycle = conn.cycle_id
+    conn.execute("update schedule_jobs set status = 'done' where cycle_id = %s and status in ('queued', 'running')", (cycle,))
+    old = conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0]
+    conn.execute("update cycles set status = 'published' where id = %s", (cycle,))
+    with pytest.raises(psycopg.Error):
+        _as_coord(conn, "select public.request_schedule(%s)", cycle)
+    conn.execute("update cycles set status = %s where id = %s", (old, cycle))

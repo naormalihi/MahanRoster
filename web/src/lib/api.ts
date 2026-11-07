@@ -85,6 +85,8 @@ export interface Api {
   mfaVerify(factorId: string, code: string): Promise<void>;
   changePassword(newPassword: string): Promise<void>;
   board(fromIso: string, toIso: string): Promise<BoardRow[]>;
+  /** Start of the first published duty from a moment on (null = none). */
+  nextPublished(fromIso: string): Promise<string | null>;
   soldiers(): Promise<ExistingSoldier[]>;
   gafim(): Promise<NamedRef[]>;
   ranks(): Promise<NamedRef[]>;
