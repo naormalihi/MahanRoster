@@ -25,6 +25,7 @@ import {
   type ExemptionInput,
   type ExemptionType,
 } from "../lib/cycles";
+import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
 import type { ExistingSoldier, RosterPlan } from "../lib/roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "../lib/soldiers";
 
@@ -108,6 +109,7 @@ export class DemoApi implements Api {
   private absenceList: Absence[] = [];
   private blockList: DateBlock[] = [];
   private seq = 0;
+  private overrides = new Map<string, { value: number; reason: string }>();
   private calendar: CalendarDay[] = israeliHolidays("2026-09-01", "2027-08-31");
 
   private extraOf(id: string): Extra {
@@ -455,5 +457,77 @@ export class DemoApi implements Api {
   async cancelDateBlock(id: string) {
     await delay();
     this.blockList.find((x) => x.id === id)!.status = "cancelled";
+  }
+
+  // ----- potential (rough demo rules by rank; the real one is computed in the database) -----
+
+  private demoCells(cycleId: string): PotentialCell[] {
+    const c = this.cycleList.find((x) => x.id === cycleId)!;
+    const total = Math.round((Date.parse(c.end_date) - Date.parse(c.start_date)) / 86_400_000) + 1;
+    const rankIdx = (n: string) => RANKS.indexOf(n);
+    const out: PotentialCell[] = [];
+    this.soldierList.filter((s) => s.is_active).forEach((s, i) => {
+      const r = rankIdx(s.rank_name);
+      const absent = i % 9 === 3 ? 0.67 : i % 13 === 5 ? 0.5 : 1;
+      const rules: Record<string, boolean> = {
+        c0: r >= 4 && r <= 9 && s.service_type === "career", // הגנ"ש
+        c1: r >= 7 && r <= 9, // קצין תורן
+        c2: r >= 4 && r <= 9, // מפקד שער
+        c3: r === 10, // ממלכ"ת
+        c4: r <= 3 && s.service_type === "mandatory", // שמירות חובה
+        c5: s.gender === "female" && r <= 9, // משימות חיילות
+      };
+      for (const cat of CATEGORIES) {
+        const ok = rules[cat.id];
+        const o = this.overrides.get(`${cycleId}|${s.id}|${cat.id}`);
+        out.push({
+          soldier_id: s.id, category_id: cat.id, value: ok ? absent : 0, best_task_type_id: "t",
+          reasons: ok ? [] : [r > 10 ? "rank" : "population"], available_days: Math.round(total * absent), cycle_days: total,
+          override_value: o?.value ?? null, override_reason: o?.reason ?? null,
+        });
+      }
+    });
+    return out;
+  }
+
+  async computePotential(cycleId: string) {
+    await delay(500);
+    this.cycleList.find((x) => x.id === cycleId)!.potential_computed_at = new Date().toISOString();
+    return this.soldierList.filter((s) => s.is_active).length;
+  }
+
+  async potentialMatrix(cycleId: string) {
+    await delay(300);
+    return this.demoCells(cycleId);
+  }
+
+  async potentialDaily(cycleId: string): Promise<DailyAvailability[]> {
+    await delay(200);
+    const c = this.cycleList.find((x) => x.id === cycleId)!;
+    const cells = this.demoCells(cycleId);
+    const out: DailyAvailability[] = [];
+    for (let d = c.start_date, k = 0; d <= c.end_date; d = addDaysIso(d, 1), k++)
+      for (const cat of CATEGORIES) {
+        const base = cells.filter((x) => x.category_id === cat.id && x.value > 0).length;
+        out.push({ day: d, category_id: cat.id, available: Math.max(0, base - ((k * 7 + cat.id.length) % 5) - (k > 20 && k < 34 ? 3 : 0)) });
+      }
+    return out;
+  }
+
+  async snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]> {
+    void cycleId;
+    return this.soldierList.filter((s) => s.is_active).map((s) => ({
+      soldier_id: s.id, rank_name: s.rank_name, service_type: s.service_type, is_parent: s.parent_status, qualifies_day_only: s.parent_status,
+    }));
+  }
+
+  async setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string) {
+    await delay();
+    this.overrides.set(`${cycleId}|${soldierId}|${categoryId}`, { value, reason });
+  }
+
+  async clearPotentialOverride(cycleId: string, soldierId: string, categoryId: string) {
+    await delay();
+    this.overrides.delete(`${cycleId}|${soldierId}|${categoryId}`);
   }
 }

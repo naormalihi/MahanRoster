@@ -54,6 +54,7 @@ const STAGE_LINK: Partial<Record<CycleStatus, { to: string; label: string }>> = 
   loading: { to: "/roster", label: "לטעינת כוח אדם" },
   collecting: { to: "/constraints", label: "לאילוצים" },
   approving: { to: "/constraints?tab=exemptions&status=pending", label: "לפטורים הממתינים" },
+  potential: { to: "/potential", label: "למטריצת הפוטנציאל" },
 };
 
 /** Stages after this one need screens that do not exist yet; the stepper stops here. */

@@ -18,6 +18,7 @@ import type {
   ExemptionInput,
   ExemptionType,
 } from "./cycles";
+import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
@@ -123,6 +124,14 @@ export interface Api {
   dateBlocks(fromIso: string, toIso: string): Promise<DateBlock[]>;
   addDateBlocks(rows: DateBlockInput[], cycleId: string | null): Promise<void>;
   cancelDateBlock(id: string): Promise<void>;
+  // potential
+  /** Freeze ranks/populations for the cycle (snapshot) and stamp the time. */
+  computePotential(cycleId: string): Promise<number>;
+  potentialMatrix(cycleId: string): Promise<PotentialCell[]>;
+  potentialDaily(cycleId: string): Promise<DailyAvailability[]>;
+  snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]>;
+  setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string): Promise<void>;
+  clearPotentialOverride(cycleId: string, soldierId: string, categoryId: string): Promise<void>;
 }
 
 /**

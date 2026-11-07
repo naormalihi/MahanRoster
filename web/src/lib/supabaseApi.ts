@@ -19,6 +19,7 @@ import {
   type ExemptionInput,
   type ExemptionType,
 } from "./cycles";
+import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
@@ -296,7 +297,7 @@ export class SupabaseApi implements Api {
 
   async cycles(): Promise<Cycle[]> {
     return check(
-      await this.sb.from("cycles").select("id, name, start_date, end_date, exemption_deadline, status, published_at").order("start_date", { ascending: false }),
+      await this.sb.from("cycles").select("id, name, start_date, end_date, exemption_deadline, status, published_at, potential_computed_at").order("start_date", { ascending: false }),
     ) as Cycle[];
   }
 
@@ -418,5 +419,54 @@ export class SupabaseApi implements Api {
 
   async cancelDateBlock(id: string) {
     maybe(await this.sb.from("date_blocks").update({ status: "cancelled" }).eq("id", id));
+  }
+
+  // ----- potential -----
+
+  async computePotential(cycleId: string) {
+    return Number(check(await this.sb.rpc("compute_potential", { p_cycle: cycleId })));
+  }
+
+  async potentialMatrix(cycleId: string): Promise<PotentialCell[]> {
+    const rows = check(await this.sb.rpc("potential_matrix", { p_cycle: cycleId })) as PotentialCell[];
+    return rows.map((r) => ({
+      ...r,
+      value: Number(r.value),
+      override_value: r.override_value === null ? null : Number(r.override_value),
+    }));
+  }
+
+  async potentialDaily(cycleId: string): Promise<DailyAvailability[]> {
+    return check(await this.sb.rpc("potential_daily", { p_cycle: cycleId })) as DailyAvailability[];
+  }
+
+  async snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]> {
+    const rows = check(
+      await this.sb
+        .from("cycle_soldier_snapshot")
+        .select("soldier_id, service_type, is_parent, qualifies_day_only, rank:ranks(name)")
+        .eq("cycle_id", cycleId),
+    ) as unknown as (Omit<SnapshotSoldier, "rank_name"> & { rank: { name: string } | null })[];
+    return rows.map(({ rank, ...r }) => ({ ...r, rank_name: rank?.name ?? "" }));
+  }
+
+  async setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string) {
+    maybe(
+      await this.sb.from("potential_overrides").upsert({
+        cycle_id: cycleId,
+        soldier_id: soldierId,
+        category_id: categoryId,
+        value,
+        reason,
+        created_by: await this.uid(),
+        created_at: new Date().toISOString(),
+      }),
+    );
+  }
+
+  async clearPotentialOverride(cycleId: string, soldierId: string, categoryId: string) {
+    maybe(
+      await this.sb.from("potential_overrides").delete().eq("cycle_id", cycleId).eq("soldier_id", soldierId).eq("category_id", categoryId),
+    );
   }
 }

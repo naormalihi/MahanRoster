@@ -43,6 +43,7 @@ export interface Cycle {
   exemption_deadline: string | null; // ISO timestamp
   status: CycleStatus;
   published_at: string | null;
+  potential_computed_at?: string | null;
 }
 
 export type CycleInput = Pick<Cycle, "name" | "start_date" | "end_date" | "exemption_deadline">;
