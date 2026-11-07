@@ -67,7 +67,8 @@ ROWS = [
 ]
 
 
-def build(path: str) -> None:
+def write(path: str, rows: list[tuple], note_outside: tuple[int, int, str] | None = None) -> None:
+    """rows: (population, start, end, חג, duty, performer, gaf, reserve, gaf, ranks, instructions, notes, highlight)"""
     wb = Workbook()
     ws = wb.active
     ws.title = "לוח תורנויות"
@@ -81,24 +82,18 @@ def build(path: str) -> None:
         c.font = Font(bold=True, size=12)
         c.alignment = wrap
         c.border = border
-    ws.auto_filter.ref = f"A1:L{len(ROWS) + 1}"
+    ws.auto_filter.ref = f"A1:L{len(rows) + 1}"
     ws.freeze_panes = "A2"
 
-    for pop, start, end, duty, perf, g1, res, g2, ranks, instr, notes, hl in ROWS:
-        ws.append([
-            pop,
-            datetime.strptime(start, "%d/%m/%Y"),
-            datetime.strptime(end, "%d/%m/%Y"),
-            "X",
-            duty, perf, g1, res, g2, ranks, instr, notes,
-        ])
+    yellow = PatternFill("solid", fgColor=YELLOW)
+    for pop, start, end, hol, duty, perf, g1, res, g2, ranks, instr, notes, hl in rows:
+        ws.append([pop, start, end, hol, duty, perf, g1, res, g2, ranks, instr, notes])
         r = ws.max_row
         for c in ws[r]:
             c.alignment = wrap
             c.border = border
         ws.cell(r, 2).number_format = ws.cell(r, 3).number_format = "dd/mm/yyyy"
         ws.cell(r, 1).fill = PatternFill("solid", fgColor=POP_FILL[pop])
-        yellow = PatternFill("solid", fgColor=YELLOW)
         if hl == "row":
             for col in range(1, 13):
                 ws.cell(r, col).fill = yellow
@@ -110,16 +105,24 @@ def build(path: str) -> None:
                 ws.cell(r, col).fill = PatternFill("solid", fgColor=BLUE)
         if instr.startswith("תורנות מרלו"):
             ws.cell(r, 11).font = Font(bold=True)
-        if "מטווחים בתוקף" in instr:
-            ws.cell(r, 11).font = Font(bold=False)
 
     widths = {"A": 14, "B": 13, "C": 13, "D": 5, "E": 20, "F": 16, "G": 10, "H": 16, "I": 10, "J": 30, "K": 48, "L": 34}
     for col, w in widths.items():
         ws.column_dimensions[col].width = w
     ws.row_dimensions[1].height = 34
-    # a note outside the table, as in the original (row 21, column M)
-    ws.cell(21, 13, "הופעל")
+    if note_outside:
+        ws.cell(*note_outside)
     wb.save(path)
+
+
+def build(path: str) -> None:
+    d = lambda s: datetime.strptime(s, "%d/%m/%Y")
+    write(
+        path,
+        [(pop, d(s), d(e), "X", duty, perf, g1, res, g2, ranks, instr, notes, hl)
+         for pop, s, e, duty, perf, g1, res, g2, ranks, instr, notes, hl in ROWS],
+        note_outside=(21, 13, "הופעל"),  # a note outside the table, as in the original
+    )
 
 
 if __name__ == "__main__":
