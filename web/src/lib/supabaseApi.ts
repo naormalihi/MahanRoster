@@ -20,6 +20,7 @@ import {
   type ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
@@ -537,5 +538,45 @@ export class SupabaseApi implements Api {
 
   async deleteSlots(ids: string[]) {
     if (ids.length) maybe(await this.sb.from("slots").delete().in("id", ids));
+  }
+
+  // ----- scheduling runs -----
+
+  async scheduleJobs(cycleId: string): Promise<ScheduleJob[]> {
+    const rows = check(
+      await this.sb
+        .from("schedule_jobs")
+        .select(
+          "id, status, kind, progress, created_at, started_at, finished_at, error, params, result_status:result->>status, wall_time:result->wall_time_seconds, unfilled:result->unfilled, warnings:result->warnings, pools:result->pools",
+        )
+        .eq("cycle_id", cycleId)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ) as unknown as ScheduleJob[];
+    return rows.map((r) => ({ ...r, wall_time: r.wall_time === null ? null : Number(r.wall_time) }));
+  }
+
+  async requestSchedule(cycleId: string) {
+    return String(check(await this.sb.rpc("request_schedule", { p_cycle: cycleId })));
+  }
+
+  async redispatchSchedule(jobId: string) {
+    return String(check(await this.sb.rpc("redispatch_schedule", { p_job: jobId })));
+  }
+
+  async cancelScheduleJob(jobId: string) {
+    maybe(await this.sb.rpc("cancel_schedule_job", { p_job: jobId }));
+  }
+
+  async dispatchConfigured() {
+    return Boolean(maybe(await this.sb.rpc("dispatch_configured")));
+  }
+
+  async dispatchResponse(jobId: string) {
+    return maybe(await this.sb.rpc("schedule_dispatch_response", { p_job: jobId })) as {
+      status_code: number | null;
+      error: string | null;
+      body: string | null;
+    } | null;
   }
 }

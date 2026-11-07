@@ -28,7 +28,8 @@ def windows(problem: Problem) -> list[list]:
     return [by_month[key] for key in sorted(by_month)]
 
 
-def solve_rolling(problem: Problem, log: bool = False) -> Solution:
+def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solution:
+    """on_progress(done_windows, total_windows) is called after each month, if given."""
     t0 = _time.time()
     groups = windows(problem)
     if len(groups) <= 1:
@@ -41,7 +42,9 @@ def solve_rolling(problem: Problem, log: bool = False) -> Solution:
     chosen: list[tuple[str, str, str]] = []
     unfilled, warnings, statuses = [], [], []
 
-    for slots in groups:
+    for i, slots in enumerate(groups):
+        if on_progress:
+            on_progress(i, len(groups))
         ids = {k.id for k in slots}
         window_start = min(k.starts_at for k in slots)
         sub = replace(

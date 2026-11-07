@@ -56,6 +56,8 @@ const STAGE_LINK: Partial<Record<CycleStatus, { to: string; label: string }>> = 
   approving: { to: "/constraints?tab=exemptions&status=pending", label: "לפטורים הממתינים" },
   potential: { to: "/potential", label: "למטריצת הפוטנציאל" },
   slots: { to: "/slots", label: "לקליטת לוח הבסיס" },
+  scheduling: { to: "/schedule", label: "להרצת השיבוץ" },
+  review: { to: "/schedule", label: "לתוצאת השיבוץ" },
 };
 
 /** Stages after this one need screens that do not exist yet; the stepper stops here. */

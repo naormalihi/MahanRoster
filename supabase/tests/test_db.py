@@ -581,3 +581,19 @@ def test_tash7_slot_flag_and_weight_reach_the_engine(conn):
     assert doc["settings"]["weights"]["home_nightly_preference"] == 100
     p = models.load_problem(json.dumps(doc))
     assert p.settings.weights.home_nightly_preference == 100
+
+
+def test_queued_job_dispatch_and_cancel(conn):
+    cycle = conn.cycle_id
+    conn.execute("update schedule_jobs set status = 'done' where cycle_id = %s and status in ('queued', 'running')", (cycle,))
+    job = _as_coord(conn, "select public.request_schedule(%s)", cycle)[0][0]
+    # no pg_net / vault here: nothing is sent, and the job says so
+    assert conn.execute("select params ->> 'dispatch' from schedule_jobs where id = %s", (job,)).fetchone()[0] == "unavailable"
+    assert _as_coord(conn, "select public.dispatch_configured()")[0][0] is False
+    assert _as_coord(conn, "select public.redispatch_schedule(%s)", job)[0][0] == "unavailable"
+    assert _as_coord(conn, "select public.schedule_dispatch_response(%s)", job)[0][0] is None
+    with session_as(conn, VIEWER):
+        with pytest.raises(psycopg.Error):
+            conn.execute("select public.cancel_schedule_job(%s)", (job,))
+    _as_coord(conn, "select public.cancel_schedule_job(%s)", job)
+    assert conn.execute("select status from schedule_jobs where id = %s", (job,)).fetchone()[0] == "failed"

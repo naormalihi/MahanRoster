@@ -26,6 +26,7 @@ import {
   type ExemptionType,
 } from "../lib/cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
+import type { ScheduleJob } from "../lib/schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
 import type { ExistingSoldier, RosterPlan } from "../lib/roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "../lib/soldiers";
@@ -112,6 +113,7 @@ export class DemoApi implements Api {
   private seq = 0;
   private aliasList: Alias[] = [];
   private slotsByCycle = new Map<string, SlotRow[]>();
+  private jobs: (ScheduleJob & { cycle_id: string })[] = [];
   private overrides = new Map<string, { value: number; reason: string }>();
   private calendar: CalendarDay[] = israeliHolidays("2026-09-01", "2027-08-31");
 
@@ -576,5 +578,70 @@ export class DemoApi implements Api {
   async deleteSlots(ids: string[]) {
     await delay();
     for (const [k, v] of this.slotsByCycle) this.slotsByCycle.set(k, v.filter((s) => !ids.includes(s.id)));
+  }
+
+  // ----- scheduling runs (simulated: waits 4 s, runs 12 s) -----
+
+  private tick(j: ScheduleJob & { cycle_id: string }) {
+    if (j.status === "failed" || j.status === "done") return;
+    const age = (Date.now() - Date.parse(j.created_at)) / 1000;
+    if (age < 4) return;
+    if (j.status === "queued") Object.assign(j, { status: "running", started_at: new Date().toISOString(), params: { ...j.params, run_url: "https://github.com/" } });
+    j.progress = Math.min(95, Math.round(5 + ((age - 4) / 12) * 90));
+    if (age < 16) return;
+    const slots = this.slotsByCycle.get(j.cycle_id) ?? [];
+    Object.assign(j, {
+      status: "done",
+      progress: 100,
+      finished_at: new Date().toISOString(),
+      result_status: "FEASIBLE",
+      wall_time: 12.4,
+      unfilled: slots.slice(0, 1).map((s) => ({ slot_id: s.id, role: "reserve", missing: 1, eligible_count: 1, reasons: { rank: 31, population: 18, busy: 4, absence: 2 } })),
+      warnings: [],
+      pools: [
+        { population: "mandatory", soldiers: 40, mean_before: 6.2, mean_after: 9.8, min_after: 8.5, max_after: 11, stdev_after: 0.6, max_weekends: 3, max_reserves: 4 },
+        { population: "career", soldiers: 20, mean_before: 5.1, mean_after: 7.9, min_after: 6.8, max_after: 9.1, stdev_after: 0.7, max_weekends: 2, max_reserves: 3 },
+      ],
+    });
+    const c = this.cycleList.find((x) => x.id === j.cycle_id);
+    if (c && c.status === "scheduling") c.status = "review";
+  }
+
+  async scheduleJobs(cycleId: string) {
+    await delay();
+    const mine = this.jobs.filter((j) => j.cycle_id === cycleId);
+    mine.forEach((j) => this.tick(j));
+    return mine.map(({ cycle_id: _c, ...j }) => ({ ...j })).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async requestSchedule(cycleId: string) {
+    await delay(300);
+    if (this.jobs.some((j) => j.cycle_id === cycleId && (j.status === "queued" || j.status === "running")))
+      throw new Error("a scheduling run is already in progress for this cycle");
+    const id = this.nextId("job");
+    this.jobs.push({
+      id, cycle_id: cycleId, status: "queued", kind: "full", progress: 0, created_at: new Date().toISOString(), started_at: null,
+      finished_at: null, error: null, params: { dispatch: "sent" }, result_status: null, wall_time: null, unfilled: null, warnings: null, pools: null,
+    });
+    const c = this.cycleList.find((x) => x.id === cycleId);
+    if (c && ["slots", "potential", "review", "scheduling"].includes(c.status)) c.status = "scheduling";
+    return id;
+  }
+
+  async redispatchSchedule() {
+    return "sent";
+  }
+
+  async cancelScheduleJob(jobId: string) {
+    const j = this.jobs.find((x) => x.id === jobId);
+    if (j && (j.status === "queued" || j.status === "running")) Object.assign(j, { status: "failed", error: "בוטל על ידי נע\"ת", finished_at: new Date().toISOString() });
+  }
+
+  async dispatchConfigured() {
+    return true;
+  }
+
+  async dispatchResponse() {
+    return { status_code: 204, error: null, body: "" };
   }
 }

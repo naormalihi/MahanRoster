@@ -19,6 +19,7 @@ import type {
   ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
@@ -142,6 +143,13 @@ export interface Api {
   /** Insert the slots; with replace, first delete the cycle's slots that have no real assignments. */
   importSlots(cycleId: string, slots: SlotDraft[], replace: boolean, fileName: string): Promise<{ inserted: number; deleted: number }>;
   deleteSlots(ids: string[]): Promise<void>;
+  // scheduling runs
+  scheduleJobs(cycleId: string): Promise<ScheduleJob[]>;
+  requestSchedule(cycleId: string): Promise<string>;
+  redispatchSchedule(jobId: string): Promise<string>;
+  cancelScheduleJob(jobId: string): Promise<void>;
+  dispatchConfigured(): Promise<boolean>;
+  dispatchResponse(jobId: string): Promise<{ status_code: number | null; error: string | null; body: string | null } | null>;
 }
 
 /**

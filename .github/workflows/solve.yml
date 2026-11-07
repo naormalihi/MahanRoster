@@ -1,0 +1,43 @@
+name: solve
+
+# Runs the scheduling engine on the jobs queued in the database (schedule_jobs).
+# Started by the database when נע"ת presses "הרצת שיבוץ" (workflow_dispatch through
+# pg_net), or by hand from the Actions tab. Uses the SUPABASE_DB_URL secret, like
+# db-migrate. Processes every queued job and exits.
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "Job id (informational – every queued job is processed)"
+        required: false
+
+concurrency:
+  group: solve
+  cancel-in-progress: false
+
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: solver/pyproject.toml
+      - run: pip install "./solver[worker]"
+      - name: Solve queued jobs
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set"; exit 1; fi
+          python -m mahanroster_solver.worker 2>&1 | tee worker.log
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Scheduling run" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 40 worker.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
