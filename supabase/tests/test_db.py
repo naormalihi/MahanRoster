@@ -775,3 +775,21 @@ def test_fairness_groups_and_credit_periods(conn):
     assert conn.execute("select days, points from cycle_credits where cycle_id = %s", (cycle,)).fetchall() == [(24, 7.5)]
     conn.execute("update soldiers set enlistment_date = null where id = %s", (sid,))
     conn.execute("update absences set status = 'cancelled' where soldier_id = %s", (sid,))
+
+
+def test_gaf_named_by_a_framework_path_is_merged(conn):
+    sid, gaf = conn.execute("select id, gaf_id from soldiers where is_active order by id limit 1").fetchone()
+    name = "גף בדיקה"
+    conn.execute("update org_units set name = %s where id = %s", (name, gaf))
+    path = conn.execute(
+        "insert into org_units (kind, name) values ('gaf', %s) returning id", (f'מה"ן - מלמסים/{name}/צוות בדיקה - מלמסים',)
+    ).fetchone()[0]
+    a = conn.execute("select id from assignments where soldier_id = %s limit 1", (sid,)).fetchone()
+    if a:
+        conn.execute("update assignments set gaf_id = %s where id = %s", (path, a[0]))
+    assert conn.execute("select app.merge_gaf_paths()").fetchone()[0] == 1
+    assert conn.execute("select merged_into_id, active_to is not null from org_units where id = %s", (path,)).fetchone() == (gaf, True)
+    if a:
+        assert conn.execute("select gaf_id from assignments where id = %s", (a[0],)).fetchone()[0] == gaf
+    cols = [d.name for d in conn.execute("select * from published_board limit 0").description]
+    assert {"performer_gafim", "reserve_gafim"} <= set(cols)
