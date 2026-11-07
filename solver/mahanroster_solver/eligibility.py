@@ -22,7 +22,7 @@ REASON_LABELS = {
     "rank": "דרגה מחוץ לטווח",
     "gender": "מגדר",
     "qualifying_only": "משרת הורה או פטור מזכה – רק ממלכ\"ת יום",
-    "not_qualifying": "ממלכ\"ת יום – רק למשרתי הורה ובעלי פטור מזכה",
+    "not_qualifying": "ממלכ\"ת יום – רק למשרתי הורה, בעלי פטור מזכה והאוכלוסיות שהוגדרו לה",
     "shachar": "שח\"ר – המשימה לא מסומנת מתאימה לשח\"ר",
     "weapon_range": "מטווח לא בתוקף ביום התורנות",
     "not_enlisted": "לפני תאריך הגיוס",
@@ -87,7 +87,10 @@ class EligibilityIndex:
         if task.service_restriction != "any" and soldier.service_type != task.service_restriction:
             reasons.append("service")
         if task.qualifying_duty:
-            if not soldier.qualifies_day_only:
+            # Open to parents / qualifying-exemption holders, and to any population listed on the type
+            # (e.g. רס"ן). The rank range below still applies to everyone.
+            listed = bool(task.eligible_populations) and bool(set(task.eligible_populations) & set(soldier.populations))
+            if not (soldier.qualifies_day_only or listed):
                 reasons.append("not_qualifying")
         else:
             if soldier.qualifies_day_only:

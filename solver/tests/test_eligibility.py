@@ -92,3 +92,16 @@ def test_penalty_slot_only_for_named_soldier():
     k = slot("p", "guard", *MON, r=0, is_penalty=True, penalty_soldier_id="B")
     assert reasons(soldier("A"), k) == ["penalty_other"]
     assert reasons(soldier("B", service_type="career"), k) == []
+
+
+def test_qualifying_duty_also_open_to_listed_population_within_rank_range():
+    day = TaskType("day", "ממלכ\"ת יום", 0.75, qualifying_duty=True, eligible_populations=["major"], rank_max=13)
+    k = slot("d", "day", "2027-01-04T08:00", "2027-01-04T17:00", r=0)
+    major = soldier("M", service_type="career", populations=["career", "officer", "major"], rank_order=13)
+    colonel = soldier("C", service_type="career", populations=["career", "officer", "major"], rank_order=14)
+    captain = soldier("K", service_type="career", populations=["career", "officer"], rank_order=12)
+    parent = soldier("P", service_type="career", populations=["career"], rank_order=6, qualifies_day_only=True)
+    assert reasons(major, k, tasks=(day,)) == []
+    assert "rank" in reasons(colonel, k, tasks=(day,))
+    assert "not_qualifying" in reasons(captain, k, tasks=(day,))
+    assert reasons(parent, k, tasks=(day,)) == []
