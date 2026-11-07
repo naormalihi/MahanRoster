@@ -70,3 +70,34 @@ describe("plan", () => {
     expect(plan.updated).toHaveLength(1);
   });
 });
+
+describe("HR export layout", () => {
+  const hr = ["מספר אישי", "מין", "דרגה מחושבת", "שם פרטי", "שם משפחה", "מסגרת", "תאריך תום שירות (תש\"ש)", "נמצא במשרת הורה"];
+  const m = detectMapping(hr);
+
+  it("maps computed rank, end-of-service date, parent and framework", () => {
+    expect(m.rank).toBe("דרגה מחושבת");
+    expect(m.releaseDate).toBe("תאריך תום שירות (תש\"ש)");
+    expect(m.parent).toBe("נמצא במשרת הורה");
+    expect(m.framework).toBe("מסגרת");
+    expect(m.serviceType).toBeUndefined();
+    expect(mappingProblems(m)).toEqual([]);
+  });
+
+  it("takes the gaf from the framework and the service type from the rank", () => {
+    const base = { "מספר אישי": "9104891", "מין": "זכר", "שם פרטי": "ליאור", "שם משפחה": "סגל", "תאריך תום שירות (תש\"ש)": "", "נמצא במשרת הורה": "" };
+    const { rows, errors } = parseRows(
+      [
+        { ...base, "דרגה מחושבת": "סמ\"ר", "מסגרת": "מה\"ן - מלמסים/גף ענן/צוות DevOps - מלמסים" },
+        { ...base, "מספר אישי": "9311538", "דרגה מחושבת": "רס\"ר", "מסגרת": "מה\"ן - מלמסים/גף בדיקות - מלמסים", "נמצא במשרת הורה": "YES" },
+        { ...base, "מספר אישי": "9129838", "דרגה מחושבת": "קמ\"א", "מסגרת": "מה\"ן - מלמסים" },
+      ],
+      m,
+    );
+    expect(rows.map((r) => [r.gaf, r.serviceType, r.parent])).toEqual([
+      ["גף ענן", "mandatory", false],
+      ["גף בדיקות", "career", true],
+    ]);
+    expect(errors).toEqual([{ line: 4, message: "לא נמצא גף במסגרת" }]);
+  });
+});

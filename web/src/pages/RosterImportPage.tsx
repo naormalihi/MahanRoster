@@ -252,6 +252,14 @@ export function RosterImportPage() {
               <Chip label={`ללא שינוי: ${plan.unchanged}`} />
               {parsed.errors.length > 0 && <Chip color="error" label={`שורות שגויות: ${parsed.errors.length}`} />}
             </Stack>
+            {!mapping.serviceType && (
+              <Alert severity="info">
+                אין בקובץ עמודת סוג שירות, ולכן הוא נקבע לפי הדרגה: טוראי עד סמ"ר – חובה, רס"ל ומעלה וקצינים – קבע.
+              </Alert>
+            )}
+            {!mapping.gaf && mapping.framework && (
+              <Alert severity="info">הגף נלקח מעמודת המסגרת (החלק שמתחיל ב"גף").</Alert>
+            )}
             {plan.unknownRanks.length > 0 && (
               <Alert severity="error">
                 דרגות שלא מוגדרות במערכת: {plan.unknownRanks.join(", ")}. יש להוסיף אותן בהגדרות לפני הטעינה, כי הדרגה קובעת זכאות.
