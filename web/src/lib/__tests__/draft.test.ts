@@ -33,6 +33,14 @@ describe("draft", () => {
     expect(ls.find((l) => l.soldier_id === "s2")).toMatchObject({ points: 1, reserves: 1, manual: 1 });
     expect(poolMeans(ls).get("mandatory")).toBeCloseTo(5.25);
   });
+  it("groups soldiers by the duties open to them", async () => {
+    const { byProfile } = await import("../draft");
+    const l = (id: string, expected: number) => ({ soldier_id: id, pool: "m", baseline: 0, points: expected, expected, duties: 0, reserves: 0, weekends: 0, manual: 0 });
+    const open: Record<string, string[]> = { a: ["שמירות", "רס\"ר"], b: ["רס\"ר", "שמירות"], c: ["רס\"ר"], d: [] };
+    const r = byProfile([l("a", 30), l("b", 34), l("c", 10), l("d", 0)], (id) => [...open[id]]);
+    expect(r[0]).toEqual({ key: "רס\"ר + שמירות", soldiers: 2, mean: 32, min: 30, max: 34 });
+    expect(r.find((x) => x.key === "—")?.soldiers).toBe(1);
+  });
   it("weeks start on Sunday", () => {
     expect(weeksOf("2027-01-01", "2027-01-20")).toEqual(["2026-12-27", "2027-01-03", "2027-01-10", "2027-01-17"]);
   });

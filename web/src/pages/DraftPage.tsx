@@ -42,6 +42,7 @@ import { planningCycle, stageLabel, type Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
 import {
   ROLE_LABEL,
+  byProfile,
   bySlot,
   loads,
   poolMeans,
@@ -356,7 +357,7 @@ function SlotsTab({ ctx }: { ctx: Ctx }) {
 // Load per soldier
 // ---------------------------------------------------------------------------
 
-function LoadTab({ ctx, snapshot, cells }: { ctx: Ctx; snapshot: SnapshotSoldier[]; cells: PotentialCell[] | null }) {
+function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: SnapshotSoldier[]; cells: PotentialCell[] | null; categories: Map<string, string> }) {
   const [pool, setPool] = useState("mandatory");
   const ls = useMemo(() => loads(snapshot, ctx.assignments), [snapshot, ctx.assignments]);
   const means = poolMeans(ls);
@@ -366,6 +367,10 @@ function LoadTab({ ctx, snapshot, cells }: { ctx: Ctx; snapshot: SnapshotSoldier
   const shown = ls.filter((l) => l.pool === pool).sort((a, b) => b.expected - a.expected);
   const mean = means.get(pool) ?? 0;
   const zeroOpen = shown.filter((l) => cells && !open.get(l.soldier_id)).length;
+  const openNames = new Map<string, string[]>();
+  for (const c of cells ?? [])
+    if (effective(c) > 0) openNames.set(c.soldier_id, [...(openNames.get(c.soldier_id) ?? []), categories.get(c.category_id) ?? "?"]);
+  const profiles = cells ? byProfile(shown, (id) => [...(openNames.get(id) ?? [])]) : [];
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
@@ -378,6 +383,33 @@ function LoadTab({ ctx, snapshot, cells }: { ctx: Ctx; snapshot: SnapshotSoldier
           {zeroOpen} חיילים בקבוצה הזו לא זכאים לאף קטגוריית תורנות לפי מטריצת הפוטנציאל, ולכן הניקוד שלהם 0. הם נכללים בממוצע ומושכים אותו למטה – זה
           לא חוסר הוגנות בשיבוץ.
         </Alert>
+      )}
+      {profiles.length > 0 && (
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            לפי מה שהחיילים יכולים לעשות – הוגנות נמדדת בין מי שזכאים לאותן תורנויות
+          </Typography>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {["קטגוריות פתוחות", "חיילים", "ממוצע", "מינימום", "מקסימום"].map((h) => (
+                  <TableCell key={h}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {profiles.map((p) => (
+                <TableRow key={p.key}>
+                  <TableCell>{p.key}</TableCell>
+                  <TableCell>{p.soldiers}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{p.mean.toFixed(1)}</TableCell>
+                  <TableCell>{p.min.toFixed(1)}</TableCell>
+                  <TableCell sx={{ color: p.max - p.min > 8 ? "error.main" : undefined }}>{p.max.toFixed(1)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
       )}
       <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: "65vh" }}>
         <Table size="small" stickyHeader>
@@ -435,13 +467,15 @@ export function DraftPage() {
   const [assignments, setAssignments] = useState<DraftAssignment[] | null>(null);
   const [snapshot, setSnapshot] = useState<SnapshotSoldier[]>([]);
   const [cells, setCells] = useState<PotentialCell[] | null>(null);
+  const [categories, setCategories] = useState<Map<string, string>>(new Map());
   const [tab, setTab] = useState<"slots" | "load">("slots");
   const [publishing, setPublishing] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    Promise.all([api!.cycles(), api!.taskTypes(), api!.soldiers()])
-      .then(([c, t, s]) => {
+    Promise.all([api!.cycles(), api!.taskTypes(), api!.soldiers(), api!.dutyCategories()])
+      .then(([c, t, s, cats]) => {
+        setCategories(new Map(cats.map((x) => [x.id, x.name])));
         setCycles(c);
         setTasks(new Map(t.map((x) => [x.id, x])));
         setSoldiers(new Map(s.map((x) => [x.id, x])));
@@ -547,7 +581,7 @@ export function DraftPage() {
           </Tabs>
           {(() => {
             const ctx: Ctx = { cycle, slots, tasks, soldiers, assignments, reload: load, locked };
-            return tab === "slots" ? <SlotsTab ctx={ctx} /> : <LoadTab ctx={ctx} snapshot={snapshot} cells={cells} />;
+            return tab === "slots" ? <SlotsTab ctx={ctx} /> : <LoadTab ctx={ctx} snapshot={snapshot} cells={cells} categories={categories} />;
           })()}
         </>
       )}
