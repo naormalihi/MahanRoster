@@ -3,6 +3,7 @@
  * (in-memory fictitious unit, for previews and screenshots without a backend).
  */
 
+import type { CalendarDay, Population, ScoringSettings, TaskType, TaskTypeInput } from "./catalog";
 import type { ExistingSoldier, RosterPlan } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
@@ -76,6 +77,17 @@ export interface Api {
   loadRoles(): Promise<LoadRoleRef[]>;
   /** Replace the soldier's load-role periods with the given list. */
   setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
+  // settings screen
+  taskTypes(): Promise<TaskType[]>;
+  /** Create (id null) or update a duty type. */
+  saveTaskType(id: string | null, t: TaskTypeInput): Promise<void>;
+  dutyCategories(): Promise<NamedRef[]>;
+  populations(): Promise<Population[]>;
+  scoringSettings(): Promise<ScoringSettings>;
+  saveScoringSettings(s: ScoringSettings): Promise<void>;
+  calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]>;
+  saveCalendarDays(days: CalendarDay[]): Promise<void>;
+  deleteCalendarDay(day: string): Promise<void>;
 }
 
 /**

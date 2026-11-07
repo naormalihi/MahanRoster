@@ -8,6 +8,7 @@
  */
 
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "../lib/api";
+import { israeliHolidays, type CalendarDay, type Population, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import type { ExistingSoldier, RosterPlan } from "../lib/roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "../lib/soldiers";
 
@@ -36,6 +37,28 @@ function rng(seed: number) {
   };
 }
 
+const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד שער", "ממלכ\"ת", "שמירות חובה", "משימות חיילות"].map((name, i) => ({ id: `c${i}`, name }));
+const POPULATIONS: Population[] = [
+  { code: "mandatory", name: "חובה" },
+  { code: "career", name: "קבע" },
+  { code: "officer", name: "קצינים" },
+  { code: "major", name: "רס\"ן ומעלה" },
+];
+const tt = (code: string, name: string, cat: number, weight: number, o: Partial<TaskTypeInput> = {}): TaskType => ({
+  id: `t_${code}`, code, name, category_id: `c${cat}`, weight, min_rest_hours: 0, service_restriction: "any",
+  requires_weapon: false, is_weekend_type: false, shachar_compatible: false, qualifying_duty: false,
+  eligible_populations: [], rank_min_id: null, rank_max_id: null, gender: null,
+  default_start_time: "08:00", default_end_time: "08:00", color: null, is_active: true, ...o,
+});
+const DEMO_TASKS: TaskType[] = [
+  tt("hagnash", "הגנ\"ש – חול", 0, 1, { eligible_populations: ["officer", "career"], rank_max_id: "r9", requires_weapon: true, color: "#2f7d5b" }),
+  tt("katzin_toran", "קצין תורן – חול", 1, 1, { eligible_populations: ["officer"], rank_max_id: "r9", color: "#3b6ea8" }),
+  tt("katzin_toran_shabbat", "קצין תורן – שבת", 1, 3, { eligible_populations: ["officer"], rank_max_id: "r9", is_weekend_type: true, color: "#3b6ea8" }),
+  tt("mamlachat_yom", "ממלכ\"ת יום – חול", 3, 0.75, { eligible_populations: ["major"], rank_max_id: "r10", qualifying_duty: true, shachar_compatible: true, default_end_time: "17:00", color: "#6a7ab0" }),
+  tt("mamlachat_layla", "ממלכ\"ת לילה – חול", 3, 1, { eligible_populations: ["major"], rank_max_id: "r10", min_rest_hours: 12, default_start_time: "20:00", color: "#4a5a8a" }),
+  tt("shmira", "שמירה – חול", 4, 1, { service_restriction: "mandatory", rank_max_id: "r3", requires_weapon: true, min_rest_hours: 8, color: "#9a6a1f" }),
+];
+
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -48,6 +71,9 @@ export class DemoApi implements Api {
   private keyCheck: string | null = null;
   private boardRows: BoardRow[] = [];
   private extra = new Map<string, Extra>();
+  private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
+  private scoring: ScoringSettings = { weekend_multiplier: 1.5, holiday_multiplier: 2, night_multiplier: 1.25, night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
+  private calendar: CalendarDay[] = israeliHolidays("2026-09-01", "2027-08-31");
 
   private extraOf(id: string): Extra {
     if (!this.extra.has(id))
@@ -233,5 +259,53 @@ export class DemoApi implements Api {
       const lr = LOAD_ROLES.find((x) => x.id === r.load_role_id)!;
       return { ...r, name: lr.name, factor: lr.factor };
     });
+  }
+
+  async taskTypes() {
+    await delay();
+    return this.tasks.map((t) => ({ ...t })).sort((a, b) => a.name.localeCompare(b.name, "he"));
+  }
+
+  async saveTaskType(id: string | null, t: TaskTypeInput) {
+    await delay();
+    if (id) Object.assign(this.tasks.find((x) => x.id === id)!, t);
+    else this.tasks.push({ ...t, id: `t_${t.code}` });
+  }
+
+  async dutyCategories() {
+    return CATEGORIES;
+  }
+
+  async populations() {
+    return POPULATIONS;
+  }
+
+  async scoringSettings() {
+    await delay();
+    return { ...this.scoring, weekend_weekdays: [...this.scoring.weekend_weekdays] };
+  }
+
+  async saveScoringSettings(s: ScoringSettings) {
+    await delay();
+    this.scoring = { ...s };
+  }
+
+  async calendarDays(fromIso: string, toIso: string) {
+    await delay();
+    return this.calendar.filter((d) => d.day >= fromIso && d.day <= toIso).map((d) => ({ ...d }));
+  }
+
+  async saveCalendarDays(days: CalendarDay[]) {
+    await delay();
+    for (const d of days) {
+      this.calendar = this.calendar.filter((x) => x.day !== d.day);
+      this.calendar.push({ ...d });
+    }
+    this.calendar.sort((a, b) => a.day.localeCompare(b.day));
+  }
+
+  async deleteCalendarDay(day: string) {
+    await delay();
+    this.calendar = this.calendar.filter((x) => x.day !== day);
   }
 }

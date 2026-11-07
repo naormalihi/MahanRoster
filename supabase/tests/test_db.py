@@ -84,7 +84,7 @@ def seed(c):
     # the tests use the solver's fictitious catalog instead of the shipped reference data
     q("truncate populations, day_types, ranks, load_roles, absence_types, exemption_types cascade")
     q("insert into populations (code, name) values ('mandatory','חובה'),('career','קבע'),('officer','קצינים'),('major','רס\"ן ומעלה')")
-    q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג')")
+    q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג'),('memorial','יום זיכרון')")
     rank_id = {}
     for name, order in synthetic.RANKS.items():
         rank_id[order] = q(
@@ -379,3 +379,42 @@ def test_service_type_follows_career_start_date_per_cycle(conn):
     doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
     by_id = {s["id"]: s for s in doc["soldiers"]}
     assert by_id[str(past)]["service_type"] == "career" and by_id[str(past)]["balance_population"] == "career"
+
+
+def test_weight_changes_are_recorded(conn):
+    tid = conn.execute("select id from task_types order by code limit 1").fetchone()[0]
+    count = lambda: conn.execute("select count(*) from weight_history where task_type_id = %s", (tid,)).fetchone()[0]
+    before = count()
+    with session_as(conn, COORD):
+        conn.execute("update task_types set weight = weight + 0.25 where id = %s", (tid,))
+        conn.execute("update task_types set name = name where id = %s", (tid,))  # not a weight change
+        assert count() == before + 1
+        by = conn.execute(
+            "select changed_by from weight_history where task_type_id = %s order by id desc limit 1", (tid,)
+        ).fetchone()[0]
+        assert by == COORD
+        conn.execute("update settings set value = '2.5' where key = 'holiday_multiplier'")
+        v = conn.execute(
+            "select value from weight_history where multiplier_key = 'holiday_multiplier' order by id desc limit 1"
+        ).fetchone()[0]
+        assert float(v) == 2.5
+
+
+def test_staff_manage_the_calendar_and_viewer_cannot(conn):
+    with session_as(conn, COORD):
+        conn.execute("insert into calendar_days (day, day_type, source, note) values ('2030-04-18','holiday','hebcal','פסח')")
+        assert conn.execute("select count(*) from calendar_days where day = '2030-04-18'").fetchone()[0] == 1
+    with session_as(conn, VIEWER):
+        with pytest.raises(psycopg.Error):
+            conn.execute("insert into calendar_days (day, day_type) values ('2030-04-19','holiday')")
+
+
+def test_holidays_are_preloaded(conn):
+    # the test seed truncates reference data (and the calendar with it), so apply the file again
+    conn.execute((ROOT / "supabase/migrations/20261107000011_holidays_2026_2035.sql").read_text(encoding="utf-8"))
+    rows = dict(conn.execute(
+        "select day::text, day_type from calendar_days where day in ('2026-09-21', '2027-04-22', '2035-10-03')"
+    ).fetchall())
+    assert rows.get("2026-09-21") == "holiday"  # יום כיפור
+    assert rows.get("2027-04-22") == "holiday"  # פסח
+    assert conn.execute("select count(*) from calendar_days where extract(year from day) = 2035").fetchone()[0] >= 15
