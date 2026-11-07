@@ -129,6 +129,8 @@ class Slot:
     # Per-slot overrides of the task type.
     rank_min: Optional[int] = None
     rank_max: Optional[int] = None
+    # Explicit rank orders allowed (the base lists e.g. "סמל - רס"ל, סג"מ - סגן"); overrides any range.
+    allowed_ranks: Optional[list[int]] = None
     gender: Optional[str] = None
     is_penalty: bool = False
     penalty_soldier_id: Optional[str] = None

@@ -1,0 +1,139 @@
+import { describe, expect, it } from "vitest";
+import type { TaskType } from "../catalog";
+import { buildSlots, findHeader, genderHint, parseRanks, readRows, resolveDuty, slotTimes, weekendVariant } from "../baseSchedule";
+
+const RANKS = ["טוראי", "רב\"ט", "סמל", "סמ\"ר", "רס\"ל", "רס\"ר", "רס\"מ", "רס\"ב", "רנ\"ג", "סג\"מ", "סגן", "קמ\"א", "סרן", "רס\"ן", "סא\"ל"].map((name, i) => ({
+  id: `r${i}`,
+  name,
+  sort_order: name === "קמ\"א" ? 11 : i < 12 ? i + 1 : i,
+}));
+RANKS.push({ id: "civ", name: "אזרח עובד צה\"ל", sort_order: 50 });
+const id = (n: string) => RANKS.find((r) => r.name === n)!.id;
+
+const task = (id: string, name: string, o: Partial<TaskType> = {}): TaskType => ({
+  id, code: id, name, category_id: "c", weight: 1, min_rest_hours: 0, service_restriction: "any", requires_weapon: false,
+  is_weekend_type: false, shachar_compatible: false, qualifying_duty: false, eligible_populations: [], rank_min_id: null,
+  rank_max_id: null, gender: null, default_start_time: "08:00", default_end_time: "08:00", color: null, is_active: true, ...o,
+});
+const TASKS = [
+  task("kt", "קצין תורן – חול", { category_id: "kt" }),
+  task("kts", "קצין תורן – שבת", { category_id: "kt", is_weekend_type: true }),
+  task("khs", "ק. הגנ\"ק – שבת", { category_id: "kt", is_weekend_type: true }),
+  task("shmira", "שמירות חובה", { default_start_time: "13:00", default_end_time: "13:00" }),
+  task("mm", "ממלכ\"ת יום – חול", { default_start_time: "08:00", default_end_time: "17:00" }),
+  task("ch", "משימות חיילות"),
+];
+
+describe("ranks column", () => {
+  it("all ranks / empty = no restriction", () => {
+    expect(parseRanks("כלל הדרגות", RANKS).rankIds).toBeNull();
+    expect(parseRanks("", RANKS).rankIds).toBeNull();
+    expect(parseRanks("מבצעים אמהות/אבות במשרת הורה, אנשי קבע בעלי פטור רפואי - כלל הדרגות", RANKS).rankIds).toBeNull();
+  });
+  it("single rank and appointment", () => {
+    expect(parseRanks("רס\"ן", RANKS).rankIds).toEqual([id("רס\"ן")]);
+    expect(parseRanks("רס\"ן, סרן במינוי רס\"ן", RANKS)).toEqual({ rankIds: [id("רס\"ן")], unknown: [] });
+  });
+  it("a list of ranges", () => {
+    const r = parseRanks("סמל - רס\"ל, סג\"מ - סגן, קמ\"א", RANKS);
+    expect(new Set(r.rankIds)).toEqual(new Set(["סמל", "סמ\"ר", "רס\"ל", "סג\"מ", "סגן", "קמ\"א"].map(id)));
+    expect(r.unknown).toEqual([]);
+    expect(new Set(parseRanks("סגן- סרן", RANKS).rankIds)).toEqual(new Set(["סגן", "קמ\"א", "סרן"].map(id)));
+  });
+  it("reports names it does not know, keeps the rest", () => {
+    const r = parseRanks("רס\"ר-רס\"מ, סרן, קא\"ב", RANKS);
+    expect(new Set(r.rankIds)).toEqual(new Set(["רס\"ר", "רס\"מ", "סרן"].map(id)));
+    expect(r.unknown).toEqual(["קא\"ב"]);
+    expect(parseRanks("ת\"ש 7", RANKS)).toEqual({ rankIds: null, unknown: ["ת\"ש 7"] });
+  });
+  it("gershayim variants", () => {
+    expect(parseRanks("רס״ן", RANKS).rankIds).toEqual([id("רס\"ן")]);
+  });
+});
+
+describe("duties", () => {
+  it("resolves by alias, then by name without the חול/שבת suffix", () => {
+    expect(resolveDuty("אמ\"ת גבעת המורה", [{ alias: "אמ\"ת גבעת המורה", task_type_id: "ch" }], TASKS)).toBe("ch");
+    expect(resolveDuty("קצין תורן", [], TASKS)).toBe("kt");
+    expect(resolveDuty("שמירות  חובה", [], TASKS)).toBe("shmira");
+    expect(resolveDuty("ש.ג דרום 7-11", [], TASKS)).toBeNull();
+  });
+  it("switches to the Shabbat type on weekend days", () => {
+    expect(weekendVariant("kt", "2026-07-10", TASKS, [5, 6])).toBe("kts"); // Friday
+    expect(weekendVariant("kt", "2026-07-09", TASKS, [5, 6])).toBe("kt"); // Thursday
+    expect(weekendVariant("kts", "2026-07-08", TASKS, [5, 6])).toBe("kt");
+    expect(weekendVariant("shmira", "2026-07-10", TASKS, [5, 6])).toBe("shmira"); // no sibling
+  });
+  it("gender from the instructions", () => {
+    expect(genderHint("תורנות מרלו\"ג, יש להקצות בנים בלבד")).toBe("male");
+    expect(genderHint("התייצבות 09:00")).toBeNull();
+  });
+});
+
+describe("times", () => {
+  it("one-day duty 08:00–08:00 ends next morning; week duty ends on the end date", () => {
+    expect(slotTimes("2026-07-05", "2026-07-05", TASKS[0])).toEqual({ starts_at: "2026-07-05T08:00:00+03:00", ends_at: "2026-07-06T08:00:00+03:00" });
+    expect(slotTimes("2026-07-01", "2026-07-08", TASKS[3])).toEqual({ starts_at: "2026-07-01T13:00:00+03:00", ends_at: "2026-07-08T13:00:00+03:00" });
+    expect(slotTimes("2026-07-12", "2026-07-12", TASKS[4]).ends_at).toBe("2026-07-12T17:00:00+03:00");
+    expect(slotTimes("2027-01-12", "2027-01-12", TASKS[4]).starts_at).toBe("2027-01-12T08:00:00+02:00");
+  });
+});
+
+describe("the base file", () => {
+  // rows as in the base's file (after an earlier schedule, so names are filled in)
+  const file: unknown[][] = [
+    ["אוכלוסיה", "תאריך התחלה", "תאריך סיום", "חג", "תורנות", "מבצע", "גף", "עתודה", "גף", "דרגות", "הנחיות", "הערות"],
+    ["משימות חיליות", "14/06/2026", "21/06/2026", "X", "אמ\"ת גבעת המורה", "עופרי חרפוף", "תמנע", "", "", "סגן- סרן", "התייצבות עד השעה 10:00 בבוקר", ""],
+    [],
+    ["חובה", "28/06/2026", "02/07/2026", "X", "רס\"ר", "שחר שרעבי", "קרן אור", "איתי חנה", "קרן אור", "כלל הדרגות", "תורנות מרלו\"ג, יש להקצות בנים בלבד", "מור סנגבי 050-0000000"],
+    ["קצינים ונגדים", "05/07/2026", "05/07/2026", "X", "קצין תורן", "יוסף קטרי", "תמונא", "נועם כהן", "תמונא", "רס\"ר-רס\"מ, סרן, קא\"ב", "התייצבות בשעה 09:00 ברס\"ר", ""],
+    ["קצינים ונגדים", "10/07/2026", "10/07/2026", "X", "קצין תורן", "", "", "", "", "רס\"ר-רס\"מ, סרן", "", ""],
+    ["קצינים ונגדים", "05/07/2026", "07/07/2026", "X", "ש.ג דרום 7-11", "", "", "", "", "סמל - רס\"ל, סג\"מ - סגן, קמ\"א", "", ""],
+    ["חובה", "01/07/2026", "08/07/2026", "X", "שמירות חובה", "", "", "", "", "כלל הדרגות", "", ""],
+    ["חובה", "31/02/2026", "", "X", "שמירות חובה", "", "", "", "", "", "", ""],
+  ];
+  it("finds the header and reads the rows", () => {
+    expect(findHeader(file)?.columns).toMatchObject({ population: 0, start: 1, end: 2, duty: 4, ranks: 9, instructions: 10, notes: 11 });
+    const r = readRows(file);
+    expect(r.rows).toHaveLength(6);
+    expect(r.errors).toEqual([{ line: 9, message: "שמירות חובה: תאריך התחלה לא תקין" }]);
+  });
+  it("builds slots for the cycle and lists unmapped duties", () => {
+    const { rows } = readRows(file);
+    const res = buildSlots(rows, {
+      aliases: [{ alias: "אמ\"ת גבעת המורה", task_type_id: "ch" }],
+      tasks: TASKS,
+      ranks: RANKS,
+      weekendIsoDays: [5, 6],
+      cycle: { start_date: "2026-06-20", end_date: "2026-12-31" },
+    });
+    expect(res.outside.map((r) => r.line)).toEqual([2]); // starts before the cycle
+    expect(res.unmapped).toEqual([
+      { duty: "רס\"ר", count: 1, population: "חובה" },
+      { duty: "ש.ג דרום 7-11", count: 1, population: "קצינים ונגדים" },
+    ]);
+    expect(res.slots.map((s) => s.task_type_id)).toEqual(["kt", "kts", "shmira"]);
+    expect(res.slots[0].unknownRanks).toEqual(["קא\"ב"]);
+    expect(res.slots[1].weekendSwitched).toBe(true);
+    expect(res.slots[2].allowed_rank_ids).toBeNull();
+  });
+});
+
+describe("Excel dates", () => {
+  it("reads date cells exactly, in any time zone", async () => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([["תאריך התחלה", "תורנות"], [46362, "קצין תורן"]]);
+    ws["A2"].t = "n";
+    ws["A2"].z = "dd/mm/yyyy";
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "x");
+    const back = XLSX.read(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(back.Sheets.x, { header: 1, raw: true, defval: "" });
+    expect(readRows(rows).rows[0].start).toBe("2026-12-06");
+  });
+  it("a Date a few seconds before midnight is the next day", async () => {
+    const { toIsoDate } = await import("../roster");
+    expect(toIsoDate(new Date(2026, 11, 5, 23, 59, 20))).toBe("2026-12-06");
+    expect(toIsoDate(new Date(2026, 11, 6, 0, 0, 0))).toBe("2026-12-06");
+  });
+});

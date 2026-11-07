@@ -533,3 +533,30 @@ def test_potential_overrides_are_staff_only(conn):
     with session_as(conn, VIEWER):
         with pytest.raises(psycopg.Error):
             conn.execute("select * from public.potential_matrix(%s)", (conn.cycle_id,))
+
+
+def test_slot_rank_list_reaches_the_engine_and_notes_stay_internal(conn):
+    cycle = conn.cycle_id
+    sid = conn.execute("select id from slots where cycle_id = %s order by starts_at limit 1", (cycle,)).fetchone()[0]
+    r1, o1, r2, o2 = conn.execute(
+        "select (array_agg(id order by sort_order))[2], (array_agg(sort_order order by sort_order))[2], "
+        "(array_agg(id order by sort_order))[4], (array_agg(sort_order order by sort_order))[4] from ranks"
+    ).fetchone()
+    conn.execute(
+        "update slots set allowed_rank_ids = %s, instructions = 'התייצבות 09:00', notes = 'איש קשר 050-0000000' where id = %s",
+        ([r1, r2], sid),
+    )
+    conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    s = next(x for x in doc["slots"] if x["id"] == str(sid))
+    assert sorted(s["allowed_ranks"]) == sorted([o1, o2])
+    assert all(x["allowed_ranks"] is None for x in doc["slots"] if x["id"] != str(sid))
+    models.load_problem(json.dumps(doc))  # the engine accepts the new field
+    cols = [r[0] for r in conn.execute(
+        "select column_name from information_schema.columns where table_name = 'published_board'").fetchall()]
+    assert "instructions" in cols and "notes" not in cols
+    task = conn.execute("select id from task_types limit 1").fetchone()[0]
+    with session_as(conn, VIEWER):
+        assert conn.execute("select count(*) from task_type_aliases").fetchone()[0] == 0
+        with pytest.raises(psycopg.Error):
+            conn.execute("insert into task_type_aliases (alias, task_type_id) values ('x', %s)", (task,))

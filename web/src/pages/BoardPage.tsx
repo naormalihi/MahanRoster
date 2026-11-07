@@ -177,6 +177,11 @@ export function BoardPage() {
                         {r.report_place ? ` · ${r.report_place}` : ""}
                       </Typography>
                     )}
+                    {r.instructions && (
+                      <Typography variant="caption" color="text.secondary" component="div" sx={{ whiteSpace: "pre-line", maxWidth: 320 }}>
+                        {r.instructions}
+                      </Typography>
+                    )}
                   </Box>
                 </Stack>
               </Paper>

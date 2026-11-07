@@ -19,6 +19,7 @@ import {
   type ExemptionInput,
   type ExemptionType,
 } from "./cycles";
+import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
@@ -468,5 +469,69 @@ export class SupabaseApi implements Api {
     maybe(
       await this.sb.from("potential_overrides").delete().eq("cycle_id", cycleId).eq("soldier_id", soldierId).eq("category_id", categoryId),
     );
+  }
+
+  // ----- base schedule -----
+
+  async rankRefs(): Promise<RankRef[]> {
+    return check(await this.sb.from("ranks").select("id, name, sort_order").order("sort_order")) as RankRef[];
+  }
+
+  async taskTypeAliases(): Promise<Alias[]> {
+    return check(await this.sb.from("task_type_aliases").select("alias, task_type_id")) as Alias[];
+  }
+
+  async saveTaskTypeAliases(aliases: Alias[]) {
+    if (aliases.length) maybe(await this.sb.from("task_type_aliases").upsert(aliases));
+  }
+
+  async cycleSlots(cycleId: string): Promise<SlotRow[]> {
+    const rows = check(
+      await this.sb
+        .from("slots")
+        .select(
+          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, assignments(status)",
+        )
+        .eq("cycle_id", cycleId)
+        .is("cancelled_at", null)
+        .order("starts_at"),
+    ) as unknown as (Omit<SlotRow, "assigned"> & { assignments: { status: string }[] })[];
+    return rows.map(({ assignments, ...r }) => ({ ...r, assigned: assignments.filter((a) => a.status !== "draft").length }));
+  }
+
+  async importSlots(cycleId: string, slots: SlotDraft[], replace: boolean, fileName: string) {
+    let deleted = 0;
+    if (replace) {
+      const free = (await this.cycleSlots(cycleId)).filter((s) => s.assigned === 0).map((s) => s.id);
+      for (let i = 0; i < free.length; i += 200) maybe(await this.sb.from("slots").delete().in("id", free.slice(i, i + 200)));
+      deleted = free.length;
+    }
+    const imp = check(
+      await this.sb
+        .from("roster_imports")
+        .insert({ kind: "base_slots", status: "applied", summary: { file: fileName, slots: slots.length, replaced: deleted, cycle_id: cycleId } })
+        .select("id")
+        .single(),
+    ) as { id: string };
+    const rows = slots.map((d) => ({
+      cycle_id: cycleId,
+      task_type_id: d.task_type_id,
+      starts_at: d.starts_at,
+      ends_at: d.ends_at,
+      performers_needed: d.performers_needed,
+      reserves_needed: d.reserves_needed,
+      allowed_rank_ids: d.allowed_rank_ids,
+      gender: d.gender,
+      instructions: d.instructions,
+      notes: d.notes,
+      import_id: imp.id,
+      source_line: d.line,
+    }));
+    for (let i = 0; i < rows.length; i += 200) maybe(await this.sb.from("slots").insert(rows.slice(i, i + 200)));
+    return { inserted: rows.length, deleted };
+  }
+
+  async deleteSlots(ids: string[]) {
+    if (ids.length) maybe(await this.sb.from("slots").delete().in("id", ids));
   }
 }

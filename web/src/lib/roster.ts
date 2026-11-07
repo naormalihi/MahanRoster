@@ -93,10 +93,23 @@ export interface ParseResult {
   errors: { line: number; message: string }[];
 }
 
+/**
+ * Excel cells are read without cellDates: a date cell arrives as its serial number (days since
+ * 1899-12-30) and is converted exactly. (With cellDates, SheetJS builds the Date in the browser's
+ * zone with a historical offset – in Israel 23:59:20 of the day before.)
+ */
 export function toIsoDate(v: unknown): string | null {
   if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number") {
+    if (!(v > 1 && v < 2958466)) return "invalid";
+    const dt = new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86_400_000);
+    return dt.toISOString().slice(0, 10);
+  }
   if (v instanceof Date && !isNaN(v.getTime())) {
-    const y = v.getFullYear(), m = v.getMonth() + 1, d = v.getDate();
+    // a Date from elsewhere: its local calendar day, rounded to the nearest midnight
+    const r = new Date(v.getTime() + 12 * 3_600_000);
+    r.setHours(0, 0, 0, 0);
+    const y = r.getFullYear(), m = r.getMonth() + 1, d = r.getDate();
     return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   }
   const s = String(v).trim();

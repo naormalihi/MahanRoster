@@ -97,12 +97,16 @@ class EligibilityIndex:
                 reasons.append("qualifying_only")
             if task.eligible_populations and not set(task.eligible_populations) & set(soldier.populations):
                 reasons.append("population")
-        rank_min = slot.rank_min if slot.rank_min is not None else task.rank_min
-        rank_max = slot.rank_max if slot.rank_max is not None else task.rank_max
-        if (rank_min is not None and soldier.rank_order < rank_min) or (
-            rank_max is not None and soldier.rank_order > rank_max
-        ):
-            reasons.append("rank")
+        if slot.allowed_ranks is not None:
+            if soldier.rank_order not in slot.allowed_ranks:
+                reasons.append("rank")
+        else:
+            rank_min = slot.rank_min if slot.rank_min is not None else task.rank_min
+            rank_max = slot.rank_max if slot.rank_max is not None else task.rank_max
+            if (rank_min is not None and soldier.rank_order < rank_min) or (
+                rank_max is not None and soldier.rank_order > rank_max
+            ):
+                reasons.append("rank")
         gender = slot.gender or task.gender
         if gender and soldier.gender != gender:
             reasons.append("gender")
