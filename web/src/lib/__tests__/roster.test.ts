@@ -43,10 +43,22 @@ describe("parsing", () => {
   });
 });
 
+describe("ת\"ש 7 column", () => {
+  it("reads it when the column exists, keeps the stored value when it does not", () => {
+    const base = { "מספר אישי": "1234567", "שם מלא": "א ב", "דרגה": "סמל", "גף": "גף א", "סוג שירות": "חובה" };
+    const m = detectMapping([...Object.keys(base), "ת\"ש"]);
+    expect(m.homeNightly).toBe("ת\"ש");
+    const rows = parseRows([{ ...base, "ת\"ש": "7" }, { ...base, "מספר אישי": "1234568", "ת\"ש": "" }], m).rows;
+    expect(rows.map((r) => r.homeNightly)).toEqual([true, false]);
+    const without = parseRows([base], detectMapping(Object.keys(base))).rows;
+    expect(without[0].homeNightly).toBeNull();
+  });
+});
+
 describe("plan", () => {
   const rec = (key: string, extra = {}) => ({
     ...toRecord({ line: 2, personalNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,
-      enlistmentDate: null, releaseDate: null, careerStartDate: null, rangeValidUntil: "2027-06-30", parent: false }, key),
+      enlistmentDate: null, releaseDate: null, careerStartDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null }, key),
     ...extra,
   });
   const existing = (key: string, extra = {}): ExistingSoldier => ({ ...rec(key), id: "id-" + key, is_active: true, gender: "male", ...extra });

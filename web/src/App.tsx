@@ -12,6 +12,7 @@ import { SoldiersPage } from "./pages/SoldiersPage";
 // Excel parsing is heavy and only נע"ת needs it.
 const ConstraintsPage = lazy(() => import("./pages/ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
 const PotentialPage = lazy(() => import("./pages/PotentialPage").then((m) => ({ default: m.PotentialPage })));
+const SlotsPage = lazy(() => import("./pages/SlotsPage").then((m) => ({ default: m.SlotsPage })));
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
@@ -54,6 +55,16 @@ function Gate() {
             element={
               <Suspense fallback={<CircularProgress />}>
                 <PotentialPage />
+              </Suspense>
+            }
+          />
+        )}
+        {staff && (
+          <Route
+            path="/slots"
+            element={
+              <Suspense fallback={<CircularProgress />}>
+                <SlotsPage />
               </Suspense>
             }
           />

@@ -37,6 +37,24 @@ def test_slot_rank_override():
     assert "rank" in reasons(soldier("A", rank_order=2), k)
 
 
+def test_slot_rank_list_overrides_ranges():
+    k = slot("k", "guard", *MON, rank_max=1, allowed_ranks=[2, 4])  # the list wins over the range
+    assert reasons(soldier("A", rank_order=2), k) == []
+    assert "rank" in reasons(soldier("B", rank_order=3), k)
+    assert reasons(soldier("C", rank_order=4), k) == []
+
+
+def test_home_nightly_only_daytime_duties():
+    s = soldier("A", home_nightly=True)
+    assert "home_nightly" in reasons(s, slot("k", "guard", *MON))  # 24 hours
+    assert reasons(s, slot("k", "guard", "2027-01-04T08:00", "2027-01-04T17:00")) == []
+    assert "home_nightly" in reasons(s, slot("k", "guard", "2027-01-04T15:00", "2027-01-04T23:00"))
+    # a week worked 08:00-17:00 each day: no night hours
+    week = slot("k", "guard", "2027-01-04T08:00", "2027-01-08T17:00", daily_hours="08:00-17:00")
+    assert reasons(s, week) == []
+    assert "home_nightly" in reasons(s, slot("k", "guard", "2027-01-04T08:00", "2027-01-08T17:00"))
+
+
 def test_qualifying_duty_only_for_qualifying_soldiers():
     parent = soldier("P", qualifies_day_only=True)
     assert "qualifying_only" in reasons(parent, slot("k", "guard", *MON))

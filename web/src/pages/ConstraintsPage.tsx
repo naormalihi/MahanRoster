@@ -810,7 +810,7 @@ function ExcelTab({ ctx }: { ctx: Ctx }) {
     setPlan(null);
     try {
       const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+      const wb = XLSX.read(await file.arrayBuffer());
       const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" });
       const [types, blocks, absences, quota] = await Promise.all([
         api!.absenceTypes(),

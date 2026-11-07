@@ -41,6 +41,7 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: "/cycles", label: "מחזורים" },
         { to: "/constraints", label: "אילוצים" },
         { to: "/potential", label: "פוטנציאל" },
+        { to: "/slots", label: "לוח הבסיס" },
         { to: "/soldiers", label: "חיילים" },
         { to: "/roster", label: "טעינת כוח אדם" },
         { to: "/admin", label: "הגדרות" },

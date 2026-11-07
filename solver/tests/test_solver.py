@@ -28,6 +28,16 @@ def test_lowest_score_gets_the_duty():
     assert [(a.soldier_id, a.role) for a in sol.assignments] == [("B", "performer")]
 
 
+def test_tash7_slot_prefers_home_nightly_soldiers():
+    day = ("2027-01-04T08:00", "2027-01-04T17:00")
+    soldiers = [soldier("A", baseline_score=0), soldier("B", baseline_score=5, home_nightly=True), soldier("C", gaf="G1")]
+    p = problem(soldiers, [slot("a", "guard", *day, r=0, prefer_home_nightly=True)], settings=FAST)
+    assert [a.soldier_id for a in solve(p).assignments] == ["B"]  # despite the higher score
+    # nobody home-nightly available -> still filled by someone else
+    p = problem([soldier("A"), soldier("C")], [slot("a", "guard", *day, r=0, prefer_home_nightly=True)], settings=FAST)
+    assert len(solve(p).assignments) == 1
+
+
 def test_rest_and_roles_respected():
     slots = [
         slot(f"d{i}", "guard", f"2027-01-{4 + i:02d}T08:00", f"2027-01-{5 + i:02d}T08:00") for i in range(4)

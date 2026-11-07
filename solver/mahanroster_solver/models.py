@@ -67,6 +67,8 @@ class Soldier:
     unit_join_date: Optional[date] = None
     range_valid_until: Optional[date] = None
     is_shachar: bool = False
+    # ת"ש 7: must be home every night, so no duty that covers night hours.
+    home_nightly: bool = False
     # Parent, or holder of an exemption marked "qualifies for day duty only".
     qualifies_day_only: bool = False
     # Fairness pool: soldiers are compared only inside their pool.
@@ -129,6 +131,12 @@ class Slot:
     # Per-slot overrides of the task type.
     rank_min: Optional[int] = None
     rank_max: Optional[int] = None
+    # Explicit rank orders allowed (the base lists e.g. "סמל - רס"ל, סג"מ - סגן"); overrides any range.
+    allowed_ranks: Optional[list[int]] = None
+    # The base marked the slot "ת"ש 7": soldiers who must be home nightly come first.
+    prefer_home_nightly: bool = False
+    # Multi-day slot worked only these hours each day ("08:00-17:00"); None = continuous.
+    daily_hours: Optional[str] = None
     gender: Optional[str] = None
     is_penalty: bool = False
     penalty_soldier_id: Optional[str] = None
@@ -154,6 +162,7 @@ class Weights:
     consecutive_weekends: float = 2.0
     same_week: float = 1.0  # more than one duty in the same week
     cross_gaf_reserve: float = 5.0  # career reserve from another gaf
+    home_nightly_preference: float = 100.0  # a "ת"ש 7" slot given to someone else (≈ 10 points of fairness)
 
 
 @dataclass

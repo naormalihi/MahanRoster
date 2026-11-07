@@ -18,6 +18,7 @@ import type {
   ExemptionInput,
   ExemptionType,
 } from "./cycles";
+import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
@@ -57,6 +58,7 @@ export interface BoardRow {
   briefing_place: string | null;
   updated_at: string;
   changed_after_publish: boolean;
+  instructions?: string | null;
 }
 
 export interface NamedRef {
@@ -132,6 +134,14 @@ export interface Api {
   snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]>;
   setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string): Promise<void>;
   clearPotentialOverride(cycleId: string, soldierId: string, categoryId: string): Promise<void>;
+  // base schedule
+  rankRefs(): Promise<RankRef[]>;
+  taskTypeAliases(): Promise<Alias[]>;
+  saveTaskTypeAliases(aliases: Alias[]): Promise<void>;
+  cycleSlots(cycleId: string): Promise<SlotRow[]>;
+  /** Insert the slots; with replace, first delete the cycle's slots that have no real assignments. */
+  importSlots(cycleId: string, slots: SlotDraft[], replace: boolean, fileName: string): Promise<{ inserted: number; deleted: number }>;
+  deleteSlots(ids: string[]): Promise<void>;
 }
 
 /**

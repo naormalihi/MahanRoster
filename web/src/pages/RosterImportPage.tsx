@@ -100,7 +100,7 @@ export function RosterImportPage() {
   async function readFile(file: File) {
     setError(null);
     setFileName(file.name);
-    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+    const wb = XLSX.read(await file.arrayBuffer());
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: true });
     const hdrs = (XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 })[0] ?? []).map(String);
