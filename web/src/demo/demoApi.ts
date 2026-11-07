@@ -59,6 +59,7 @@ export class DemoApi implements Api {
         gender: rand() < 0.6 ? "male" : "female",
         enlistment_date: "2025-03-01",
         release_date: career ? null : "2027-09-01",
+        career_start_date: career ? "2022-08-01" : null,
         range_valid_until: "2027-06-30",
         parent_status: false,
         is_active: true,

@@ -92,7 +92,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("soldiers")
         .select(
-          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, range_valid_until, parent_status, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
+          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, range_valid_until, parent_status, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
         ),
     ) as unknown as (Omit<ExistingSoldier, "gaf_name" | "rank_name"> & { gaf: { name: string }; rank: { name: string } | null })[];
     return rows.map(({ gaf, rank, ...s }) => ({ ...s, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
@@ -137,6 +137,7 @@ export class SupabaseApi implements Api {
       computed_rank_id: rankId.get(r.rank_name),
       enlistment_date: r.enlistment_date,
       release_date: r.release_date,
+      career_start_date: r.career_start_date,
       range_valid_until: r.range_valid_until,
       parent_status: r.parent_status,
       is_active: true,

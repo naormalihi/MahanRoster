@@ -345,3 +345,37 @@ def test_worker_processes_a_queued_job(conn):
     assert row == ("done", 100)
     # stability mode kept every published assignment
     assert count(conn, "select count(*) from assignments a join slots s on s.id = a.slot_id where s.cycle_id = %s and a.status = 'draft'", cycle) == 0
+
+
+def test_missing_range_date_is_assumed_valid(conn):
+    sid = conn.execute("select id from soldiers where range_valid_until is not null order by id limit 1").fetchone()[0]
+    conn.execute("update soldiers set range_valid_until = null where id = %s", (sid,))
+    end = conn.execute("select end_date from cycles where id = %s", (conn.cycle_id,)).fetchone()[0]
+
+    def range_in_input():
+        doc = conn.execute("select public.build_solver_input(%s)", (conn.cycle_id,)).fetchone()[0]
+        return next(s["range_valid_until"] for s in doc["soldiers"] if s["id"] == str(sid))
+
+    assert range_in_input() == end.isoformat()
+    conn.execute("update settings set value = 'false' where key = 'assume_range_valid'")
+    assert range_in_input() is None
+    conn.execute("update settings set value = 'true' where key = 'assume_range_valid'")
+
+
+def test_service_type_follows_career_start_date_per_cycle(conn):
+    cycle = conn.cycle_id
+    start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+    future, past = conn.execute(
+        "select (array_agg(id order by id))[1], (array_agg(id order by id))[2] from soldiers where service_type = 'mandatory' and is_active"
+    ).fetchone()
+    conn.execute("update soldiers set career_start_date = %s where id = %s", (start.replace(year=start.year + 1), future))
+    conn.execute("update soldiers set career_start_date = %s where id = %s", (start.replace(year=start.year - 1), past))
+    conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+    rows = dict(conn.execute(
+        "select soldier_id, service_type::text from cycle_soldier_snapshot where cycle_id = %s and soldier_id in (%s, %s)",
+        (cycle, future, past),
+    ).fetchall())
+    assert rows == {future: "mandatory", past: "career"}
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    by_id = {s["id"]: s for s in doc["soldiers"]}
+    assert by_id[str(past)]["service_type"] == "career" and by_id[str(past)]["balance_population"] == "career"
