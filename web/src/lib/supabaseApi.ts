@@ -20,6 +20,7 @@ import {
   type ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
@@ -448,10 +449,10 @@ export class SupabaseApi implements Api {
     const rows = check(
       await this.sb
         .from("cycle_soldier_snapshot")
-        .select("soldier_id, service_type, is_parent, qualifies_day_only, rank:ranks(name)")
+        .select("soldier_id, service_type, is_parent, qualifies_day_only, balance_population, baseline_score, rank:ranks(name)")
         .eq("cycle_id", cycleId),
     ) as unknown as (Omit<SnapshotSoldier, "rank_name"> & { rank: { name: string } | null })[];
-    return rows.map(({ rank, ...r }) => ({ ...r, rank_name: rank?.name ?? "" }));
+    return rows.map(({ rank, ...r }) => ({ ...r, baseline_score: Number(r.baseline_score), rank_name: rank?.name ?? "" }));
   }
 
   async setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string) {
@@ -583,5 +584,46 @@ export class SupabaseApi implements Api {
       error: string | null;
       body: string | null;
     } | null;
+  }
+
+  // ----- draft editor -----
+
+  async draftAssignments(cycleId: string): Promise<DraftAssignment[]> {
+    const out: DraftAssignment[] = [];
+    // paged: a half-year cycle has ~600 rows, above PostgREST's default page in some setups
+    for (let from = 0; ; from += 1000) {
+      const rows = check(
+        await this.sb
+          .from("assignments")
+          .select("id, slot_id, soldier_id, role, status, source, points, normalized_points, weekend_units, explanation, manual_reason, slots!inner(cycle_id)")
+          .eq("slots.cycle_id", cycleId)
+          .not("status", "in", "(dropped,cancelled_approved,swapped_out)")
+          .range(from, from + 999),
+      ) as unknown as (DraftAssignment & { slots: unknown })[];
+      out.push(
+        ...rows.map(({ slots: _s, ...r }) => ({ ...r, points: Number(r.points), normalized_points: Number(r.normalized_points) })),
+      );
+      if (rows.length < 1000) break;
+    }
+    return out;
+  }
+
+  async slotCandidates(slotId: string): Promise<Candidate[]> {
+    const rows = check(await this.sb.rpc("slot_candidates", { p_slot: slotId })) as Candidate[];
+    return rows.map((r) => ({ ...r, cycle_points: Number(r.cycle_points), conflicts: r.conflicts ?? [] }));
+  }
+
+  async manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string) {
+    return String(
+      check(await this.sb.rpc("manual_assign", { p_slot: slotId, p_role: role, p_soldier: soldierId, p_replace: replaceId, p_reason: reason })),
+    );
+  }
+
+  async removeAssignment(assignmentId: string, reason: string) {
+    maybe(await this.sb.rpc("remove_assignment", { p_assignment: assignmentId, p_reason: reason }));
+  }
+
+  async publishCycle(cycleId: string) {
+    return Number(check(await this.sb.rpc("publish_cycle", { p_cycle: cycleId })));
   }
 }

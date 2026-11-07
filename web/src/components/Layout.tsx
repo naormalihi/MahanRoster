@@ -30,8 +30,8 @@ const ROLE_LABEL: Record<string, string> = {
 export function Layout({ children }: { children: ReactNode }) {
   const { me, api, signOut } = useAuth();
   const staff = isStaff(me);
-  // nine links fit one row from about 1440px
-  const compact = useMediaQuery("(max-width:1439.95px)");
+  // ten links fit one row from about 1536px
+  const compact = useMediaQuery("(max-width:1535.95px)");
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
@@ -43,6 +43,7 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: "/potential", label: "פוטנציאל" },
         { to: "/slots", label: "לוח הבסיס" },
         { to: "/schedule", label: "שיבוץ" },
+        { to: "/draft", label: "טיוטה" },
         { to: "/soldiers", label: "חיילים" },
         { to: "/roster", label: "טעינת כוח אדם" },
         { to: "/admin", label: "הגדרות" },

@@ -25,6 +25,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
@@ -183,7 +184,10 @@ function Result({ job, slots, tasks }: { job: ScheduleJob; slots: Map<string, Sl
             {missingP === 0 && missingR === 0
               ? "כל המשבצות אוישו, מבצעים ועתודות."
               : `חסרים ${missingP} מבצעים ו-${missingR} עתודות. הפירוט למטה.`}{" "}
-            הטיוטה נשמרה; שיבוצים ידניים ומשבצות שפורסמו לא השתנו.
+            הטיוטה נשמרה; שיבוצים ידניים ומשבצות שפורסמו לא השתנו.{" "}
+            <Link component={RouterLink} to="/draft">
+              לטיוטה
+            </Link>
           </Alert>
         )}
         {(job.warnings?.length ?? 0) > 0 && (

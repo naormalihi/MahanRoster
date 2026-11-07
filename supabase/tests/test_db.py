@@ -651,3 +651,65 @@ def test_assumed_range_covers_slots_that_end_after_the_cycle(conn):
     doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
     s = next(x for x in doc["soldiers"] if x["id"] == str(sid))
     assert s["range_valid_until"] == (end + __import__("datetime").timedelta(days=7)).isoformat()
+
+
+def test_sql_points_match_the_engine(conn):
+    from mahanroster_solver.scoring import normalized_points, raw_points
+
+    cycle = conn.cycle_id
+    conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    p = models.load_problem(json.dumps(doc))
+    tasks = {t.id: t for t in p.task_types}
+    hol = set(p.holidays)
+    # a holiday and a load role in play, so the multipliers and the factor are exercised
+    leader = next(s for s in p.soldiers if s.load_roles)
+    checked = 0
+    for k in p.slots[:60]:
+        raw, norm = conn.execute("select raw, normalized from app.slot_points(%s, %s)", (k.id, leader.id)).fetchone()
+        assert float(raw) == round(raw_points(tasks[k.task_type_id], k.starts_at, k.ends_at, p.settings, hol), 2), k
+        assert abs(float(norm) - normalized_points(leader, tasks[k.task_type_id], k.starts_at, k.ends_at, p.settings, hol)) < 0.02
+        checked += 1
+    assert checked >= 30
+
+
+def test_candidates_match_the_engine_and_manual_changes(conn):
+    from mahanroster_solver.eligibility import EligibilityIndex
+
+    cycle = conn.cycle_id
+    conn.execute("update cycles set status = 'review' where id = %s", (cycle,))
+    conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    p = models.load_problem(json.dumps(doc))
+    idx = EligibilityIndex(p)
+    soldiers = {s.id: s for s in p.soldiers}
+    ignore = {"busy", "penalty_other"}  # other-cycle duties: SQL reports them as conflicts instead
+    for k in p.slots[::15]:
+        rows = _as_coord(conn, "select soldier_id, reasons from public.slot_candidates(%s)", k.id)
+        assert len(rows) == len(p.soldiers)
+        for sid, reasons in rows:
+            py = set(idx.check(soldiers[str(sid)], k)) - ignore
+            assert set(reasons) == py, (k.id, str(sid), reasons, py)
+
+    # manual: replace a draft performer by an eligible soldier, with a reason
+    slot, new_sid = None, None
+    for k in p.slots:  # a slot with a free, eligible soldier (the test data is random)
+        rows = _as_coord(conn, "select soldier_id from public.slot_candidates(%s) where reasons = '{}' and in_slot is null and conflicts = '[]' limit 1", k.id)
+        if rows:
+            slot, new_sid = k, rows[0][0]
+            break
+    assert slot is not None
+    with pytest.raises(psycopg.Error):
+        _as_coord(conn, "select public.manual_assign(%s, 'performer', %s, null, ' ')", slot.id, new_sid)
+    aid = _as_coord(conn, "select public.manual_assign(%s, 'performer', %s, null, 'בדיקה')", slot.id, new_sid)[0][0]
+    row = conn.execute("select source, manual_reason, points, role from assignments where id = %s", (aid,)).fetchone()
+    assert row[0] == "manual" and row[1] == "בדיקה" and float(row[2]) > 0 and row[3] == "performer"
+    in_slot = _as_coord(conn, "select in_slot from public.slot_candidates(%s) where soldier_id = %s", slot.id, new_sid)[0][0]
+    assert in_slot == "performer"
+    with pytest.raises(psycopg.Error):  # twice in the same slot
+        _as_coord(conn, "select public.manual_assign(%s, 'reserve', %s, null, 'x')", slot.id, new_sid)
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    assert any(f["slot_id"] == str(slot.id) and f["soldier_id"] == str(new_sid) for f in doc["fixed"])  # kept by the next run
+    _as_coord(conn, "select public.remove_assignment(%s, 'בדיקה')", aid)
+    assert conn.execute("select count(*) from assignments where id = %s", (aid,)).fetchone()[0] == 0
+    assert conn.execute("select count(*) from audit_log where action = 'remove_assignment' and entity_id = %s", (str(aid),)).fetchone()[0] == 1

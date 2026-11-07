@@ -26,6 +26,7 @@ import {
   type ExemptionType,
 } from "../lib/cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
+import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
 import type { ScheduleJob } from "../lib/schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
 import type { ExistingSoldier, RosterPlan } from "../lib/roster";
@@ -125,6 +126,7 @@ export class DemoApi implements Api {
   ].map(([alias, task_type_id]) => ({ alias, task_type_id }));
   private slotsByCycle = new Map<string, SlotRow[]>();
   private jobs: (ScheduleJob & { cycle_id: string })[] = [];
+  private draft: (DraftAssignment & { cycle_id: string })[] = [];
   private overrides = new Map<string, { value: number; reason: string }>();
   private calendar: CalendarDay[] = israeliHolidays("2026-09-01", "2027-08-31");
 
@@ -539,6 +541,7 @@ export class DemoApi implements Api {
     void cycleId;
     return this.soldierList.filter((s) => s.is_active).map((s) => ({
       soldier_id: s.id, rank_name: s.rank_name, service_type: s.service_type, is_parent: s.parent_status, qualifies_day_only: s.parent_status,
+      balance_population: s.service_type, baseline_score: 0,
     }));
   }
 
@@ -622,6 +625,32 @@ export class DemoApi implements Api {
     });
     const c = this.cycleList.find((x) => x.id === j.cycle_id);
     if (c && c.status === "scheduling") c.status = "review";
+    this.fillDraft(j.cycle_id);
+  }
+
+  /** Rough demo draft: each slot gets the least-loaded soldiers of a fitting service. */
+  private fillDraft(cycleId: string) {
+    this.draft = this.draft.filter((a) => a.cycle_id !== cycleId || a.source === "manual");
+    const load = new Map<string, number>();
+    const tasks = new Map(this.tasks.map((t) => [t.id, t]));
+    const slots = (this.slotsByCycle.get(cycleId) ?? []).slice(1); // leave the first one unfilled
+    for (const k of slots) {
+      const t = tasks.get(k.task_type_id);
+      const pool = this.soldierList.filter((s) => s.is_active && (!t || t.service_restriction === "any" || t.service_restriction === s.service_type));
+      const days = Math.max(1, Math.round((Date.parse(k.ends_at) - Date.parse(k.starts_at)) / 86_400_000));
+      const pts = Math.round((t?.weight ?? 1) * days * 100) / 100;
+      const pick = [...pool].sort((a, b) => (load.get(a.id) ?? 0) - (load.get(b.id) ?? 0) || a.id.localeCompare(b.id)).slice(0, 2);
+      pick.forEach((s, i) => {
+        const role: DraftRole = i === 0 ? "performer" : "reserve";
+        if (role === "performer") load.set(s.id, (load.get(s.id) ?? 0) + pts);
+        this.draft.push({
+          id: this.nextId("as"), cycle_id: cycleId, slot_id: k.id, soldier_id: s.id, role, status: "draft", source: "solver",
+          points: role === "performer" ? pts : 0, normalized_points: role === "performer" ? pts : 0, weekend_units: 0,
+          explanation: role === "performer" ? `שובץ כי הניקוד שלו ${(load.get(s.id)! - pts).toFixed(1)} לעומת ממוצע האוכלוסייה 3.0` : "עתודה",
+          manual_reason: null,
+        });
+      });
+    }
   }
 
   async scheduleJobs(cycleId: string) {
@@ -660,5 +689,62 @@ export class DemoApi implements Api {
 
   async dispatchResponse() {
     return { status_code: 204, error: null, body: "" };
+  }
+
+  // ----- draft editor -----
+
+  async draftAssignments(cycleId: string) {
+    await delay();
+    return this.draft.filter((a) => a.cycle_id === cycleId).map(({ cycle_id: _c, ...a }) => ({ ...a }));
+  }
+
+  async slotCandidates(slotId: string): Promise<Candidate[]> {
+    await delay(300);
+    const cycleId = [...this.slotsByCycle].find(([, v]) => v.some((s) => s.id === slotId))?.[0] ?? "";
+    const mine = this.draft.filter((a) => a.cycle_id === cycleId);
+    return this.soldierList
+      .filter((s) => s.is_active)
+      .map((s, i) => ({
+        soldier_id: s.id,
+        reasons: i % 5 === 0 ? ["rank"] : i % 7 === 0 ? ["absence"] : [],
+        conflicts: i % 11 === 0 ? [{ slot_id: "x", task: "קצין תורן – חול", role: "performer" as DraftRole, starts_at: new Date().toISOString(), ends_at: new Date().toISOString() }] : [],
+        cycle_points: mine.filter((a) => a.soldier_id === s.id).reduce((n, a) => n + a.normalized_points, 0),
+        cycle_duties: mine.filter((a) => a.soldier_id === s.id).length,
+        in_slot: mine.find((a) => a.slot_id === slotId && a.soldier_id === s.id)?.role ?? null,
+      }));
+  }
+
+  async manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string) {
+    await delay();
+    if (!reason.trim()) throw new Error("a reason is required");
+    const cycleId = [...this.slotsByCycle].find(([, v]) => v.some((s) => s.id === slotId))?.[0] ?? "";
+    let points = 1;
+    if (replaceId) {
+      const old = this.draft.find((a) => a.id === replaceId)!;
+      role = old.role;
+      points = old.points || 1;
+      this.draft = this.draft.filter((a) => a.id !== replaceId);
+    }
+    const id = this.nextId("as");
+    this.draft.push({
+      id, cycle_id: cycleId, slot_id: slotId, soldier_id: soldierId, role, status: "draft", source: "manual",
+      points: role === "performer" ? points : 0, normalized_points: role === "performer" ? points : 0, weekend_units: 0,
+      explanation: `שיבוץ ידני: ${reason}`, manual_reason: reason,
+    });
+    return id;
+  }
+
+  async removeAssignment(assignmentId: string) {
+    await delay();
+    this.draft = this.draft.filter((a) => a.id !== assignmentId);
+  }
+
+  async publishCycle(cycleId: string) {
+    await delay(300);
+    const c = this.cycleList.find((x) => x.id === cycleId)!;
+    Object.assign(c, { status: "published", published_at: new Date().toISOString() });
+    const mine = this.draft.filter((a) => a.cycle_id === cycleId && a.status === "draft");
+    mine.forEach((a) => (a.status = a.role === "performer" ? "assigned" : "reserve_idle"));
+    return mine.length;
   }
 }

@@ -57,7 +57,7 @@ const STAGE_LINK: Partial<Record<CycleStatus, { to: string; label: string }>> = 
   potential: { to: "/potential", label: "למטריצת הפוטנציאל" },
   slots: { to: "/slots", label: "לקליטת לוח הבסיס" },
   scheduling: { to: "/schedule", label: "להרצת השיבוץ" },
-  review: { to: "/schedule", label: "לתוצאת השיבוץ" },
+  review: { to: "/draft", label: "לטיוטה ולפרסום" },
 };
 
 /** Stages after this one need screens that do not exist yet; the stepper stops here. */
