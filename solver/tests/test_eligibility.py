@@ -44,6 +44,25 @@ def test_slot_rank_list_overrides_ranges():
     assert reasons(soldier("C", rank_order=4), k) == []
 
 
+def test_medical_exemption_permits_the_day_duty_while_in_force():
+    day = slot("d", "day", "2027-01-04T08:30", "2027-01-04T16:30", r=0)
+    s = soldier("A")
+    assert "not_qualifying" in reasons(s, day)
+    med = Exemption("A", date(2027, 1, 1), date(2027, 1, 10), excluded_task_type_ids=["guard"], qualifies_task_type_ids=["day"])
+    assert reasons(s, day, exemptions=[med]) == []
+    assert "exemption" in reasons(s, slot("k", "guard", *MON), exemptions=[med])
+    later = slot("d2", "day", "2027-01-12T08:30", "2027-01-12T16:30", r=0)
+    assert "not_qualifying" in reasons(s, later, exemptions=[med])  # after the exemption ends
+
+
+def test_briefing_day_must_be_free():
+    k = slot("k", "guard", "2027-01-06T13:00", "2027-01-13T13:00", briefing_at=dt("2027-01-05T13:00"))
+    away = Absence("A", dt("2027-01-03T00:00"), dt("2027-01-06T00:00"))  # back on the start day
+    assert "absence" in reasons(soldier("A"), k, absences=[away])
+    assert reasons(soldier("A"), slot("k", "guard", "2027-01-06T13:00", "2027-01-13T13:00"), absences=[away]) == []
+    assert "date_block" in reasons(soldier("A"), k, date_blocks=[DateBlock("A", date(2027, 1, 5))])
+
+
 def test_home_nightly_only_daytime_duties():
     s = soldier("A", home_nightly=True)
     assert "home_nightly" in reasons(s, slot("k", "guard", *MON))  # 24 hours

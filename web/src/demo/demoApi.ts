@@ -56,7 +56,7 @@ function rng(seed: number) {
   };
 }
 
-const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד שער", "ממלכ\"ת", "שמירות חובה", "משימות חיילות"].map((name, i) => ({ id: `c${i}`, name }));
+const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד שער", "ממלכ\"ת", "שמירות חובה", "משימות חיליות", "רס\"ר", "מפקד תורן"].map((name, i) => ({ id: `c${i}`, name }));
 const POPULATIONS: Population[] = [
   { code: "mandatory", name: "חובה" },
   { code: "career", name: "קבע" },
@@ -67,15 +67,22 @@ const tt = (code: string, name: string, cat: number, weight: number, o: Partial<
   id: `t_${code}`, code, name, category_id: `c${cat}`, weight, min_rest_hours: 0, service_restriction: "any",
   requires_weapon: false, is_weekend_type: false, shachar_compatible: false, qualifying_duty: false,
   eligible_populations: [], rank_min_id: null, rank_max_id: null, gender: null,
-  default_start_time: "08:00", default_end_time: "08:00", color: null, is_active: true, ...o,
-});
+  default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
+}) as TaskType;
 const DEMO_TASKS: TaskType[] = [
   tt("hagnash", "הגנ\"ש – חול", 0, 1, { eligible_populations: ["officer", "career"], rank_max_id: "r9", requires_weapon: true, color: "#2f7d5b" }),
   tt("katzin_toran", "קצין תורן – חול", 1, 1, { eligible_populations: ["officer"], rank_max_id: "r9", color: "#3b6ea8" }),
   tt("katzin_toran_shabbat", "קצין תורן – שבת", 1, 3, { eligible_populations: ["officer"], rank_max_id: "r9", is_weekend_type: true, color: "#3b6ea8" }),
   tt("mamlachat_yom", "ממלכ\"ת יום – חול", 3, 0.75, { eligible_populations: ["major"], rank_max_id: "r10", qualifying_duty: true, shachar_compatible: true, default_end_time: "17:00", color: "#6a7ab0" }),
   tt("mamlachat_layla", "ממלכ\"ת לילה – חול", 3, 1, { eligible_populations: ["major"], rank_max_id: "r10", min_rest_hours: 12, default_start_time: "20:00", color: "#4a5a8a" }),
-  tt("shmira", "שמירה – חול", 4, 1, { service_restriction: "mandatory", rank_max_id: "r3", requires_weapon: true, min_rest_hours: 8, color: "#9a6a1f" }),
+  tt("shmirot_chova", "שמירות חובה", 4, 1, { service_restriction: "mandatory", eligible_populations: ["mandatory"], rank_max_id: "r3", requires_weapon: true, min_rest_hours: 24, default_start_time: "13:00", default_end_time: "13:00", color: "#9a6a1f" }),
+  tt("mefaked_shaar", "מפקד שער – חול", 2, 1, { eligible_populations: ["career", "officer"], rank_max_id: "r9", requires_weapon: true, color: "#9a6a1f" }),
+  tt("mesimot_chayliyot", "משימות חיליות", 5, 1, { eligible_populations: ["officer"], rank_max_id: "r10", requires_weapon: true, min_rest_hours: 24, default_start_time: "10:00", default_end_time: "10:00", color: "#7a3e9d" }),
+  tt("rasar", "רס\"ר – חול", 6, 0.75, { service_restriction: "mandatory", eligible_populations: ["mandatory"], rank_max_id: "r3", default_end_time: "17:00", color: "#a04f5e" }),
+  tt("mefaked_toran", "מפקד תורן", 7, 1, {
+    eligible_populations: ["major"], rank_max_id: "r10", min_rest_hours: 24, color: "#8a3b2e",
+    weekday_hours: { "0": "06:00-08:00+1", "1": "08:00-08:00", "2": "08:00-08:00", "3": "08:00-08:00", "4": "08:00-18:00", after_holiday: "06:00-08:00+1" },
+  }),
 ];
 
 const EXEMPTION_TYPES: ExemptionType[] = [
@@ -111,7 +118,11 @@ export class DemoApi implements Api {
   private absenceList: Absence[] = [];
   private blockList: DateBlock[] = [];
   private seq = 0;
-  private aliasList: Alias[] = [];
+  private aliasList: Alias[] = [
+    ["אמ\"ת גבעת המורה", "t_mesimot_chayliyot"], ["אמ\"ת חרבית", "t_mesimot_chayliyot"], ["שיפוט צד", "t_mesimot_chayliyot"],
+    ["רסר הקלת\"ש", "t_rasar"], ["רסר טקס רלצד", "t_rasar"], ["ממלכת יום", "t_mamlachat_yom"],
+    ["ש.ג דרום 7-11", "t_mefaked_shaar"], ["צפון 10-13,16-16", "t_mefaked_shaar"],
+  ].map(([alias, task_type_id]) => ({ alias, task_type_id }));
   private slotsByCycle = new Map<string, SlotRow[]>();
   private jobs: (ScheduleJob & { cycle_id: string })[] = [];
   private overrides = new Map<string, { value: number; reason: string }>();
@@ -483,7 +494,9 @@ export class DemoApi implements Api {
         c2: r >= 4 && r <= 9, // מפקד שער
         c3: r === 10, // ממלכ"ת
         c4: r <= 3 && s.service_type === "mandatory", // שמירות חובה
-        c5: s.gender === "female" && r <= 9, // משימות חיילות
+        c5: r >= 7 && r <= 10, // משימות חיליות
+        c6: r <= 3 && s.service_type === "mandatory", // רס"ר
+        c7: r === 10, // מפקד תורן
       };
       for (const cat of CATEGORIES) {
         const ok = rules[cat.id];
@@ -557,6 +570,10 @@ export class DemoApi implements Api {
     }
   }
 
+  async deleteTaskTypeAlias(alias: string) {
+    this.aliasList = this.aliasList.filter((a) => a.alias !== alias);
+  }
+
   async cycleSlots(cycleId: string) {
     await delay();
     return (this.slotsByCycle.get(cycleId) ?? []).map((s) => ({ ...s }));
@@ -569,7 +586,7 @@ export class DemoApi implements Api {
     const added: SlotRow[] = slots.map((d) => ({
       id: this.nextId("sl"), task_type_id: d.task_type_id, starts_at: d.starts_at, ends_at: d.ends_at,
       performers_needed: d.performers_needed, reserves_needed: d.reserves_needed, allowed_rank_ids: d.allowed_rank_ids,
-      gender: d.gender, instructions: d.instructions, notes: d.notes, source_line: d.line, prefer_home_nightly: d.prefer_home_nightly, daily_hours: d.daily_hours, assigned: 0,
+      gender: d.gender, instructions: d.instructions, notes: d.notes, source_line: d.line, prefer_home_nightly: d.prefer_home_nightly, daily_hours: d.daily_hours, briefing_at: d.briefing_at, assigned: 0,
     }));
     this.slotsByCycle.set(cycleId, [...kept, ...added].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
     return { inserted: added.length, deleted: cur.length - kept.length };

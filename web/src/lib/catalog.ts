@@ -22,6 +22,8 @@ export interface TaskType {
   gender: "male" | "female" | null;
   default_start_time: string | null; // HH:MM
   default_end_time: string | null;
+  /** hours by start weekday ("0" = Sunday … "6", "after_holiday"), "HH:MM-HH:MM"; overrides the defaults */
+  weekday_hours: Record<string, string> | null;
   color: string | null;
   is_active: boolean;
 }
@@ -45,6 +47,8 @@ export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" |
   if (!(t.weight > 0) || t.weight > 99) p.push("משקל חייב להיות גדול מ-0 (עד 99)");
   if (!Number.isInteger(t.min_rest_hours) || t.min_rest_hours < 0) p.push("שעות מנוחה – מספר שלם, 0 ומעלה");
   if (!!t.default_start_time !== !!t.default_end_time) p.push("שעת התחלה וסיום – שתיהן או אף אחת");
+  if (t.weekday_hours && Object.values(t.weekday_hours).some((w) => !/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d(\+1)?$/.test(w)))
+    p.push("שעות לפי יום בתבנית 08:00-17:00 (או 06:00-08:00+1 לסיום למחרת)");
   return p;
 }
 

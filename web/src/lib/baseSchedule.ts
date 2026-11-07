@@ -222,17 +222,72 @@ export interface SlotDraft {
   weekendSwitched: boolean;
   /** The file and the holiday calendar disagree on whether the duty falls on a holiday. */
   holidayMismatch: "file_only" | "calendar_only" | null;
+  briefing_at: string | null;
+  /** a briefing day was written but is too far before the start to be about this slot */
+  briefingIgnored: boolean;
+  /** the population column contradicts the mapped type (e.g. "חובה" on a career-only type) */
+  populationMismatch: boolean;
+}
+
+const dowOf = (day: string) => new Date(day + "T12:00:00Z").getUTCDay(); // 0 = Sunday
+
+/**
+ * The hours a duty type uses on a given start day: by weekday (or after a holiday) when set, else the
+ * defaults. A window ending "+1" ends the next day ("06:00-08:00+1"); so does one whose end is not after its start.
+ */
+export function hoursOn(
+  day: string,
+  task: Pick<TaskType, "default_start_time" | "default_end_time" | "weekday_hours">,
+  holidays?: Set<string>,
+): [string, string, boolean] {
+  const wh = task.weekday_hours;
+  const w = wh && ((holidays?.has(addDaysIso(day, -1)) && wh.after_holiday) || wh[String(dowOf(day))]);
+  const [a, b] = w ? w.split("-") : [task.default_start_time ?? "08:00", task.default_end_time ?? "08:00"];
+  const end = b.replace("+1", "");
+  return [a, end, b.endsWith("+1") || end <= a];
 }
 
 /**
- * Times: the duty type's default hours on the start and end dates. An end that is not after
- * the start (08:00 → 08:00 on the same date) runs to the next day.
+ * Times: the duty type's hours on the start and end dates. One day: ends the next day when the
+ * window says so (08:00 → 08:00). Several days: ends on the end date.
  */
-export function slotTimes(start: string, end: string, task: Pick<TaskType, "default_start_time" | "default_end_time">) {
-  const st = task.default_start_time ?? "08:00";
-  const et = task.default_end_time ?? "08:00";
-  const endDay = end > start || et > st ? end : addDaysIso(end, 1);
+export function slotTimes(
+  start: string,
+  end: string,
+  task: Pick<TaskType, "default_start_time" | "default_end_time"> & Partial<Pick<TaskType, "weekday_hours">>,
+  holidays?: Set<string>,
+) {
+  const t = { weekday_hours: null, ...task };
+  const [st, , nextDay] = hoursOn(start, t, holidays);
+  const [, et] = hoursOn(end, t, holidays);
+  const endDay = end > start || !nextDay ? end : addDaysIso(end, 1);
   return { starts_at: localTs(start, st), ends_at: localTs(endDay, et) };
+}
+
+const WEEKDAY_WORD: Record<string, number> = { ראשון: 0, שני: 1, שלישי: 2, רביעי: 3, חמישי: 4, שישי: 5, שבת: 6 };
+
+/**
+ * A briefing written in the instructions ("התייצבות לתדריך ביום שלישי ... בשעה 13:00"): the last such
+ * weekday on or before the start, up to 3 days before. A phone briefing does not count.
+ */
+export function parseBriefing(instructions: string | null, startDay: string): { at: string | null; ignored: boolean } {
+  const line = (instructions ?? "").split(/\n/).find((l) => l.includes("תדריך") && !l.includes("טלפוני"));
+  if (!line) return { at: null, ignored: false };
+  const dayWord = line.match(/ביום\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/);
+  const time = line.match(/(\d{1,2}):(\d{2})/);
+  if (!dayWord || !time) return { at: null, ignored: false };
+  const want = WEEKDAY_WORD[dayWord[1]];
+  const back = (dowOf(startDay) - want + 7) % 7;
+  if (back > 3) return { at: null, ignored: true };
+  return { at: localTs(addDaysIso(startDay, -back), `${time[1].padStart(2, "0")}:${time[2]}`), ignored: false };
+}
+
+/** The file's population column against the mapped type's service restriction. */
+export function populationMismatch(population: string, task: Pick<TaskType, "service_restriction">): boolean {
+  const p = norm(population);
+  if (p === "חובה") return task.service_restriction === "career";
+  if (p === norm("קצינים ונגדים")) return task.service_restriction === "mandatory";
+  return false;
 }
 
 /** A duty type that runs within one day (08:00–17:00), over several days, is worked those hours each day. */
@@ -278,6 +333,7 @@ export function buildSlots(
     const taskId = weekendVariant(mapped, r.start, ctx.tasks, ctx.weekendIsoDays);
     const task = ctx.tasks.find((t) => t.id === taskId)!;
     const ranks = parseRanks(r.ranksText, ctx.ranks);
+    const briefing = parseBriefing(r.instructions, r.start);
     let holidayMismatch: SlotDraft["holidayMismatch"] = null;
     if (r.holiday !== null && ctx.holidays) {
       let onHoliday = false;
@@ -289,7 +345,7 @@ export function buildSlots(
       line: r.line,
       duty: r.duty,
       task_type_id: taskId,
-      ...slotTimes(r.start, r.end, task),
+      ...slotTimes(r.start, r.end, task, ctx.holidays),
       performers_needed: 1,
       reserves_needed: 1,
       allowed_rank_ids: ranks.rankIds,
@@ -302,6 +358,9 @@ export function buildSlots(
       daily_hours: dailyHours(r.start, r.end, task),
       weekendSwitched: taskId !== mapped,
       holidayMismatch,
+      briefing_at: briefing.at,
+      briefingIgnored: briefing.ignored,
+      populationMismatch: populationMismatch(r.population, task),
     });
   }
   return { slots, unmapped: [...unmapped.values()].sort((a, b) => b.count - a.count), outside };
@@ -322,6 +381,7 @@ export interface SlotRow {
   source_line: number | null;
   prefer_home_nightly: boolean;
   daily_hours: string | null;
+  briefing_at: string | null;
   assigned: number; // assignments that are not drafts
 }
 

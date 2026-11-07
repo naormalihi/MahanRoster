@@ -139,6 +139,7 @@ export interface Api {
   rankRefs(): Promise<RankRef[]>;
   taskTypeAliases(): Promise<Alias[]>;
   saveTaskTypeAliases(aliases: Alias[]): Promise<void>;
+  deleteTaskTypeAlias(alias: string): Promise<void>;
   cycleSlots(cycleId: string): Promise<SlotRow[]>;
   /** Insert the slots; with replace, first delete the cycle's slots that have no real assignments. */
   importSlots(cycleId: string, slots: SlotDraft[], replace: boolean, fileName: string): Promise<{ inserted: number; deleted: number }>;
