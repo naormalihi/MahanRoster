@@ -71,8 +71,10 @@ export interface SoldierLoad {
   soldier_id: string;
   pool: string;
   baseline: number;
+  credit: number; // availability credit for days out of the unit not by choice
+  creditDays: number;
   points: number; // this cycle, normalized, as performer
-  expected: number; // baseline + points
+  expected: number; // baseline + credit + points
   duties: number;
   reserves: number;
   weekends: number;
@@ -80,13 +82,32 @@ export interface SoldierLoad {
 }
 
 export function loads(
-  snapshot: { soldier_id: string; balance_population: string; baseline_score: number }[],
+  snapshot: {
+    soldier_id: string;
+    balance_population: string;
+    baseline_score: number;
+    fairness_group?: string | null;
+    credit?: number;
+    credit_days?: number;
+  }[],
   assignments: DraftAssignment[],
 ): SoldierLoad[] {
   const m = new Map<string, SoldierLoad>(
     snapshot.map((s) => [
       s.soldier_id,
-      { soldier_id: s.soldier_id, pool: s.balance_population, baseline: s.baseline_score, points: 0, expected: s.baseline_score, duties: 0, reserves: 0, weekends: 0, manual: 0 },
+      {
+        soldier_id: s.soldier_id,
+        pool: s.fairness_group || s.balance_population,
+        baseline: s.baseline_score,
+        credit: s.credit ?? 0,
+        creditDays: s.credit_days ?? 0,
+        points: 0,
+        expected: s.baseline_score + (s.credit ?? 0),
+        duties: 0,
+        reserves: 0,
+        weekends: 0,
+        manual: 0,
+      },
     ]),
   );
   for (const a of assignments) {
@@ -101,7 +122,7 @@ export function loads(
   }
   for (const l of m.values()) {
     l.points = Math.round(l.points * 100) / 100;
-    l.expected = Math.round((l.baseline + l.points) * 100) / 100;
+    l.expected = Math.round((l.baseline + l.credit + l.points) * 100) / 100;
   }
   return [...m.values()];
 }

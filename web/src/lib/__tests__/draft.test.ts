@@ -33,9 +33,20 @@ describe("draft", () => {
     expect(ls.find((l) => l.soldier_id === "s2")).toMatchObject({ points: 1, reserves: 1, manual: 1 });
     expect(poolMeans(ls).get("mandatory")).toBeCloseTo(5.25);
   });
+  it("pools by fairness group and adds the availability credit", () => {
+    const ls = loads(
+      [
+        { soldier_id: "s1", balance_population: "mandatory", baseline_score: 1, fairness_group: "mandatory:a", credit: 4, credit_days: 14 },
+        { soldier_id: "s2", balance_population: "mandatory", baseline_score: 0, fairness_group: "mandatory:b" },
+      ],
+      [a("1", "k", "s1", "performer", 2)],
+    );
+    expect(ls.find((l) => l.soldier_id === "s1")).toMatchObject({ pool: "mandatory:a", expected: 7, creditDays: 14 });
+    expect([...poolMeans(ls).keys()].sort()).toEqual(["mandatory:a", "mandatory:b"]);
+  });
   it("groups soldiers by the duties open to them", async () => {
     const { byProfile } = await import("../draft");
-    const l = (id: string, expected: number) => ({ soldier_id: id, pool: "m", baseline: 0, points: expected, expected, duties: 0, reserves: 0, weekends: 0, manual: 0 });
+    const l = (id: string, expected: number) => ({ soldier_id: id, pool: "m", baseline: 0, credit: 0, creditDays: 0, points: expected, expected, duties: 0, reserves: 0, weekends: 0, manual: 0 });
     const open: Record<string, string[]> = { a: ["שמירות", "רס\"ר"], b: ["רס\"ר", "שמירות"], c: ["רס\"ר"], d: [] };
     const r = byProfile([l("a", 30), l("b", 34), l("c", 10), l("d", 0)], (id) => [...open[id]]);
     expect(r[0]).toEqual({ key: "רס\"ר + שמירות", soldiers: 2, mean: 32, min: 30, max: 34 });

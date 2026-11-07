@@ -20,6 +20,12 @@ export interface SnapshotSoldier {
   qualifies_day_only: boolean;
   balance_population: string;
   baseline_score: number;
+  /** Soldiers who can share load inside the population (connected duty categories). */
+  fairness_group?: string | null;
+  fairness_label?: string | null;
+  /** Availability credit of the last run: days out of the unit not by choice, and their points. */
+  credit_days?: number;
+  credit?: number;
 }
 
 export interface DailyAvailability {

@@ -358,9 +358,18 @@ function SlotsTab({ ctx }: { ctx: Ctx }) {
 // ---------------------------------------------------------------------------
 
 function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: SnapshotSoldier[]; cells: PotentialCell[] | null; categories: Map<string, string> }) {
-  const [pool, setPool] = useState("mandatory");
   const ls = useMemo(() => loads(snapshot, ctx.assignments), [snapshot, ctx.assignments]);
   const means = poolMeans(ls);
+  // a group's name: its population and the duty categories its soldiers share
+  const groupName = new Map<string, string>();
+  for (const s of snapshot) {
+    const key = s.fairness_group || s.balance_population;
+    if (!groupName.has(key)) groupName.set(key, [POOL_LABEL[s.balance_population] ?? s.balance_population, s.fairness_label].filter(Boolean).join(" · "));
+  }
+  const keys = [...means.keys()].sort((a, b) => ls.filter((l) => l.pool === b).length - ls.filter((l) => l.pool === a).length);
+  const [picked, setPool] = useState("");
+  const pool = keys.includes(picked) ? picked : keys[0] ?? "";
+  const credited = ls.some((l) => l.creditDays > 0);
   const rank = new Map(snapshot.map((s) => [s.soldier_id, s.rank_name]));
   const open = new Map<string, number>();
   for (const c of cells ?? []) if (effective(c) > 0) open.set(c.soldier_id, (open.get(c.soldier_id) ?? 0) + 1);
@@ -374,10 +383,19 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-        {[...means.keys()].map((p) => (
-          <Chip key={p} label={`${POOL_LABEL[p] ?? p} · ממוצע ${(means.get(p) ?? 0).toFixed(1)}`} color={p === pool ? "primary" : "default"} onClick={() => setPool(p)} />
+        {keys.map((p) => (
+          <Chip
+            key={p}
+            label={`${groupName.get(p) ?? POOL_LABEL[p] ?? p} · ${ls.filter((l) => l.pool === p).length} · ממוצע ${(means.get(p) ?? 0).toFixed(1)}`}
+            color={p === pool ? "primary" : "default"}
+            onClick={() => setPool(p)}
+          />
         ))}
       </Stack>
+      <Typography variant="body2" color="text.secondary">
+        כל קבוצה כוללת חיילים מאותה אוכלוסייה שיכולים להתחלק בעומס (יש להם קטגוריות תורנות משותפות). ההוגנות והממוצע נמדדים בתוך הקבוצה.
+        {credited && " זיכוי = ימים מחוץ ליחידה שלא מבחירה (לפני גיוס, אחרי שחרור, חודש חסד, פטור מלא, קורס או מחלה ארוכים) כפול העומס היומי הממוצע של הקבוצה."}
+      </Typography>
       {cells && zeroOpen > 0 && (
         <Alert severity="info">
           {zeroOpen} חיילים בקבוצה הזו לא זכאים לאף קטגוריית תורנות לפי מטריצת הפוטנציאל, ולכן הניקוד שלהם 0. הם נכללים בממוצע ומושכים אותו למטה – זה
@@ -415,7 +433,7 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              {["חייל", "גף", "דרגה", "ניקוד קודם", "במחזור", "צפוי", "מול הממוצע", "תורנויות", "עתודות", "סופ״ש", "קטגוריות פתוחות"].map((h) => (
+              {["חייל", "גף", "דרגה", "ניקוד קודם", ...(credited ? ["זיכוי"] : []), "במחזור", "צפוי", "מול הממוצע", "תורנויות", "עתודות", "סופ״ש", "קטגוריות פתוחות"].map((h) => (
                 <TableCell key={h} sx={{ whiteSpace: "nowrap" }}>
                   {h}
                 </TableCell>
@@ -435,6 +453,7 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
                   <TableCell>{s?.gaf_name}</TableCell>
                   <TableCell>{rank.get(l.soldier_id)}</TableCell>
                   <TableCell>{l.baseline.toFixed(1)}</TableCell>
+                  {credited && <TableCell title={l.creditDays ? `${l.creditDays} ימים` : undefined}>{l.creditDays ? `${l.credit.toFixed(1)} (${l.creditDays} י׳)` : ""}</TableCell>}
                   <TableCell>{l.points.toFixed(1)}</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>{l.expected.toFixed(1)}</TableCell>
                   <TableCell sx={{ color: Math.abs(diff) > 5 ? (diff > 0 ? "error.main" : "info.main") : undefined }}>

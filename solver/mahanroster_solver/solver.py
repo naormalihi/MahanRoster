@@ -15,8 +15,11 @@ Hard constraints
     * fixed assignments (manual locks, penalty slots, published slots)
     * optional monthly cap of duties per soldier
 
-Soft objective, inside each fairness pool (mandatory vs. career):
-    expected score E_s = baseline_s + normalized points assigned this cycle
+Soft objective, inside each fairness pool (the soldier's fairness group – soldiers of
+one population who can share load – or else the population):
+    expected score E_s = baseline_s + credit_s + normalized points assigned this cycle
+    where credit_s = the pool's average load per available day × the days the soldier
+    is out of the unit not by choice (see availability_credits)
     minimize max E_s, the L1 spread of E_s around the pool mean, the max
     number of weekend/holiday units, the max number of reserve roles,
     consecutive weekends, several duties in one week, career reserves
@@ -41,6 +44,7 @@ from .models import (
     ROLE_RESERVE,
     SERVICE_MANDATORY,
     AssignmentOut,
+    CreditOut,
     PoolStats,
     Problem,
     Solution,
@@ -142,6 +146,38 @@ def _pool_load(prep: Prepared, members: list[str], by_soldier, slots) -> float:
             share = len(inside) / len(elig)
             load += share * slots[kid].performers_needed * sum(prep.pts[s, kid] for s in inside) / len(inside)
     return load
+
+
+def availability_credits(problem: Problem, prep: Prepared) -> dict[str, tuple[int, int]]:
+    """Per soldier: (credited days, scaled credit) for the days of this run's slots.
+
+    The pool's expected load is shared among its soldiers in proportion to the days each
+    is available; a credited day is worth the pool's average load per available day.
+    """
+    if not problem.slots:
+        return {}
+    first = min(k.starts_at.date() for k in problem.slots)
+    last = max(k.starts_at.date() for k in problem.slots)
+    span = (last - first).days + 1
+    slots = {k.id: k for k in problem.slots}
+    by_soldier = defaultdict(list)
+    for sid, kid in prep.pts:
+        by_soldier[sid].append(kid)
+    members = defaultdict(list)
+    for s in problem.soldiers:
+        members[s.pool].append(s)
+    out: dict[str, tuple[int, int]] = {}
+    for pool, ss in members.items():
+        days = {s.id: s.credited_days(first, last) for s in ss}
+        if not any(days.values()):
+            continue
+        load = _pool_load(prep, [s.id for s in ss if s.id in by_soldier], by_soldier, slots)
+        available = sum(span - d for d in days.values())
+        rate = load / available if available > 0 else 0.0
+        for s in ss:
+            if days[s.id]:
+                out[s.id] = (days[s.id], round(rate * days[s.id]))
+    return out
 
 
 def _thresholds(base: dict[str, int], bound: dict[str, int], pool_load: float, step: int = SCALE) -> range:
@@ -278,7 +314,8 @@ def solve(problem: Problem, log: bool = False) -> Solution:
     pools = defaultdict(list)
     for s in problem.soldiers:
         if s.id in by_soldier:  # only soldiers who can take part in this cycle are balanced
-            pools[s.balance_population].append(s.id)
+            pools[s.pool].append(s.id)
+    credit = availability_credits(problem, prep)
 
     objective = []
     objective += [UNFILLED_PERFORMER_PENALTY * v for v in unfilled_p.values()]
@@ -294,7 +331,7 @@ def solve(problem: Problem, log: bool = False) -> Solution:
         n = len(members)
         for sid in members:
             pool_of[sid] = (pool, n)
-        base = {sid: max(0, round(SCALE * soldiers[sid].baseline_score)) for sid in members}
+        base = {sid: max(0, round(SCALE * soldiers[sid].baseline_score)) + credit.get(sid, (0, 0))[1] for sid in members}
         bound = {sid: base[sid] + sum(prep.pts[sid, kid] for kid in by_soldier[sid]) for sid in members}
         hi_bound = max(bound.values())
         for sid in members:
@@ -414,18 +451,22 @@ def solve(problem: Problem, log: bool = False) -> Solution:
     for (sid, kid), v in r.items():
         if solver.Value(v):
             chosen.append((sid, kid, ROLE_RESERVE))
-    sol.assignments = build_assignments(problem, prep, chosen)
+    credits = {sid: v / SCALE for sid, (_, v) in credit.items()}
+    sol.assignments = build_assignments(problem, prep, chosen, credits)
     for k in problem.slots:
         for role, var in ((ROLE_PERFORMER, unfilled_p.get(k.id)), (ROLE_RESERVE, unfilled_r.get(k.id))):
             if var is not None and solver.Value(var) > 0:
                 sol.unfilled.append(
                     UnfilledOut(k.id, role, solver.Value(var), len(prep.eligible[k.id]), prep.reasons[k.id])
                 )
-    sol.pools = pool_stats(problem, prep, chosen)
+    sol.pools = pool_stats(problem, prep, chosen, credits)
+    sol.credits = [CreditOut(sid, d, round(v / SCALE, 2)) for sid, (d, v) in sorted(credit.items())]
     return sol
 
 
-def build_assignments(problem: Problem, prep: Prepared, chosen: list[tuple[str, str, str]]) -> list[AssignmentOut]:
+def build_assignments(
+    problem: Problem, prep: Prepared, chosen: list[tuple[str, str, str]], credits: Optional[dict[str, float]] = None
+) -> list[AssignmentOut]:
     """Attach points and a short explanation to every chosen assignment.
 
     The explanation compares the soldier's running score just before the duty
@@ -433,18 +474,19 @@ def build_assignments(problem: Problem, prep: Prepared, chosen: list[tuple[str, 
     """
     soldiers = {s.id: s for s in problem.soldiers}
     slots = {k.id: k for k in problem.slots}
-    running = {s.id: s.baseline_score for s in problem.soldiers}
+    credits = credits or {}
+    running = {s.id: s.baseline_score + credits.get(s.id, 0.0) for s in problem.soldiers}
     active = {sid for sid, _ in prep.pts}  # same population basis as pool_stats
     pool_members = defaultdict(list)
     for s in problem.soldiers:
         if s.id in active:
-            pool_members[s.balance_population].append(s.id)
+            pool_members[s.pool].append(s.id)
 
     out = []
     for sid, kid, role in sorted(chosen, key=lambda c: (slots[c[1]].starts_at, c[2] != ROLE_PERFORMER, c[0])):
         k = slots[kid]
         s = soldiers[sid]
-        pool = pool_members[s.balance_population]
+        pool = pool_members[s.pool]
         avg = mean(running[p] for p in pool)
         norm = prep.pts[sid, kid] / SCALE if role == ROLE_PERFORMER else 0.0
         if k.is_penalty:
@@ -467,8 +509,11 @@ def build_assignments(problem: Problem, prep: Prepared, chosen: list[tuple[str, 
     return out
 
 
-def pool_stats(problem: Problem, prep: Prepared, chosen: list[tuple[str, str, str]]) -> list[PoolStats]:
-    after = {s.id: s.baseline_score for s in problem.soldiers}
+def pool_stats(
+    problem: Problem, prep: Prepared, chosen: list[tuple[str, str, str]], credits: Optional[dict[str, float]] = None
+) -> list[PoolStats]:
+    credits = credits or {}
+    after = {s.id: s.baseline_score + credits.get(s.id, 0.0) for s in problem.soldiers}
     weekends = {s.id: s.baseline_weekends for s in problem.soldiers}
     reserves = {s.id: s.baseline_reserves for s in problem.soldiers}
     active = {sid for sid, kid in prep.pts}
@@ -481,7 +526,7 @@ def pool_stats(problem: Problem, prep: Prepared, chosen: list[tuple[str, str, st
     pools = defaultdict(list)
     for s in problem.soldiers:
         if s.id in active:
-            pools[s.balance_population].append(s)
+            pools[s.pool].append(s)
     stats = []
     for pool, members in sorted(pools.items()):
         a = [after[s.id] for s in members]
