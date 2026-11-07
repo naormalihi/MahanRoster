@@ -76,10 +76,11 @@ for rank, n, ages, svc, note in GROUPS:
         parent_until = (TODAY + timedelta(days=rnd.randint(60, 700))) if parent else None
         kids = rnd.choice([1, 2, 3]) if parent else (rnd.choice([0, 0, 0, 1]) if age > 27 else 0)
         profile = rnd.choice(PROFILES)
-        # career start: none for mandatory ranks and academic officers (קמ"א), half of the lieutenants,
-        # everyone above; a few signed with a start date still ahead
+        # The HR file always has a career start date. Mandatory soldiers carry the planned
+        # date (day after end of service, so it is in the future); a few career soldiers
+        # signed but start later.
         if rank in {"סמל", 'סמ"ר', 'קמ"א'} or (rank == "סגן" and rnd.random() < 0.5):
-            career_start = None
+            career_start = end + timedelta(days=1)
         elif rnd.random() < 0.06:
             career_start = TODAY + timedelta(days=rnd.randint(20, 120))
         else:

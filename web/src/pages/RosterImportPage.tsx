@@ -255,7 +255,9 @@ export function RosterImportPage() {
               {parsed.errors.length > 0 && <Chip color="error" label={`שורות שגויות: ${parsed.errors.length}`} />}
             </Stack>
             {!mapping.serviceType && mapping.careerStartDate && (
-              <Alert severity="info">סוג השירות נקבע לפי תאריך הכניסה לקבע: מי שיש לו תאריך שכבר עבר – קבע, כל השאר – חובה.</Alert>
+              <Alert severity="info">
+                סוג השירות נקבע לפי תאריך הכניסה לקבע: תאריך שעבר – קבע, תאריך עתידי – חובה עד שיגיע. בכל מחזור הסיווג נקבע מחדש לפי תאריך תחילת המחזור.
+              </Alert>
             )}
             {!mapping.serviceType && !mapping.careerStartDate && (
               <Alert severity="warning">
