@@ -9,6 +9,7 @@ import { BoardPage } from "./pages/BoardPage";
 import { SoldiersPage } from "./pages/SoldiersPage";
 
 // Excel parsing is heavy and only נע"ת needs it.
+const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
 function Gate() {
@@ -40,6 +41,16 @@ function Gate() {
             element={
               <Suspense fallback={<CircularProgress />}>
                 <RosterImportPage />
+              </Suspense>
+            }
+          />
+        )}
+        {staff && (
+          <Route
+            path="/admin"
+            element={
+              <Suspense fallback={<CircularProgress />}>
+                <AdminPage />
               </Suspense>
             }
           />

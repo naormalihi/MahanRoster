@@ -27,7 +27,11 @@
         }
         window.addEventListener("error", function (e) {
           var t = e.target;
-          if (t && t !== window && (t.src || t.href)) show("failed to load " + (t.src || t.href));
+          if (t && t !== window && (t.src || t.href)) {
+            // a missing font or stylesheet is cosmetic; only a script that failed to load stops the app
+            if (t.tagName === "SCRIPT") show("failed to load " + t.src);
+            return;
+          }
           else show((e.message || "error") + (e.filename ? " @ " + e.filename + ":" + e.lineno : ""));
         }, true);
         window.addEventListener("unhandledrejection", function (e) { show("unhandled: " + (e.reason && (e.reason.stack || e.reason.message) || e.reason)); });

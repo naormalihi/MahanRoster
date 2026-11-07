@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "./api";
 import { usernameToEmail } from "./api";
+import { SCORING_KEYS, type CalendarDay, type Population, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
@@ -213,5 +214,59 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("soldier_load_roles").delete().eq("soldier_id", soldierId));
     if (roles.length)
       maybe(await this.sb.from("soldier_load_roles").insert(roles.map((r) => ({ ...r, soldier_id: soldierId }))));
+  }
+
+  async taskTypes(): Promise<TaskType[]> {
+    const rows = check(await this.sb.from("task_types").select("*").order("name")) as TaskType[];
+    const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null);
+    return rows.map((r) => ({
+      ...r,
+      weight: Number(r.weight),
+      default_start_time: hhmm(r.default_start_time),
+      default_end_time: hhmm(r.default_end_time),
+    }));
+  }
+
+  async saveTaskType(id: string | null, t: TaskTypeInput) {
+    if (id) maybe(await this.sb.from("task_types").update(t).eq("id", id));
+    else maybe(await this.sb.from("task_types").insert(t));
+  }
+
+  async dutyCategories(): Promise<NamedRef[]> {
+    return check(await this.sb.from("duty_categories").select("id, name").order("name"));
+  }
+
+  async populations(): Promise<Population[]> {
+    return check(await this.sb.from("populations").select("code, name").order("priority"));
+  }
+
+  async scoringSettings(): Promise<ScoringSettings> {
+    const rows = check(await this.sb.from("settings").select("key, value").in("key", [...SCORING_KEYS])) as { key: string; value: unknown }[];
+    const v = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    return {
+      weekend_multiplier: Number(v.weekend_multiplier),
+      holiday_multiplier: Number(v.holiday_multiplier),
+      night_multiplier: Number(v.night_multiplier),
+      night_window: String(v.night_window),
+      weekend_weekdays: (v.weekend_weekdays as number[]) ?? [],
+    };
+  }
+
+  async saveScoringSettings(s: ScoringSettings) {
+    maybe(await this.sb.from("settings").upsert(SCORING_KEYS.map((key) => ({ key, value: s[key] }))));
+  }
+
+  async calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]> {
+    return check(
+      await this.sb.from("calendar_days").select("day, day_type, source, note").gte("day", fromIso).lte("day", toIso).order("day"),
+    ) as CalendarDay[];
+  }
+
+  async saveCalendarDays(days: CalendarDay[]) {
+    if (days.length) maybe(await this.sb.from("calendar_days").upsert(days));
+  }
+
+  async deleteCalendarDay(day: string) {
+    maybe(await this.sb.from("calendar_days").delete().eq("day", day));
   }
 }

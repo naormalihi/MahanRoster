@@ -19,6 +19,7 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: "/", label: "לוח מפורסם" },
         { to: "/soldiers", label: "חיילים" },
         { to: "/roster", label: "טעינת כוח אדם" },
+        { to: "/admin", label: "הגדרות" },
       ]
     : [];
   return (
