@@ -95,10 +95,13 @@ let instance: Api | null = null;
 export async function getApi(): Promise<Api> {
   if (instance) return instance;
   const env = import.meta.env;
-  if (env.VITE_DEMO === "1" || !env.VITE_SUPABASE_URL) {
+  if (env.VITE_DEMO === "1" || (env.DEV && !env.VITE_SUPABASE_URL)) {
     const { DemoApi } = await import("../demo/demoApi");
     instance = new DemoApi();
   } else {
+    // A production build without its settings must fail loudly, not fall back to fake data.
+    if (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_ANON_KEY)
+      throw new Error("ההגדרות VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY חסרות בבנייה");
     const { SupabaseApi } = await import("./supabaseApi");
     instance = new SupabaseApi(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
   }

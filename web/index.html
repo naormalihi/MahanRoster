@@ -10,6 +10,33 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- If the app cannot start (old browser, failed script load, crash), show why instead of a blank page. -->
+    <div id="boot-error" style="display:none;font-family:Arial,sans-serif;padding:24px;max-width:640px;margin:40px auto;border:1px solid #d33;border-radius:10px;background:#fff5f5;color:#611">
+      <b>האפליקציה לא הצליחה לעלות.</b>
+      <pre id="boot-error-text" style="white-space:pre-wrap;direction:ltr;text-align:left;font-size:12px;margin-top:12px"></pre>
+    </div>
+    <script>
+      (function () {
+        function show(msg) {
+          var box = document.getElementById("boot-error");
+          var root = document.getElementById("root");
+          if (root && root.childElementCount > 0 && !window.__bootFailed) return;
+          window.__bootFailed = true;
+          box.style.display = "block";
+          document.getElementById("boot-error-text").textContent += msg + "\n";
+        }
+        window.addEventListener("error", function (e) {
+          var t = e.target;
+          if (t && t !== window && (t.src || t.href)) show("failed to load " + (t.src || t.href));
+          else show((e.message || "error") + (e.filename ? " @ " + e.filename + ":" + e.lineno : ""));
+        }, true);
+        window.addEventListener("unhandledrejection", function (e) { show("unhandled: " + (e.reason && (e.reason.stack || e.reason.message) || e.reason)); });
+        setTimeout(function () {
+          var root = document.getElementById("root");
+          if (root && root.childElementCount === 0) show("the app did not render within 8 seconds (" + navigator.userAgent + ")");
+        }, 8000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
