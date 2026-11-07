@@ -606,7 +606,9 @@ def test_medical_exemption_permits_the_day_duty_and_briefing_reaches_the_engine(
     day_task = conn.execute("select id from task_types where qualifying_duty order by code limit 1").fetchone()[0]
     sid = conn.execute(
         """select s.soldier_id from cycle_soldier_snapshot s where s.cycle_id = %s and not s.qualifies_day_only
-             and not ('major' = any(s.populations)) order by s.soldier_id limit 1""", (cycle,)).fetchone()[0]
+             and not ('major' = any(s.populations))
+             and not exists (select 1 from exemptions e where e.soldier_id = s.soldier_id and e.status = 'approved')
+           order by s.soldier_id limit 1""", (cycle,)).fetchone()[0]
     med = conn.execute("insert into exemption_types (name) values ('רפואי בדיקה') returning id").fetchone()[0]
     conn.execute("insert into exemption_type_duties values (%s, %s, 'qualifies')", (med, day_task))
     start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
@@ -618,7 +620,7 @@ def test_medical_exemption_permits_the_day_duty_and_briefing_reaches_the_engine(
 
     doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
     mine = [e for e in doc["exemptions"] if e["soldier_id"] == str(sid)]
-    assert mine and mine[0]["qualifies_task_type_ids"] == [str(day_task)]
+    assert [e["qualifies_task_type_ids"] for e in mine] == [[str(day_task)]]
     assert [x["briefing_at"] for x in doc["slots"] if x["id"] == str(k)][0] is not None
     p = models.load_problem(json.dumps(doc))
     idx = EligibilityIndex(p)
