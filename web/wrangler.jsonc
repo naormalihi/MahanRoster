@@ -4,6 +4,8 @@
 {
   "name": "mahanroster",
   "compatibility_date": "2026-10-01",
+  // branch builds run `wrangler preview`, which requires this block (it may stay empty)
+  "previews": {},
   "assets": {
     "directory": "./dist",
     // client-side routes (/roster …) fall back to index.html
