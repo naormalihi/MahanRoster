@@ -9,6 +9,22 @@
 
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "../lib/api";
 import { israeliHolidays, type CalendarDay, type Population, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
+import {
+  absenceSpan,
+  addDaysIso,
+  localMidnight,
+  type Absence,
+  type AbsenceInput,
+  type Cycle,
+  type CycleInput,
+  type CycleStatus,
+  type DateBlock,
+  type DateBlockInput,
+  type Exemption,
+  type ExemptionDecision,
+  type ExemptionInput,
+  type ExemptionType,
+} from "../lib/cycles";
 import type { ExistingSoldier, RosterPlan } from "../lib/roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "../lib/soldiers";
 
@@ -59,6 +75,17 @@ const DEMO_TASKS: TaskType[] = [
   tt("shmira", "שמירה – חול", 4, 1, { service_restriction: "mandatory", rank_max_id: "r3", requires_weapon: true, min_rest_hours: 8, color: "#9a6a1f" }),
 ];
 
+const EXEMPTION_TYPES: ExemptionType[] = [
+  { id: "e_full", name: "פטור מלא", qualifies_day_only: false, allows_partial_restriction: true },
+  { id: "e_part", name: "פטור חלקי", qualifies_day_only: false, allows_partial_restriction: true },
+  { id: "e_qual", name: "פטור מזכה – ממלכ\"ת יום בלבד", qualifies_day_only: true, allows_partial_restriction: true },
+  { id: "e_med", name: "רפואי", qualifies_day_only: false, allows_partial_restriction: true },
+  { id: "e_kaps", name: "קפ\"ס", qualifies_day_only: false, allows_partial_restriction: true },
+  { id: "e_shachar", name: "שח\"ר", qualifies_day_only: false, allows_partial_restriction: true },
+  { id: "e_bereaved", name: "משפחה שכולה", qualifies_day_only: false, allows_partial_restriction: true },
+];
+const ABSENCE_TYPES = ["חופשה", "קורס", "יציאה לחו\"ל", "מחלה", "אחר"].map((name, i) => ({ id: `a${i}`, name }));
+
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -73,6 +100,14 @@ export class DemoApi implements Api {
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
   private scoring: ScoringSettings = { weekend_multiplier: 1.5, holiday_multiplier: 2, night_multiplier: 1.25, night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
+  private cycleList: Cycle[] = [
+    { id: "c1", name: "יוני–נובמבר 2026", start_date: "2026-06-01", end_date: "2026-11-30", exemption_deadline: null, status: "published", published_at: "2026-05-20T10:00:00Z" },
+    { id: "c2", name: "דצמבר 2026 – מאי 2027", start_date: "2026-12-01", end_date: "2027-05-31", exemption_deadline: "2026-10-22T00:00:00+03:00", status: "collecting", published_at: null },
+  ];
+  private exemptionList: Exemption[] = [];
+  private absenceList: Absence[] = [];
+  private blockList: DateBlock[] = [];
+  private seq = 0;
   private calendar: CalendarDay[] = israeliHolidays("2026-09-01", "2027-08-31");
 
   private extraOf(id: string): Extra {
@@ -307,5 +342,118 @@ export class DemoApi implements Api {
   async deleteCalendarDay(day: string) {
     await delay();
     this.calendar = this.calendar.filter((x) => x.day !== day);
+  }
+
+  private nextId(p: string) {
+    return `${p}${++this.seq}`;
+  }
+
+  /** A few pending constraints for the demo, once soldiers exist. */
+  private seedConstraints() {
+    if (this.exemptionList.length || this.soldierList.length < 6) return;
+    const s = this.soldierList;
+    const ex = (i: number, type: string, from: string, to: string, status: Exemption["status"], proof: boolean): Exemption => ({
+      id: this.nextId("x"), soldier_id: s[i].id, exemption_type_id: type, kind: "full", start_date: from, end_date: to,
+      excluded_task_type_ids: null, restricted_hours: null, is_urgent: false, status, source: "coordinator",
+      proof_checked_at: proof ? "2026-11-01T09:00:00Z" : null, decided_at: status === "pending" ? null : "2026-11-02T09:00:00Z",
+      decision_reason: null, received_via: "in_person", received_at: "2026-11-01T09:00:00Z",
+    });
+    this.exemptionList.push(ex(0, "e_med", "2026-12-01", "2027-02-28", "pending", false), ex(1, "e_kaps", "2026-12-01", "2027-05-31", "pending", true), ex(2, "e_bereaved", "2026-12-01", "2027-05-31", "approved", true));
+    this.absenceList.push({ id: this.nextId("ab"), soldier_id: s[3].id, absence_type_id: "a1", ...absenceSpan({ from: "2027-01-10", to: "2027-02-20" }), status: "active", cancel_reason: null, received_via: "excel" });
+    this.blockList.push({ id: this.nextId("b"), soldier_id: s[4].id, cycle_id: "c2", day: "2026-12-24", status: "active", received_via: "excel" });
+  }
+
+  async cycles() {
+    await delay();
+    return this.cycleList.map((c) => ({ ...c })).sort((a, b) => b.start_date.localeCompare(a.start_date));
+  }
+
+  async saveCycle(id: string | null, c: CycleInput) {
+    await delay();
+    if (id) Object.assign(this.cycleList.find((x) => x.id === id)!, c);
+    else this.cycleList.push({ ...c, id: this.nextId("c"), status: "draft", published_at: null });
+  }
+
+  async setCycleStatus(id: string, status: CycleStatus) {
+    await delay();
+    this.cycleList.find((x) => x.id === id)!.status = status;
+  }
+
+  async exemptionTypes() {
+    return EXEMPTION_TYPES;
+  }
+
+  async absenceTypes() {
+    return ABSENCE_TYPES;
+  }
+
+  async blockQuota() {
+    return 1;
+  }
+
+  async exemptions(fromIso: string, toIso: string) {
+    await delay();
+    this.seedConstraints();
+    return this.exemptionList.filter((e) => e.start_date <= toIso && e.end_date >= fromIso).map((e) => ({ ...e }));
+  }
+
+  async addExemption(e: ExemptionInput) {
+    await delay();
+    this.exemptionList.push({
+      ...e, id: this.nextId("x"), status: "pending", source: "coordinator", proof_checked_at: null, decided_at: null,
+      decision_reason: null, received_at: new Date().toISOString(),
+    });
+  }
+
+  async markProofChecked(id: string) {
+    await delay();
+    this.exemptionList.find((x) => x.id === id)!.proof_checked_at = new Date().toISOString();
+  }
+
+  async decideExemption(id: string, d: ExemptionDecision) {
+    await delay();
+    const e = this.exemptionList.find((x) => x.id === id)!;
+    if (d.action === "approve" && !e.proof_checked_at) throw new Error("לא ניתן לאשר לפני סימון \"אסמכתא נבדקה\"");
+    e.status = d.action === "approve" ? "approved" : d.action === "reject" ? "rejected" : "cancelled";
+    e.decision_reason = d.action === "approve" ? null : d.reason;
+    e.decided_at = new Date().toISOString();
+  }
+
+  async absences(fromIso: string, toIso: string) {
+    await delay();
+    this.seedConstraints();
+    const lo = localMidnight(fromIso), hi = localMidnight(addDaysIso(toIso, 1));
+    return this.absenceList.filter((a) => Date.parse(a.starts_at) < Date.parse(hi) && Date.parse(a.ends_at) > Date.parse(lo)).map((a) => ({ ...a }));
+  }
+
+  async addAbsences(rows: AbsenceInput[]) {
+    await delay();
+    for (const a of rows)
+      this.absenceList.push({ id: this.nextId("ab"), soldier_id: a.soldier_id, absence_type_id: a.absence_type_id, ...absenceSpan(a), status: "active", cancel_reason: null, received_via: a.received_via });
+  }
+
+  async cancelAbsence(id: string, reason: string) {
+    await delay();
+    Object.assign(this.absenceList.find((x) => x.id === id)!, { status: "cancelled", cancel_reason: reason });
+  }
+
+  async dateBlocks(fromIso: string, toIso: string) {
+    await delay();
+    this.seedConstraints();
+    return this.blockList.filter((b) => b.day >= fromIso && b.day <= toIso).map((b) => ({ ...b }));
+  }
+
+  async addDateBlocks(rows: DateBlockInput[], cycleId: string | null) {
+    await delay();
+    for (const b of rows) {
+      if (this.blockList.some((x) => x.status === "active" && x.soldier_id === b.soldier_id && x.day.slice(0, 7) === b.day.slice(0, 7)))
+        throw new Error("לחייל כבר יש חסימה בחודש הזה");
+      this.blockList.push({ ...b, id: this.nextId("b"), cycle_id: cycleId, status: "active" });
+    }
+  }
+
+  async cancelDateBlock(id: string) {
+    await delay();
+    this.blockList.find((x) => x.id === id)!.status = "cancelled";
   }
 }

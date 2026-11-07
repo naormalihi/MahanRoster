@@ -2,6 +2,23 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "./api";
 import { usernameToEmail } from "./api";
 import { SCORING_KEYS, type CalendarDay, type Population, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
+import {
+  absenceSpan,
+  localMidnight,
+  addDaysIso,
+  type Absence,
+  type AbsenceInput,
+  type AbsenceType,
+  type Cycle,
+  type CycleInput,
+  type CycleStatus,
+  type DateBlock,
+  type DateBlockInput,
+  type Exemption,
+  type ExemptionDecision,
+  type ExemptionInput,
+  type ExemptionType,
+} from "./cycles";
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
@@ -268,5 +285,138 @@ export class SupabaseApi implements Api {
 
   async deleteCalendarDay(day: string) {
     maybe(await this.sb.from("calendar_days").delete().eq("day", day));
+  }
+
+  // ----- cycles -----
+
+  private async uid() {
+    const { data } = await this.sb.auth.getUser();
+    return data.user?.id ?? null;
+  }
+
+  async cycles(): Promise<Cycle[]> {
+    return check(
+      await this.sb.from("cycles").select("id, name, start_date, end_date, exemption_deadline, status, published_at").order("start_date", { ascending: false }),
+    ) as Cycle[];
+  }
+
+  async saveCycle(id: string | null, c: CycleInput) {
+    if (id) maybe(await this.sb.from("cycles").update(c).eq("id", id));
+    else maybe(await this.sb.from("cycles").insert(c));
+  }
+
+  async setCycleStatus(id: string, status: CycleStatus) {
+    maybe(await this.sb.from("cycles").update({ status }).eq("id", id));
+  }
+
+  // ----- constraints -----
+
+  async exemptionTypes(): Promise<ExemptionType[]> {
+    return check(
+      await this.sb.from("exemption_types").select("id, name, qualifies_day_only, allows_partial_restriction").order("name"),
+    ) as ExemptionType[];
+  }
+
+  async absenceTypes(): Promise<AbsenceType[]> {
+    return check(await this.sb.from("absence_types").select("id, name").order("name"));
+  }
+
+  async blockQuota() {
+    const row = maybe(await this.sb.from("settings").select("value").eq("key", "block_quota_per_month").maybeSingle());
+    return Number(row?.value ?? 1);
+  }
+
+  async exemptions(fromIso: string, toIso: string): Promise<Exemption[]> {
+    return check(
+      await this.sb
+        .from("exemptions")
+        .select(
+          "id, soldier_id, exemption_type_id, kind, start_date, end_date, excluded_task_type_ids, restricted_hours, is_urgent, status, source, proof_checked_at, decided_at, decision_reason, received_via, received_at",
+        )
+        .lte("start_date", toIso)
+        .gte("end_date", fromIso)
+        .order("start_date"),
+    ) as Exemption[];
+  }
+
+  async addExemption(e: ExemptionInput) {
+    maybe(
+      await this.sb.from("exemptions").insert({
+        ...e,
+        excluded_task_type_ids: e.kind === "partial" && e.excluded_task_type_ids?.length ? e.excluded_task_type_ids : null,
+        restricted_hours: e.kind === "partial" ? e.restricted_hours : null,
+        status: "pending",
+        source: "coordinator",
+        received_at: new Date().toISOString(),
+      }),
+    );
+  }
+
+  async markProofChecked(id: string) {
+    maybe(await this.sb.from("exemptions").update({ proof_checked_at: new Date().toISOString(), proof_checked_by: await this.uid() }).eq("id", id));
+  }
+
+  async decideExemption(id: string, d: ExemptionDecision) {
+    const base = { decided_at: new Date().toISOString(), decided_by: await this.uid() };
+    const patch =
+      d.action === "approve"
+        ? { ...base, status: "approved", decision_reason: null }
+        : { ...base, status: d.action === "reject" ? "rejected" : "cancelled", decision_reason: d.reason };
+    maybe(await this.sb.from("exemptions").update(patch).eq("id", id));
+  }
+
+  async absences(fromIso: string, toIso: string): Promise<Absence[]> {
+    return check(
+      await this.sb
+        .from("absences")
+        .select("id, soldier_id, absence_type_id, starts_at, ends_at, status, cancel_reason, received_via")
+        .lt("starts_at", localMidnight(addDaysIso(toIso, 1)))
+        .gt("ends_at", localMidnight(fromIso))
+        .order("starts_at"),
+    ) as Absence[];
+  }
+
+  async addAbsences(rows: AbsenceInput[]) {
+    if (!rows.length) return;
+    const now = new Date().toISOString();
+    maybe(
+      await this.sb.from("absences").insert(
+        rows.map((a) => ({
+          soldier_id: a.soldier_id,
+          absence_type_id: a.absence_type_id,
+          ...absenceSpan(a),
+          received_via: a.received_via,
+          received_at: now,
+        })),
+      ),
+    );
+  }
+
+  async cancelAbsence(id: string, reason: string) {
+    maybe(await this.sb.from("absences").update({ status: "cancelled", cancel_reason: reason, cancelled_by: await this.uid() }).eq("id", id));
+  }
+
+  async dateBlocks(fromIso: string, toIso: string): Promise<DateBlock[]> {
+    return check(
+      await this.sb
+        .from("date_blocks")
+        .select("id, soldier_id, cycle_id, day, status, received_via")
+        .gte("day", fromIso)
+        .lte("day", toIso)
+        .order("day"),
+    ) as DateBlock[];
+  }
+
+  async addDateBlocks(rows: DateBlockInput[], cycleId: string | null) {
+    if (!rows.length) return;
+    const now = new Date().toISOString();
+    const { error } = await this.sb
+      .from("date_blocks")
+      .insert(rows.map((b) => ({ ...b, cycle_id: cycleId, received_at: now })));
+    if (error) throw new Error(error.code === "23505" ? "לחייל כבר יש חסימה בחודש הזה" : error.message);
+  }
+
+  async cancelDateBlock(id: string) {
+    maybe(await this.sb.from("date_blocks").update({ status: "cancelled" }).eq("id", id));
   }
 }

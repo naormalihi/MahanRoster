@@ -4,6 +4,20 @@
  */
 
 import type { CalendarDay, Population, ScoringSettings, TaskType, TaskTypeInput } from "./catalog";
+import type {
+  Absence,
+  AbsenceInput,
+  AbsenceType,
+  Cycle,
+  CycleInput,
+  CycleStatus,
+  DateBlock,
+  DateBlockInput,
+  Exemption,
+  ExemptionDecision,
+  ExemptionInput,
+  ExemptionType,
+} from "./cycles";
 import type { ExistingSoldier, RosterPlan } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
@@ -88,6 +102,27 @@ export interface Api {
   calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]>;
   saveCalendarDays(days: CalendarDay[]): Promise<void>;
   deleteCalendarDay(day: string): Promise<void>;
+  // cycles
+  cycles(): Promise<Cycle[]>;
+  saveCycle(id: string | null, c: CycleInput): Promise<void>;
+  setCycleStatus(id: string, status: CycleStatus): Promise<void>;
+  // constraints
+  exemptionTypes(): Promise<ExemptionType[]>;
+  absenceTypes(): Promise<AbsenceType[]>;
+  blockQuota(): Promise<number>;
+  /** Exemptions that overlap the range. */
+  exemptions(fromIso: string, toIso: string): Promise<Exemption[]>;
+  addExemption(e: ExemptionInput): Promise<void>;
+  /** Mark the paper proof as seen (outside the system). */
+  markProofChecked(id: string): Promise<void>;
+  decideExemption(id: string, d: ExemptionDecision): Promise<void>;
+  /** Absences that overlap the range (days, inclusive). */
+  absences(fromIso: string, toIso: string): Promise<Absence[]>;
+  addAbsences(rows: AbsenceInput[]): Promise<void>;
+  cancelAbsence(id: string, reason: string): Promise<void>;
+  dateBlocks(fromIso: string, toIso: string): Promise<DateBlock[]>;
+  addDateBlocks(rows: DateBlockInput[], cycleId: string | null): Promise<void>;
+  cancelDateBlock(id: string): Promise<void>;
 }
 
 /**

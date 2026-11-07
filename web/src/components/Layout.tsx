@@ -17,6 +17,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const links = staff
     ? [
         { to: "/", label: "לוח מפורסם" },
+        { to: "/cycles", label: "מחזורים" },
+        { to: "/constraints", label: "אילוצים" },
         { to: "/soldiers", label: "חיילים" },
         { to: "/roster", label: "טעינת כוח אדם" },
         { to: "/admin", label: "הגדרות" },
@@ -26,6 +28,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", "@media print": { bgcolor: "white" } }}>
       <AppBar position="sticky" color="primary" elevation={0} sx={{ "@media print": { display: "none" } }}>
         <Toolbar sx={{ gap: 1, flexWrap: "wrap" }}>
+          <Box component="img" src="/brand/emblem-mark-light.png" alt="סמל יחידת מה״ן" sx={{ height: 34, ml: 1 }} />
           <Typography variant="h3" component="div" sx={{ fontWeight: 700, ml: 2 }}>
             MahanRoster
           </Typography>
@@ -46,6 +49,13 @@ export function Layout({ children }: { children: ReactNode }) {
           </Button>
         </Toolbar>
       </AppBar>
+      <Box sx={{ display: "none", "@media print": { display: "flex" }, alignItems: "center", gap: 2, px: 1, pt: 1, pb: 2, borderBottom: "2px solid #e8700f" }}>
+        <Box component="img" src="/brand/emblem.png" alt="סמל יחידת מה״ן" sx={{ height: 70 }} />
+        <Box>
+          <Typography sx={{ fontWeight: 700, fontSize: 18 }}>יחידת מה״ן – תורנויות</Typography>
+          <Typography variant="body2">הודפס ב-{new Date().toLocaleDateString("he-IL")}</Typography>
+        </Box>
+      </Box>
       <Container maxWidth="lg" sx={{ py: 3, px: { xs: 2, sm: 3 } }}>
         {children}
       </Container>

@@ -1,4 +1,3 @@
-import LockIcon from "@mui/icons-material/LockOutlined";
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { passwordProblems } from "../lib/api";
@@ -9,10 +8,8 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
     <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", bgcolor: "background.default", px: 2 }}>
       <Paper sx={{ p: { xs: 3, sm: 4 }, width: "100%", maxWidth: 400 }}>
         <Stack spacing={2.5}>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-            <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: "primary.main", color: "white", display: "grid", placeItems: "center" }}>
-              <LockIcon fontSize="small" />
-            </Box>
+          <Box component="img" src="/brand/emblem.png" alt="סמל יחידת מה״ן" sx={{ width: 150, mx: "auto", display: "block" }} />
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", justifyContent: "center", textAlign: "center" }}>
             <Box>
               <Typography variant="h2">{title}</Typography>
               {subtitle && (
