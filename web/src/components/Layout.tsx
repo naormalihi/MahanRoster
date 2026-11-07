@@ -17,7 +17,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const links = staff
     ? [
         { to: "/", label: "לוח מפורסם" },
-        { to: "/roster", label: "כוח אדם" },
+        { to: "/soldiers", label: "חיילים" },
+        { to: "/roster", label: "טעינת כוח אדם" },
       ]
     : [];
   return (

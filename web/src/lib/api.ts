@@ -4,6 +4,7 @@
  */
 
 import type { ExistingSoldier, RosterPlan } from "./roster";
+import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
 export type Role = "coordinator" | "deputy" | "viewer" | "gaf_commander" | "gaf_rep" | "unit_commander" | "soldier";
 
@@ -70,6 +71,11 @@ export interface Api {
   unitKeyCheck(): Promise<string | null>;
   setUnitKeyCheck(value: string): Promise<void>;
   applyRoster(plan: RosterPlan): Promise<ApplyResult>;
+  soldierDetails(): Promise<SoldierDetail[]>;
+  updateSoldiers(ids: string[], patch: SoldierPatch): Promise<void>;
+  loadRoles(): Promise<LoadRoleRef[]>;
+  /** Replace the soldier's load-role periods with the given list. */
+  setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
 }
 
 /**

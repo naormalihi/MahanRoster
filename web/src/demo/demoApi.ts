@@ -9,6 +9,10 @@
 
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "../lib/api";
 import type { ExistingSoldier, RosterPlan } from "../lib/roster";
+import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "../lib/soldiers";
+
+type Extra = Omit<SoldierDetail, keyof ExistingSoldier | "gaf_id" | "load_roles"> & { load_roles: SoldierLoadRole[] };
+const LOAD_ROLES: LoadRoleRef[] = [{ id: "lr1", name: "ראש צוות", factor: 0.5 }];
 
 const GAFIM = ["גף מבצעים", "גף טכני", "גף מודיעין", "גף לוגיסטיקה"];
 const RANKS = ["טוראי", "רב\"ט", "סמל", "סמ\"ר", "רס\"ל", "רס\"ר", "רס\"מ", "סגן", "קמ\"א", "סרן", "רס\"ן", "סא\"ל"];
@@ -43,6 +47,17 @@ export class DemoApi implements Api {
   private rankList: NamedRef[] = RANKS.map((name, i) => ({ id: `r${i}`, name }));
   private keyCheck: string | null = null;
   private boardRows: BoardRow[] = [];
+  private extra = new Map<string, Extra>();
+
+  private extraOf(id: string): Extra {
+    if (!this.extra.has(id))
+      this.extra.set(id, {
+        appointment_rank_id: null, appointment_rank_until: null, is_shachar: false, shachar_start_date: null,
+        parent_override: null, parent_override_reason: null, parent_override_until: null, second_role_signed_at: null,
+        load_roles: [],
+      });
+    return this.extra.get(id)!;
+  }
 
   constructor() {
     const rand = rng(7);
@@ -65,6 +80,9 @@ export class DemoApi implements Api {
         is_active: true,
       });
     }
+    this.soldierList[3].range_valid_until = null;
+    this.soldierList[5].range_valid_until = "2026-01-01";
+    this.extraOf(this.soldierList[0].id).load_roles = [{ load_role_id: "lr1", name: "ראש צוות", factor: 0.5, valid_from: "2026-01-01", valid_to: null }];
     // Published board: three weeks from the most recent Sunday.
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -180,5 +198,40 @@ export class DemoApi implements Api {
     const gone = new Set(plan.removed.map((s) => s.id));
     for (const s of this.soldierList) if (gone.has(s.id)) s.is_active = false;
     return { added: plan.added.length, updated: plan.updated.length, deactivated: plan.removed.length, gafimCreated: plan.unknownGafim.length };
+  }
+
+  async soldierDetails(): Promise<SoldierDetail[]> {
+    await delay();
+    return this.soldierList
+      .map((s) => ({
+        ...s,
+        gaf_id: this.gafList.find((g) => g.name === s.gaf_name)?.id ?? "",
+        ...this.extraOf(s.id),
+      }))
+      .sort((a, b) => a.full_name.localeCompare(b.full_name, "he"));
+  }
+
+  async updateSoldiers(ids: string[], patch: SoldierPatch) {
+    await delay();
+    for (const id of ids) {
+      const s = this.soldierList.find((x) => x.id === id)!;
+      const e = this.extraOf(id);
+      for (const [k, v] of Object.entries(patch)) {
+        if (k in s) (s as unknown as Record<string, unknown>)[k] = v;
+        else (e as unknown as Record<string, unknown>)[k] = v;
+      }
+    }
+  }
+
+  async loadRoles() {
+    return LOAD_ROLES;
+  }
+
+  async setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]) {
+    await delay();
+    this.extraOf(soldierId).load_roles = roles.map((r) => {
+      const lr = LOAD_ROLES.find((x) => x.id === r.load_role_id)!;
+      return { ...r, name: lr.name, factor: lr.factor };
+    });
   }
 }

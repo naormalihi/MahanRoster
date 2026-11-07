@@ -6,6 +6,7 @@ import { isStaff } from "./lib/api";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ChangePasswordPage, LoginPage, MfaPage } from "./pages/AuthPages";
 import { BoardPage } from "./pages/BoardPage";
+import { SoldiersPage } from "./pages/SoldiersPage";
 
 // Excel parsing is heavy and only נע"ת needs it.
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
@@ -32,6 +33,7 @@ function Gate() {
     <Layout>
       <Routes>
         <Route path="/" element={<BoardPage />} />
+        {staff && <Route path="/soldiers" element={<SoldiersPage />} />}
         {staff && (
           <Route
             path="/roster"
