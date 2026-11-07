@@ -14,7 +14,7 @@ from collections import defaultdict
 from dataclasses import replace
 from datetime import timedelta
 
-from .models import ROLE_PERFORMER, ROLE_RESERVE, Absence, Problem, Solution
+from .models import ROLE_PERFORMER, ROLE_RESERVE, Absence, CreditOut, Problem, Solution
 from .scoring import weekend_units
 from .solver import build_assignments, pool_stats, prepare, solve
 
@@ -41,6 +41,8 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
     carried: list[Absence] = []
     chosen: list[tuple[str, str, str]] = []
     unfilled, warnings, statuses = [], [], []
+    credit_days: dict[str, int] = defaultdict(int)
+    credit_pts: dict[str, float] = defaultdict(float)
 
     for i, slots in enumerate(groups):
         if on_progress:
@@ -63,6 +65,12 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
         unfilled += sol.unfilled
         warnings += sol.warnings
         slot_by_id = {k.id: k for k in slots}
+        # availability credits of this month go into the running score like points
+        for c in sol.credits:
+            credit_days[c.soldier_id] += c.days
+            credit_pts[c.soldier_id] += c.points
+            score, wk, res = state[c.soldier_id]
+            state[c.soldier_id] = (score + c.points, wk, res)
         for a in sol.assignments:
             chosen.append((a.soldier_id, a.slot_id, a.role))
             score, wk, res = state[a.soldier_id]
@@ -83,8 +91,9 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
         status=worst,
         objective=None,
         wall_time_seconds=round(_time.time() - t0, 2),
-        assignments=build_assignments(problem, prep, chosen),
+        assignments=build_assignments(problem, prep, chosen, credit_pts),
         unfilled=unfilled,
-        pools=pool_stats(problem, prep, chosen),
+        pools=pool_stats(problem, prep, chosen, credit_pts),
+        credits=[CreditOut(sid, credit_days[sid], round(credit_pts[sid], 2)) for sid in sorted(credit_days)],
         warnings=warnings,
     )

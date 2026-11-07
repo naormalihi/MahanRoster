@@ -55,6 +55,14 @@ class LoadRolePeriod:
 
 
 @dataclass
+class Period:
+    """Inclusive date range."""
+
+    start: date
+    end: date
+
+
+@dataclass
 class Soldier:
     id: str
     gaf_id: str
@@ -73,11 +81,30 @@ class Soldier:
     qualifies_day_only: bool = False
     # Fairness pool: soldiers are compared only inside their pool.
     balance_population: str = SERVICE_MANDATORY
+    # Finer pool inside the population: soldiers who can share load (connected duty
+    # categories). None = the population is the pool.
+    fairness_group: Optional[str] = None
+    # Days the soldier is out of the unit not by choice (before enlistment, after release,
+    # grace, full exemption, crediting absence): credited the pool's average daily load.
+    credit_periods: list[Period] = field(default_factory=list)
     # Normalized score in the rolling window before the cycle, opening points included.
     baseline_score: float = 0.0
     baseline_weekends: int = 0
     baseline_reserves: int = 0
     load_roles: list[LoadRolePeriod] = field(default_factory=list)
+
+    @property
+    def pool(self) -> str:
+        return self.fairness_group or self.balance_population
+
+    def credited_days(self, first: date, last: date) -> int:
+        days = set()
+        for p in self.credit_periods:
+            a, b = max(p.start, first), min(p.end, last)
+            while a <= b:
+                days.add(a)
+                a = date.fromordinal(a.toordinal() + 1)
+        return len(days)
 
     def factor_on(self, day: date) -> float:
         active = [
@@ -238,6 +265,13 @@ class PoolStats:
 
 
 @dataclass
+class CreditOut:
+    soldier_id: str
+    days: int
+    points: float  # normalized points credited for those days
+
+
+@dataclass
 class Solution:
     cycle_id: str
     status: str  # OPTIMAL | FEASIBLE | INFEASIBLE | MODEL_INVALID | UNKNOWN
@@ -246,6 +280,7 @@ class Solution:
     assignments: list[AssignmentOut] = field(default_factory=list)
     unfilled: list[UnfilledOut] = field(default_factory=list)
     pools: list[PoolStats] = field(default_factory=list)
+    credits: list[CreditOut] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
 

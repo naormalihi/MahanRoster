@@ -453,13 +453,24 @@ export class SupabaseApi implements Api {
   }
 
   async snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]> {
-    const rows = check(
-      await this.sb
+    const [rows, credits] = await Promise.all([
+      this.sb
         .from("cycle_soldier_snapshot")
-        .select("soldier_id, service_type, is_parent, qualifies_day_only, balance_population, baseline_score, rank:ranks(name)")
-        .eq("cycle_id", cycleId),
-    ) as unknown as (Omit<SnapshotSoldier, "rank_name"> & { rank: { name: string } | null })[];
-    return rows.map(({ rank, ...r }) => ({ ...r, baseline_score: Number(r.baseline_score), rank_name: rank?.name ?? "" }));
+        .select("soldier_id, service_type, is_parent, qualifies_day_only, balance_population, baseline_score, fairness_group, fairness_label, rank:ranks(name)")
+        .eq("cycle_id", cycleId)
+        .then(check) as Promise<(Omit<SnapshotSoldier, "rank_name"> & { rank: { name: string } | null })[]>,
+      this.sb.from("cycle_credits").select("soldier_id, days, points").eq("cycle_id", cycleId).then(check) as Promise<
+        { soldier_id: string; days: number; points: number }[]
+      >,
+    ]);
+    const cr = new Map(credits.map((c) => [c.soldier_id, c]));
+    return rows.map(({ rank, ...r }) => ({
+      ...r,
+      baseline_score: Number(r.baseline_score),
+      rank_name: rank?.name ?? "",
+      credit_days: cr.get(r.soldier_id)?.days ?? 0,
+      credit: Number(cr.get(r.soldier_id)?.points ?? 0),
+    }));
   }
 
   async setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string) {

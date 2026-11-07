@@ -724,3 +724,54 @@ def test_no_full_run_on_a_published_cycle(conn):
     with pytest.raises(psycopg.Error):
         _as_coord(conn, "select public.request_schedule(%s)", cycle)
     conn.execute("update cycles set status = %s where id = %s", (old, cycle))
+
+
+def test_fairness_groups_and_credit_periods(conn):
+    from datetime import timedelta
+
+    cycle = conn.cycle_id
+    start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
+    _as_coord(conn, "select public.compute_potential(%s)", cycle)
+    rows = conn.execute(
+        "select soldier_id, balance_population, fairness_group, fairness_label from cycle_soldier_snapshot where cycle_id = %s", (cycle,)
+    ).fetchall()
+    assert rows and all(g and g.startswith(p + ":") and l for _, p, g, l in rows)
+    # soldiers of one group share an open category with someone in the group; groups never mix populations
+    groups = {}
+    for s, p, g, _ in rows:
+        groups.setdefault(g, set()).add(p)
+    assert all(len(ps) == 1 for ps in groups.values())
+
+    sid = rows[0][0]
+    conn.execute("update absences set status = 'cancelled' where soldier_id = %s", (sid,))
+    conn.execute("update exemptions set status = 'cancelled', decision_reason = 'test' where soldier_id = %s", (sid,))
+    conn.execute("update soldiers set enlistment_date = %s, unit_join_date = null, release_date = null where id = %s", (start + timedelta(days=5), sid))
+    course = conn.execute(
+        "insert into absence_types (name, credits_load) values ('קורס', true) on conflict (name) do update set credits_load = true returning id"
+    ).fetchone()[0]
+    leave = conn.execute("select id from absence_types where name = 'חופשה'").fetchone()[0]
+    for t, a, b in ((course, 10, 18), (leave, 19, 27), (course, 27, 29)):  # a long course, a leave, a short course
+        conn.execute(
+            """insert into absences (soldier_id, absence_type_id, starts_at, ends_at)
+               values (%s, %s, (%s::date)::timestamp at time zone 'Asia/Jerusalem', (%s::date)::timestamp at time zone 'Asia/Jerusalem')""",
+            (sid, t, start + timedelta(days=a), start + timedelta(days=b)),
+        )
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    s = next(x for x in doc["soldiers"] if x["id"] == str(sid))
+    assert s["fairness_group"]
+    assert s["credit_periods"] == [
+        {"start": str(start), "end": str(start + timedelta(days=4))},
+        {"start": str(start + timedelta(days=10)), "end": str(start + timedelta(days=17))},
+    ]
+    problem = models.load_problem(json.dumps(doc))  # the engine accepts the new fields
+    assert next(x for x in problem.soldiers if x.id == str(sid)).credited_days(start, end) == 13
+
+    # a run's credits are stored per cycle and count in the baseline of a later cycle
+    job = conn.execute("insert into schedule_jobs (cycle_id, kind, status) values (%s, 'full', 'running') returning id", (cycle,)).fetchone()[0]
+    conn.execute(
+        "update schedule_jobs set status = 'done', result = %s where id = %s",
+        (Jsonb({"credits": [{"soldier_id": str(sid), "days": 24, "points": 7.5}]}), job),
+    )
+    assert conn.execute("select days, points from cycle_credits where cycle_id = %s", (cycle,)).fetchall() == [(24, 7.5)]
+    conn.execute("update soldiers set enlistment_date = null where id = %s", (sid,))
+    conn.execute("update absences set status = 'cancelled' where soldier_id = %s", (sid,))

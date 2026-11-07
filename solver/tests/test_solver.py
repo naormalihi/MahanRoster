@@ -111,3 +111,31 @@ def test_rolling_keeps_rest_across_months():
     who = {a.slot_id: a.soldier_id for a in sol.assignments}
     assert who["jan"] == "A" and who["feb"] == "B"  # A is still resting on Feb 1st
     assert violations(p, sol) == []
+
+
+def test_late_arrival_is_credited_instead_of_catching_up():
+    from datetime import date, timedelta
+
+    from mahanroster_solver.models import Period
+
+    days = [date(2027, 1, 3) + timedelta(days=i) for i in range(28)]
+    slots = [slot(f"d{d.day}", "towers", f"{d}T08:00", f"{d}T20:00", r=0) for d in days]
+    late = soldier("D", enlistment_date=date(2027, 1, 17), credit_periods=[Period(date(2027, 1, 3), date(2027, 1, 16))])
+    p = problem([soldier("A"), soldier("B"), soldier("C"), late], slots, settings=Settings(time_limit_seconds=20, workers=2))
+    sol = solve(p)
+    n = {s: sum(a.soldier_id == s and a.role == "performer" for a in sol.assignments) for s in "ABCD"}
+    assert not sol.unfilled
+    # 28 duties over 3 × 28 + 14 available days: about 8 each for A–C and 4 for D (not 7)
+    assert n["D"] <= 5 and min(n["A"], n["B"], n["C"]) >= 7, n
+    (c,) = sol.credits
+    total = sum(a.normalized_points for a in sol.assignments)
+    assert c.soldier_id == "D" and c.days == 14 and c.points == pytest.approx(total * 14 / 98, abs=0.05)
+
+
+def test_pools_follow_fairness_groups():
+    p = problem(
+        [soldier("A", fairness_group="mandatory:x"), soldier("B", fairness_group="mandatory:x"), soldier("C", fairness_group="mandatory:y")],
+        [slot("a", "towers", "2027-01-04T08:00", "2027-01-04T20:00", r=0)],
+        settings=FAST,
+    )
+    assert sorted(ps.population for ps in solve(p).pools) == ["mandatory:x", "mandatory:y"]

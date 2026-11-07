@@ -545,7 +545,7 @@ export class DemoApi implements Api {
     void cycleId;
     return this.soldierList.filter((s) => s.is_active).map((s) => ({
       soldier_id: s.id, rank_name: s.rank_name, service_type: s.service_type, is_parent: s.parent_status, qualifies_day_only: s.parent_status,
-      balance_population: s.service_type, baseline_score: 0,
+      balance_population: s.service_type, baseline_score: 0, fairness_group: s.service_type, fairness_label: null, credit: 0, credit_days: 0,
     }));
   }
 
