@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectMapping, mappingProblems, parseRows, planImport, toRecord, type ExistingSoldier } from "../roster";
+import { detectMapping, mappingProblems, parseRows, planImport, serviceOf, toRecord, type ExistingSoldier } from "../roster";
 
 const headers = ["מ\"א", "שם פרטי", "שם משפחה", "סוג שירות", "גף", "דרגה", "מין", "תאריך גיוס", "תאריך שחרור", "תוקף מטווח", "משרת הורה"];
 
@@ -46,7 +46,7 @@ describe("parsing", () => {
 describe("plan", () => {
   const rec = (key: string, extra = {}) => ({
     ...toRecord({ line: 2, personalNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,
-      enlistmentDate: null, releaseDate: null, rangeValidUntil: "2027-06-30", parent: false }, key),
+      enlistmentDate: null, releaseDate: null, careerStartDate: null, rangeValidUntil: "2027-06-30", parent: false }, key),
     ...extra,
   });
   const existing = (key: string, extra = {}): ExistingSoldier => ({ ...rec(key), id: "id-" + key, is_active: true, gender: "male", ...extra });
@@ -99,5 +99,20 @@ describe("HR export layout", () => {
       ["גף בדיקות", "career", true],
     ]);
     expect(errors).toEqual([{ line: 4, message: "לא נמצא גף במסגרת" }]);
+  });
+});
+
+describe("service type", () => {
+  it("prefers a service column, then the career start date, then the rank", () => {
+    expect(serviceOf({ serviceType: "x" }, "קבע", null, "סמל")).toBe("career");
+    const byDate = { careerStartDate: "תאריך כניסה לקבע" };
+    expect(serviceOf(byDate, undefined, "2024-08-01", "סמל", "2026-11-07")).toBe("career");
+    expect(serviceOf(byDate, undefined, "2027-01-01", "רס\"ל", "2026-11-07")).toBe("mandatory"); // signed, not started yet
+    expect(serviceOf(byDate, undefined, null, "סרן", "2026-11-07")).toBe("mandatory");
+    expect(serviceOf({}, undefined, null, "סמ\"ר")).toBe("mandatory");
+    expect(serviceOf({}, undefined, null, "רס\"ל")).toBe("career");
+  });
+  it("detects the career start date column", () => {
+    expect(detectMapping(["תאריך כניסה לקבע"]).careerStartDate).toBe("תאריך כניסה לקבע");
   });
 });

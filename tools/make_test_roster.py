@@ -45,7 +45,7 @@ TODAY = date(2026, 11, 7)
 
 HEADERS = [
     "מספר אישי", "מין", "דרגה מחושבת", "שם פרטי", "שם משפחה", "מסגרת", "יחידת סיפוח", "עיסוק מיועד",
-    "עיסוק מיועד קוד", "תאריך זכאות לדרגה מחושבת", "תאריך תום שירות (תש\"ש)", "נמצא במשרת הורה",
+    "עיסוק מיועד קוד", "תאריך זכאות לדרגה מחושבת", "תאריך תום שירות (תש\"ש)", "תאריך כניסה לקבע", "נמצא במשרת הורה",
     "תאריך סיום - הורה", "מספר ילדים", "מתנדב", "פרופיל", "גיל",
     "ק. הגנ\"ש", "ק. תורן", "מפקד שער", "מפקד תורן", "ממלכת יום", "משימות חיילות", "הערות",
 ]
@@ -76,6 +76,14 @@ for rank, n, ages, svc, note in GROUPS:
         parent_until = (TODAY + timedelta(days=rnd.randint(60, 700))) if parent else None
         kids = rnd.choice([1, 2, 3]) if parent else (rnd.choice([0, 0, 0, 1]) if age > 27 else 0)
         profile = rnd.choice(PROFILES)
+        # career start: none for mandatory ranks and academic officers (קמ"א), half of the lieutenants,
+        # everyone above; a few signed with a start date still ahead
+        if rank in {"סמל", 'סמ"ר', 'קמ"א'} or (rank == "סגן" and rnd.random() < 0.5):
+            career_start = None
+        elif rnd.random() < 0.06:
+            career_start = TODAY + timedelta(days=rnd.randint(20, 120))
+        else:
+            career_start = TODAY - timedelta(days=int(365 * rnd.uniform(0.3, max(0.5, age - 21))))
         availability = 0.67 if rnd.random() < 0.05 else 1
         av = availability
         # potential matrix (1 / 0.67 / empty) – mirrors the eligibility the system will compute itself
@@ -98,7 +106,7 @@ for rank, n, ages, svc, note in GROUPS:
         rows.append([
             pn(), "נקבה" if female else "זכר", rank, first, rnd.choice(LAST),
             f"מה\"ן - מלמסים/{gaf}/{team} - מלמסים", rnd.choice([21, 21, 34, 57]), occ, code,
-            eligible, end, "YES" if parent else None, parent_until, kids,
+            eligible, end, career_start, "YES" if parent else None, parent_until, kids,
             "כן" if rnd.random() < 0.05 else None, profile, age,
             *cells.values(), note,
         ])
@@ -121,7 +129,7 @@ for c in ws[1]:
     c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     c.border = Border(top=thin, bottom=thin, left=thin, right=thin)
 ws.row_dimensions[1].height = 42
-widths = [11, 7, 9, 10, 11, 52, 9, 18, 9, 13, 13, 9, 12, 7, 7, 7, 6, 7, 7, 7, 7, 7, 8, 24]
+widths = [11, 7, 9, 10, 11, 52, 9, 18, 9, 13, 13, 13, 9, 12, 7, 7, 7, 6, 7, 7, 7, 7, 7, 8, 24]
 for i, w in enumerate(widths, start=1):
     ws.column_dimensions[get_column_letter(i)].width = w
 for row in ws.iter_rows(min_row=2):

@@ -11,6 +11,7 @@ export type FieldKey =
   | "firstName"
   | "lastName"
   | "serviceType"
+  | "careerStartDate"
   | "gaf"
   | "framework"
   | "rank"
@@ -26,6 +27,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
   { key: "firstName", label: "שם פרטי", required: false, synonyms: ["שם פרטי"] },
   { key: "lastName", label: "שם משפחה", required: false, synonyms: ["שם משפחה"] },
   { key: "serviceType", label: "סוג שירות", required: false, synonyms: ["סוג שירות", "שירות", "מעמד"] },
+  { key: "careerStartDate", label: "תאריך כניסה לקבע", required: false, synonyms: ["תאריך כניסה לקבע", "כניסה לקבע", "תאריך תחילת קבע", "תחילת קבע"] },
   { key: "gaf", label: "גף", required: false, synonyms: ["גף", "מחלקה", "ענף"] },
   { key: "framework", label: "מסגרת", required: false, synonyms: ["מסגרת", "שיוך ארגוני"] },
   { key: "rank", label: "דרגה", required: true, synonyms: ["דרגה", "דרגה מחושבת", "דרגה נוכחית"] },
@@ -81,6 +83,7 @@ export interface RosterRow {
   gender: "male" | "female" | null;
   enlistmentDate: string | null;
   releaseDate: string | null;
+  careerStartDate: string | null;
   rangeValidUntil: string | null;
   parent: boolean;
 }
@@ -123,6 +126,24 @@ function gender(v: unknown): "male" | "female" | null {
 
 const truthy = (v: unknown) => ["כן", "v", "1", "true", "x", "✓", "yes", "y"].includes(clean(String(v ?? "")));
 
+/**
+ * Service type, by the first source the file has:
+ *   1. a service-type column;
+ *   2. a career start date column – career from that date on, mandatory before it or when empty;
+ *   3. the rank – טוראי to סמ"ר mandatory, everyone else career.
+ */
+export function serviceOf(
+  m: Mapping,
+  serviceCell: unknown,
+  careerStart: string | null,
+  rank: string,
+  today = new Date().toISOString().slice(0, 10),
+): "mandatory" | "career" | null {
+  if (m.serviceType) return service(serviceCell);
+  if (m.careerStartDate) return careerStart && careerStart !== "invalid" && careerStart <= today ? "career" : "mandatory";
+  return MANDATORY_RANKS.has(rank) ? "mandatory" : "career";
+}
+
 /** Parse sheet rows (objects keyed by header) with a column mapping. */
 export function parseRows(records: Record<string, unknown>[], m: Mapping): ParseResult {
   const rows: RosterRow[] = [];
@@ -143,12 +164,14 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
     seen.set(pn, line);
     const name = String(get("fullName") ?? `${get("firstName") ?? ""} ${get("lastName") ?? ""}`).trim().replace(/\s+/g, " ");
     const rankName = String(get("rank") ?? "").trim();
-    const svc = m.serviceType ? service(get("serviceType")) : MANDATORY_RANKS.has(rankName) ? "mandatory" : "career";
+    const careerStart = toIsoDate(get("careerStartDate"));
+    const svc = serviceOf(m, get("serviceType"), careerStart, rankName);
     const gafName = m.gaf ? String(get("gaf") ?? "").trim() : gafFromFramework(String(get("framework") ?? ""));
     const dates = {
       enlistmentDate: toIsoDate(get("enlistmentDate")),
       releaseDate: toIsoDate(get("releaseDate")),
       rangeValidUntil: toIsoDate(get("rangeValidUntil")),
+      careerStartDate: careerStart,
     };
     const problems: string[] = [];
     if (!name) problems.push("שם חסר");
@@ -170,6 +193,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
       gender: gender(get("gender")),
       enlistmentDate: dates.enlistmentDate,
       releaseDate: dates.releaseDate,
+      careerStartDate: dates.careerStartDate,
       rangeValidUntil: dates.rangeValidUntil,
       parent: truthy(get("parent")),
     });
@@ -190,6 +214,7 @@ export interface SoldierRecord {
   gender: "male" | "female" | null;
   enlistment_date: string | null;
   release_date: string | null;
+  career_start_date: string | null;
   range_valid_until: string | null;
   parent_status: boolean;
 }
@@ -208,6 +233,7 @@ export const RECORD_LABELS: Record<keyof SoldierRecord, string> = {
   gender: "מין",
   enlistment_date: "תאריך גיוס",
   release_date: "תאריך שחרור",
+  career_start_date: "כניסה לקבע",
   range_valid_until: "תוקף מטווח",
   parent_status: "משרת הורה",
 };
@@ -231,6 +257,7 @@ export function toRecord(row: RosterRow, key: string): SoldierRecord {
     gender: row.gender,
     enlistment_date: row.enlistmentDate,
     release_date: row.releaseDate,
+    career_start_date: row.careerStartDate,
     range_valid_until: row.rangeValidUntil,
     parent_status: row.parent,
   };

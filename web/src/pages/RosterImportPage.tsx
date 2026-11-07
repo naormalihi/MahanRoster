@@ -56,7 +56,9 @@ function show(v: unknown): string {
 function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) => f.label),
-    ["1234567", "ישראל ישראלי", "חובה", "גף מבצעים", "סמל", "זכר", "01/03/2025", "01/09/2027", "30/06/2027", "לא"],
+    FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) =>
+      ({ personalNumber: "1234567", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "סמל",
+         gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא" } as Record<string, string>)[f.key] ?? ""),
   ]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "כוח אדם");
@@ -252,9 +254,12 @@ export function RosterImportPage() {
               <Chip label={`ללא שינוי: ${plan.unchanged}`} />
               {parsed.errors.length > 0 && <Chip color="error" label={`שורות שגויות: ${parsed.errors.length}`} />}
             </Stack>
-            {!mapping.serviceType && (
-              <Alert severity="info">
-                אין בקובץ עמודת סוג שירות, ולכן הוא נקבע לפי הדרגה: טוראי עד סמ"ר – חובה, רס"ל ומעלה וקצינים – קבע.
+            {!mapping.serviceType && mapping.careerStartDate && (
+              <Alert severity="info">סוג השירות נקבע לפי תאריך הכניסה לקבע: מי שיש לו תאריך שכבר עבר – קבע, כל השאר – חובה.</Alert>
+            )}
+            {!mapping.serviceType && !mapping.careerStartDate && (
+              <Alert severity="warning">
+                אין בקובץ עמודת סוג שירות או תאריך כניסה לקבע, ולכן סוג השירות נקבע לפי הדרגה: טוראי עד סמ"ר – חובה, כל השאר – קבע.
               </Alert>
             )}
             {!mapping.gaf && mapping.framework && (
