@@ -84,7 +84,7 @@ def seed(c):
     # the tests use the solver's fictitious catalog instead of the shipped reference data
     q("truncate populations, day_types, ranks, load_roles, absence_types, exemption_types cascade")
     q("insert into populations (code, name) values ('mandatory','חובה'),('career','קבע'),('officer','קצינים'),('major','רס\"ן ומעלה')")
-    q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג')")
+    q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג'),('memorial','יום זיכרון')")
     rank_id = {}
     for name, order in synthetic.RANKS.items():
         rank_id[order] = q(
@@ -407,3 +407,14 @@ def test_staff_manage_the_calendar_and_viewer_cannot(conn):
     with session_as(conn, VIEWER):
         with pytest.raises(psycopg.Error):
             conn.execute("insert into calendar_days (day, day_type) values ('2030-04-19','holiday')")
+
+
+def test_holidays_are_preloaded(conn):
+    # the test seed truncates reference data (and the calendar with it), so apply the file again
+    conn.execute((ROOT / "supabase/migrations/20261107000011_holidays_2026_2035.sql").read_text(encoding="utf-8"))
+    rows = dict(conn.execute(
+        "select day::text, day_type from calendar_days where day in ('2026-09-21', '2027-04-22', '2035-10-03')"
+    ).fetchall())
+    assert rows.get("2026-09-21") == "holiday"  # יום כיפור
+    assert rows.get("2027-04-22") == "holiday"  # פסח
+    assert conn.execute("select count(*) from calendar_days where extract(year from day) = 2035").fetchone()[0] >= 15

@@ -660,20 +660,20 @@ function CalendarTab() {
           ))}
         </TextField>
         <Button variant="contained" startIcon={<AutorenewIcon />} onClick={autoLoad} disabled={busy || !days}>
-          טעינת חגי ישראל
+          רענון חגי ישראל
         </Button>
         <Button startIcon={<AddIcon />} onClick={() => setEditing("new")}>
           הוספת יום
         </Button>
       </Stack>
       <Typography variant="body2" color="text.secondary">
-        חג וערב חג מקבלים את מקדם החג ונספרים כימי סוף שבוע באיזון. חול המועד לא מסומן; אפשר להוסיף אותו ידנית. יום זיכרון מסומן לידיעה בלבד.
+        חגי ישראל לשנים 2026–2035 כבר טעונים. חג וערב חג מקבלים את מקדם החג ונספרים כימי סוף שבוע באיזון. חול המועד לא מסומן; אפשר להוסיף אותו ידנית. יום זיכרון מסומן לידיעה בלבד. "רענון" משלים ימים שנמחקו ולא נוגע בימים שנערכו ידנית.
       </Typography>
       {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
       {!days ? (
         <Loading />
       ) : days.length === 0 ? (
-        <Alert severity="info">אין ימים מסומנים ל-{year}. לחץ על "טעינת חגי ישראל".</Alert>
+        <Alert severity="info">אין ימים מסומנים ל-{year}. לחץ על "רענון חגי ישראל".</Alert>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
