@@ -15,7 +15,6 @@ import {
   Toolbar,
   Typography,
   useMediaQuery,
-  useTheme,
 } from "@mui/material";
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -31,7 +30,8 @@ const ROLE_LABEL: Record<string, string> = {
 export function Layout({ children }: { children: ReactNode }) {
   const { me, api, signOut } = useAuth();
   const staff = isStaff(me);
-  const compact = useMediaQuery(useTheme().breakpoints.down("lg"));
+  // nine links fit one row from about 1440px
+  const compact = useMediaQuery("(max-width:1439.95px)");
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
@@ -42,6 +42,7 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: "/constraints", label: "אילוצים" },
         { to: "/potential", label: "פוטנציאל" },
         { to: "/slots", label: "לוח הבסיס" },
+        { to: "/schedule", label: "שיבוץ" },
         { to: "/soldiers", label: "חיילים" },
         { to: "/roster", label: "טעינת כוח אדם" },
         { to: "/admin", label: "הגדרות" },

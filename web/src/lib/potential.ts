@@ -36,6 +36,16 @@ export const REASON_LABEL: Record<string, string> = {
   shachar: "שח\"ר – התורנות לא מסומנת מתאימה",
   home_nightly: "ת\"ש 7 – לן בבית, והתורנות כוללת לילה",
   unavailable: "לא זמין בכל המחזור (היעדרות, פטור, גיוס/שחרור או חודש חסד)",
+  weapon_range: "מטווח לא בתוקף ביום התורנות",
+  not_enlisted: "לפני תאריך הגיוס",
+  released: "אחרי תאריך השחרור",
+  grace: "חודש חסד",
+  exemption: "פטור מאושר",
+  absence: "היעדרות",
+  date_block: "חסימת תאריך",
+  personal_constraint: "אילוץ אישי",
+  penalty_other: "משבצת קנס של חייל אחר",
+  busy: "משובץ בתורנות סמוכה (כולל מנוחה)",
 };
 
 export const reasonText = (reasons: string[]) => reasons.map((r) => REASON_LABEL[r] ?? r).join(" · ");

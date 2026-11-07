@@ -31,13 +31,24 @@ def claim(conn):
         ).fetchone()
         if row is None:
             return None
-        conn.execute("update schedule_jobs set status = 'running', started_at = now() where id = %s", (row[0],))
+        run = os.environ.get("GITHUB_RUN_ID")
+        run_url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY')}/actions/runs/{run}" if run else None
+        conn.execute(
+            """update schedule_jobs set status = 'running', started_at = now(), progress = 1,
+                 params = params || jsonb_build_object('run_url', %s::text) where id = %s""",
+            (run_url, row[0]),
+        )
         return row
 
 
 def run_one(conn, job_id, payload) -> str:
     problem = models.load_problem(json.dumps(payload))
-    solution = solve_rolling(problem)
+
+    def progress(done: int, total: int) -> None:
+        # 5–95 % while solving month by month
+        conn.execute("update schedule_jobs set progress = %s where id = %s", (5 + int(90 * done / max(total, 1)), job_id))
+
+    solution = solve_rolling(problem, on_progress=progress)
     bad = violations(problem, solution)
     if bad:
         # Never store a schedule that breaks a hard rule.
