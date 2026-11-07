@@ -356,7 +356,7 @@ def test_missing_range_date_is_assumed_valid(conn):
         doc = conn.execute("select public.build_solver_input(%s)", (conn.cycle_id,)).fetchone()[0]
         return next(s["range_valid_until"] for s in doc["soldiers"] if s["id"] == str(sid))
 
-    assert range_in_input() == end.isoformat()
+    assert range_in_input() >= end.isoformat()
     conn.execute("update settings set value = 'false' where key = 'assume_range_valid'")
     assert range_in_input() is None
     conn.execute("update settings set value = 'true' where key = 'assume_range_valid'")
@@ -606,7 +606,9 @@ def test_medical_exemption_permits_the_day_duty_and_briefing_reaches_the_engine(
     day_task = conn.execute("select id from task_types where qualifying_duty order by code limit 1").fetchone()[0]
     sid = conn.execute(
         """select s.soldier_id from cycle_soldier_snapshot s where s.cycle_id = %s and not s.qualifies_day_only
-             and not ('major' = any(s.populations)) order by s.soldier_id limit 1""", (cycle,)).fetchone()[0]
+             and not ('major' = any(s.populations))
+             and not exists (select 1 from exemptions e where e.soldier_id = s.soldier_id and e.status = 'approved')
+           order by s.soldier_id limit 1""", (cycle,)).fetchone()[0]
     med = conn.execute("insert into exemption_types (name) values ('רפואי בדיקה') returning id").fetchone()[0]
     conn.execute("insert into exemption_type_duties values (%s, %s, 'qualifies')", (med, day_task))
     start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
@@ -618,7 +620,7 @@ def test_medical_exemption_permits_the_day_duty_and_briefing_reaches_the_engine(
 
     doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
     mine = [e for e in doc["exemptions"] if e["soldier_id"] == str(sid)]
-    assert mine and mine[0]["qualifies_task_type_ids"] == [str(day_task)]
+    assert [e["qualifies_task_type_ids"] for e in mine] == [[str(day_task)]]
     assert [x["briefing_at"] for x in doc["slots"] if x["id"] == str(k)][0] is not None
     p = models.load_problem(json.dumps(doc))
     idx = EligibilityIndex(p)
@@ -631,3 +633,21 @@ def test_medical_exemption_permits_the_day_duty_and_briefing_reaches_the_engine(
     assert "not_qualifying" not in static
     conn.execute("update exemptions set status = 'cancelled', decision_reason = 'test' where soldier_id = %s and exemption_type_id = %s", (sid, med))
     conn.execute("update slots set briefing_at = null where id = %s", (k,))
+
+
+def test_assumed_range_covers_slots_that_end_after_the_cycle(conn):
+    cycle = conn.cycle_id
+    end = conn.execute("select end_date from cycles where id = %s", (cycle,)).fetchone()[0]
+    sid = conn.execute("select id from soldiers where range_valid_until is not null order by id limit 1").fetchone()[0]
+    conn.execute("update soldiers set range_valid_until = null where id = %s", (sid,))
+    task = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+    conn.execute(
+        """insert into slots (cycle_id, task_type_id, starts_at, ends_at)
+           values (%s, %s, (%s::date)::timestamp at time zone 'Asia/Jerusalem' + interval '13 hours',
+                           (%s::date + 7)::timestamp at time zone 'Asia/Jerusalem' + interval '13 hours')""",
+        (cycle, task, end, end),
+    )
+    conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    s = next(x for x in doc["soldiers"] if x["id"] == str(sid))
+    assert s["range_valid_until"] == (end + __import__("datetime").timedelta(days=7)).isoformat()
