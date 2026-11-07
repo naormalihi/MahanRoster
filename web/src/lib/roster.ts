@@ -12,6 +12,7 @@ export type FieldKey =
   | "lastName"
   | "serviceType"
   | "gaf"
+  | "framework"
   | "rank"
   | "gender"
   | "enlistmentDate"
@@ -24,14 +25,15 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
   { key: "fullName", label: "שם מלא", required: false, synonyms: ["שם מלא", "שם"] },
   { key: "firstName", label: "שם פרטי", required: false, synonyms: ["שם פרטי"] },
   { key: "lastName", label: "שם משפחה", required: false, synonyms: ["שם משפחה"] },
-  { key: "serviceType", label: "סוג שירות", required: true, synonyms: ["סוג שירות", "שירות", "מעמד"] },
-  { key: "gaf", label: "גף", required: true, synonyms: ["גף", "מחלקה", "ענף"] },
-  { key: "rank", label: "דרגה", required: true, synonyms: ["דרגה", "דרגה נוכחית"] },
+  { key: "serviceType", label: "סוג שירות", required: false, synonyms: ["סוג שירות", "שירות", "מעמד"] },
+  { key: "gaf", label: "גף", required: false, synonyms: ["גף", "מחלקה", "ענף"] },
+  { key: "framework", label: "מסגרת", required: false, synonyms: ["מסגרת", "שיוך ארגוני"] },
+  { key: "rank", label: "דרגה", required: true, synonyms: ["דרגה", "דרגה מחושבת", "דרגה נוכחית"] },
   { key: "gender", label: "מין", required: false, synonyms: ["מין", "מגדר"] },
   { key: "enlistmentDate", label: "תאריך גיוס", required: false, synonyms: ["תאריך גיוס", "גיוס"] },
-  { key: "releaseDate", label: "תאריך שחרור", required: false, synonyms: ["תאריך שחרור", "שחרור", "תש\"ש"] },
+  { key: "releaseDate", label: "תאריך שחרור", required: false, synonyms: ["תאריך שחרור", "שחרור", "תש\"ש", "תאריך תום שירות (תש\"ש)", "תאריך תום שירות"] },
   { key: "rangeValidUntil", label: "תוקף מטווח", required: false, synonyms: ["תוקף מטווח", "מטווח"] },
-  { key: "parent", label: "משרת הורה", required: false, synonyms: ["משרת הורה", "הורה"] },
+  { key: "parent", label: "משרת הורה", required: false, synonyms: ["משרת הורה", "נמצא במשרת הורה", "הורה"] },
 ];
 
 export type Mapping = Partial<Record<FieldKey, string>>;
@@ -56,7 +58,17 @@ export function mappingProblems(m: Mapping): string[] {
   const out: string[] = [];
   for (const f of FIELDS) if (f.required && !m[f.key]) out.push(`חסרה עמודה: ${f.label}`);
   if (!m.fullName && !(m.firstName && m.lastName)) out.push("חסרה עמודת שם (שם מלא, או שם פרטי ושם משפחה)");
+  if (!m.gaf && !m.framework) out.push("חסרה עמודת גף (גף, או מסגרת שהגף מופיע בה)");
   return out;
+}
+
+/** Ranks that are mandatory service when the file has no service-type column. */
+export const MANDATORY_RANKS = new Set(["טוראי", "טור'", "רב\"ט", "סמל", "סמ\"ר"]);
+
+/** "מה"ן - מלמסים/גף ענן/צוות DevOps - מלמסים" → "גף ענן" */
+export function gafFromFramework(framework: string): string | null {
+  const part = framework.split("/").map((p) => p.trim()).find((p) => /^גף[\s]/.test(p));
+  return part ? part.replace(/\s+-\s+.*$/, "").trim() : null;
 }
 
 export interface RosterRow {
@@ -109,7 +121,7 @@ function gender(v: unknown): "male" | "female" | null {
   return null;
 }
 
-const truthy = (v: unknown) => ["כן", "v", "1", "true", "x", "✓"].includes(clean(String(v ?? "")));
+const truthy = (v: unknown) => ["כן", "v", "1", "true", "x", "✓", "yes", "y"].includes(clean(String(v ?? "")));
 
 /** Parse sheet rows (objects keyed by header) with a column mapping. */
 export function parseRows(records: Record<string, unknown>[], m: Mapping): ParseResult {
@@ -130,7 +142,9 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
     }
     seen.set(pn, line);
     const name = String(get("fullName") ?? `${get("firstName") ?? ""} ${get("lastName") ?? ""}`).trim().replace(/\s+/g, " ");
-    const svc = service(get("serviceType"));
+    const rankName = String(get("rank") ?? "").trim();
+    const svc = m.serviceType ? service(get("serviceType")) : MANDATORY_RANKS.has(rankName) ? "mandatory" : "career";
+    const gafName = m.gaf ? String(get("gaf") ?? "").trim() : gafFromFramework(String(get("framework") ?? ""));
     const dates = {
       enlistmentDate: toIsoDate(get("enlistmentDate")),
       releaseDate: toIsoDate(get("releaseDate")),
@@ -139,8 +153,8 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
     const problems: string[] = [];
     if (!name) problems.push("שם חסר");
     if (!svc) problems.push(`סוג שירות לא מוכר: "${get("serviceType") ?? ""}"`);
-    if (!String(get("gaf") ?? "").trim()) problems.push("גף חסר");
-    if (!String(get("rank") ?? "").trim()) problems.push("דרגה חסרה");
+    if (!gafName) problems.push(m.gaf ? "גף חסר" : "לא נמצא גף במסגרת");
+    if (!rankName) problems.push("דרגה חסרה");
     for (const [k, v] of Object.entries(dates)) if (v === "invalid") problems.push(`תאריך לא תקין (${FIELDS.find((f) => f.key === k)?.label})`);
     if (problems.length) {
       errors.push({ line, message: problems.join(", ") });
@@ -151,8 +165,8 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
       personalNumber: pn,
       fullName: name,
       serviceType: svc!,
-      gaf: String(get("gaf")).trim(),
-      rank: String(get("rank")).trim(),
+      gaf: gafName!,
+      rank: rankName,
       gender: gender(get("gender")),
       enlistmentDate: dates.enlistmentDate,
       releaseDate: dates.releaseDate,
