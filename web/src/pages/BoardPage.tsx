@@ -31,8 +31,15 @@ function rangeOf(r: Range): [Date, Date] {
   return [today, addDays(today, 31)];
 }
 
-function Names({ names, query }: { names: string[]; query: string }) {
-  if (!names.length) return <Typography component="span" color="text.disabled">—</Typography>;
+function Names({ names, query, required }: { names: string[]; query: string; required?: boolean }) {
+  if (!names.length)
+    return required ? (
+      <Typography component="span" color="error" sx={{ fontWeight: 600 }}>
+        לא מאויש
+      </Typography>
+    ) : (
+      <Typography component="span" color="text.disabled">—</Typography>
+    );
   return (
     <>
       {names.map((n, i) => {
@@ -162,7 +169,7 @@ export function BoardPage() {
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="body2">
                       <b>מבצע: </b>
-                      <Names names={r.performers} query={q} />
+                      <Names names={r.performers} query={q} required />
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       <b>עתודה: </b>

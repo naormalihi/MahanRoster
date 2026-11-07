@@ -19,6 +19,7 @@ import type {
   ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan } from "./roster";
@@ -151,6 +152,12 @@ export interface Api {
   cancelScheduleJob(jobId: string): Promise<void>;
   dispatchConfigured(): Promise<boolean>;
   dispatchResponse(jobId: string): Promise<{ status_code: number | null; error: string | null; body: string | null } | null>;
+  // draft editor
+  draftAssignments(cycleId: string): Promise<DraftAssignment[]>;
+  slotCandidates(slotId: string): Promise<Candidate[]>;
+  manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string): Promise<string>;
+  removeAssignment(assignmentId: string, reason: string): Promise<void>;
+  publishCycle(cycleId: string): Promise<number>;
 }
 
 /**

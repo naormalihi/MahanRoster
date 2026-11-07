@@ -14,6 +14,7 @@ const ConstraintsPage = lazy(() => import("./pages/ConstraintsPage").then((m) =>
 const PotentialPage = lazy(() => import("./pages/PotentialPage").then((m) => ({ default: m.PotentialPage })));
 const SlotsPage = lazy(() => import("./pages/SlotsPage").then((m) => ({ default: m.SlotsPage })));
 const SchedulePage = lazy(() => import("./pages/SchedulePage").then((m) => ({ default: m.SchedulePage })));
+const DraftPage = lazy(() => import("./pages/DraftPage").then((m) => ({ default: m.DraftPage })));
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
@@ -76,6 +77,16 @@ function Gate() {
             element={
               <Suspense fallback={<CircularProgress />}>
                 <SchedulePage />
+              </Suspense>
+            }
+          />
+        )}
+        {staff && (
+          <Route
+            path="/draft"
+            element={
+              <Suspense fallback={<CircularProgress />}>
+                <DraftPage />
               </Suspense>
             }
           />

@@ -18,6 +18,8 @@ export interface SnapshotSoldier {
   service_type: "mandatory" | "career";
   is_parent: boolean;
   qualifies_day_only: boolean;
+  balance_population: string;
+  baseline_score: number;
 }
 
 export interface DailyAvailability {
