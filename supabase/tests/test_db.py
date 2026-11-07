@@ -692,10 +692,13 @@ def test_candidates_match_the_engine_and_manual_changes(conn):
             assert set(reasons) == py, (k.id, str(sid), reasons, py)
 
     # manual: replace a draft performer by an eligible soldier, with a reason
-    slot = p.slots[3]
-    rows = _as_coord(conn, "select soldier_id from public.slot_candidates(%s) where reasons = '{}' and in_slot is null and conflicts = '[]'", slot.id)
-    assert rows
-    new_sid = rows[0][0]
+    slot, new_sid = None, None
+    for k in p.slots:  # a slot with a free, eligible soldier (the test data is random)
+        rows = _as_coord(conn, "select soldier_id from public.slot_candidates(%s) where reasons = '{}' and in_slot is null and conflicts = '[]' limit 1", k.id)
+        if rows:
+            slot, new_sid = k, rows[0][0]
+            break
+    assert slot is not None
     with pytest.raises(psycopg.Error):
         _as_coord(conn, "select public.manual_assign(%s, 'performer', %s, null, ' ')", slot.id, new_sid)
     aid = _as_coord(conn, "select public.manual_assign(%s, 'performer', %s, null, 'בדיקה')", slot.id, new_sid)[0][0]
