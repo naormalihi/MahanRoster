@@ -126,3 +126,32 @@ export function weeksOf(from: string, to: string): string[] {
   }
   return out;
 }
+
+export interface ProfileStats {
+  key: string; // the open categories, joined
+  soldiers: number;
+  mean: number;
+  min: number;
+  max: number;
+}
+
+/**
+ * Soldiers grouped by what they can do (their open categories): fairness is only meaningful
+ * between soldiers who can do the same duties.
+ */
+export function byProfile(ls: SoldierLoad[], openOf: (soldierId: string) => string[]): ProfileStats[] {
+  const groups = new Map<string, number[]>();
+  for (const l of ls) {
+    const key = openOf(l.soldier_id).sort((a, b) => a.localeCompare(b, "he")).join(" + ") || "—";
+    groups.set(key, [...(groups.get(key) ?? []), l.expected]);
+  }
+  return [...groups]
+    .map(([key, v]) => ({
+      key,
+      soldiers: v.length,
+      mean: Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10,
+      min: Math.min(...v),
+      max: Math.max(...v),
+    }))
+    .sort((a, b) => b.soldiers - a.soldiers);
+}

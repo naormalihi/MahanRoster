@@ -55,6 +55,15 @@ describe("ת\"ש 7 column", () => {
   });
 });
 
+describe("gaf column holding the framework path", () => {
+  it("extracts the gaf", () => {
+    const base = { "מספר אישי": "1234567", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה" };
+    const m = detectMapping([...Object.keys(base), "גף"]);
+    const rows = parseRows([{ ...base, "גף": "מה\"ן - מלמסים/גף ענן/צוות תשתיות - מלמסים" }, { ...base, "מספר אישי": "1234568", "גף": "גף טכני" }], m).rows;
+    expect(rows.map((r) => r.gaf)).toEqual(["גף ענן", "גף טכני"]);
+  });
+});
+
 describe("plan", () => {
   const rec = (key: string, extra = {}) => ({
     ...toRecord({ line: 2, personalNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,

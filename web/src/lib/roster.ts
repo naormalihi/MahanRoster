@@ -183,7 +183,11 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
     const rankName = String(get("rank") ?? "").trim();
     const careerStart = toIsoDate(get("careerStartDate"));
     const svc = serviceOf(m, get("serviceType"), careerStart, rankName);
-    const gafName = m.gaf ? String(get("gaf") ?? "").trim() : gafFromFramework(String(get("framework") ?? ""));
+    // a "גף" column that actually holds the full framework path is read like the framework column
+    const rawGaf = m.gaf ? String(get("gaf") ?? "").trim() : "";
+    const gafName = m.gaf
+      ? rawGaf.includes("/") ? gafFromFramework(rawGaf) ?? rawGaf : rawGaf
+      : gafFromFramework(String(get("framework") ?? ""));
     const dates = {
       enlistmentDate: toIsoDate(get("enlistmentDate")),
       releaseDate: toIsoDate(get("releaseDate")),
