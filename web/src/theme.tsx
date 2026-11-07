@@ -11,8 +11,9 @@ const theme = createTheme({
   direction: "rtl",
   palette: {
     mode: "light",
-    primary: { main: "#2d4a6b" },
-    secondary: { main: "#7a5c2e" },
+    // the unit emblem: deep navy and orange
+    primary: { main: "#1a1466" },
+    secondary: { main: "#e8700f" },
     background: { default: "#f4f5f7", paper: "#ffffff" },
   },
   shape: { borderRadius: 10 },

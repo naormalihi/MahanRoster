@@ -6,9 +6,11 @@ import { isStaff } from "./lib/api";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ChangePasswordPage, LoginPage, MfaPage } from "./pages/AuthPages";
 import { BoardPage } from "./pages/BoardPage";
+import { CyclesPage } from "./pages/CyclesPage";
 import { SoldiersPage } from "./pages/SoldiersPage";
 
 // Excel parsing is heavy and only נע"ת needs it.
+const ConstraintsPage = lazy(() => import("./pages/ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
@@ -34,6 +36,17 @@ function Gate() {
     <Layout>
       <Routes>
         <Route path="/" element={<BoardPage />} />
+        {staff && <Route path="/cycles" element={<CyclesPage />} />}
+        {staff && (
+          <Route
+            path="/constraints"
+            element={
+              <Suspense fallback={<CircularProgress />}>
+                <ConstraintsPage />
+              </Suspense>
+            }
+          />
+        )}
         {staff && <Route path="/soldiers" element={<SoldiersPage />} />}
         {staff && (
           <Route

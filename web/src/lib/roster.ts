@@ -93,7 +93,7 @@ export interface ParseResult {
   errors: { line: number; message: string }[];
 }
 
-function toIsoDate(v: unknown): string | null {
+export function toIsoDate(v: unknown): string | null {
   if (v === null || v === undefined || v === "") return null;
   if (v instanceof Date && !isNaN(v.getTime())) {
     const y = v.getFullYear(), m = v.getMonth() + 1, d = v.getDate();
