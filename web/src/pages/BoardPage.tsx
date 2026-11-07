@@ -1,3 +1,5 @@
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import {
@@ -6,6 +8,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   InputAdornment,
   MenuItem,
   Paper,
@@ -18,17 +21,21 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { addDays, dayKey, dayLabel, spanLabel, startOfDay, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
+import { addDays, dayKey, dayLabel, spanLabel, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
 
 type Range = "week" | "next" | "weekend" | "month";
 
-function rangeOf(r: Range): [Date, Date] {
+const monthFmt = new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" });
+
+/** First day of a month, local midnight. */
+const monthStartOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+
+function rangeOf(r: Range, month: Date): [Date, Date] {
   const [sun] = weekOf();
   if (r === "week") return [sun, addDays(sun, 7)];
   if (r === "next") return [addDays(sun, 7), addDays(sun, 14)];
   if (r === "weekend") return upcomingWeekend();
-  const today = startOfDay(new Date());
-  return [today, addDays(today, 31)];
+  return [month, new Date(month.getFullYear(), month.getMonth() + 1, 1)];
 }
 
 function Names({ names, query, required }: { names: string[]; query: string; required?: boolean }) {
@@ -58,6 +65,8 @@ function Names({ names, query, required }: { names: string[]; query: string; req
 export function BoardPage() {
   const { api } = useAuth();
   const [range, setRange] = useState<Range>("week");
+  const [month, setMonth] = useState<Date>(() => monthStartOf(new Date()));
+  const [next, setNext] = useState<string | null>(null);
   const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -65,13 +74,23 @@ export function BoardPage() {
   const [category, setCategory] = useState("");
 
   useEffect(() => {
-    const [from, to] = rangeOf(range);
+    const [from, to] = rangeOf(range, month);
     setRows(null);
+    setNext(null);
     api!
       .board(from.toISOString(), to.toISOString())
-      .then(setRows)
+      .then((r) => {
+        setRows(r);
+        // nothing here: offer the next published date (a cycle is published about two months ahead)
+        if (!r.length) api!.nextPublished(to.toISOString()).then(setNext).catch(() => setNext(null));
+      })
       .catch((e) => setError((e as Error).message));
-  }, [api, range]);
+  }, [api, range, month]);
+
+  const jumpTo = (iso: string) => {
+    setMonth(monthStartOf(new Date(iso)));
+    setRange("month");
+  };
 
   const gafim = useMemo(() => [...new Set((rows ?? []).flatMap((r) => r.gafim))].sort(), [rows]);
   const categories = useMemo(() => [...new Set((rows ?? []).map((r) => r.category_name ?? ""))].filter(Boolean).sort(), [rows]);
@@ -112,8 +131,30 @@ export function BoardPage() {
             <ToggleButton value="week">השבוע</ToggleButton>
             <ToggleButton value="next">שבוע הבא</ToggleButton>
             <ToggleButton value="weekend">הסופ"ש הקרוב</ToggleButton>
-            <ToggleButton value="month">30 יום</ToggleButton>
+            <ToggleButton value="month">חודש</ToggleButton>
           </ToggleButtonGroup>
+          {range === "month" && (
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <IconButton aria-label="החודש הקודם" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
+                <ChevronRightIcon />
+              </IconButton>
+              <Typography sx={{ minWidth: 130, textAlign: "center", fontWeight: 600 }}>{monthFmt.format(month)}</Typography>
+              <IconButton aria-label="החודש הבא" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
+                <ChevronLeftIcon />
+              </IconButton>
+              <TextField
+                type="month"
+                size="small"
+                value={`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`}
+                onChange={(e) => {
+                  const [y, m] = e.target.value.split("-").map(Number);
+                  if (y && m) setMonth(new Date(y, m - 1, 1));
+                }}
+                sx={{ width: 170, display: { xs: "none", sm: "inline-flex" } }}
+                slotProps={{ htmlInput: { "aria-label": "בחירת חודש" } }}
+              />
+            </Stack>
+          )}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <TextField
               placeholder="חיפוש לפי שם"
@@ -145,7 +186,22 @@ export function BoardPage() {
         </Box>
       )}
       {rows && shown.length === 0 && (
-        <Alert severity="info">{rows.length ? "אין תורנויות שמתאימות לסינון." : "אין תורנויות מפורסמות בטווח הזה."}</Alert>
+        <Alert
+          severity="info"
+          action={
+            !rows.length && next ? (
+              <Button color="inherit" size="small" onClick={() => jumpTo(next)}>
+                מעבר ל{monthFmt.format(new Date(next))}
+              </Button>
+            ) : undefined
+          }
+        >
+          {rows.length
+            ? "אין תורנויות שמתאימות לסינון."
+            : next
+              ? `אין תורנויות מפורסמות בטווח הזה. הלוח המפורסם הבא מתחיל ב-${dayLabel(next)}.`
+              : "אין תורנויות מפורסמות בטווח הזה."}
+        </Alert>
       )}
 
       {[...byDay.entries()].map(([day, items]) => (

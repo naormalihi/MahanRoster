@@ -242,6 +242,10 @@ export class DemoApi implements Api {
     if (this.user) this.user.mustChange = false;
   }
 
+  async nextPublished(fromIso: string) {
+    return this.boardRows.filter((r) => r.starts_at >= fromIso).map((r) => r.starts_at).sort()[0] ?? null;
+  }
+
   async board(fromIso: string, toIso: string) {
     await delay();
     return this.boardRows.filter((r) => r.starts_at >= fromIso && r.starts_at < toIso);

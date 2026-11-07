@@ -104,6 +104,13 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("password_changed"));
   }
 
+  async nextPublished(fromIso: string) {
+    const row = maybe(
+      await this.sb.from("published_board").select("starts_at").gte("starts_at", fromIso).order("starts_at").limit(1).maybeSingle(),
+    ) as { starts_at: string } | null;
+    return row?.starts_at ?? null;
+  }
+
   async board(fromIso: string, toIso: string): Promise<BoardRow[]> {
     return check(
       await this.sb.from("published_board").select("*").gte("starts_at", fromIso).lt("starts_at", toIso).order("starts_at"),
