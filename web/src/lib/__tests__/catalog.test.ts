@@ -18,6 +18,7 @@ const base: TaskTypeInput = {
   gender: null,
   default_start_time: null,
   default_end_time: null,
+  weekday_hours: null,
   color: null,
   is_active: true,
 };

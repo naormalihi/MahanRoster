@@ -159,6 +159,8 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
   const unknownRankRows = result?.slots.filter((s) => s.unknownRanks.length) ?? [];
   const switched = result?.slots.filter((s) => s.weekendSwitched).length ?? 0;
   const holidayMismatch = result?.slots.filter((s) => s.holidayMismatch) ?? [];
+  const popMismatch = result?.slots.filter((s) => s.populationMismatch) ?? [];
+  const briefingIgnored = result?.slots.filter((s) => s.briefingIgnored) ?? [];
   const allMapped = result && result.unmapped.every((u) => mapping[u.duty] !== undefined);
 
   return (
@@ -256,6 +258,24 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                 )}
               </Alert>
             )}
+            {popMismatch.length > 0 && (
+              <Alert severity="warning">
+                <b>עמודת האוכלוסייה סותרת את סוג התורנות ב-{popMismatch.length} משבצות</b> (למשל "חובה" על סוג שמיועד לקבע). בדוק את ההתאמה:
+                <List dense disablePadding>
+                  {[...new Set(popMismatch.map((s) => `${s.duty} → ${taskName.get(s.task_type_id)}`))].map((t) => (
+                    <ListItem key={t} disableGutters sx={{ py: 0 }}>
+                      {t}
+                    </ListItem>
+                  ))}
+                </List>
+              </Alert>
+            )}
+            {briefingIgnored.length > 0 && (
+              <Alert severity="info">
+                ב-{briefingIgnored.length} משבצות כתוב תדריך ביום שרחוק יותר מ-3 ימים לפני ההתחלה (שורות{" "}
+                {briefingIgnored.slice(0, 10).map((s) => s.line).join(", ")}), ולכן הוא לא נבדק. אם התאריכים בשורה שגויים, תקן אותם בקובץ.
+              </Alert>
+            )}
             {holidayMismatch.length > 0 && (
               <Alert severity="info">
                 <b>עמודת "חג" בקובץ לא תואמת את לוח החגים ב-{holidayMismatch.length} משבצות.</b> מקדם החג נקבע לפי לוח החגים (במסך הגדרות); אם הקובץ צודק,
@@ -296,6 +316,7 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                         {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
                         {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                         {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
+                        {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
                       </TableCell>
                       <TableCell title={s.ranksText}>
                         {s.allowed_rank_ids ? s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ") : "לפי סוג התורנות"}
@@ -401,6 +422,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void }
                   {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
                   {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                         {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
+                        {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
                 </TableCell>
                 <TableCell>
                   {s.performers_needed}/{s.reserves_needed}

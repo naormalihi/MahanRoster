@@ -13,8 +13,8 @@ const id = (n: string) => RANKS.find((r) => r.name === n)!.id;
 const task = (id: string, name: string, o: Partial<TaskType> = {}): TaskType => ({
   id, code: id, name, category_id: "c", weight: 1, min_rest_hours: 0, service_restriction: "any", requires_weapon: false,
   is_weekend_type: false, shachar_compatible: false, qualifying_duty: false, eligible_populations: [], rank_min_id: null,
-  rank_max_id: null, gender: null, default_start_time: "08:00", default_end_time: "08:00", color: null, is_active: true, ...o,
-});
+  rank_max_id: null, gender: null, default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
+}) as TaskType;
 const TASKS = [
   task("kt", "קצין תורן – חול", { category_id: "kt" }),
   task("kts", "קצין תורן – שבת", { category_id: "kt", is_weekend_type: true }),
@@ -80,6 +80,32 @@ describe("daily hours", () => {
     expect(dailyHours("2026-12-15", "2026-12-22", { default_start_time: "08:00", default_end_time: "17:00" })).toBe("08:00-17:00");
     expect(dailyHours("2026-12-15", "2026-12-15", { default_start_time: "08:00", default_end_time: "17:00" })).toBeNull();
     expect(dailyHours("2026-12-15", "2026-12-22", { default_start_time: "13:00", default_end_time: "13:00" })).toBeNull();
+  });
+});
+
+describe("hours by weekday, briefing, population", () => {
+  it("מפקד תורן: hours depend on the day and on a holiday the day before", async () => {
+    const { slotTimes } = await import("../baseSchedule");
+    const mt = { default_start_time: "08:00", default_end_time: "08:00", weekday_hours: { "0": "06:00-08:00+1", "1": "08:00-08:00", "4": "08:00-18:00", after_holiday: "06:00-08:00+1" } };
+    expect(slotTimes("2027-01-03", "2027-01-03", mt)).toEqual({ starts_at: "2027-01-03T06:00:00+02:00", ends_at: "2027-01-04T08:00:00+02:00" }); // Sunday
+    expect(slotTimes("2027-01-07", "2027-01-07", mt)).toEqual({ starts_at: "2027-01-07T08:00:00+02:00", ends_at: "2027-01-07T18:00:00+02:00" }); // Thursday
+    expect(slotTimes("2027-01-05", "2027-01-05", mt).starts_at).toBe("2027-01-05T08:00:00+02:00"); // Tuesday: defaults
+    expect(slotTimes("2027-04-29", "2027-04-29", mt, new Set(["2027-04-28"])).starts_at).toBe("2027-04-29T06:00:00+03:00"); // after a holiday
+  });
+  it("briefing from the instructions", async () => {
+    const { parseBriefing } = await import("../baseSchedule");
+    const guard = "התייצבות לתדריך ביום שלישי בגף הגנ\"ק בשעה 13:00, התדריכים מעודכנים מידי שבוע";
+    expect(parseBriefing(guard, "2027-01-06")).toEqual({ at: "2027-01-05T13:00:00+02:00", ignored: false }); // Wed start → Tue
+    expect(parseBriefing("התייצבות לתדריך בשעה 09:00 ביום שלישי בגף אבטחה פיזית", "2027-01-03")).toEqual({ at: null, ignored: true }); // Sun start, Tue is 5 days back
+    expect(parseBriefing("ביצוע תדריך טלפוני מול מ\"ג תזונה בשעה 11:00", "2027-01-05")).toEqual({ at: null, ignored: false });
+    expect(parseBriefing("התייצבות בשעה 09:00 ברס\"ר", "2027-01-05")).toEqual({ at: null, ignored: false });
+  });
+  it("population column against the duty type", async () => {
+    const { populationMismatch } = await import("../baseSchedule");
+    expect(populationMismatch("חובה", { service_restriction: "career" })).toBe(true);
+    expect(populationMismatch("קצינים ונגדים", { service_restriction: "mandatory" })).toBe(true);
+    expect(populationMismatch("קצינים ונגדים", { service_restriction: "any" })).toBe(false);
+    expect(populationMismatch("משימות חיליות", { service_restriction: "mandatory" })).toBe(false);
   });
 });
 

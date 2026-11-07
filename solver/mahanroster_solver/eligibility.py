@@ -110,7 +110,12 @@ class EligibilityIndex:
             # Open to parents / qualifying-exemption holders, and to any population listed on the type
             # (e.g. רס"ן). The rank range below still applies to everyone.
             listed = bool(task.eligible_populations) and bool(set(task.eligible_populations) & set(soldier.populations))
-            if not (soldier.qualifies_day_only or listed):
+            # an exemption that permits this duty while it is in force (פטור רפואי → ממלכ"ת יום)
+            by_exemption = any(
+                task.id in e.qualifies_task_type_ids and e.start_date <= first_day and e.end_date >= last_day
+                for e in self.exemptions.get(soldier.id, ())
+            )
+            if not (soldier.qualifies_day_only or listed or by_exemption):
                 reasons.append("not_qualifying")
         else:
             if soldier.qualifies_day_only:
@@ -157,11 +162,12 @@ class EligibilityIndex:
             if by_type and by_hours:
                 reasons.append("exemption")
                 break
-        if any(_overlaps(slot.starts_at, slot.ends_at, a.starts_at, a.ends_at) for a in self.absences.get(soldier.id, ())):
+        from_ = min(slot.briefing_at, slot.starts_at) if slot.briefing_at else slot.starts_at
+        if any(_overlaps(from_, slot.ends_at, a.starts_at, a.ends_at) for a in self.absences.get(soldier.id, ())):
             reasons.append("absence")
         if any(_overlaps(slot.starts_at, slot.ends_at, a.starts_at, a.ends_at) for a in self.busy.get(soldier.id, ())):
             reasons.append("busy")
-        if self.blocks.get(soldier.id) and any(d in self.blocks[soldier.id] for d in _days(slot.starts_at, slot.ends_at)):
+        if self.blocks.get(soldier.id) and any(d in self.blocks[soldier.id] for d in _days(from_, slot.ends_at)):
             reasons.append("date_block")
         for c in self.personal.get(soldier.id, ()):
             if c.valid_until and c.valid_until < first_day:

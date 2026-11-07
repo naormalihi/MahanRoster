@@ -493,7 +493,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("slots")
         .select(
-          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, assignments(status)",
+          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, briefing_at, assignments(status)",
         )
         .eq("cycle_id", cycleId)
         .is("cancelled_at", null)
@@ -526,6 +526,7 @@ export class SupabaseApi implements Api {
       allowed_rank_ids: d.allowed_rank_ids,
       prefer_home_nightly: d.prefer_home_nightly,
       daily_hours: d.daily_hours,
+      briefing_at: d.briefing_at,
       gender: d.gender,
       instructions: d.instructions,
       notes: d.notes,
@@ -534,6 +535,10 @@ export class SupabaseApi implements Api {
     }));
     for (let i = 0; i < rows.length; i += 200) maybe(await this.sb.from("slots").insert(rows.slice(i, i + 200)));
     return { inserted: rows.length, deleted };
+  }
+
+  async deleteTaskTypeAlias(alias: string) {
+    maybe(await this.sb.from("task_type_aliases").delete().eq("alias", alias));
   }
 
   async deleteSlots(ids: string[]) {

@@ -597,3 +597,37 @@ def test_queued_job_dispatch_and_cancel(conn):
             conn.execute("select public.cancel_schedule_job(%s)", (job,))
     _as_coord(conn, "select public.cancel_schedule_job(%s)", job)
     assert conn.execute("select status from schedule_jobs where id = %s", (job,)).fetchone()[0] == "failed"
+
+
+def test_medical_exemption_permits_the_day_duty_and_briefing_reaches_the_engine(conn):
+    from mahanroster_solver.eligibility import EligibilityIndex
+
+    cycle = conn.cycle_id
+    day_task = conn.execute("select id from task_types where qualifying_duty order by code limit 1").fetchone()[0]
+    sid = conn.execute(
+        """select s.soldier_id from cycle_soldier_snapshot s where s.cycle_id = %s and not s.qualifies_day_only
+             and not ('major' = any(s.populations)) order by s.soldier_id limit 1""", (cycle,)).fetchone()[0]
+    med = conn.execute("insert into exemption_types (name) values ('רפואי בדיקה') returning id").fetchone()[0]
+    conn.execute("insert into exemption_type_duties values (%s, %s, 'qualifies')", (med, day_task))
+    start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
+    conn.execute(
+        """insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+           values (%s, %s, 'full', %s, %s, 'approved', now())""", (sid, med, start, end))
+    k = conn.execute("select id from slots where cycle_id = %s order by starts_at limit 1", (cycle,)).fetchone()[0]
+    conn.execute("update slots set briefing_at = starts_at - interval '20 hours' where id = %s", (k,))
+
+    doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+    mine = [e for e in doc["exemptions"] if e["soldier_id"] == str(sid)]
+    assert mine and mine[0]["qualifies_task_type_ids"] == [str(day_task)]
+    assert [x["briefing_at"] for x in doc["slots"] if x["id"] == str(k)][0] is not None
+    p = models.load_problem(json.dumps(doc))
+    idx = EligibilityIndex(p)
+    soldier = next(s for s in p.soldiers if s.id == str(sid))
+    day_slots = [s for s in p.slots if s.task_type_id == str(day_task)]
+    assert day_slots and "not_qualifying" not in idx.check(soldier, day_slots[0])
+    static = conn.execute(
+        "select reasons from app.potential_static(%s) where soldier_id = %s and task_type_id = %s", (cycle, sid, day_task)
+    ).fetchone()[0]
+    assert "not_qualifying" not in static
+    conn.execute("update exemptions set status = 'cancelled', decision_reason = 'test' where soldier_id = %s and exemption_type_id = %s", (sid, med))
+    conn.execute("update slots set briefing_at = null where id = %s", (k,))

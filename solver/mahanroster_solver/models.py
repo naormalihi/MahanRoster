@@ -97,6 +97,8 @@ class Exemption:
     excluded_task_type_ids: Optional[list[str]] = None
     # Partial exemption by hours, e.g. "18:00-06:00".
     restricted_hours: Optional[str] = None
+    # Qualifying duties the holder may do while exempt (פטור רפואי → ממלכ"ת יום).
+    qualifies_task_type_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -137,6 +139,9 @@ class Slot:
     prefer_home_nightly: bool = False
     # Multi-day slot worked only these hours each day ("08:00-17:00"); None = continuous.
     daily_hours: Optional[str] = None
+    # Briefing before the duty (e.g. the day before at 13:00): the soldier must be
+    # available from here – absences and date blocks are checked from this time.
+    briefing_at: Optional[datetime] = None
     gender: Optional[str] = None
     is_penalty: bool = False
     penalty_soldier_id: Optional[str] = None

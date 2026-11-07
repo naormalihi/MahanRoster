@@ -86,9 +86,61 @@ const EMPTY_TASK: TaskTypeInput = {
   gender: null,
   default_start_time: "08:00",
   default_end_time: "08:00",
+  weekday_hours: null,
   color: "#3b6ea8",
   is_active: true,
 };
+
+const WEEKDAY_KEYS: { key: string; label: string }[] = [
+  { key: "0", label: "ראשון" },
+  { key: "1", label: "שני" },
+  { key: "2", label: "שלישי" },
+  { key: "3", label: "רביעי" },
+  { key: "4", label: "חמישי" },
+  { key: "5", label: "שישי" },
+  { key: "6", label: "שבת" },
+  { key: "after_holiday", label: "אחרי חג" },
+];
+
+/** Optional hours per start weekday, e.g. מפקד תורן: Sunday 06:00 → 08:00 next day, Thursday 08:00 → 18:00. */
+function WeekdayHours(props: { value: Record<string, string> | null; onChange: (v: Record<string, string> | null) => void }) {
+  const on = !!props.value;
+  const setDay = (k: string, w: string) => {
+    const next = { ...(props.value ?? {}) };
+    if (w.trim()) next[k] = w.trim();
+    else delete next[k];
+    props.onChange(Object.keys(next).length ? next : {});
+  };
+  return (
+    <Box>
+      <FormControlLabel
+        control={<Switch checked={on} onChange={(e) => props.onChange(e.target.checked ? {} : null)} />}
+        label="שעות שונות לפי יום בשבוע"
+      />
+      {on && (
+        <>
+          <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
+            לפי היום שבו התורנות מתחילה. תבנית 08:00-18:00; סיום למחרת: 06:00-08:00+1 (או כשהסיום לא אחרי ההתחלה, כמו 08:00-08:00). ריק = שעות ברירת
+            המחדל. "אחרי חג" גובר ביום שאחרי חג.
+          </Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 1 }}>
+            {WEEKDAY_KEYS.map((d) => (
+              <TextField
+                key={d.key}
+                size="small"
+                label={d.label}
+                value={props.value?.[d.key] ?? ""}
+                onChange={(e) => setDay(d.key, e.target.value)}
+                placeholder="08:00-08:00"
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { dir: "ltr" } }}
+              />
+            ))}
+          </Box>
+        </>
+      )}
+    </Box>
+  );
+}
 
 function TaskDialog(props: {
   task: TaskType | null;
@@ -206,6 +258,7 @@ function TaskDialog(props: {
               fullWidth
             />
           </Stack>
+          <WeekdayHours value={t.weekday_hours} onChange={(v) => set("weekday_hours", v)} />
 
           <Typography variant="subtitle2" sx={{ pt: 1 }}>
             מי יכול לבצע
@@ -381,7 +434,7 @@ function CatalogTab() {
                 <TableCell>{catName.get(t.category_id ?? "") ?? "—"}</TableCell>
                 <TableCell>{t.weight}</TableCell>
                 <TableCell sx={{ whiteSpace: "nowrap" }} dir="ltr">
-                  {t.default_start_time ? `${t.default_start_time}–${t.default_end_time}` : "—"}
+                  {t.weekday_hours && Object.keys(t.weekday_hours).length ? "לפי יום" : t.default_start_time ? `${t.default_start_time}–${t.default_end_time}` : "—"}
                 </TableCell>
                 <TableCell>{t.min_rest_hours ? `${t.min_rest_hours} ש׳` : "—"}</TableCell>
                 <TableCell>{who(t)}</TableCell>
@@ -727,8 +780,89 @@ function CalendarTab() {
 
 // ---------------------------------------------------------------------------
 
+function AliasesTab() {
+  const { api } = useAuth();
+  const [aliases, setAliases] = useState<{ alias: string; task_type_id: string }[] | null>(null);
+  const [tasks, setTasks] = useState<TaskType[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      const [a, t] = await Promise.all([api!.taskTypeAliases(), api!.taskTypes()]);
+      setAliases(a.sort((x, y) => x.alias.localeCompare(y.alias, "he")));
+      setTasks(t);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, [api]);
+  useEffect(() => void load(), [load]);
+  if (error) return <Alert severity="error">{error}</Alert>;
+  if (!aliases) return <Loading />;
+  return (
+    <Stack spacing={2}>
+      <Typography variant="body2" color="text.secondary">
+        השמות שהבסיס משתמש בהם בקובץ המשבצות, ולאיזה סוג תורנות כל שם מותאם. שם שלא מופיע כאן ולא זהה לשם של סוג תורנות יופיע בקליטה לבחירה. משבצת שמתחילה
+        בסוף שבוע עוברת לבד לסוג השבת של אותה תורנות.
+      </Typography>
+      {aliases.length === 0 ? (
+        <Alert severity="info">עוד אין התאמות שמורות.</Alert>
+      ) : (
+        <Paper variant="outlined" sx={{ overflowX: "auto" }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>שם בקובץ הבסיס</TableCell>
+                <TableCell>סוג תורנות</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {aliases.map((a) => (
+                <TableRow key={a.alias}>
+                  <TableCell>{a.alias}</TableCell>
+                  <TableCell>
+                    <TextField
+                      select
+                      size="small"
+                      value={a.task_type_id}
+                      onChange={async (e) => {
+                        await api!.saveTaskTypeAliases([{ alias: a.alias, task_type_id: e.target.value }]);
+                        void load();
+                      }}
+                      sx={{ minWidth: 220 }}
+                    >
+                      {tasks.map((t) => (
+                        <MenuItem key={t.id} value={t.id}>
+                          {t.name}
+                          {!t.is_active && " (לא פעילה)"}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </TableCell>
+                  <TableCell>
+                    <IconButton
+                      size="small"
+                      aria-label="מחיקה"
+                      onClick={async () => {
+                        await api!.deleteTaskTypeAlias(a.alias);
+                        void load();
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
+    </Stack>
+  );
+}
+
 const TABS = [
   { key: "catalog", label: "קטלוג תורנויות" },
+  { key: "aliases", label: "שמות מהבסיס" },
   { key: "scoring", label: "מקדמי ניקוד" },
   { key: "calendar", label: "לוח חגים" },
 ] as const;
@@ -747,6 +881,7 @@ export function AdminPage() {
       {tab === "catalog" && <CatalogTab />}
       {tab === "scoring" && <ScoringTab />}
       {tab === "calendar" && <CalendarTab />}
+      {tab === "aliases" && <AliasesTab />}
     </Stack>
   );
 }
