@@ -25,7 +25,7 @@ import {
 } from "@mui/material";
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { isStaff } from "../lib/api";
+import { canRead, isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
@@ -34,6 +34,7 @@ const ROLE_LABEL: Record<string, string> = {
   coordinator: "נע\"ת תורנויות",
   deputy: "ממלא מקום",
   viewer: "צפייה",
+  gaf_commander: "מפקד גף",
 };
 
 /** Four areas instead of a link per screen; the cycle steps live inside "מחזור". */
@@ -48,6 +49,7 @@ const STAFF_LINKS = [
 /** The cycle every step works on, chosen here once. */
 function CycleSwitcher({ dark }: { dark?: boolean }) {
   const { cycles, cycle, setCycleId } = useCycle();
+  const staff = isStaff(useAuth().me);
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   if (!cycles) return null;
@@ -92,8 +94,8 @@ function CycleSwitcher({ dark }: { dark?: boolean }) {
             <ListItemText primary={c.name} secondary={stageLabel(c.status)} />
           </MenuItem>
         ))}
-        <Divider />
-        <MenuItem
+        {staff && <Divider />}
+        {staff && <MenuItem
           onClick={() => {
             setAnchor(null);
             navigate("/cycles");
@@ -103,7 +105,7 @@ function CycleSwitcher({ dark }: { dark?: boolean }) {
             <SettingsIcon fontSize="small" />
           </ListItemIcon>
           ניהול מחזורים (יצירה, תאריכים, שלבים)
-        </MenuItem>
+        </MenuItem>}
       </Menu>
     </>
   );
@@ -112,11 +114,12 @@ function CycleSwitcher({ dark }: { dark?: boolean }) {
 export function Layout({ children }: { children: ReactNode }) {
   const { me, api, signOut } = useAuth();
   const staff = isStaff(me);
+  const reader = canRead(me);
   const compact = useMediaQuery("(max-width:1099.95px)");
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
-  const links = staff ? STAFF_LINKS : [];
+  const links = staff ? STAFF_LINKS : reader ? STAFF_LINKS.filter((l) => l.to !== "/admin") : [];
   const current = links.find((l) => l.match(pathname));
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", "@media print": { bgcolor: "white" } }}>
@@ -151,7 +154,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </Button>
             ))}
           <Box sx={{ flex: 1 }} />
-          {staff && !compact && <CycleSwitcher />}
+          {reader && !compact && <CycleSwitcher />}
           {api?.demo && <Chip size="small" label={compact ? "הדגמה" : "מצב הדגמה – נתונים פיקטיביים"} sx={{ bgcolor: "#f3c96b", color: "#3a2a00" }} />}
           {me && !compact && (
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
@@ -176,7 +179,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </Typography>
             </Box>
           </Box>
-          {staff && (
+          {reader && (
             <Box sx={{ px: 2, pb: 1.5 }}>
               <CycleSwitcher dark />
             </Box>

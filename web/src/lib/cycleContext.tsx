@@ -4,7 +4,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { isStaff } from "./api";
+import { canRead } from "./api";
 import { useAuth } from "./auth";
 import { planningCycle, type Cycle } from "./cycles";
 import { dayKey } from "./dates";
@@ -38,7 +38,7 @@ export function defaultCycle(cycles: Cycle[], today: string): Cycle | undefined 
 
 export function CycleProvider({ children }: { children: ReactNode }) {
   const { api, me } = useAuth();
-  const staff = isStaff(me);
+  const staff = canRead(me);
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const [cycleId, setId] = useState(stored);
   const { pathname } = useLocation();

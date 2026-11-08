@@ -26,6 +26,7 @@ import {
   type ExemptionType,
 } from "../lib/cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
+import type { AppUser } from "../lib/users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
 import type { ScheduleJob } from "../lib/schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
@@ -210,6 +211,7 @@ export class DemoApi implements Api {
     if (u === "naat") this.user = { name: u, roles: ["coordinator"], mustChange: false, aal2: false };
     else if (u === "board") this.user = { name: u, roles: ["viewer"], mustChange: false, aal2: true };
     else if (u === "new.user") this.user = { name: u, roles: ["viewer"], mustChange: true, aal2: true };
+    else if (u === "cmd") this.user = { name: u, roles: ["gaf_commander"], mustChange: false, aal2: false };
     else throw new Error("שם משתמש או סיסמה שגויים");
   }
 
@@ -750,6 +752,45 @@ export class DemoApi implements Api {
     const mine = this.draft.filter((a) => a.cycle_id === cycleId && a.status === "draft");
     mine.forEach((a) => (a.status = a.role === "performer" ? "assigned" : "reserve_idle"));
     return mine.length;
+  }
+
+  private users: AppUser[] = [
+    { user_id: "u-naat", username: "naat", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: new Date().toISOString(), roles: [{ id: "r1", role: "coordinator", gaf_id: null, valid_from: null, valid_to: null }] },
+    { user_id: "u-board", username: "board", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: null, roles: [{ id: "r2", role: "viewer", gaf_id: null, valid_from: null, valid_to: null }] },
+  ];
+
+  async listUsers() {
+    await delay();
+    return this.users.map((u) => ({ ...u, roles: [...u.roles] }));
+  }
+
+  async createUser(username: string, password: string, soldierId: string | null) {
+    await delay(300);
+    if (this.users.some((u) => u.username === username)) throw new Error("שם המשתמש כבר קיים");
+    if (password.length < 10) throw new Error("סיסמה זמנית: לפחות 10 תווים");
+    const s = this.soldierList.find((x) => x.id === soldierId);
+    const id = crypto.randomUUID();
+    this.users.push({ user_id: id, username, soldier_id: soldierId, soldier_name: s?.full_name ?? null, is_locked: false, must_change_password: true, last_login_at: null, roles: [{ id: crypto.randomUUID(), role: "gaf_commander", gaf_id: null, valid_from: null, valid_to: null }] });
+    return id;
+  }
+
+  async resetUserPassword(userId: string, password: string) {
+    await delay();
+    if (password.length < 10) throw new Error("סיסמה זמנית: לפחות 10 תווים");
+    const u = this.users.find((x) => x.user_id === userId);
+    if (u) u.must_change_password = true;
+  }
+
+  async setUserLocked(userId: string, locked: boolean) {
+    await delay();
+    const u = this.users.find((x) => x.user_id === userId);
+    if (u) u.is_locked = locked;
+  }
+
+  async setUserSoldier(userId: string, soldierId: string | null) {
+    await delay();
+    const u = this.users.find((x) => x.user_id === userId);
+    if (u) Object.assign(u, { soldier_id: soldierId, soldier_name: this.soldierList.find((x) => x.id === soldierId)?.full_name ?? null });
   }
 
   async unpublishCycle(cycleId: string) {

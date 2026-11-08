@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { getApi, isStaff, type Api, type Me, type MfaState } from "./api";
+import { canRead, getApi, type Api, type Me, type MfaState } from "./api";
 
 /**
  * Where the signed-in user stands:
@@ -40,10 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const who = await a.me();
     setMe(who);
     if (!who) return setStage("signedOut");
-    // Staff must pass a second factor; everyone else may if they set one up.
+    // Staff and commanders must pass a second factor; everyone else may if they set one up.
     const m = await a.mfaState();
     setMfa(m);
-    if (m.needsVerify || (isStaff(who) && m.needsEnroll)) return setStage("mfa");
+    if (m.needsVerify || (canRead(who) && m.needsEnroll)) return setStage("mfa");
     if (who.mustChangePassword) return setStage("changePassword");
     setStage("ready");
   }, [api]);

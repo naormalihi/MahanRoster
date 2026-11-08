@@ -19,6 +19,7 @@ import type {
   ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { AppUser } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
@@ -35,6 +36,10 @@ export interface Me {
 }
 
 export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinator") || me.roles.includes("deputy"));
+/** Gaf commanders: read-only access to the whole unit. */
+export const isCommander = (me: Me | null) => !!me && me.roles.includes("gaf_commander");
+/** Sees the planning screens (staff edit, commanders only read). */
+export const canRead = (me: Me | null) => isStaff(me) || isCommander(me);
 
 export interface MfaState {
   /** signed in with password only, and a TOTP factor exists */
@@ -165,6 +170,13 @@ export interface Api {
   publishCycle(cycleId: string): Promise<number>;
   /** Back to draft; only before the cycle starts, by the coordinator. */
   unpublishCycle(cycleId: string): Promise<number>;
+
+  listUsers(): Promise<AppUser[]>;
+  /** A gaf-commander account with a temporary password, linked to a soldier record. */
+  createUser(username: string, password: string, soldierId: string | null): Promise<string>;
+  resetUserPassword(userId: string, password: string): Promise<void>;
+  setUserLocked(userId: string, locked: boolean): Promise<void>;
+  setUserSoldier(userId: string, soldierId: string | null): Promise<void>;
 }
 
 /**

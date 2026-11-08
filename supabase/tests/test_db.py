@@ -839,3 +839,37 @@ def test_unpublish_by_the_coordinator_before_the_cycle_starts(conn):
     row = conn.execute("select after from audit_log where action = 'unpublish' and entity_id = %s order by at desc limit 1", (str(cycle),)).fetchone()
     assert row and row[0]["assignments_returned"] == published
     conn.execute("update cycles set status = %s where id = %s", (status0, cycle))
+
+
+def test_gaf_commander_reads_everything_and_writes_nothing(conn):
+    sid = conn.execute("select id from soldiers where is_active order by id limit 1").fetchone()[0]
+    uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.gaf1", "temp-pass-123", sid)[0][0]
+    assert conn.execute("select username, must_change_password, soldier_id from app_users where id = %s", (uid,)).fetchone() == ("cmd.gaf1", True, sid)
+    assert conn.execute("select count(*) from auth.identities where user_id = %s", (uid,)).fetchone()[0] == 1
+    assert conn.execute("select encrypted_password = crypt('temp-pass-123', encrypted_password) from auth.users where id = %s", (uid,)).fetchone()[0]
+    users = _as_coord(conn, "select username, roles from public.list_users()")
+    assert any(u == "cmd.gaf1" and r[0]["role"] == "gaf_commander" for u, r in users)
+    with pytest.raises(psycopg.Error):  # a second account with the same name
+        _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', null)", "cmd.gaf1", "temp-pass-123")
+
+    cycle = conn.cycle_id
+    with session_as(conn, uid) as c:
+        assert c.execute("select count(*) from soldiers").fetchone()[0] > 0
+        assert c.execute("select count(*) from exemptions").fetchone()[0] >= 0
+        assert c.execute("select count(*) from public.potential_matrix(%s)", (cycle,)).fetchone()[0] > 0
+        assert c.execute("update soldiers set full_name = full_name where id = %s", (sid,)).rowcount == 0  # RLS: nothing to update
+    with session_as(conn, uid) as c:
+        with pytest.raises(psycopg.Error):
+            c.execute("insert into absences (soldier_id, absence_type_id, starts_at, ends_at) select %s, id, now(), now() + interval '1 day' from absence_types limit 1", (sid,))
+    with session_as(conn, uid) as c:
+        with pytest.raises(psycopg.Error):
+            c.execute("select public.create_user('x.y', 'temp-pass-123', 'gaf_commander', null)")
+    # without the second factor: nothing
+    with session_as(conn, uid, aal="aal1") as c:
+        assert c.execute("select count(*) from soldiers").fetchone()[0] == 0
+
+    _as_coord(conn, "select public.reset_user_password(%s, %s)", uid, "another-pass-456")
+    assert conn.execute("select encrypted_password = crypt('another-pass-456', encrypted_password) from auth.users where id = %s", (uid,)).fetchone()[0]
+    _as_coord(conn, "select public.set_user_locked(%s, true)", uid)
+    with session_as(conn, uid) as c:
+        assert c.execute("select count(*) from soldiers").fetchone()[0] == 0  # locked = no role

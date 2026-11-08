@@ -36,6 +36,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { UsersTab } from "./UsersTab";
 import {
   DAY_TYPE_LABEL,
   ISO_DAY_LABEL,
@@ -865,6 +866,7 @@ const TABS = [
   { key: "aliases", label: "שמות מהבסיס" },
   { key: "scoring", label: "מקדמי ניקוד" },
   { key: "calendar", label: "לוח חגים" },
+  { key: "users", label: "משתמשים" },
 ] as const;
 
 export function AdminPage() {
@@ -882,6 +884,7 @@ export function AdminPage() {
       {tab === "scoring" && <ScoringTab />}
       {tab === "calendar" && <CalendarTab />}
       {tab === "aliases" && <AliasesTab />}
+      {tab === "users" && <UsersTab />}
     </Stack>
   );
 }
