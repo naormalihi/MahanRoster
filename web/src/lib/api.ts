@@ -61,6 +61,9 @@ export interface BoardRow {
   updated_at: string;
   changed_after_publish: boolean;
   instructions?: string | null;
+  /** The gaf of each performer / reserve, in the order of the names. */
+  performer_gafim?: string[];
+  reserve_gafim?: string[];
 }
 
 export interface NamedRef {
