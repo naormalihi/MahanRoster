@@ -751,4 +751,21 @@ export class DemoApi implements Api {
     mine.forEach((a) => (a.status = a.role === "performer" ? "assigned" : "reserve_idle"));
     return mine.length;
   }
+
+  async reauthenticate(password: string, code: string) {
+    await delay(300);
+    if (!password || !/^\d{6}$/.test(code)) throw new Error("הסיסמה או הקוד שגויים");
+  }
+
+  async unpublishCycle(cycleId: string, reason: string, confirmName: string) {
+    await delay(300);
+    const c = this.cycleList.find((x) => x.id === cycleId)!;
+    if (c.status !== "published") throw new Error("המחזור לא במצב \"פורסם\"");
+    if (confirmName.trim() !== c.name.trim()) throw new Error("שם המחזור שהוקלד לא תואם");
+    if (reason.trim().length < 5) throw new Error("חובה לכתוב נימוק");
+    Object.assign(c, { status: "review", published_at: null });
+    const mine = this.draft.filter((a) => a.cycle_id === cycleId && (a.status === "assigned" || a.status === "reserve_idle"));
+    mine.forEach((a) => (a.status = "draft"));
+    return mine.length;
+  }
 }

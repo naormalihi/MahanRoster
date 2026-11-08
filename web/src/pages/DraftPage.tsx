@@ -37,6 +37,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
+import { UnpublishDialog, type UnpublishImpact } from "../components/UnpublishDialog";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import { stageLabel, type Cycle } from "../lib/cycles";
@@ -478,7 +479,7 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
 // ---------------------------------------------------------------------------
 
 export function DraftPage() {
-  const { api } = useAuth();
+  const { api, me } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle } = useCycle();
   const [tasks, setTasks] = useState<Map<string, TaskType>>(new Map());
@@ -490,6 +491,7 @@ export function DraftPage() {
   const [categories, setCategories] = useState<Map<string, string>>(new Map());
   const [tab, setTab] = useState<"slots" | "load">("slots");
   const [publishing, setPublishing] = useState(false);
+  const [unpublishing, setUnpublishing] = useState<UnpublishImpact | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -557,7 +559,7 @@ export function DraftPage() {
       ) : assignments.length === 0 ? (
         <Alert severity="info">
           אין עדיין טיוטה למחזור הזה. הרץ שיבוץ במסך{" "}
-          <RouterLink to="/schedule" style={{ color: "inherit" }}>
+          <RouterLink to="/cycle/schedule?view=run" style={{ color: "inherit" }}>
             שיבוץ
           </RouterLink>
           .
@@ -588,7 +590,46 @@ export function DraftPage() {
             const ctx: Ctx = { cycle, slots, tasks, soldiers, assignments, reload: load, locked };
             return tab === "slots" ? <SlotsTab ctx={ctx} /> : <LoadTab ctx={ctx} snapshot={snapshot} cells={cells} categories={categories} />;
           })()}
+          {cycle.status === "published" && me?.roles.includes("coordinator") && (() => {
+            const now = Date.now();
+            const started = cycle.start_date <= dayKey(new Date()) || slots.some((s) => Date.parse(s.starts_at) <= now);
+            const impact = {
+              assignments: assignments.filter((a) => a.status === "assigned" || a.status === "reserve_idle").length,
+              nextWeek: slots.filter((s) => Date.parse(s.starts_at) - now < 7 * 86_400_000).length,
+            };
+            return (
+              <Paper variant="outlined" sx={{ p: 2, borderColor: "error.light" }}>
+                <Typography variant="h3" color="error.main" sx={{ mb: 0.5 }}>
+                  פעולות רגישות
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
+                  <Typography variant="body2" sx={{ flex: 1 }}>
+                    {started
+                      ? "המחזור כבר התחיל, ולכן אי אפשר לבטל את הפרסום. שינויים במחזור שרץ נעשים בתפעול השוטף."
+                      : "ביטול פרסום מחזיר את המחזור לטיוטה כדי לתקן ולפרסם שוב. אפשרי רק לפני שהמחזור מתחיל, ודורש הזדהות מחדש."}
+                  </Typography>
+                  <Button color="error" variant="outlined" disabled={started} onClick={() => setUnpublishing(impact)}>
+                    ביטול פרסום
+                  </Button>
+                </Stack>
+              </Paper>
+            );
+          })()}
         </>
+      )}
+      {unpublishing && cycle && (
+        <UnpublishDialog
+          cycle={cycle}
+          impact={unpublishing}
+          onClose={() => setUnpublishing(null)}
+          onDone={(n) => {
+            setUnpublishing(null);
+            setMsg({ ok: true, text: `הפרסום בוטל: ${n} שיבוצים חזרו לטיוטה, והמחזור הוסר מהלוח המפורסם.` });
+            void api!.cycles().then(setCycles);
+            void reloadCycle();
+            void load();
+          }}
+        />
       )}
       <Dialog open={publishing} onClose={() => setPublishing(false)} maxWidth="xs" fullWidth>
         <DialogTitle>פרסום הלוח</DialogTitle>

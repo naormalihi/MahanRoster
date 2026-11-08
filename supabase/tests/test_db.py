@@ -793,3 +793,50 @@ def test_gaf_named_by_a_framework_path_is_merged(conn):
         assert conn.execute("select gaf_id from assignments where id = %s", (a[0],)).fetchone()[0] == gaf
     cols = [d.name for d in conn.execute("select * from published_board limit 0").description]
     assert {"performer_gafim", "reserve_gafim"} <= set(cols)
+
+
+def test_unpublish_needs_fresh_sign_in_and_a_cycle_not_started(conn):
+    import time
+
+    cycle = conn.cycle_id
+    name, status0 = conn.execute("select name, status from cycles where id = %s", (cycle,)).fetchone()
+    conn.execute("update schedule_jobs set status = 'done' where cycle_id = %s and status in ('queued', 'running')", (cycle,))
+    conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+    conn.execute(
+        """update assignments a set status = case when a.role = 'performer' then 'assigned' else 'reserve_idle' end::assignment_status
+           from slots s where s.id = a.slot_id and s.cycle_id = %s and a.status = 'draft'""", (cycle,))
+    published = conn.execute(
+        "select count(*) from assignments a join slots s on s.id = a.slot_id where s.cycle_id = %s and a.status in ('assigned','reserve_idle')",
+        (cycle,)).fetchone()[0]
+
+    def call(user, amr_age, confirm=name, reason="פורסם עם שגיאה בקליטה"):
+        now = int(time.time())
+        claims = {"sub": str(user), "aal": "aal2",
+                  "amr": [{"method": "totp", "timestamp": now - amr_age}, {"method": "password", "timestamp": now - amr_age}]}
+        conn.execute("begin")
+        conn.execute("set local role authenticated")
+        conn.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(user),))
+        conn.execute("select set_config('request.jwt.claims', %s, true)", (json.dumps(claims),))
+        try:
+            return conn.execute("select public.unpublish_cycle(%s, %s, %s)", (cycle, reason, confirm)).fetchone()[0]
+        finally:
+            conn.execute("rollback" if conn.info.transaction_status == 3 else "commit")
+
+    for args in ((COORD, 3600), (DEPUTY_ACTIVE, 10), (COORD, 10, "שם אחר"), (COORD, 10, name, "")):
+        with pytest.raises(psycopg.Error):
+            call(*args)
+    assert conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "published"
+
+    # a cycle that already started cannot be unpublished
+    start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+    conn.execute("update cycles set start_date = current_date - 1 where id = %s", (cycle,))
+    with pytest.raises(psycopg.Error):
+        call(COORD, 10)
+    conn.execute("update cycles set start_date = %s where id = %s", (start, cycle))
+
+    assert call(COORD, 10) == published
+    assert conn.execute("select status, published_at from cycles where id = %s", (cycle,)).fetchone() == ("review", None)
+    assert conn.execute("select count(*) from published_board where cycle_id = %s", (cycle,)).fetchone()[0] == 0
+    row = conn.execute("select after from audit_log where action = 'unpublish' and entity_id = %s order by at desc limit 1", (str(cycle),)).fetchone()
+    assert row and row[0]["assignments_returned"] == published and row[0]["reason"]
+    conn.execute("update cycles set status = %s where id = %s", (status0, cycle))
