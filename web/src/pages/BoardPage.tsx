@@ -107,7 +107,9 @@ function DutyRow({ r, query }: { r: BoardRow; query: string }) {
         <Box sx={{ gridArea: "duty", minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", flexWrap: "wrap" }}>
             <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>{r.task_name}</Typography>
-            {r.changed_after_publish && <Chip size="small" color="warning" label="עודכן" sx={{ height: 20 }} />}
+            {r.changed_after_publish && (
+              <Chip size="small" color="warning" label={`עודכן ${dateFmt.format(new Date(r.updated_at))}`} title={`עודכן אחרי הפרסום, ${dateFmt.format(new Date(r.updated_at))} ${timeLabel(r.updated_at)}`} sx={{ height: 20 }} />
+            )}
           </Stack>
           {time}
         </Box>
