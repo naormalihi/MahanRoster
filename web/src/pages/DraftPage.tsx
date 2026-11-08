@@ -36,9 +36,10 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useCycle } from "../lib/cycleContext";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
-import { planningCycle, stageLabel, type Cycle } from "../lib/cycles";
+import { stageLabel, type Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
 import {
   ROLE_LABEL,
@@ -479,7 +480,7 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
 export function DraftPage() {
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
-  const [cycleId, setCycleId] = useState("");
+  const { cycleId, reload: reloadCycle } = useCycle();
   const [tasks, setTasks] = useState<Map<string, TaskType>>(new Map());
   const [soldiers, setSoldiers] = useState<Map<string, ExistingSoldier>>(new Map());
   const [slots, setSlots] = useState<SlotRow[] | null>(null);
@@ -498,8 +499,6 @@ export function DraftPage() {
         setCycles(c);
         setTasks(new Map(t.map((x) => [x.id, x])));
         setSoldiers(new Map(s.map((x) => [x.id, x])));
-        const withDraft = c.find((x) => x.status === "review" || x.status === "scheduling");
-        setCycleId((id) => id || withDraft?.id || planningCycle(c, dayKey(new Date()))?.id || "");
       })
       .catch((e) => setMsg({ ok: false, text: (e as Error).message }));
   }, [api]);
@@ -536,6 +535,7 @@ export function DraftPage() {
       setPublishing(false);
       setMsg({ ok: true, text: "הלוח פורסם. הוא מופיע עכשיו ב\"לוח מפורסם\" לכל מי שיש לו גישה." });
       setCycles(await api!.cycles());
+      void reloadCycle();
       void load();
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
@@ -545,20 +545,6 @@ export function DraftPage() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Typography variant="h1" sx={{ flex: 1 }}>
-          טיוטת שיבוץ
-        </Typography>
-        {cycles.length > 0 && (
-          <TextField select size="small" label="מחזור" value={cycleId} onChange={(e) => setCycleId(e.target.value)} sx={{ minWidth: 220 }}>
-            {cycles.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
-      </Stack>
       {msg && (
         <Alert severity={msg.ok ? "success" : "error"} onClose={() => setMsg(null)}>
           {msg.text}

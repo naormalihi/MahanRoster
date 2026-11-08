@@ -1,3 +1,4 @@
+import BackIcon from "@mui/icons-material/ArrowForward";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
 import KeyIcon from "@mui/icons-material/KeyOutlined";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
@@ -24,6 +25,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import * as XLSX from "xlsx";
 import type { ApplyResult } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -154,7 +156,12 @@ export function RosterImportPage() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h1">טעינת כוח אדם</Typography>
+      <Box>
+        <Button size="small" startIcon={<BackIcon />} component={RouterLink} to="/soldiers">
+          חיילים
+        </Button>
+        <Typography variant="h1">טעינת כוח אדם</Typography>
+      </Box>
       <Stepper activeStep={step} alternativeLabel>
         {["מפתח יחידה", "קובץ ועמודות", "תצוגה מקדימה", "סיום"].map((l) => (
           <Step key={l}>

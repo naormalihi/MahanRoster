@@ -26,6 +26,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useCycle } from "../lib/cycleContext";
 import {
   buildSlots,
   readRows,
@@ -36,13 +37,12 @@ import {
   type SlotRow,
 } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
-import { planningCycle, type Cycle } from "../lib/cycles";
-import { TZ, dayKey } from "../lib/dates";
+import type { Cycle } from "../lib/cycles";
+import { TZ } from "../lib/dates";
 
 const tsFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 const dowFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "short" });
 const span = (a: string, b: string) => `${dowFmt.format(new Date(a))} ${tsFmt.format(new Date(a))} – ${tsFmt.format(new Date(b))}`;
-const fmtDay = (d: string) => d.split("-").reverse().join("/");
 
 function Loading() {
   return (
@@ -353,7 +353,7 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
 // Existing slots
 // ---------------------------------------------------------------------------
 
-function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void }) {
+function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; locked?: boolean }) {
   const { api } = useAuth();
   const [task, setTask] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -378,7 +378,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void }
           <Chip key={id} label={`${taskName.get(id) ?? "?"} (${n})`} color={task === id ? "primary" : "default"} variant={task === id ? "filled" : "outlined"} onClick={() => setTask(id)} />
         ))}
       </Stack>
-      {selected.size > 0 && (
+      {selected.size > 0 && !props.locked && (
         <Box>
           <Button color="error" startIcon={<DeleteIcon />} onClick={del}>
             מחיקת {selected.size} משבצות
@@ -451,7 +451,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void }
 export function SlotsPage() {
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
-  const [cycleId, setCycleId] = useState("");
+  const { cycleId, locked } = useCycle();
   const [refs, setRefs] = useState<Refs | null>(null);
   const [slots, setSlots] = useState<SlotRow[] | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -470,7 +470,6 @@ export function SlotsPage() {
     ])
       .then(([c, tasks, categories, ranks, aliases, sc, cal]) => {
         setCycles(c);
-        setCycleId((id) => id || planningCycle(c, dayKey(new Date()))?.id || "");
         const holidays = new Set(cal.filter((d) => d.day_type === "holiday" || d.day_type === "holiday_eve").map((d) => d.day));
         setRefs({ tasks, categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
       })
@@ -494,22 +493,8 @@ export function SlotsPage() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Typography variant="h1" sx={{ flex: 1 }}>
-          לוח הבסיס
-        </Typography>
-        {cycles.length > 0 && (
-          <TextField select size="small" label="מחזור" value={cycleId} onChange={(e) => setCycleId(e.target.value)} sx={{ minWidth: 220 }}>
-            {cycles.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.name} ({fmtDay(c.start_date)}–{fmtDay(c.end_date)})
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
-      </Stack>
       {!cycle ? (
-        <Alert severity="info">צריך קודם ליצור מחזור במסך "מחזורים".</Alert>
+        <Alert severity="info">צריך קודם ליצור מחזור בניהול המחזורים.</Alert>
       ) : (
         <>
           {done && (
@@ -517,6 +502,12 @@ export function SlotsPage() {
               {done}
             </Alert>
           )}
+          {locked ? (
+            <Alert severity="info">
+              המחזור פורסם, ולכן אי אפשר לקלוט מחדש את לוח הבסיס או למחוק משבצות. שינוי מהבסיס אחרי הפרסום ייקלט בתפעול השוטף, בשיבוץ במצב
+              יציבות שמשנה רק את המשבצות שהשתנו.
+            </Alert>
+          ) : (
           <ImportCard
             key={cycle.id}
             cycle={cycle}
@@ -528,8 +519,9 @@ export function SlotsPage() {
               void loadSlots();
             }}
           />
+          )}
           <Typography variant="h2">משבצות במחזור</Typography>
-          {slots ? <SlotList slots={slots} refs={refs} onDeleted={loadSlots} /> : <Loading />}
+          {slots ? <SlotList slots={slots} refs={refs} onDeleted={loadSlots} locked={locked} /> : <Loading />}
         </>
       )}
     </Stack>
