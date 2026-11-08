@@ -16,6 +16,7 @@ const SlotsPage = lazy(() => import("./pages/SlotsPage").then((m) => ({ default:
 const SchedulePage = lazy(() => import("./pages/SchedulePage").then((m) => ({ default: m.SchedulePage })));
 const DraftPage = lazy(() => import("./pages/DraftPage").then((m) => ({ default: m.DraftPage })));
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const HistoryPage = lazy(() => import("./pages/HistoryPage").then((m) => ({ default: m.HistoryPage })));
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
 function Gate() {
@@ -98,6 +99,16 @@ function Gate() {
             element={
               <Suspense fallback={<CircularProgress />}>
                 <RosterImportPage />
+              </Suspense>
+            }
+          />
+        )}
+        {staff && (
+          <Route
+            path="/history"
+            element={
+              <Suspense fallback={<CircularProgress />}>
+                <HistoryPage />
               </Suspense>
             }
           />

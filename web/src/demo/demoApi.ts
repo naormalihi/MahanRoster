@@ -26,6 +26,7 @@ import {
   type ExemptionType,
 } from "../lib/cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
+import type { HistoryDraft, HistoryDuty, HistoryImport } from "../lib/history";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
 import type { ScheduleJob } from "../lib/schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
@@ -750,5 +751,56 @@ export class DemoApi implements Api {
     const mine = this.draft.filter((a) => a.cycle_id === cycleId && a.status === "draft");
     mine.forEach((a) => (a.status = a.role === "performer" ? "assigned" : "reserve_idle"));
     return mine.length;
+  }
+
+  // History import: points are the duty weight per started day (enough for the demo)
+  private histImports: HistoryImport[] = [];
+  private histDuties = new Map<string, HistoryDuty[]>();
+
+  async historyImports() {
+    await delay();
+    return this.histImports.map((x) => ({ ...x }));
+  }
+
+  async historyDuties(importId: string) {
+    await delay();
+    return [...(this.histDuties.get(importId) ?? [])].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  }
+
+  async importHistory(fileName: string, rows: HistoryDraft[]) {
+    await delay(300);
+    const id = crypto.randomUUID();
+    const tasks = await this.taskTypes();
+    this.histDuties.set(
+      id,
+      rows.map((r) => {
+        const w = tasks.find((t) => t.id === r.task_type_id)?.weight ?? 1;
+        const days = Math.max(1, Math.ceil((Date.parse(r.ends_at) - Date.parse(r.starts_at)) / 86_400_000));
+        const dow = new Date(r.starts_at).getDay();
+        return {
+          soldier_id: r.soldier_id,
+          task_type_id: r.task_type_id,
+          starts_at: r.starts_at,
+          normalized_points: r.is_penalty ? 0 : Math.round(w * days * (dow >= 5 ? 1.5 : 1) * 100) / 100,
+          weekend_units: !r.is_penalty && dow >= 5 ? 1 : 0,
+          reserve_activated: r.reserve_activated,
+          is_penalty: r.is_penalty,
+        };
+      }),
+    );
+    this.histImports.unshift({ id, file_name: fileName, rows: rows.length, created_at: new Date().toISOString(), approved_at: null });
+    return id;
+  }
+
+  async approveHistory(importId: string) {
+    await delay();
+    const x = this.histImports.find((i) => i.id === importId);
+    if (x && !x.approved_at) x.approved_at = new Date().toISOString();
+  }
+
+  async deleteHistory(importId: string) {
+    await delay();
+    this.histImports = this.histImports.filter((i) => i.id !== importId);
+    this.histDuties.delete(importId);
   }
 }
