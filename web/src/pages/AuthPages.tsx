@@ -53,7 +53,7 @@ export function LoginPage() {
         <Stack spacing={2}>
           {api?.demo && (
             <Alert severity="info">
-              מצב הדגמה. משתמשים: <b>naat</b> (נע"ת), <b>board</b> (צפייה), <b>new.user</b>. כל סיסמה מתקבלת.
+              מצב הדגמה. משתמשים: <b>naat</b> (נע"ת), <b>board</b> (צפייה), <b>cmd</b> (מפקד גף), <b>new.user</b>. כל סיסמה מתקבלת.
             </Alert>
           )}
           <TextField

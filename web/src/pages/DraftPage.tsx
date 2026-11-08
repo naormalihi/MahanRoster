@@ -37,6 +37,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
+import { useCanEdit } from "../components/ReadOnly";
 import { UnpublishDialog, type UnpublishImpact } from "../components/UnpublishDialog";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
@@ -480,6 +481,7 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
 
 export function DraftPage() {
   const { api, me } = useAuth();
+  const canEdit = useCanEdit();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle } = useCycle();
   const [tasks, setTasks] = useState<Map<string, TaskType>>(new Map());
@@ -587,7 +589,7 @@ export function DraftPage() {
             <Tab value="load" label="עומס לפי חייל" />
           </Tabs>
           {(() => {
-            const ctx: Ctx = { cycle, slots, tasks, soldiers, assignments, reload: load, locked };
+            const ctx: Ctx = { cycle, slots, tasks, soldiers, assignments, reload: load, locked: locked || !canEdit };
             return tab === "slots" ? <SlotsTab ctx={ctx} /> : <LoadTab ctx={ctx} snapshot={snapshot} cells={cells} categories={categories} />;
           })()}
           {cycle.status === "published" && me?.roles.includes("coordinator") && (() => {

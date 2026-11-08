@@ -2,7 +2,8 @@ import { Alert, Box, CircularProgress } from "@mui/material";
 import { lazy, Suspense, type ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { isStaff } from "./lib/api";
+import { canRead, isStaff } from "./lib/api";
+import { ReadOnlyScope } from "./components/ReadOnly";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ChangePasswordPage, LoginPage, MfaPage } from "./pages/AuthPages";
 import { BoardPage } from "./pages/BoardPage";
@@ -34,22 +35,28 @@ function Gate() {
   if (stage === "mfa") return <MfaPage />;
   if (stage === "changePassword") return <ChangePasswordPage />;
   const staff = isStaff(me);
+  const reader = canRead(me);
   const lazyEl = (el: ReactElement) => <Suspense fallback={<CircularProgress />}>{el}</Suspense>;
+  const ro = (el: ReactElement) => <ReadOnlyScope>{el}</ReadOnlyScope>;
   return (
     <CycleProvider>
       <Layout>
         <Routes>
-          <Route path="/" element={staff ? <HomePage /> : <BoardPage />} />
+          <Route path="/" element={reader ? <HomePage /> : <BoardPage />} />
           <Route path="/board" element={<BoardPage />} />
+          {reader && (
+            <>
+              <Route path="/cycle" element={ro(<CycleWorkspace step="overview" />)} />
+              <Route path="/cycle/constraints" element={ro(<CycleWorkspace step="constraints" />)} />
+              <Route path="/cycle/potential" element={ro(<CycleWorkspace step="potential" />)} />
+              <Route path="/cycle/slots" element={ro(<CycleWorkspace step="slots" />)} />
+              <Route path="/cycle/schedule" element={ro(<CycleWorkspace step="schedule" />)} />
+              <Route path="/soldiers" element={ro(<SoldiersPage />)} />
+            </>
+          )}
           {staff && (
             <>
-              <Route path="/cycle" element={<CycleWorkspace step="overview" />} />
-              <Route path="/cycle/constraints" element={<CycleWorkspace step="constraints" />} />
-              <Route path="/cycle/potential" element={<CycleWorkspace step="potential" />} />
-              <Route path="/cycle/slots" element={<CycleWorkspace step="slots" />} />
-              <Route path="/cycle/schedule" element={<CycleWorkspace step="schedule" />} />
               <Route path="/cycles" element={<CyclesPage />} />
-              <Route path="/soldiers" element={<SoldiersPage />} />
               <Route path="/soldiers/import" element={lazyEl(<RosterImportPage />)} />
               <Route path="/admin" element={lazyEl(<AdminPage />)} />
               {/* old addresses, kept so bookmarks still work */}

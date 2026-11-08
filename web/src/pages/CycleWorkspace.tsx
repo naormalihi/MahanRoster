@@ -107,7 +107,7 @@ function Overview({ cycle, facts, onChanged }: { cycle: Cycle; facts: CycleFacts
           severity="info"
           action={
             next.step !== "overview" && (
-              <Button color="inherit" size="small" onClick={() => navigate(STEPS.find((s) => s.key === next.step)!.path)}>
+              <Button data-read color="inherit" size="small" onClick={() => navigate(STEPS.find((s) => s.key === next.step)!.path)}>
                 מעבר
               </Button>
             )

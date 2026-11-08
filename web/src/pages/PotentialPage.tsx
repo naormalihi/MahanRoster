@@ -31,6 +31,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
+import { useCanEdit } from "../components/ReadOnly";
 import type { Cycle } from "../lib/cycles";
 import {
   cellText,
@@ -338,6 +339,7 @@ export function PotentialPage() {
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle, locked } = useCycle();
+  const canEdit = useCanEdit();
   const [soldiers, setSoldiers] = useState<Map<string, ExistingSoldier>>(new Map());
   const [categories, setCategories] = useState<NamedRef[]>([]);
   const [data, setData] = useState<Data | null>(null);
@@ -459,7 +461,7 @@ export function PotentialPage() {
                 חישוב מחדש
               </Button>
             )}
-            <Button variant="contained" startIcon={<DownloadIcon />} onClick={exportToBase} disabled={!data}>
+            <Button data-read variant="contained" startIcon={<DownloadIcon />} onClick={exportToBase} disabled={!data}>
               ייצוא לבסיס
             </Button>
           </Stack>
@@ -470,7 +472,7 @@ export function PotentialPage() {
           {!data ? (
             <Loading />
           ) : tab === "matrix" ? (
-            <MatrixTab cycle={cycle} data={data} soldiers={soldiers} categories={shownCategories} reload={loadData} locked={locked} />
+            <MatrixTab cycle={cycle} data={data} soldiers={soldiers} categories={shownCategories} reload={loadData} locked={locked || !canEdit} />
           ) : (
             <HeatTab daily={data.daily} categories={shownCategories} />
           )}

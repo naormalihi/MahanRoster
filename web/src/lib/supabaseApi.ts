@@ -20,6 +20,7 @@ import {
   type ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { AppUser } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
@@ -643,6 +644,26 @@ export class SupabaseApi implements Api {
 
   async publishCycle(cycleId: string) {
     return Number(check(await this.sb.rpc("publish_cycle", { p_cycle: cycleId })));
+  }
+
+  async listUsers(): Promise<AppUser[]> {
+    return check(await this.sb.rpc("list_users")) as AppUser[];
+  }
+
+  async createUser(username: string, password: string, soldierId: string | null) {
+    return check(await this.sb.rpc("create_user", { p_username: username, p_password: password, p_role: "gaf_commander", p_soldier: soldierId })) as string;
+  }
+
+  async resetUserPassword(userId: string, password: string) {
+    maybe(await this.sb.rpc("reset_user_password", { p_user: userId, p_password: password }));
+  }
+
+  async setUserLocked(userId: string, locked: boolean) {
+    maybe(await this.sb.rpc("set_user_locked", { p_user: userId, p_locked: locked }));
+  }
+
+  async setUserSoldier(userId: string, soldierId: string | null) {
+    maybe(await this.sb.rpc("set_user_soldier", { p_user: userId, p_soldier: soldierId }));
   }
 
   async unpublishCycle(cycleId: string) {
