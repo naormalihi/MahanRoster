@@ -793,3 +793,47 @@ def test_gaf_named_by_a_framework_path_is_merged(conn):
         assert conn.execute("select gaf_id from assignments where id = %s", (a[0],)).fetchone()[0] == gaf
     cols = [d.name for d in conn.execute("select * from published_board limit 0").description]
     assert {"performer_gafim", "reserve_gafim"} <= set(cols)
+
+
+def test_history_import_and_opening_scores(conn):
+    from datetime import timedelta
+
+    cycle = conn.cycle_id
+    start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+    _as_coord(conn, "select public.compute_potential(%s)", cycle)
+    grp = conn.execute(
+        """select fairness_group from cycle_soldier_snapshot where cycle_id = %s and fairness_group not like '%%:none'
+           group by 1 order by count(*) desc limit 1""", (cycle,)).fetchone()[0]
+    members = [r[0] for r in conn.execute(
+        "select soldier_id from cycle_soldier_snapshot where cycle_id = %s and fairness_group = %s order by soldier_id", (cycle, grp))]
+    a, b = members[0], members[1]
+    conn.execute("update soldiers set opening_score = null, opening_score_at = null where id = %s", (b,))  # no manual opening
+    task = conn.execute("select id from task_types where is_active and not is_weekend_type limit 1").fetchone()[0]
+    day = start - timedelta(days=10)
+    rows = [{"line": 2, "soldier_id": str(s), "task_type_id": str(task),
+             "starts_at": f"{day}T08:00:00+02:00", "ends_at": f"{day + timedelta(days=1)}T08:00:00+02:00"} for s in members if s != b]
+    imp = _as_coord(conn, "select public.import_history(%s, %s)", "hist.xlsx", Jsonb(rows))[0][0]
+    pts = conn.execute("select normalized_points from history_duties where import_id = %s and soldier_id = %s", (imp, a)).fetchone()[0]
+    assert pts > 0
+
+    # not approved yet: not in the baseline
+    _as_coord(conn, "select public.snapshot_cycle(%s)", cycle)
+    base = lambda s: conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s", (cycle, s)).fetchone()[0]
+    a0 = base(a)
+    _as_coord(conn, "select public.approve_history(%s)", imp)
+    _as_coord(conn, "select public.snapshot_cycle(%s)", cycle)
+    assert base(a) == a0 + pts
+    # b has no history: opens at the mean of the others in the group, recorded for this cycle
+    mean = conn.execute(
+        """select avg(baseline_score) from cycle_soldier_snapshot where cycle_id = %s and fairness_group = %s
+           and soldier_id not in (select soldier_id from score_adjustments where cycle_id = %s)""", (cycle, grp, cycle)).fetchone()[0]
+    adj = conn.execute("select reason, points from score_adjustments where cycle_id = %s and soldier_id = %s", (cycle, b)).fetchall()
+    assert adj and adj[0][0] == "new_soldier" and abs(adj[0][1] - mean) < 0.01
+    assert abs(base(b) - mean) < 0.02
+    # taking the snapshot again does not stack openings
+    _as_coord(conn, "select public.snapshot_cycle(%s)", cycle)
+    assert conn.execute("select count(*) from score_adjustments where cycle_id = %s and soldier_id = %s", (cycle, b)).fetchone()[0] == 1
+
+    _as_coord(conn, "select public.delete_history(%s)", imp)
+    assert conn.execute("select count(*) from history_duties where import_id = %s", (imp,)).fetchone()[0] == 0
+    _as_coord(conn, "select public.snapshot_cycle(%s)", cycle)

@@ -20,6 +20,7 @@ import {
   type ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { HistoryDraft, HistoryDuty, HistoryImport } from "./history";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
@@ -497,6 +498,40 @@ export class SupabaseApi implements Api {
 
   async rankRefs(): Promise<RankRef[]> {
     return check(await this.sb.from("ranks").select("id, name, sort_order").order("sort_order")) as RankRef[];
+  }
+
+  async historyImports(): Promise<HistoryImport[]> {
+    return check(
+      await this.sb.from("history_imports").select("id, file_name, rows, created_at, approved_at").order("created_at", { ascending: false }),
+    ) as HistoryImport[];
+  }
+
+  async historyDuties(importId: string): Promise<HistoryDuty[]> {
+    const out: HistoryDuty[] = [];
+    for (let from = 0; ; from += 1000) {
+      const page = check(
+        await this.sb
+          .from("history_duties")
+          .select("soldier_id, task_type_id, starts_at, normalized_points, weekend_units, reserve_activated, is_penalty")
+          .eq("import_id", importId)
+          .order("starts_at")
+          .range(from, from + 999),
+      ) as HistoryDuty[];
+      out.push(...page.map((d) => ({ ...d, normalized_points: Number(d.normalized_points) })));
+      if (page.length < 1000) return out;
+    }
+  }
+
+  async importHistory(fileName: string, rows: HistoryDraft[]): Promise<string> {
+    return check(await this.sb.rpc("import_history", { p_file: fileName, p_rows: rows })) as string;
+  }
+
+  async approveHistory(importId: string) {
+    maybe(await this.sb.rpc("approve_history", { p_import: importId }));
+  }
+
+  async deleteHistory(importId: string) {
+    maybe(await this.sb.rpc("delete_history", { p_import: importId }));
   }
 
   async taskTypeAliases(): Promise<Alias[]> {

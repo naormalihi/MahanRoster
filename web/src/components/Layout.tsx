@@ -46,6 +46,7 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: "/draft", label: "טיוטה" },
         { to: "/soldiers", label: "חיילים" },
         { to: "/roster", label: "טעינת כוח אדם" },
+        { to: "/history", label: "ייבוא היסטוריה" },
         { to: "/admin", label: "הגדרות" },
       ]
     : [];

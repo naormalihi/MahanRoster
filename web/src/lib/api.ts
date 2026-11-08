@@ -19,6 +19,7 @@ import type {
   ExemptionType,
 } from "./cycles";
 import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { HistoryDraft, HistoryDuty, HistoryImport } from "./history";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
@@ -163,6 +164,13 @@ export interface Api {
   manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string): Promise<string>;
   removeAssignment(assignmentId: string, reason: string): Promise<void>;
   publishCycle(cycleId: string): Promise<number>;
+
+  historyImports(): Promise<HistoryImport[]>;
+  historyDuties(importId: string): Promise<HistoryDuty[]>;
+  /** Stores the rows as an unapproved import (points computed by the server) and returns its id. */
+  importHistory(fileName: string, rows: HistoryDraft[]): Promise<string>;
+  approveHistory(importId: string): Promise<void>;
+  deleteHistory(importId: string): Promise<void>;
 }
 
 /**
