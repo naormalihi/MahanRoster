@@ -51,11 +51,10 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres pytest -q su
 4. יוצרים את המשתמש הראשון ב-Auth, ומריצים:
    `insert into app_users (id, username) values ('<uid>', 'naat'); insert into user_roles (user_id, role) values ('<uid>', 'coordinator');`
 
-## Full reset (fresh install)
+## Start over: delete all cycles and soldiers
 
-Irreversible. Keeps only the coordinator logins.
-
-1. Supabase › SQL Editor: run `reset_all.sql`. It copies every table to schema `reset_backup` first.
-2. GitHub › Actions › db-migrate › Run workflow: re-applies all migrations (catalog, settings, holidays).
-3. SQL Editor: run `bootstrap_after_reset.sql` to give the kept logins their נע"ת role back.
-4. When sure: `drop schema reset_backup cascade;`
+Irreversible. Run `reset_cycles_and_soldiers.sql` in Supabase › SQL Editor. It deletes every cycle
+(slots, runs, assignments, constraints) and every soldier (exemptions, absences, history, roster
+imports), and copies those tables to schema `reset_backup` first. Kept: catalog, settings, holidays,
+gafim, users (their link to a soldier is cleared) and the audit log.
+When sure: `drop schema reset_backup cascade;`

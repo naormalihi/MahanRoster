@@ -873,3 +873,20 @@ def test_gaf_commander_reads_everything_and_writes_nothing(conn):
     _as_coord(conn, "select public.set_user_locked(%s, true)", uid)
     with session_as(conn, uid) as c:
         assert c.execute("select count(*) from soldiers").fetchone()[0] == 0  # locked = no role
+
+
+def test_reset_cycles_and_soldiers_keeps_users_and_catalog(conn):
+    sql = (ROOT / "supabase/reset_cycles_and_soldiers.sql").read_text(encoding="utf-8")
+    body = sql.split("begin;", 1)[1].rsplit("commit;", 1)[0]
+    with conn.transaction():
+        conn.execute("update app_users set soldier_id = (select id from soldiers limit 1) where id = %s", (COORD,))
+        before = conn.execute("select (select count(*) from app_users), (select count(*) from task_types), (select count(*) from org_units), (select count(*) from soldiers)").fetchone()
+        assert before[3] > 0
+        conn.execute(body)
+        after = conn.execute("select (select count(*) from app_users), (select count(*) from task_types), (select count(*) from org_units), (select count(*) from soldiers)").fetchone()
+        assert after == (before[0], before[1], before[2], 0)
+        for t in ("cycles", "slots", "assignments", "exemptions", "schedule_jobs", "cycle_soldier_snapshot"):
+            assert conn.execute(f"select count(*) from {t}").fetchone()[0] == 0, t
+        assert conn.execute("select count(*) from reset_backup.soldiers").fetchone()[0] == before[3]
+        assert conn.execute("select count(*) from app_users where soldier_id is not null").fetchone()[0] == 0
+        raise psycopg.Rollback()
