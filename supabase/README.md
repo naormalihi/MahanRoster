@@ -50,3 +50,12 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres pytest -q su
 3. מריצים את המיגרציות בסדר, דרך `supabase db push` או דרך עורך ה-SQL. את `tests/supabase_stub.sql` **לא מריצים** על פרויקט אמיתי.
 4. יוצרים את המשתמש הראשון ב-Auth, ומריצים:
    `insert into app_users (id, username) values ('<uid>', 'naat'); insert into user_roles (user_id, role) values ('<uid>', 'coordinator');`
+
+## Full reset (fresh install)
+
+Irreversible. Keeps only the coordinator logins.
+
+1. Supabase › SQL Editor: run `reset_all.sql`. It copies every table to schema `reset_backup` first.
+2. GitHub › Actions › db-migrate › Run workflow: re-applies all migrations (catalog, settings, holidays).
+3. SQL Editor: run `bootstrap_after_reset.sql` to give the kept logins their נע"ת role back.
+4. When sure: `drop schema reset_backup cascade;`
