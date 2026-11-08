@@ -25,3 +25,40 @@ describe("board", () => {
     expect(isWeekend("2027-01-03")).toBe(false);
   });
 });
+
+describe("calendar views", () => {
+  it("builds a month of Sunday-first weeks", async () => {
+    const { monthGrid } = await import("../board");
+    const g = monthGrid(2027, 1); // January 2027 starts on a Friday
+    expect(g[0]).toEqual(["2026-12-27", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02"]);
+    expect(g[g.length - 1]).toContain("2027-01-31");
+    expect(g.every((w) => w.length === 7)).toBe(true);
+  });
+  it("summarizes days and builds the week table", async () => {
+    const { daySummaries, weekMatrix, weekDays } = await import("../board");
+    const rs = [
+      { ...row("a", "2027-01-05T06:00:00Z", "2027-01-06T06:00:00Z", "קצין תורן"), performers: ["דנה"] },
+      row("b", "2027-01-05T10:00:00Z", "2027-01-05T15:00:00Z", "קצין תורן"),
+      { ...row("c", "2027-01-06T11:00:00Z", "2027-01-13T11:00:00Z", "שמירות"), performers: ["יוסי"] },
+    ];
+    expect(daySummaries(rs).get("2027-01-05")).toEqual({ types: [{ name: "קצין תורן", color: null, count: 2 }], total: 2, unstaffed: 1 });
+    const m = weekMatrix(rs, weekDays("2027-01-03"));
+    expect(m.map((x) => x.task)).toEqual(["קצין תורן", "שמירות"]);
+    expect(m[0].byDay.get("2027-01-05")?.length).toBe(2);
+  });
+  it("exports one person's duties as a calendar file", async () => {
+    const { dutiesIcs, matchingNames } = await import("../board");
+    const rs = [
+      { ...row("a", "2027-01-05T06:00:00Z", "2027-01-06T06:00:00Z", "קצין תורן"), performers: ["דנה כהן"], instructions: "ציוד: נשק, אפוד" },
+      { ...row("b", "2027-01-07T06:00:00Z", "2027-01-08T06:00:00Z", "מפקד שער"), reserves: ["דנה כהן"] },
+      { ...row("c", "2027-01-07T06:00:00Z", "2027-01-08T06:00:00Z", "מפקד שער"), performers: ["דנה לוי"] },
+    ];
+    expect(matchingNames(rs, "דנה")).toEqual(["דנה כהן", "דנה לוי"]);
+    const { ics, count } = dutiesIcs(rs, "דנה כהן", new Date("2026-11-08T10:00:00Z"));
+    expect(count).toBe(2);
+    expect(ics).toContain("DTSTART:20270105T060000Z");
+    expect(ics).toContain("SUMMARY:עתודה – מפקד שער");
+    expect(ics).toContain("ציוד: נשק\\, אפוד");
+    expect(ics.split("\r\n").every((l) => new TextEncoder().encode(l).length <= 75)).toBe(true);
+  });
+});

@@ -5,6 +5,10 @@ import InfoIcon from "@mui/icons-material/InfoOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import TuneIcon from "@mui/icons-material/Tune";
+import CalendarIcon from "@mui/icons-material/CalendarMonthOutlined";
+import EventIcon from "@mui/icons-material/EventOutlined";
+import ViewListIcon from "@mui/icons-material/ViewListOutlined";
+import ViewWeekIcon from "@mui/icons-material/ViewWeekOutlined";
 import {
   Alert,
   Badge,
@@ -13,6 +17,10 @@ import {
   Chip,
   CircularProgress,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   InputAdornment,
   MenuItem,
@@ -24,9 +32,10 @@ import {
   Typography,
 } from "@mui/material";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { groupByDay, isWeekend, mentions, people, span, type Person } from "../lib/board";
+import { daySummaries, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix, type Person } from "../lib/board";
 import { addDays, dayKey, dayLabel, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
 
 type Range = "week" | "next" | "weekend" | "month";
@@ -191,10 +200,275 @@ function DayHeader({ day, count }: { day: string; count: number }) {
   );
 }
 
+type View = "list" | "month" | "week";
+
+const weekdayShortFmt = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", weekday: "short" });
+const WEEKDAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+const localDay = (key: string) => new Date(key + "T00:00:00");
+
+/** Month grid: a few type lines per day; a day opens its duties below. */
+function MonthView({ month, rows, query }: { month: Date; rows: BoardRow[]; query: string }) {
+  const weeks = monthGrid(month.getFullYear(), month.getMonth() + 1);
+  const sums = daySummaries(rows);
+  const thisMonth = (d: string) => Number(d.slice(5, 7)) === month.getMonth() + 1;
+  const today = dayKey(new Date());
+  const firstBusy = weeks.flat().find((d) => thisMonth(d) && sums.has(d));
+  const [picked, setPicked] = useState<string | null>(null);
+  const selected = picked ?? (thisMonth(today) && sums.has(today) ? today : firstBusy ?? null);
+  const dayRows = selected ? groupByDay(rows).find(([d]) => d === selected)?.[1] ?? [] : [];
+  return (
+    <Stack spacing={1.5}>
+      <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 2 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
+          {WEEKDAYS.map((w, i) => (
+            <Box key={w} sx={{ p: 0.75, textAlign: "center", fontSize: 12, fontWeight: 700, color: "text.secondary", bgcolor: i >= 5 ? "rgba(232,112,15,0.06)" : "action.hover" }}>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                {w}
+              </Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                {w[0]}׳
+              </Box>
+            </Box>
+          ))}
+          {weeks.flat().map((d) => {
+            const s = sums.get(d);
+            const inMonth = thisMonth(d);
+            const isSel = d === selected;
+            return (
+              <Box
+                key={d}
+                role="button"
+                tabIndex={0}
+                aria-label={`${dayLabel(localDay(d))}${s ? `, ${s.total} תורנויות` : ""}`}
+                onClick={() => setPicked(d)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setPicked(d)}
+                sx={{
+                  minHeight: { xs: 58, sm: 96 },
+                  p: { xs: 0.5, sm: 0.75 },
+                  borderTop: 1,
+                  borderInlineStart: 1,
+                  borderColor: "divider",
+                  cursor: "pointer",
+                  opacity: inMonth ? 1 : 0.4,
+                  bgcolor: isSel ? "rgba(26,20,102,0.07)" : isWeekend(d) ? "rgba(232,112,15,0.035)" : "background.paper",
+                  outline: isSel ? "2px solid" : "none",
+                  outlineColor: "primary.main",
+                  outlineOffset: -2,
+                  "&:hover": { bgcolor: "rgba(26,20,102,0.05)" },
+                }}
+              >
+                <Stack direction="row" sx={{ alignItems: "center", gap: 0.5 }}>
+                  <Box
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      ...(d === today ? { bgcolor: "secondary.main", color: "#fff", borderRadius: "50%", width: 22, height: 22, display: "grid", placeItems: "center" } : null),
+                    }}
+                  >
+                    {Number(d.slice(8))}
+                  </Box>
+                  {s && s.unstaffed > 0 && (
+                    <Box title={`${s.unstaffed} לא מאוישות`} sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main" }} />
+                  )}
+                </Stack>
+                {s && (
+                  <>
+                    <Box sx={{ display: { xs: "none", sm: "block" }, mt: 0.25 }}>
+                      {s.types.slice(0, 3).map((t) => (
+                        <Box key={t.name} sx={{ display: "flex", alignItems: "center", gap: 0.5, fontSize: 11.5, lineHeight: 1.45, whiteSpace: "nowrap", overflow: "hidden" }}>
+                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, bgcolor: t.color ?? "grey.500" }} />
+                          <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {t.name}
+                          </Box>
+                          {t.count > 1 && <Box component="span" sx={{ color: "text.secondary" }}>×{t.count}</Box>}
+                        </Box>
+                      ))}
+                      {s.types.length > 3 && (
+                        <Box sx={{ fontSize: 11, color: "text.secondary" }}>+{s.types.slice(3).reduce((a, t) => a + t.count, 0)} נוספות</Box>
+                      )}
+                    </Box>
+                    <Box sx={{ display: { xs: "flex", sm: "none" }, flexWrap: "wrap", gap: 0.4, mt: 0.5 }}>
+                      {s.types.slice(0, 6).map((t) => (
+                        <Box key={t.name} sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: t.color ?? "grey.500" }} />
+                      ))}
+                    </Box>
+                  </>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
+      </Paper>
+      {selected && (
+        <Box component="section">
+          <DayHeader day={selected} count={dayRows.length} />
+          {dayRows.length ? (
+            <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 2 }}>
+              {dayRows.map((r, i) => (
+                <Fragment key={r.slot_id}>
+                  {i > 0 && <Box sx={{ borderTop: 1, borderColor: "divider", mx: 1.5 }} />}
+                  <DutyRow r={r} query={query} />
+                </Fragment>
+              ))}
+            </Paper>
+          ) : (
+            <Typography color="text.secondary">אין תורנויות ביום הזה.</Typography>
+          )}
+        </Box>
+      )}
+    </Stack>
+  );
+}
+
+/** Duty type × day: who does what this week. Made for printing and the notice board. */
+function WeekView({ sunday, rows, query }: { sunday: Date; rows: BoardRow[]; query: string }) {
+  const days = weekDays(dayKey(sunday));
+  const matrix = weekMatrix(rows, days);
+  const today = dayKey(new Date());
+  if (!matrix.length) return null;
+  return (
+    <Paper variant="outlined" sx={{ overflowX: "auto", borderRadius: 2 }}>
+      <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 760, fontSize: 13, "& td, & th": { border: 1, borderColor: "divider", p: 0.75, verticalAlign: "top" } }}>
+        <thead>
+          <tr>
+            <Box component="th" sx={{ width: 130, textAlign: "start", bgcolor: "action.hover" }}>
+              תורנות
+            </Box>
+            {days.map((d) => (
+              <Box
+                component="th"
+                key={d}
+                sx={{ textAlign: "center", bgcolor: d === today ? "rgba(232,112,15,0.15)" : isWeekend(d) ? "rgba(232,112,15,0.06)" : "action.hover" }}
+              >
+                <Box sx={{ fontWeight: 700 }}>{weekdayShortFmt.format(localDay(d))}</Box>
+                <Box sx={{ fontWeight: 400, color: "text.secondary", fontSize: 12 }}>{dateFmt.format(localDay(d))}</Box>
+              </Box>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matrix.map((m) => (
+            <tr key={m.task}>
+              <Box component="th" sx={{ textAlign: "start", fontWeight: 700, borderInlineStart: `4px solid ${m.color ?? "#999"} !important` }}>
+                {m.task}
+              </Box>
+              {days.map((d) => (
+                <Box component="td" key={d} sx={{ bgcolor: isWeekend(d) ? "rgba(232,112,15,0.03)" : undefined }}>
+                  {(m.byDay.get(d) ?? []).map((r) => {
+                    const t = span(r.starts_at, r.ends_at);
+                    return (
+                      <Box key={r.slot_id} sx={{ "& + &": { mt: 0.75, pt: 0.75, borderTop: 1, borderColor: "divider" } }}>
+                        {r.performers.length ? (
+                          r.performers.map((n) => (
+                            <Box key={n} sx={{ fontWeight: 700, ...(query && n.includes(query) ? { bgcolor: "#ffe58a", color: "#000", borderRadius: 0.5, px: 0.3 } : null) }}>
+                              {n}
+                            </Box>
+                          ))
+                        ) : (
+                          <Box sx={{ color: "error.main", fontWeight: 700 }}>לא מאויש</Box>
+                        )}
+                        {r.reserves.length > 0 && <Box sx={{ color: "text.secondary", fontSize: 12 }}>עתודה: {r.reserves.join(", ")}</Box>}
+                        <Box sx={{ color: "text.secondary", fontSize: 11.5, fontVariantNumeric: "tabular-nums" }}>
+                          {t.from}–{t.to}
+                          {t.until && ` · ${t.until}`}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </Box>
+    </Paper>
+  );
+}
+
+/** "My duties" to the phone's calendar: one person's coming duties as an .ics file. */
+function CalendarExport({ query }: { query: string }) {
+  const { api } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<BoardRow[] | null>(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setRows(null);
+    setError(null);
+    const now = new Date();
+    api!
+      .board(now.toISOString(), addDays(now, 400).toISOString())
+      .then((r) => {
+        setRows(r);
+        const names = matchingNames(r, query);
+        setName(names.length === 1 ? names[0] : "");
+      })
+      .catch((e) => setError((e as Error).message));
+  }, [api, open, query]);
+
+  const names = rows ? matchingNames(rows, query) : [];
+  const preview = rows && name ? dutiesIcs(rows, name) : null;
+
+  function download() {
+    if (!preview) return;
+    const url = URL.createObjectURL(new Blob([preview.ics], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `תורנויות-${name}.ics`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  return (
+    <>
+      <Button size="small" variant="outlined" startIcon={<EventIcon />} onClick={() => setOpen(true)} disabled={!query.trim()} sx={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+        ליומן
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>התורנויות שלי ביומן</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.5}>
+            {error && <Alert severity="error">{error}</Alert>}
+            {!rows && !error && <CircularProgress size={22} />}
+            {rows && names.length === 0 && <Alert severity="info">לא נמצאו תורנויות קרובות לשם "{query.trim()}".</Alert>}
+            {names.length > 1 && (
+              <TextField select label="בחירת חייל" value={name} onChange={(e) => setName(e.target.value)} fullWidth>
+                {names.map((n) => (
+                  <MenuItem key={n} value={n}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            {preview && (
+              <Typography variant="body2">
+                <b>{preview.count}</b> תורנויות קרובות של {name}, כמבצע או כעתודה, עם השעות וההנחיות ותזכורת 12 שעות לפני. פותחים את הקובץ בטלפון,
+                והתורנויות נכנסות ליומן. אחרי שינוי בלוח – מורידים שוב.
+              </Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>סגירה</Button>
+          <Button variant="contained" startIcon={<EventIcon />} onClick={download} disabled={!preview?.count}>
+            הורדת קובץ יומן
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
 export function BoardPage() {
   const { api } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const view: View = params.get("view") === "month" ? "month" : params.get("view") === "week" ? "week" : "list";
+  const setView = (v: View) => setParams(v === "list" ? {} : { view: v }, { replace: true });
   const [range, setRange] = useState<Range>("week");
   const [month, setMonth] = useState<Date>(() => monthStartOf(new Date()));
+  const [sunday, setSunday] = useState<Date>(() => weekOf()[0]);
   const [next, setNext] = useState<string | null>(null);
   const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -203,8 +477,16 @@ export function BoardPage() {
   const [category, setCategory] = useState("");
   const [filters, setFilters] = useState(false);
 
+  const [from, to] = useMemo((): [Date, Date] => {
+    if (view === "month") {
+      const g = monthGrid(month.getFullYear(), month.getMonth() + 1);
+      return [localDay(g[0][0]), addDays(localDay(g[g.length - 1][6]), 1)];
+    }
+    if (view === "week") return [sunday, addDays(sunday, 7)];
+    return rangeOf(range, month);
+  }, [view, range, month, sunday]);
+
   useEffect(() => {
-    const [from, to] = rangeOf(range, month);
     setRows(null);
     setNext(null);
     api!
@@ -215,11 +497,13 @@ export function BoardPage() {
         if (!r.length) api!.nextPublished(to.toISOString()).then(setNext).catch(() => setNext(null));
       })
       .catch((e) => setError((e as Error).message));
-  }, [api, range, month]);
+  }, [api, from, to]);
 
   const jumpTo = (iso: string) => {
-    setMonth(monthStartOf(new Date(iso)));
-    setRange("month");
+    const d = new Date(iso);
+    setMonth(monthStartOf(d));
+    setSunday(weekOf(d)[0]);
+    if (view === "list") setRange("month");
   };
 
   const gafOf = (r: BoardRow) => people(r.performers, r.performer_gafim ?? r.gafim).map((p) => p.gaf).filter(Boolean);
@@ -231,12 +515,30 @@ export function BoardPage() {
   const days = groupByDay(shown);
   const unstaffed = shown.filter((r) => !r.performers.length).length;
   const active = (gaf ? 1 : 0) + (category ? 1 : 0);
-  const [from, to] = rangeOf(range, month);
   const title =
-    range === "month" ? monthFmt.format(month) : `${dateFmt.format(from)} – ${dateFmt.format(addDays(to, -1))}`;
+    view === "month" || (view === "list" && range === "month")
+      ? monthFmt.format(month)
+      : `${dateFmt.format(from)} – ${dateFmt.format(addDays(to, -1))}`;
+
+  const nav = (label: string, prev: () => void, nextFn: () => void) => (
+    <Stack direction="row" sx={{ alignItems: "center" }}>
+      <IconButton size="small" aria-label="הקודם" onClick={prev}>
+        <ChevronRightIcon />
+      </IconButton>
+      <Typography sx={{ minWidth: 104, textAlign: "center", fontWeight: 600, fontSize: 14 }}>{label}</Typography>
+      <IconButton size="small" aria-label="הבא" onClick={nextFn}>
+        <ChevronLeftIcon />
+      </IconButton>
+    </Stack>
+  );
+  const monthNav = nav(
+    monthFmt.format(month),
+    () => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1)),
+    () => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1)),
+  );
 
   return (
-    <Stack spacing={1.5} sx={{ maxWidth: 1100, mx: "auto", width: "100%" }}>
+    <Stack spacing={1.5} sx={{ maxWidth: view === "week" ? 1400 : 1100, mx: "auto", width: "100%" }}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
         <Box sx={{ flex: 1 }}>
           <Typography variant="h1">לוח התורנויות</Typography>
@@ -266,29 +568,35 @@ export function BoardPage() {
       <Paper variant="outlined" sx={{ p: 1.25, "@media print": { display: "none" } }}>
         <Stack spacing={1.25}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
-            <ToggleButtonGroup
-              value={range}
-              exclusive
-              onChange={(_, v) => v && setRange(v)}
-              size="small"
-              sx={{ "& .MuiToggleButton-root": { px: 1.25, py: 0.5 } }}
-            >
-              <ToggleButton value="week">השבוע</ToggleButton>
-              <ToggleButton value="next">הבא</ToggleButton>
-              <ToggleButton value="weekend">סופ"ש</ToggleButton>
-              <ToggleButton value="month">חודש</ToggleButton>
+            <ToggleButtonGroup value={view} exclusive onChange={(_, v) => v && setView(v)} size="small" color="primary" sx={{ "& .MuiToggleButton-root": { px: 1.25, py: 0.5 } }}>
+              <ToggleButton value="list" aria-label="רשימה">
+                <ViewListIcon fontSize="small" sx={{ ml: 0.5 }} />
+                רשימה
+              </ToggleButton>
+              <ToggleButton value="month" aria-label="חודש">
+                <CalendarIcon fontSize="small" sx={{ ml: 0.5 }} />
+                חודש
+              </ToggleButton>
+              <ToggleButton value="week" aria-label="שבוע">
+                <ViewWeekIcon fontSize="small" sx={{ ml: 0.5 }} />
+                שבוע
+              </ToggleButton>
             </ToggleButtonGroup>
-            {range === "month" && (
-              <Stack direction="row" sx={{ alignItems: "center" }}>
-                <IconButton size="small" aria-label="החודש הקודם" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
-                  <ChevronRightIcon />
-                </IconButton>
-                <Typography sx={{ minWidth: 104, textAlign: "center", fontWeight: 600, fontSize: 14 }}>{monthFmt.format(month)}</Typography>
-                <IconButton size="small" aria-label="החודש הבא" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
-                  <ChevronLeftIcon />
-                </IconButton>
-              </Stack>
+            {view === "list" && (
+              <ToggleButtonGroup value={range} exclusive onChange={(_, v) => v && setRange(v)} size="small" sx={{ "& .MuiToggleButton-root": { px: 1.25, py: 0.5 } }}>
+                <ToggleButton value="week">השבוע</ToggleButton>
+                <ToggleButton value="next">הבא</ToggleButton>
+                <ToggleButton value="weekend">סופ"ש</ToggleButton>
+                <ToggleButton value="month">חודש</ToggleButton>
+              </ToggleButtonGroup>
             )}
+            {(view === "month" || (view === "list" && range === "month")) && monthNav}
+            {view === "week" &&
+              nav(
+                `${dateFmt.format(sunday)} – ${dateFmt.format(addDays(sunday, 6))}`,
+                () => setSunday(addDays(sunday, -7)),
+                () => setSunday(addDays(sunday, 7)),
+              )}
           </Stack>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <TextField
@@ -299,6 +607,7 @@ export function BoardPage() {
               fullWidth
               slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
             />
+            <CalendarExport query={query} />
             <IconButton aria-label="סינון" aria-expanded={filters} onClick={() => setFilters(!filters)} color={active ? "primary" : "default"}>
               <Badge badgeContent={active} color="primary">
                 <TuneIcon />
@@ -353,22 +662,25 @@ export function BoardPage() {
         </Alert>
       )}
 
-      {days.map(([day, items]) => (
-        <Box key={day} component="section" sx={{ breakInside: "avoid-page" }}>
-          <DayHeader day={day} count={items.length} />
-          <Paper
-            variant="outlined"
-            sx={{ overflow: "hidden", bgcolor: isWeekend(day) ? "rgba(232,112,15,0.035)" : "background.paper", borderRadius: 2 }}
-          >
-            {items.map((r, i) => (
-              <Fragment key={r.slot_id}>
-                {i > 0 && <Box sx={{ borderTop: 1, borderColor: "divider", mx: 1.5 }} />}
-                <DutyRow r={r} query={q} />
-              </Fragment>
-            ))}
-          </Paper>
-        </Box>
-      ))}
+      {rows && view === "month" && (rows.length > 0 || !next) && <MonthView key={month.toISOString()} month={month} rows={shown} query={q} />}
+      {rows && view === "week" && <WeekView sunday={sunday} rows={shown} query={q} />}
+      {view === "list" &&
+        days.map(([day, items]) => (
+          <Box key={day} component="section" sx={{ breakInside: "avoid-page" }}>
+            <DayHeader day={day} count={items.length} />
+            <Paper
+              variant="outlined"
+              sx={{ overflow: "hidden", bgcolor: isWeekend(day) ? "rgba(232,112,15,0.035)" : "background.paper", borderRadius: 2 }}
+            >
+              {items.map((r, i) => (
+                <Fragment key={r.slot_id}>
+                  {i > 0 && <Box sx={{ borderTop: 1, borderColor: "divider", mx: 1.5 }} />}
+                  <DutyRow r={r} query={q} />
+                </Fragment>
+              ))}
+            </Paper>
+          </Box>
+        ))}
     </Stack>
   );
 }
