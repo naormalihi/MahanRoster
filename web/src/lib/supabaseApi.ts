@@ -645,7 +645,7 @@ export class SupabaseApi implements Api {
     return Number(check(await this.sb.rpc("publish_cycle", { p_cycle: cycleId })));
   }
 
-  async unpublishCycle(cycleId: string, reason: string, confirmName: string) {
-    return Number(check(await this.sb.rpc("unpublish_cycle", { p_cycle: cycleId, p_reason: reason, p_confirm_name: confirmName })));
+  async unpublishCycle(cycleId: string) {
+    return Number(check(await this.sb.rpc("unpublish_cycle", { p_cycle: cycleId })));
   }
 }

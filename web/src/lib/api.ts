@@ -164,7 +164,7 @@ export interface Api {
   removeAssignment(assignmentId: string, reason: string): Promise<void>;
   publishCycle(cycleId: string): Promise<number>;
   /** Back to draft; only before the cycle starts, by the coordinator. */
-  unpublishCycle(cycleId: string, reason: string, confirmName: string): Promise<number>;
+  unpublishCycle(cycleId: string): Promise<number>;
 }
 
 /**

@@ -809,7 +809,7 @@ def test_unpublish_by_the_coordinator_before_the_cycle_starts(conn):
         "select count(*) from assignments a join slots s on s.id = a.slot_id where s.cycle_id = %s and a.status in ('assigned','reserve_idle')",
         (cycle,)).fetchone()[0]
 
-    def call(user, amr_age, confirm=name, reason="פורסם עם שגיאה בקליטה"):
+    def call(user, amr_age=0):
         now = int(time.time())
         claims = {"sub": str(user), "aal": "aal2",
                   "amr": [{"method": "totp", "timestamp": now - amr_age}, {"method": "password", "timestamp": now - amr_age}]}
@@ -818,13 +818,12 @@ def test_unpublish_by_the_coordinator_before_the_cycle_starts(conn):
         conn.execute("select set_config('request.jwt.claim.sub', %s, true)", (str(user),))
         conn.execute("select set_config('request.jwt.claims', %s, true)", (json.dumps(claims),))
         try:
-            return conn.execute("select public.unpublish_cycle(%s, %s, %s)", (cycle, reason, confirm)).fetchone()[0]
+            return conn.execute("select public.unpublish_cycle(%s)", (cycle,)).fetchone()[0]
         finally:
             conn.execute("rollback" if conn.info.transaction_status == 3 else "commit")
 
-    for args in ((DEPUTY_ACTIVE, 10), (COORD, 10, "שם אחר"), (COORD, 10, name, "")):
-        with pytest.raises(psycopg.Error):
-            call(*args)
+    with pytest.raises(psycopg.Error):
+        call(DEPUTY_ACTIVE)
     assert conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "published"
 
     # a cycle that already started cannot be unpublished
@@ -838,5 +837,5 @@ def test_unpublish_by_the_coordinator_before_the_cycle_starts(conn):
     assert conn.execute("select status, published_at from cycles where id = %s", (cycle,)).fetchone() == ("review", None)
     assert conn.execute("select count(*) from published_board where cycle_id = %s", (cycle,)).fetchone()[0] == 0
     row = conn.execute("select after from audit_log where action = 'unpublish' and entity_id = %s order by at desc limit 1", (str(cycle),)).fetchone()
-    assert row and row[0]["assignments_returned"] == published and row[0]["reason"]
+    assert row and row[0]["assignments_returned"] == published
     conn.execute("update cycles set status = %s where id = %s", (status0, cycle))
