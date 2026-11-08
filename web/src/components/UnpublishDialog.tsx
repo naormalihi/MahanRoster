@@ -8,6 +8,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  MenuItem,
   Step,
   StepLabel,
   Stepper,
@@ -16,6 +17,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { useAuth } from "../lib/auth";
+import { useCycle } from "../lib/cycleContext";
 import type { Cycle } from "../lib/cycles";
 
 export interface UnpublishImpact {
@@ -24,8 +26,8 @@ export interface UnpublishImpact {
 }
 
 /**
- * Unpublish in three deliberate steps: read what happens, confirm (cycle name + reason),
- * sign in again (password + code). The server checks the fresh sign-in too.
+ * Unpublish in two deliberate steps: read what happens, then confirm by choosing the cycle
+ * from the list and writing a reason. The server checks the same.
  */
 export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; onClose: () => void; onDone: (n: number) => void }) {
   const { api } = useAuth();
@@ -33,19 +35,17 @@ export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [reason, setReason] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nameOk = name.trim() === cycle.name.trim();
+  const { cycles } = useCycle();
+  const nameOk = name === cycle.name;
   const reasonOk = reason.trim().length >= 5;
 
   async function run() {
     setBusy(true);
     setError(null);
     try {
-      await api!.reauthenticate(password, code.trim());
       const n = await api!.unpublishCycle(cycle.id, reason.trim(), name.trim());
       props.onDone(n);
     } catch (e) {
@@ -61,7 +61,7 @@ export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; 
       </DialogTitle>
       <DialogContent dividers>
         <Stepper activeStep={step} sx={{ mb: 2.5 }}>
-          {["מה יקרה", "אישור", "הזדהות"].map((l) => (
+          {["מה יקרה", "אישור"].map((l) => (
             <Step key={l}>
               <StepLabel>{l}</StepLabel>
             </Step>
@@ -88,14 +88,20 @@ export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; 
         {step === 1 && (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <TextField
-              label={`הקלד את שם המחזור: ${cycle.name}`}
+              select
+              label="איזה מחזור מבטלים?"
               value={name}
               onChange={(e) => setName(e.target.value)}
               error={!!name && !nameOk}
-              helperText={name && !nameOk ? "השם לא תואם" : " "}
-              autoFocus
+              helperText={name && !nameOk ? `זה לא המחזור הזה – בחר את "${cycle.name}"` : "בחירה מכוונת מהרשימה, כדי לא לבטל מחזור אחר בטעות"}
               fullWidth
-            />
+            >
+              {(cycles ?? []).map((c) => (
+                <MenuItem key={c.id} value={c.name}>
+                  {c.name}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               label="נימוק (נרשם ביומן)"
               value={reason}
@@ -108,28 +114,7 @@ export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; 
           </Box>
         )}
 
-        {step === 2 && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Typography variant="body2">לאישור הפעולה צריך להזדהות שוב: הסיסמה שלך וקוד מאפליקציית האימות.</Typography>
-            <TextField
-              label="סיסמה"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              autoFocus
-              fullWidth
-            />
-            <TextField
-              label="קוד אימות (6 ספרות)"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              slotProps={{ htmlInput: { inputMode: "numeric", dir: "ltr" } }}
-              fullWidth
-            />
-            {error && <Alert severity="error">{error}</Alert>}
-          </Box>
-        )}
+        {error && <Alert severity="error">{error}</Alert>}
       </DialogContent>
       <DialogActions>
         <Button onClick={props.onClose} disabled={busy}>
@@ -146,16 +131,11 @@ export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; 
           </Button>
         )}
         {step === 1 && (
-          <Button color="error" variant="outlined" onClick={() => setStep(2)} disabled={!nameOk || !reasonOk}>
-            המשך
-          </Button>
-        )}
-        {step === 2 && (
           <Button
             color="error"
             variant="contained"
             onClick={run}
-            disabled={busy || !password || code.length !== 6}
+            disabled={busy || !nameOk || !reasonOk}
             startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
             ביטול הפרסום

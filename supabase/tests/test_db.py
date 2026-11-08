@@ -795,7 +795,7 @@ def test_gaf_named_by_a_framework_path_is_merged(conn):
     assert {"performer_gafim", "reserve_gafim"} <= set(cols)
 
 
-def test_unpublish_needs_fresh_sign_in_and_a_cycle_not_started(conn):
+def test_unpublish_by_the_coordinator_before_the_cycle_starts(conn):
     import time
 
     cycle = conn.cycle_id
@@ -822,7 +822,7 @@ def test_unpublish_needs_fresh_sign_in_and_a_cycle_not_started(conn):
         finally:
             conn.execute("rollback" if conn.info.transaction_status == 3 else "commit")
 
-    for args in ((COORD, 3600), (DEPUTY_ACTIVE, 10), (COORD, 10, "שם אחר"), (COORD, 10, name, "")):
+    for args in ((DEPUTY_ACTIVE, 10), (COORD, 10, "שם אחר"), (COORD, 10, name, "")):
         with pytest.raises(psycopg.Error):
             call(*args)
     assert conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "published"

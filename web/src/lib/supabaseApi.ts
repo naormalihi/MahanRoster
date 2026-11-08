@@ -645,18 +645,6 @@ export class SupabaseApi implements Api {
     return Number(check(await this.sb.rpc("publish_cycle", { p_cycle: cycleId })));
   }
 
-  async reauthenticate(password: string, code: string) {
-    const { data } = await this.sb.auth.getUser();
-    if (!data.user?.email) throw new Error("לא נמצא המשתמש המחובר");
-    const { error } = await this.sb.auth.signInWithPassword({ email: data.user.email, password });
-    if (error) throw new Error("הסיסמה שגויה");
-    const factors = check(await this.sb.auth.mfa.listFactors());
-    const totp = factors.totp.find((f) => f.status === "verified");
-    if (!totp) throw new Error("לא מוגדר אימות דו-שלבי");
-    const v = await this.sb.auth.mfa.challengeAndVerify({ factorId: totp.id, code });
-    if (v.error) throw new Error("קוד האימות שגוי או שפג תוקפו");
-  }
-
   async unpublishCycle(cycleId: string, reason: string, confirmName: string) {
     return Number(check(await this.sb.rpc("unpublish_cycle", { p_cycle: cycleId, p_reason: reason, p_confirm_name: confirmName })));
   }

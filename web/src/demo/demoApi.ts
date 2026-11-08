@@ -752,11 +752,6 @@ export class DemoApi implements Api {
     return mine.length;
   }
 
-  async reauthenticate(password: string, code: string) {
-    await delay(300);
-    if (!password || !/^\d{6}$/.test(code)) throw new Error("הסיסמה או הקוד שגויים");
-  }
-
   async unpublishCycle(cycleId: string, reason: string, confirmName: string) {
     await delay(300);
     const c = this.cycleList.find((x) => x.id === cycleId)!;

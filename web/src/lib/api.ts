@@ -163,9 +163,7 @@ export interface Api {
   manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string): Promise<string>;
   removeAssignment(assignmentId: string, reason: string): Promise<void>;
   publishCycle(cycleId: string): Promise<number>;
-  /** Sign in again (password + second factor) right before a sensitive action. */
-  reauthenticate(password: string, code: string): Promise<void>;
-  /** Back to draft; only before the cycle starts, by the coordinator, after reauthenticate(). */
+  /** Back to draft; only before the cycle starts, by the coordinator. */
   unpublishCycle(cycleId: string, reason: string, confirmName: string): Promise<number>;
 }
 
