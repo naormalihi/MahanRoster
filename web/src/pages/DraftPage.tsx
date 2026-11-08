@@ -606,7 +606,7 @@ export function DraftPage() {
                   <Typography variant="body2" sx={{ flex: 1 }}>
                     {started
                       ? "המחזור כבר התחיל, ולכן אי אפשר לבטל את הפרסום. שינויים במחזור שרץ נעשים בתפעול השוטף."
-                      : "ביטול פרסום מחזיר את המחזור לטיוטה כדי לתקן ולפרסם שוב. אפשרי רק לפני שהמחזור מתחיל, ודורש הזדהות מחדש."}
+                      : "ביטול פרסום מחזיר את המחזור לטיוטה כדי לתקן ולפרסם שוב. אפשרי רק לפני שהמחזור מתחיל."}
                   </Typography>
                   <Button color="error" variant="outlined" disabled={started} onClick={() => setUnpublishing(impact)}>
                     ביטול פרסום
