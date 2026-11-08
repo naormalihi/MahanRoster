@@ -1,5 +1,5 @@
 import { Alert, Box, CircularProgress } from "@mui/material";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { isStaff } from "./lib/api";
@@ -7,14 +7,12 @@ import { AuthProvider, useAuth } from "./lib/auth";
 import { ChangePasswordPage, LoginPage, MfaPage } from "./pages/AuthPages";
 import { BoardPage } from "./pages/BoardPage";
 import { CyclesPage } from "./pages/CyclesPage";
+import { CycleWorkspace } from "./pages/CycleWorkspace";
+import { HomePage } from "./pages/HomePage";
+import { CycleProvider } from "./lib/cycleContext";
 import { SoldiersPage } from "./pages/SoldiersPage";
 
-// Excel parsing is heavy and only נע"ת needs it.
-const ConstraintsPage = lazy(() => import("./pages/ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
-const PotentialPage = lazy(() => import("./pages/PotentialPage").then((m) => ({ default: m.PotentialPage })));
-const SlotsPage = lazy(() => import("./pages/SlotsPage").then((m) => ({ default: m.SlotsPage })));
-const SchedulePage = lazy(() => import("./pages/SchedulePage").then((m) => ({ default: m.SchedulePage })));
-const DraftPage = lazy(() => import("./pages/DraftPage").then((m) => ({ default: m.DraftPage })));
+// Excel parsing is heavy and only נע"ת needs it (the cycle steps load lazily inside the workspace).
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
@@ -36,85 +34,37 @@ function Gate() {
   if (stage === "mfa") return <MfaPage />;
   if (stage === "changePassword") return <ChangePasswordPage />;
   const staff = isStaff(me);
+  const lazyEl = (el: ReactElement) => <Suspense fallback={<CircularProgress />}>{el}</Suspense>;
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<BoardPage />} />
-        {staff && <Route path="/cycles" element={<CyclesPage />} />}
-        {staff && (
-          <Route
-            path="/constraints"
-            element={
-              <Suspense fallback={<CircularProgress />}>
-                <ConstraintsPage />
-              </Suspense>
-            }
-          />
-        )}
-        {staff && (
-          <Route
-            path="/potential"
-            element={
-              <Suspense fallback={<CircularProgress />}>
-                <PotentialPage />
-              </Suspense>
-            }
-          />
-        )}
-        {staff && (
-          <Route
-            path="/slots"
-            element={
-              <Suspense fallback={<CircularProgress />}>
-                <SlotsPage />
-              </Suspense>
-            }
-          />
-        )}
-        {staff && (
-          <Route
-            path="/schedule"
-            element={
-              <Suspense fallback={<CircularProgress />}>
-                <SchedulePage />
-              </Suspense>
-            }
-          />
-        )}
-        {staff && (
-          <Route
-            path="/draft"
-            element={
-              <Suspense fallback={<CircularProgress />}>
-                <DraftPage />
-              </Suspense>
-            }
-          />
-        )}
-        {staff && <Route path="/soldiers" element={<SoldiersPage />} />}
-        {staff && (
-          <Route
-            path="/roster"
-            element={
-              <Suspense fallback={<CircularProgress />}>
-                <RosterImportPage />
-              </Suspense>
-            }
-          />
-        )}
-        {staff && (
-          <Route
-            path="/admin"
-            element={
-              <Suspense fallback={<CircularProgress />}>
-                <AdminPage />
-              </Suspense>
-            }
-          />
-        )}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
+    <CycleProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={staff ? <HomePage /> : <BoardPage />} />
+          <Route path="/board" element={<BoardPage />} />
+          {staff && (
+            <>
+              <Route path="/cycle" element={<CycleWorkspace step="overview" />} />
+              <Route path="/cycle/constraints" element={<CycleWorkspace step="constraints" />} />
+              <Route path="/cycle/potential" element={<CycleWorkspace step="potential" />} />
+              <Route path="/cycle/slots" element={<CycleWorkspace step="slots" />} />
+              <Route path="/cycle/schedule" element={<CycleWorkspace step="schedule" />} />
+              <Route path="/cycles" element={<CyclesPage />} />
+              <Route path="/soldiers" element={<SoldiersPage />} />
+              <Route path="/soldiers/import" element={lazyEl(<RosterImportPage />)} />
+              <Route path="/admin" element={lazyEl(<AdminPage />)} />
+              {/* old addresses, kept so bookmarks still work */}
+              <Route path="/constraints" element={<Navigate to="/cycle/constraints" replace />} />
+              <Route path="/potential" element={<Navigate to="/cycle/potential" replace />} />
+              <Route path="/slots" element={<Navigate to="/cycle/slots" replace />} />
+              <Route path="/schedule" element={<Navigate to="/cycle/schedule?view=run" replace />} />
+              <Route path="/draft" element={<Navigate to="/cycle/schedule?view=draft" replace />} />
+              <Route path="/roster" element={<Navigate to="/soldiers/import" replace />} />
+            </>
+          )}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Layout>
+    </CycleProvider>
   );
 }
 

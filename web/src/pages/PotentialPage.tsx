@@ -30,8 +30,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { planningCycle, type Cycle } from "../lib/cycles";
-import { dayKey } from "../lib/dates";
+import { useCycle } from "../lib/cycleContext";
+import type { Cycle } from "../lib/cycles";
 import {
   cellText,
   effective,
@@ -144,6 +144,7 @@ function MatrixTab(props: {
   soldiers: Map<string, ExistingSoldier>;
   categories: NamedRef[];
   reload: () => void;
+  locked?: boolean;
 }) {
   const { api } = useAuth();
   const { data, categories } = props;
@@ -248,7 +249,7 @@ function MatrixTab(props: {
                 {categories.map((c) => {
                   const cell = at.get(`${s.soldier_id}|${c.id}`);
                   return (
-                    <TableCell key={c.id} sx={cellSx(cell)} title={cell ? cellTitle(cell) : undefined} onClick={() => cell && setEditing(cell)}>
+                    <TableCell key={c.id} sx={cellSx(cell)} title={cell ? cellTitle(cell) : undefined} onClick={() => cell && !props.locked && setEditing(cell)}>
                       {cell ? cellText(effective(cell)) : ""}
                     </TableCell>
                   );
@@ -336,7 +337,7 @@ function HeatTab({ daily, categories }: { daily: DailyAvailability[] | null; cat
 export function PotentialPage() {
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
-  const [cycleId, setCycleId] = useState("");
+  const { cycleId, reload: reloadCycle, locked } = useCycle();
   const [soldiers, setSoldiers] = useState<Map<string, ExistingSoldier>>(new Map());
   const [categories, setCategories] = useState<NamedRef[]>([]);
   const [data, setData] = useState<Data | null>(null);
@@ -350,7 +351,6 @@ export function PotentialPage() {
     setCycles(c);
     setSoldiers(new Map(s.map((x) => [x.id, x])));
     setCategories(cats);
-    setCycleId((id) => id || planningCycle(c, dayKey(new Date()))?.id || "");
     return c;
   }, [api]);
 
@@ -392,6 +392,7 @@ export function PotentialPage() {
     try {
       await api!.computePotential(cycleId);
       await loadCycles();
+      void reloadCycle();
       await loadData();
     } catch (e) {
       setError((e as Error).message);
@@ -424,23 +425,9 @@ export function PotentialPage() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Typography variant="h1" sx={{ flex: 1 }}>
-          פוטנציאל
-        </Typography>
-        {cycles.length > 0 && (
-          <TextField select size="small" label="מחזור" value={cycleId} onChange={(e) => setCycleId(e.target.value)} sx={{ minWidth: 220 }}>
-            {cycles.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
-      </Stack>
       {error && <Alert severity="error">{error}</Alert>}
       {!cycle ? (
-        <Alert severity="info">צריך קודם ליצור מחזור במסך "מחזורים".</Alert>
+        <Alert severity="info">צריך קודם ליצור מחזור בניהול המחזורים.</Alert>
       ) : !computed ? (
         <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 720 }}>
           <Stack spacing={2}>
@@ -465,10 +452,13 @@ export function PotentialPage() {
             <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 220 }}>
               חושב ב-{new Date(cycle.potential_computed_at!).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })}. הדרגות והאוכלוסיות
               נעולות למחזור; היעדרויות ופטורים שנוספו מאז כבר נכללים.
+              {locked && " המחזור פורסם, ולכן הפוטנציאל נעול: אין חישוב מחדש ואין תיקון תאים."}
             </Typography>
-            <Button startIcon={<CalculateIcon />} onClick={() => setConfirm(true)} disabled={busy}>
-              חישוב מחדש
-            </Button>
+            {!locked && (
+              <Button startIcon={<CalculateIcon />} onClick={() => setConfirm(true)} disabled={busy}>
+                חישוב מחדש
+              </Button>
+            )}
             <Button variant="contained" startIcon={<DownloadIcon />} onClick={exportToBase} disabled={!data}>
               ייצוא לבסיס
             </Button>
@@ -480,7 +470,7 @@ export function PotentialPage() {
           {!data ? (
             <Loading />
           ) : tab === "matrix" ? (
-            <MatrixTab cycle={cycle} data={data} soldiers={soldiers} categories={shownCategories} reload={loadData} />
+            <MatrixTab cycle={cycle} data={data} soldiers={soldiers} categories={shownCategories} reload={loadData} locked={locked} />
           ) : (
             <HeatTab daily={data.daily} categories={shownCategories} />
           )}

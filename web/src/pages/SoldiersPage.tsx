@@ -2,6 +2,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
+import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import {
   Alert,
   Box,
@@ -32,6 +33,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
@@ -391,7 +393,14 @@ export function SoldiersPage() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h1">חיילים</Typography>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+        <Typography variant="h1" sx={{ flex: 1 }}>
+          חיילים
+        </Typography>
+        <Button variant="contained" startIcon={<UploadIcon />} component={RouterLink} to="/soldiers/import">
+          טעינת כוח אדם
+        </Button>
+      </Stack>
       {rows && (
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
           <Chip label={`פעילים: ${counts.active}`} />

@@ -12,7 +12,6 @@ import {
   DialogTitle,
   LinearProgress,
   Link,
-  MenuItem,
   Paper,
   Stack,
   Table,
@@ -21,16 +20,16 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useCycle } from "../lib/cycleContext";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
-import { planningCycle, stageLabel, type Cycle } from "../lib/cycles";
-import { TZ, dayKey } from "../lib/dates";
+import { stageLabel, type Cycle } from "../lib/cycles";
+import { TZ } from "../lib/dates";
 import { REASON_LABEL } from "../lib/potential";
 import {
   JOB_STATUS_LABEL,
@@ -270,7 +269,7 @@ function Result({ job, slots, tasks }: { job: ScheduleJob; slots: Map<string, Sl
 export function SchedulePage() {
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
-  const [cycleId, setCycleId] = useState("");
+  const { cycleId, reload: reloadCycle } = useCycle();
   const [tasks, setTasks] = useState<Map<string, TaskType>>(new Map());
   const [slots, setSlots] = useState<SlotRow[] | null>(null);
   const [jobs, setJobs] = useState<ScheduleJob[] | null>(null);
@@ -284,7 +283,6 @@ export function SchedulePage() {
         setCycles(c);
         setTasks(new Map(t.map((x) => [x.id, x])));
         setConfigured(conf);
-        setCycleId((id) => id || planningCycle(c, dayKey(new Date()))?.id || "");
       })
       .catch((e) => setError((e as Error).message));
   }, [api]);
@@ -320,6 +318,7 @@ export function SchedulePage() {
       await api!.requestSchedule(cycleId);
       await loadJobs();
       setCycles(await api!.cycles());
+      void reloadCycle();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -332,23 +331,9 @@ export function SchedulePage() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Typography variant="h1" sx={{ flex: 1 }}>
-          שיבוץ
-        </Typography>
-        {cycles.length > 0 && (
-          <TextField select size="small" label="מחזור" value={cycleId} onChange={(e) => setCycleId(e.target.value)} sx={{ minWidth: 220 }}>
-            {cycles.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
-      </Stack>
       {error && <Alert severity="error">{error}</Alert>}
       {!cycle ? (
-        <Alert severity="info">צריך קודם ליצור מחזור במסך "מחזורים".</Alert>
+        <Alert severity="info">צריך קודם ליצור מחזור בניהול המחזורים.</Alert>
       ) : (
         <>
           {configured === false && <SetupHelp />}

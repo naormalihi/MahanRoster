@@ -42,13 +42,13 @@ import SearchIcon from "@mui/icons-material/Search";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useCycle } from "../lib/cycleContext";
 import type { TaskType } from "../lib/catalog";
 import {
   STATUS_LABEL,
   VIA_LABEL,
   absenceDays,
   blockQuotaProblems,
-  planningCycle,
   dedupeConstraints,
   exemptionProblems,
   parseTemplate,
@@ -65,7 +65,6 @@ import {
   type ReceivedVia,
   type RequestStatus,
 } from "../lib/cycles";
-import { dayKey } from "../lib/dates";
 import type { ExistingSoldier } from "../lib/roster";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
@@ -935,7 +934,7 @@ export function ConstraintsPage() {
   const tab = TABS.find((t) => t.key === params.get("tab"))?.key ?? "exemptions";
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const [soldiers, setSoldiers] = useState<ExistingSoldier[]>([]);
-  const [cycleId, setCycleId] = useState<string>("");
+  const { cycleId } = useCycle();
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -944,7 +943,6 @@ export function ConstraintsPage() {
       .then(([c, s]) => {
         setCycles(c);
         setSoldiers(s);
-        setCycleId((id) => id || planningCycle(c, dayKey(new Date()))?.id || "");
       })
       .catch((e) => setError((e as Error).message));
   }, [api]);
@@ -957,22 +955,8 @@ export function ConstraintsPage() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Typography variant="h1" sx={{ flex: 1 }}>
-          אילוצים
-        </Typography>
-        {cycles.length > 0 && (
-          <TextField select size="small" label="מחזור" value={cycleId} onChange={(e) => setCycleId(e.target.value)} sx={{ minWidth: 220 }}>
-            {cycles.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
-      </Stack>
       {!ctx ? (
-        <Alert severity="info">כדי להזין אילוצים צריך קודם ליצור מחזור במסך "מחזורים".</Alert>
+        <Alert severity="info">כדי להזין אילוצים צריך קודם ליצור מחזור בניהול המחזורים.</Alert>
       ) : (
         <>
           <Tabs value={tab} onChange={(_, v) => setParams({ tab: v }, { replace: true })} variant="scrollable" allowScrollButtonsMobile>

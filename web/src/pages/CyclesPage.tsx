@@ -31,6 +31,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useCycle } from "../lib/cycleContext";
 import {
   STAGES,
   addDaysIso,
@@ -51,13 +52,13 @@ const today = () => dayKey(new Date());
 
 /** Stages the app already has a screen for, and where it is. */
 const STAGE_LINK: Partial<Record<CycleStatus, { to: string; label: string }>> = {
-  loading: { to: "/roster", label: "לטעינת כוח אדם" },
-  collecting: { to: "/constraints", label: "לאילוצים" },
-  approving: { to: "/constraints?tab=exemptions&status=pending", label: "לפטורים הממתינים" },
-  potential: { to: "/potential", label: "למטריצת הפוטנציאל" },
-  slots: { to: "/slots", label: "לקליטת לוח הבסיס" },
-  scheduling: { to: "/schedule", label: "להרצת השיבוץ" },
-  review: { to: "/draft", label: "לטיוטה ולפרסום" },
+  loading: { to: "/soldiers/import", label: "לטעינת כוח אדם" },
+  collecting: { to: "/cycle/constraints", label: "לאילוצים" },
+  approving: { to: "/cycle/constraints?tab=exemptions&status=pending", label: "לפטורים הממתינים" },
+  potential: { to: "/cycle/potential", label: "למטריצת הפוטנציאל" },
+  slots: { to: "/cycle/slots", label: "לקליטת לוח הבסיס" },
+  scheduling: { to: "/cycle/schedule", label: "להרצת השיבוץ" },
+  review: { to: "/cycle/schedule", label: "לטיוטה ולפרסום" },
 };
 
 /** Stages after this one need screens that do not exist yet; the stepper stops here. */
@@ -128,7 +129,7 @@ function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => 
   );
 }
 
-function StagePanel({ cycle, onChanged }: { cycle: Cycle; onChanged: () => void }) {
+export function StagePanel({ cycle, onChanged, inWorkspace }: { cycle: Cycle; onChanged: () => void; inWorkspace?: boolean }) {
   const { api } = useAuth();
   const vertical = useMediaQuery(useTheme().breakpoints.down("md"));
   const [busy, setBusy] = useState(false);
@@ -158,11 +159,13 @@ function StagePanel({ cycle, onChanged }: { cycle: Cycle; onChanged: () => void 
       <Stack spacing={2}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", flexWrap: "wrap", gap: 1 }}>
           <Typography variant="h2" sx={{ ml: 1 }}>
-            {cycle.name}
+            {inWorkspace ? "שלב המחזור" : cycle.name}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {fmt(cycle.start_date)} – {fmt(cycle.end_date)}
-          </Typography>
+          {!inWorkspace && (
+            <Typography variant="body2" color="text.secondary">
+              {fmt(cycle.start_date)} – {fmt(cycle.end_date)}
+            </Typography>
+          )}
           {cycle.exemption_deadline && (
             <Chip
               size="small"
@@ -207,7 +210,7 @@ function StagePanel({ cycle, onChanged }: { cycle: Cycle; onChanged: () => void 
         </Stack>
         {next && !canAdvance && (
           <Typography variant="caption" color="text.secondary">
-            השלבים הבאים (שיבוץ, טיוטה ופרסום) יתווספו בהמשך.
+            מכאן השלב מתקדם לבד: הרצת שיבוץ מעבירה ל"שיבוץ" ול"טיוטה להתייחסות", ופרסום מעביר ל"פורסם".
           </Typography>
         )}
       </Stack>
@@ -219,16 +222,17 @@ export function CyclesPage() {
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const [editing, setEditing] = useState<Cycle | "new" | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const { cycleId: selected, setCycleId: setSelected, reload: reloadContext } = useCycle();
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setCycles(await api!.cycles());
+      void reloadContext();
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [api]);
+  }, [api, reloadContext]);
   useEffect(() => void load(), [load]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -244,7 +248,7 @@ export function CyclesPage() {
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 2, flexWrap: "wrap" }}>
         <Typography variant="h1" sx={{ flex: 1 }}>
-          מחזורים
+          ניהול מחזורים
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
           מחזור חדש
