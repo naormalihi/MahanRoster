@@ -336,6 +336,15 @@ export class DemoApi implements Api {
     else this.tasks.push({ ...t, id: `t_${t.code}` });
   }
 
+  async deleteTaskType(id: string) {
+    await delay();
+    const t = this.tasks.find((x) => x.id === id);
+    if ([...this.slotsByCycle.values()].some((l) => l.some((s) => s.task_type_id === id)))
+      throw new Error(`התורנות "${t?.name}" בשימוש (משבצות במחזור), ולכן אי אפשר למחוק אותה. אפשר להפוך אותה ללא פעילה.`);
+    this.tasks = this.tasks.filter((x) => x.id !== id);
+    this.aliasList = this.aliasList.filter((a) => a.task_type_id !== id);
+  }
+
   async dutyCategories() {
     return CATEGORIES;
   }

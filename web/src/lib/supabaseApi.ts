@@ -263,6 +263,10 @@ export class SupabaseApi implements Api {
     else maybe(await this.sb.from("task_types").insert(t));
   }
 
+  async deleteTaskType(id: string) {
+    maybe(await this.sb.rpc("delete_task_type", { p_task: id }));
+  }
+
   async dutyCategories(): Promise<NamedRef[]> {
     return check(await this.sb.from("duty_categories").select("id, name").order("name"));
   }
