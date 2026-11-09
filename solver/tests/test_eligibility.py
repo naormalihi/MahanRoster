@@ -44,6 +44,16 @@ def test_slot_rank_list_overrides_ranges():
     assert reasons(soldier("C", rank_order=4), k) == []
 
 
+def test_task_rank_list():
+    officers = TaskType("ko", "קצין תורן", 1.0, allowed_ranks=[10, 11])
+    k = slot("k", "ko", *MON)
+    assert reasons(soldier("A", rank_order=10), k, tasks=(officers,)) == []
+    assert "rank" in reasons(soldier("B", rank_order=4), k, tasks=(officers,))
+    # a slot's own list (from the base schedule) still wins
+    k2 = slot("k2", "ko", *MON, allowed_ranks=[4])
+    assert reasons(soldier("B", rank_order=4), k2, tasks=(officers,)) == []
+
+
 def test_medical_exemption_permits_the_day_duty_while_in_force():
     day = slot("d", "day", "2027-01-04T08:30", "2027-01-04T16:30", r=0)
     s = soldier("A")

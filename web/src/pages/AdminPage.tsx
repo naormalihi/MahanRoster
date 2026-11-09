@@ -43,6 +43,8 @@ import {
   SERVICE_LABEL,
   israeliHolidays,
   mergeHolidays,
+  newTaskCode,
+  rankListLabel,
   scoringProblems,
   taskTypeProblems,
   EMPTY_MULTIPLIER,
@@ -52,7 +54,6 @@ import {
   multiplierProblems,
   type CalendarDay,
   type DayTypeRef,
-  type Population,
   type ScoreMultiplier,
   type ScoreMultiplierInput,
   type ScoringSettings,
@@ -88,9 +89,7 @@ const EMPTY_TASK: TaskTypeInput = {
   is_weekend_type: false,
   shachar_compatible: false,
   qualifying_duty: false,
-  eligible_populations: [],
-  rank_min_id: null,
-  rank_max_id: null,
+  allowed_rank_ids: null,
   gender: null,
   default_start_time: "08:00",
   default_end_time: "08:00",
@@ -154,7 +153,6 @@ function TaskDialog(props: {
   task: TaskType | null;
   all: TaskType[];
   categories: NamedRef[];
-  populations: Population[];
   ranks: NamedRef[];
   onClose: () => void;
   onSaved: () => void;
@@ -191,7 +189,7 @@ function TaskDialog(props: {
     setBusy(true);
     setError(null);
     try {
-      await api!.saveTaskType(props.task?.id ?? null, { ...t, name: t.name.trim() });
+      await api!.saveTaskType(props.task?.id ?? null, { ...t, name: t.name.trim(), code: t.code || newTaskCode() });
       props.onSaved();
     } catch (e) {
       setError((e as Error).message);
@@ -199,11 +197,33 @@ function TaskDialog(props: {
     }
   }
 
-  const rankSelect = (label: string, key: "rank_min_id" | "rank_max_id") => (
-    <TextField select label={label} value={t[key] ?? ""} onChange={(e) => set(key, e.target.value || null)} fullWidth slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-      <MenuItem value="">ללא הגבלה</MenuItem>
+  const ALL = "__all__";
+  const rankPicker = (
+    <TextField
+      select
+      label="דרגות"
+      value={t.allowed_rank_ids ?? [ALL]}
+      onChange={(e) => {
+        const v = e.target.value as unknown as string[];
+        // "כל הדרגות" picked last clears the list; picking a rank drops it
+        set("allowed_rank_ids", v[v.length - 1] === ALL || !v.length ? null : v.filter((x) => x !== ALL));
+      }}
+      fullWidth
+      helperText="אפשר לבחור כמה. בלי בחירה – כל הדרגות"
+      slotProps={{
+        select: {
+          multiple: true,
+          renderValue: (v) => ((v as string[]).includes(ALL) ? "כל הדרגות" : rankListLabel(v as string[], props.ranks)),
+        },
+      }}
+    >
+      <MenuItem value={ALL}>
+        <Checkbox size="small" checked={!t.allowed_rank_ids} sx={{ p: 0.5, ml: 1 }} />
+        כל הדרגות
+      </MenuItem>
       {props.ranks.map((r) => (
         <MenuItem key={r.id} value={r.id}>
+          <Checkbox size="small" checked={!!t.allowed_rank_ids?.includes(r.id)} sx={{ p: 0.5, ml: 1 }} />
           {r.name}
         </MenuItem>
       ))}
@@ -217,15 +237,6 @@ function TaskDialog(props: {
         <Stack spacing={2}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField label="שם" value={t.name} onChange={(e) => set("name", e.target.value)} fullWidth autoFocus />
-            <TextField
-              label="קוד (לטינית)"
-              value={t.code}
-              onChange={(e) => set("code", e.target.value.trim().toLowerCase())}
-              disabled={!!props.task}
-              helperText={props.task ? "הקוד קבוע אחרי היצירה" : "למשל katzin_toran"}
-              fullWidth
-              slotProps={{ htmlInput: { dir: "ltr" } }}
-            />
           </Stack>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField select label="קטגוריה" value={t.category_id ?? ""} onChange={(e) => set("category_id", e.target.value || null)} fullWidth slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
@@ -299,8 +310,7 @@ function TaskDialog(props: {
                 </MenuItem>
               ))}
             </TextField>
-            {rankSelect("מדרגה", "rank_min_id")}
-            {rankSelect("עד דרגה", "rank_max_id")}
+            {rankPicker}
             <TextField
               select
               label="מגדר"
@@ -314,30 +324,6 @@ function TaskDialog(props: {
               <MenuItem value="female">נשים</MenuItem>
             </TextField>
           </Stack>
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              אוכלוסיות (אם לא נבחרה אף אחת, התורנות פתוחה לכל מי שעומד בשאר התנאים)
-            </Typography>
-            <FormGroup row>
-              {props.populations.map((p) => (
-                <FormControlLabel
-                  key={p.code}
-                  label={p.name}
-                  control={
-                    <Checkbox
-                      checked={t.eligible_populations.includes(p.code)}
-                      onChange={(e) =>
-                        set(
-                          "eligible_populations",
-                          e.target.checked ? [...t.eligible_populations, p.code] : t.eligible_populations.filter((x) => x !== p.code),
-                        )
-                      }
-                    />
-                  }
-                />
-              ))}
-            </FormGroup>
-          </Box>
           <FormGroup>
             <FormControlLabel
               control={<Switch checked={t.requires_weapon} onChange={(e) => set("requires_weapon", e.target.checked)} />}
@@ -395,7 +381,6 @@ function CatalogTab() {
   const { api } = useAuth();
   const [tasks, setTasks] = useState<TaskType[] | null>(null);
   const [categories, setCategories] = useState<NamedRef[]>([]);
-  const [populations, setPopulations] = useState<Population[]>([]);
   const [ranks, setRanks] = useState<NamedRef[]>([]);
   const [editing, setEditing] = useState<TaskType | "new" | null>(null);
   const [showInactive, setShowInactive] = useState(false);
@@ -403,10 +388,9 @@ function CatalogTab() {
 
   const load = useCallback(async () => {
     try {
-      const [t, c, p, r] = await Promise.all([api!.taskTypes(), api!.dutyCategories(), api!.populations(), api!.ranks()]);
+      const [t, c, r] = await Promise.all([api!.taskTypes(), api!.dutyCategories(), api!.ranks()]);
       setTasks(t);
       setCategories(c);
-      setPopulations(p);
       setRanks(r);
     } catch (e) {
       setError((e as Error).message);
@@ -415,8 +399,6 @@ function CatalogTab() {
   useEffect(() => void load(), [load]);
 
   const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
-  const rankName = useMemo(() => new Map(ranks.map((r) => [r.id, r.name])), [ranks]);
-  const popName = useMemo(() => new Map(populations.map((p) => [p.code, p.name])), [populations]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!tasks) return <Loading />;
@@ -428,9 +410,7 @@ function CatalogTab() {
   const who = (t: TaskType) => {
     const parts: string[] = [];
     if (t.service_restriction !== "any") parts.push(SERVICE_LABEL[t.service_restriction]);
-    if (t.eligible_populations.length) parts.push(t.eligible_populations.map((p) => popName.get(p) ?? p).join(" / "));
-    if (t.rank_min_id) parts.push(`מ${rankName.get(t.rank_min_id)}`);
-    if (t.rank_max_id) parts.push(`עד ${rankName.get(t.rank_max_id)}`);
+    if (t.allowed_rank_ids) parts.push(rankListLabel(t.allowed_rank_ids, ranks));
     if (t.gender) parts.push(t.gender === "male" ? "גברים" : "נשים");
     return parts.join(" · ") || "כולם";
   };
@@ -502,7 +482,6 @@ function CatalogTab() {
           task={editing === "new" ? null : editing}
           all={tasks}
           categories={categories}
-          populations={populations}
           ranks={ranks}
           onClose={() => setEditing(null)}
           onSaved={() => {

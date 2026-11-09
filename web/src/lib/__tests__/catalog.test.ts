@@ -12,9 +12,7 @@ const base: TaskTypeInput = {
   is_weekend_type: false,
   shachar_compatible: false,
   qualifying_duty: false,
-  eligible_populations: [],
-  rank_min_id: null,
-  rank_max_id: null,
+  allowed_rank_ids: null,
   gender: null,
   default_start_time: null,
   default_end_time: null,
@@ -26,10 +24,10 @@ const base: TaskTypeInput = {
 describe("catalog validation", () => {
   const others = [{ id: "a", code: "hagnash", name: "הגנ\"ש" }];
   it("accepts a valid duty", () => expect(taskTypeProblems(base, others)).toEqual([]));
-  it("rejects duplicates, bad code and weight", () => {
-    expect(taskTypeProblems({ ...base, code: "hagnash" }, others)).toHaveLength(1);
-    expect(taskTypeProblems({ ...base, code: "hagnash" }, others, "a")).toEqual([]);
-    expect(taskTypeProblems({ ...base, code: "Bad Code" }, others)).toHaveLength(1);
+  it("rejects duplicate names, bad weight and an empty rank list", () => {
+    expect(taskTypeProblems({ ...base, name: "הגנ\"ש" }, others)).toHaveLength(1);
+    expect(taskTypeProblems({ ...base, name: "הגנ\"ש" }, others, "a")).toEqual([]);
+    expect(taskTypeProblems({ ...base, allowed_rank_ids: [] }, others)).toHaveLength(1);
     expect(taskTypeProblems({ ...base, weight: 0 }, others)).toHaveLength(1);
     expect(taskTypeProblems({ ...base, default_start_time: "08:00" }, others)).toHaveLength(1);
   });

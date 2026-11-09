@@ -125,6 +125,9 @@ class EligibilityIndex:
         if slot.allowed_ranks is not None:
             if soldier.rank_order not in slot.allowed_ranks:
                 reasons.append("rank")
+        elif task.allowed_ranks is not None:
+            if soldier.rank_order not in task.allowed_ranks:
+                reasons.append("rank")
         else:
             rank_min = slot.rank_min if slot.rank_min is not None else task.rank_min
             rank_max = slot.rank_max if slot.rank_max is not None else task.rank_max
