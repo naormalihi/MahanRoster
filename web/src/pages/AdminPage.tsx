@@ -360,9 +360,14 @@ function TaskDialog(props: {
               label="פעילה (תורנות לא פעילה לא תשובץ)"
             />
           </FormGroup>
-          {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
+      {/* outside the scrolling content, so a refusal (e.g. a duty in use) is always seen */}
+      {error && (
+        <Alert severity="error" sx={{ mx: 2, mt: 1.5 }}>
+          {error}
+        </Alert>
+      )}
       <DialogActions>
         {props.task &&
           (confirmDelete ? (
@@ -673,9 +678,13 @@ function MultiplierDialog(props: {
             />
             <FormControlLabel control={<Switch checked={m.is_active} onChange={(e) => set("is_active", e.target.checked)} />} label="פעיל" />
           </FormGroup>
-          {(error || problems.length > 0) && <Alert severity={error ? "error" : "warning"}>{error ?? problems[0]}</Alert>}
         </Stack>
       </DialogContent>
+      {(error || problems.length > 0) && (
+        <Alert severity={error ? "error" : "warning"} sx={{ mx: 2, mt: 1.5 }}>
+          {error ?? problems[0]}
+        </Alert>
+      )}
       <DialogActions>
         {props.m &&
           (confirmDelete ? (
