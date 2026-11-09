@@ -57,7 +57,7 @@ import {
 } from "../lib/draft";
 import { effective, reasonText, type PotentialCell, type SnapshotSoldier } from "../lib/potential";
 import type { ExistingSoldier } from "../lib/roster";
-import { POOL_LABEL } from "../lib/schedule";
+import { poolName, poolNames } from "../lib/schedule";
 
 const dayFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "long", day: "numeric", month: "numeric" });
 const hm = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
@@ -364,11 +364,7 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
   const ls = useMemo(() => loads(snapshot, ctx.assignments), [snapshot, ctx.assignments]);
   const means = poolMeans(ls);
   // a group's name: its population and the duty categories its soldiers share
-  const groupName = new Map<string, string>();
-  for (const s of snapshot) {
-    const key = s.fairness_group || s.balance_population;
-    if (!groupName.has(key)) groupName.set(key, [POOL_LABEL[s.balance_population] ?? s.balance_population, s.fairness_label].filter(Boolean).join(" · "));
-  }
+  const groupName = useMemo(() => poolNames(snapshot), [snapshot]);
   const keys = [...means.keys()].sort((a, b) => ls.filter((l) => l.pool === b).length - ls.filter((l) => l.pool === a).length);
   const [picked, setPool] = useState("");
   const pool = keys.includes(picked) ? picked : keys[0] ?? "";
@@ -389,7 +385,7 @@ function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: Sna
         {keys.map((p) => (
           <Chip
             key={p}
-            label={`${groupName.get(p) ?? POOL_LABEL[p] ?? p} · ${ls.filter((l) => l.pool === p).length} · ממוצע ${(means.get(p) ?? 0).toFixed(1)}`}
+            label={`${poolName(groupName, p)} · ${ls.filter((l) => l.pool === p).length} · ממוצע ${(means.get(p) ?? 0).toFixed(1)}`}
             color={p === pool ? "primary" : "default"}
             onClick={() => setPool(p)}
           />
