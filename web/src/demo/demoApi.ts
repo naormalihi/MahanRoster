@@ -736,6 +736,21 @@ export class DemoApi implements Api {
     this.slotsByCycle.set(cycleId, [...(this.slotsByCycle.get(cycleId) ?? []), row].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
   }
 
+  async activateReserve(reserveId: string, fromUnit: number, performerId: string | null) {
+    await delay(300);
+    const r = this.draft.find((a) => a.id === reserveId);
+    if (!r || r.role !== "reserve" || r.status !== "reserve_idle") throw new Error("זו לא עתודה פעילה בלוח המפורסם");
+    const p = this.draft.find((a) => a.slot_id === r.slot_id && a.role === "performer" && a.status === "assigned" && (!performerId || a.id === performerId));
+    if (!p) throw new Error("לא נמצא מבצע להחלפה – בחר את המבצע");
+    const k = [...this.slotsByCycle.values()].flat().find((s) => s.id === r.slot_id)!;
+    const units = Math.max(1, Math.ceil((Date.parse(k.ends_at) - Date.parse(k.starts_at)) / 86_400_000));
+    const per = p.points / units;
+    r.status = "reserve_activated";
+    r.points = r.normalized_points = Math.round(per * (units - fromUnit) * 100) / 100;
+    if (fromUnit === 0) Object.assign(p, { status: "dropped", points: 0, normalized_points: 0 });
+    else Object.assign(p, { status: "done", points: Math.round(per * fromUnit * 100) / 100, normalized_points: Math.round(per * fromUnit * 100) / 100 });
+  }
+
   async publishAdditions(cycleId: string) {
     await delay(300);
     const mine = this.draft.filter((a) => a.cycle_id === cycleId && a.status === "draft");
@@ -764,7 +779,8 @@ export class DemoApi implements Api {
 
   async draftAssignments(cycleId: string) {
     await delay();
-    return this.draft.filter((a) => a.cycle_id === cycleId).map(({ cycle_id: _c, ...a }) => ({ ...a }));
+    const gone = ["dropped", "cancelled_approved", "swapped_out"];
+    return this.draft.filter((a) => a.cycle_id === cycleId && !gone.includes(a.status)).map(({ cycle_id: _c, ...a }) => ({ ...a }));
   }
 
   async slotCandidates(slotId: string): Promise<Candidate[]> {

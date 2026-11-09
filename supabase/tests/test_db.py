@@ -983,3 +983,46 @@ def test_surprise_slot_added_after_publish(conn):
         assert conn.execute("select status from assignments where slot_id = %s", (new,)).fetchone()[0] == "assigned"
         assert conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "published"
         raise psycopg.Rollback()
+
+
+def test_activate_reserve_whole_and_partial(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a, b, c, d = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 4").fetchall()]
+
+        # whole duty: performer dropped, reserve performs
+        k1 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                          "(%s, %s, now() + interval '30 days', now() + interval '31 days') returning id", (cycle, tid)).fetchone()[0]
+        p1 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s returning id", (k1, a)).fetchone()[0]
+        r1 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, paired_assignment_id) select %s, id, gaf_id, 'reserve', 'reserve_idle', %s from soldiers where id = %s returning id", (k1, p1, b)).fetchone()[0]
+        _as_coord(conn, "select public.activate_reserve(%s)", r1)
+        assert conn.execute("select status, points from assignments where id = %s", (p1,)).fetchone() == ("dropped", 0)
+        st, pts = conn.execute("select status, points from assignments where id = %s", (r1,)).fetchone()
+        assert st == "reserve_activated" and pts > 0
+        # the board shows the activated reserve as the performer
+        board = conn.execute("select performers, reserves from published_board where slot_id = %s", (k1,)).fetchone()
+        assert board is None or (len(board[0]) == 1 and board[1] == [])
+        # engine input: the activated reserve is the performer; the dropped one is gone
+        doc = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]
+        fixed = [f for f in doc["fixed"] if f["slot_id"] == str(k1)]
+        assert fixed == [{"slot_id": str(k1), "soldier_id": str(b), "role": "performer"}]
+
+        # partial: a 3-day duty, the reserve takes over from day 2
+        k2 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                          "(%s, %s, now() + interval '40 days', now() + interval '43 days') returning id", (cycle, tid)).fetchone()[0]
+        p2 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s returning id", (k2, c)).fetchone()[0]
+        r2 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'reserve', 'reserve_idle' from soldiers where id = %s returning id", (k2, d)).fetchone()[0]
+        full = float(conn.execute("select raw from app.slot_points(%s, %s)", (k2, c)).fetchone()[0])
+        _as_coord(conn, "select public.activate_reserve(%s, 1)", r2)
+        sp, pp = conn.execute("select status, points from assignments where id = %s", (p2,)).fetchone()
+        sr, pr = conn.execute("select status, points from assignments where id = %s", (r2,)).fetchone()
+        assert sp == "done" and sr == "reserve_activated"
+        assert float(pp) + float(pr) == pytest.approx(full, abs=0.02) and 0 < float(pp) < full
+        doc = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]
+        assert [f["soldier_id"] for f in doc["fixed"] if f["slot_id"] == str(k2)] == [str(d)]
+        # not twice
+        with pytest.raises(psycopg.Error):
+            _as_coord(conn, "select public.activate_reserve(%s)", r2)
+        raise psycopg.Rollback()

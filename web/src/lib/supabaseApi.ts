@@ -622,6 +622,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("slots").insert({ ...k, cycle_id: cycleId }));
   }
 
+  async activateReserve(reserveId: string, fromUnit: number, performerId: string | null, note: string | null) {
+    maybe(await this.sb.rpc("activate_reserve", { p_reserve: reserveId, p_from_unit: fromUnit, p_performer: performerId, p_note: note }));
+  }
+
   async publishAdditions(cycleId: string) {
     return Number(check(await this.sb.rpc("publish_additions", { p_cycle: cycleId })));
   }

@@ -171,6 +171,11 @@ export interface Api {
   addSlot(cycleId: string, slot: NewSlot): Promise<void>;
   /** Approve the engine's draft for duties added after publishing; the cycle stays published. */
   publishAdditions(cycleId: string): Promise<number>;
+  /**
+   * The reserve takes over a published duty: from its start (the performer is dropped) or from
+   * day unit fromUnit of a multi-day duty (each keeps the points of their days).
+   */
+  activateReserve(reserveId: string, fromUnit: number, performerId: string | null, note: string | null): Promise<void>;
   redispatchSchedule(jobId: string): Promise<string>;
   cancelScheduleJob(jobId: string): Promise<void>;
   dispatchConfigured(): Promise<boolean>;
