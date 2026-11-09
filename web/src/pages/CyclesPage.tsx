@@ -16,7 +16,7 @@ import {
   Paper,
   Stack,
   Step,
-  StepLabel,
+  StepButton,
   Stepper,
   Table,
   TableBody,
@@ -29,7 +29,8 @@ import {
   useTheme,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import {
@@ -59,6 +60,20 @@ const STAGE_LINK: Partial<Record<CycleStatus, { to: string; label: string }>> = 
   slots: { to: "/cycle/slots", label: "לקליטת לוח הבסיס" },
   scheduling: { to: "/cycle/schedule", label: "להרצת השיבוץ" },
   review: { to: "/cycle/schedule", label: "לטיוטה ולפרסום" },
+};
+
+/** The screen each stage is worked on – every step of the stepper opens it. */
+const STAGE_SCREEN: Record<CycleStatus, { staff: string; reader: string }> = {
+  draft: { staff: "/cycles", reader: "/cycle" },
+  loading: { staff: "/soldiers/import", reader: "/soldiers" },
+  collecting: { staff: "/cycle/constraints", reader: "/cycle/constraints" },
+  approving: { staff: "/cycle/constraints?tab=exemptions&status=pending", reader: "/cycle/constraints?tab=exemptions" },
+  potential: { staff: "/cycle/potential", reader: "/cycle/potential" },
+  slots: { staff: "/cycle/slots", reader: "/cycle/slots" },
+  scheduling: { staff: "/cycle/schedule?view=run", reader: "/cycle/schedule?view=run" },
+  review: { staff: "/cycle/schedule?view=draft", reader: "/cycle/schedule?view=draft" },
+  published: { staff: "/cycle/operate", reader: "/board" },
+  closed: { staff: "/board", reader: "/board" },
 };
 
 /** Stages after this one need screens that do not exist yet; the stepper stops here. */
@@ -130,7 +145,9 @@ function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => 
 }
 
 export function StagePanel({ cycle, onChanged, inWorkspace }: { cycle: Cycle; onChanged: () => void; inWorkspace?: boolean }) {
-  const { api } = useAuth();
+  const { api, me } = useAuth();
+  const staff = isStaff(me);
+  const navigate = useNavigate();
   const vertical = useMediaQuery(useTheme().breakpoints.down("md"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,10 +192,16 @@ export function StagePanel({ cycle, onChanged, inWorkspace }: { cycle: Cycle; on
             />
           )}
         </Stack>
-        <Stepper activeStep={i} orientation={vertical ? "vertical" : "horizontal"} alternativeLabel={!vertical}>
+        <Stepper nonLinear activeStep={i} orientation={vertical ? "vertical" : "horizontal"} alternativeLabel={!vertical}>
           {STAGES.map((s) => (
             <Step key={s.status} completed={stageIndex(s.status) < i}>
-              <StepLabel>{s.label}</StepLabel>
+              <StepButton
+                data-read
+                onClick={() => navigate(STAGE_SCREEN[s.status][staff ? "staff" : "reader"])}
+                sx={{ textAlign: "start", borderRadius: 1, "&:hover .MuiStepLabel-label": { color: "primary.main", textDecoration: "underline" } }}
+              >
+                {s.label}
+              </StepButton>
             </Step>
           ))}
         </Stepper>
