@@ -69,3 +69,47 @@ def test_lowest_factor_wins_with_several_roles():
 def test_weekend_units_count():
     assert weekend_units(dt("2027-01-08T08:00"), dt("2027-01-10T08:00"), S, set()) == 2
     assert weekend_units(dt("2027-01-04T08:00"), dt("2027-01-05T08:00"), S, set()) == 0
+
+
+# --- user-defined multipliers -------------------------------------------------
+
+from mahanroster_solver.models import Multiplier  # noqa: E402
+
+CUSTOM = Settings(
+    multipliers=[
+        Multiplier("סוף שבוע", 1.5, weekdays=[4, 5], skip_shabbat_types=True),
+        Multiplier("חג", 2.0, day_types=["holiday", "holiday_eve"]),
+        Multiplier("לילה", 1.25, time_window="22:00-06:00"),
+        Multiplier("יום זיכרון", 1.8, day_types=["memorial"]),
+        Multiplier("חמישי בכוננות", 1.3, weekdays=[3], date_from=date(2027, 1, 1), date_to=date(2027, 1, 31)),
+    ],
+    day_types={"2027-01-05": "memorial", "2027-01-08": "holiday"},
+)
+
+
+def cpts(task, a, b):
+    return raw_points(task, dt(a), dt(b), CUSTOM, set())
+
+
+def test_custom_highest_multiplier_wins():
+    # Friday + holiday on the same unit: 2.0, not 1.5 and not the product
+    assert cpts(GUARD, "2027-01-08T08:00", "2027-01-09T08:00") == pytest.approx(2.0)
+
+
+def test_custom_night_does_not_stack_on_weekend():
+    # Friday night, 20:00–08:00 (12h, mostly night): max(1.5, 1.25) = 1.5
+    assert cpts(NIGHT, "2027-01-15T20:00", "2027-01-16T08:00") == pytest.approx(NIGHT.weight * 1.5)
+
+
+def test_custom_day_type_weekday_and_date_range():
+    assert cpts(GUARD, "2027-01-05T08:00", "2027-01-06T08:00") == pytest.approx(1.8)  # memorial (Tuesday)
+    assert cpts(GUARD, "2027-01-07T08:00", "2027-01-08T08:00") == pytest.approx(1.3)  # Thursday in January
+    assert cpts(GUARD, "2027-02-04T08:00", "2027-02-05T08:00") == pytest.approx(1.0)  # Thursday in February
+
+
+def test_custom_skip_for_shabbat_types():
+    assert cpts(SHABBAT, "2027-01-15T08:00", "2027-01-16T08:00") == pytest.approx(SHABBAT.weight)
+
+
+def test_custom_window_ignored_for_24h_duties():
+    assert cpts(GUARD, "2027-01-11T22:00", "2027-01-12T22:00") == pytest.approx(1.0)
