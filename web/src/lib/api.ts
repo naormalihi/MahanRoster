@@ -125,6 +125,8 @@ export interface Api {
   dayTypes(): Promise<DayTypeRef[]>;
   /** A new calendar day type (e.g. "כוננות מוגברת"); returns its code. */
   addDayType(name: string): Promise<string>;
+  /** Only a type נע"ת added, and only while no calendar day uses it. */
+  deleteDayType(code: string): Promise<void>;
   calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]>;
   saveCalendarDays(days: CalendarDay[]): Promise<void>;
   deleteCalendarDay(day: string): Promise<void>;

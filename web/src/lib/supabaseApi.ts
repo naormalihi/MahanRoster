@@ -324,6 +324,10 @@ export class SupabaseApi implements Api {
     return check(await this.sb.from("day_types").select("code, name").order("name")) as DayTypeRef[];
   }
 
+  async deleteDayType(code: string) {
+    maybe(await this.sb.rpc("delete_day_type", { p_code: code }));
+  }
+
   async addDayType(name: string) {
     const code = `custom_${Date.now().toString(36)}`;
     maybe(await this.sb.from("day_types").insert({ code, name: name.trim() }));

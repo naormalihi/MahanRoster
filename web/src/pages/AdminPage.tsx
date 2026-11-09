@@ -501,6 +501,18 @@ function DayTypePicker(props: { types: DayTypeRef[]; value: string[]; onChange: 
   const [error, setError] = useState<string | null>(null);
   const toggle = (code: string) =>
     props.onChange(props.value.includes(code) ? props.value.filter((x) => x !== code) : [...props.value, code]);
+  async function remove(t: DayTypeRef) {
+    if (!window.confirm(`למחוק את סוג היום "${t.name}"?`)) return;
+    try {
+      await api!.deleteDayType(t.code);
+      props.onChange(props.value.filter((x) => x !== t.code));
+      await props.onAdded();
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   async function add() {
     const name = (adding ?? "").trim();
     if (!name) return;
@@ -525,6 +537,8 @@ function DayTypePicker(props: { types: DayTypeRef[]; value: string[]; onChange: 
             color={props.value.includes(t.code) ? "primary" : "default"}
             variant={props.value.includes(t.code) ? "filled" : "outlined"}
             onClick={() => toggle(t.code)}
+            // a type נע"ת added can be deleted (the built-in ones cannot)
+            onDelete={t.code.startsWith("custom_") ? () => void remove(t) : undefined}
           />
         ))}
         {adding === null ? (

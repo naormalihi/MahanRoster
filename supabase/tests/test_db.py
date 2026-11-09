@@ -1059,3 +1059,16 @@ def test_load_roles_settings(conn):
         with pytest.raises(psycopg.Error, match="חיילים"):
             _as_coord(conn, "select public.delete_load_role(%s)", rid)
         raise psycopg.Rollback()
+
+
+def test_delete_custom_day_type(conn):
+    with conn.transaction():
+        conn.execute("insert into day_types (code, name) values ('custom_x1', 'ראש'), ('custom_x2', 'כוננות')")
+        conn.execute("insert into score_multipliers (name, value, day_types) values ('רק כוננות', 1.5, '{custom_x2}')")
+        _as_coord(conn, "select public.delete_day_type('custom_x1')")
+        assert conn.execute("select count(*) from day_types where code = 'custom_x1'").fetchone()[0] == 0
+        with pytest.raises(psycopg.Error, match="רק לפי"):
+            _as_coord(conn, "select public.delete_day_type('custom_x2')")
+        with pytest.raises(psycopg.Error, match="המובנים"):
+            _as_coord(conn, "select public.delete_day_type('holiday')")
+        raise psycopg.Rollback()

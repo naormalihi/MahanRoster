@@ -408,9 +408,16 @@ export class DemoApi implements Api {
     return this.dayTypeList.map((t) => ({ ...t }));
   }
 
+  async deleteDayType(code: string) {
+    await delay();
+    if (this.calendar.some((d) => d.day_type === code)) throw new Error("יש ימים בלוח החגים מסוג זה. שנה או מחק אותם קודם.");
+    this.dayTypeList = this.dayTypeList.filter((t) => t.code !== code);
+    this.multipliers.forEach((m) => (m.day_types = m.day_types.filter((c) => c !== code)));
+  }
+
   async addDayType(name: string) {
     await delay();
-    const code = this.nextId("custom");
+    const code = `custom_${this.nextId("t")}`;
     this.dayTypeList.push({ code, name: name.trim() });
     return code;
   }
