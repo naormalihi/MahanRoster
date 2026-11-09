@@ -256,14 +256,6 @@ function TaskDialog(props: {
               helperText={weightChanged ? "חל על שיבוצים חדשים בלבד. ניקוד שכבר נצבר לא משתנה" : "נקודות ליחידת 24 שעות"}
               fullWidth
             />
-            <TextField
-              type="number"
-              label="מנוחה אחרי (שעות)"
-              value={t.min_rest_hours}
-              onChange={(e) => set("min_rest_hours", Math.round(Number(e.target.value)))}
-              slotProps={{ htmlInput: { min: 0, step: 1 } }}
-              fullWidth
-            />
           </Stack>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField
@@ -441,7 +433,6 @@ function CatalogTab() {
               <TableCell>קטגוריה</TableCell>
               <TableCell>משקל</TableCell>
               <TableCell>שעות</TableCell>
-              <TableCell>מנוחה</TableCell>
               <TableCell>מי מבצע</TableCell>
               <TableCell>סימונים</TableCell>
               <TableCell />
@@ -461,7 +452,6 @@ function CatalogTab() {
                 <TableCell sx={{ whiteSpace: "nowrap" }} dir="ltr">
                   {t.weekday_hours && Object.keys(t.weekday_hours).length ? "לפי יום" : t.default_start_time ? `${t.default_start_time}–${t.default_end_time}` : "—"}
                 </TableCell>
-                <TableCell>{t.min_rest_hours ? `${t.min_rest_hours} ש׳` : "—"}</TableCell>
                 <TableCell>{who(t)}</TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>

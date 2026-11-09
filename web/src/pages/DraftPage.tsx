@@ -177,7 +177,7 @@ function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: Dra
                           </Typography>
                           {c.in_slot && <Chip size="small" label={`כבר ${ROLE_LABEL[c.in_slot]}`} />}
                           {bad && <Chip size="small" color="error" variant="outlined" label="לא זכאי" />}
-                          {c.conflicts.length > 0 && <Chip size="small" color="warning" variant="outlined" label="חופף/מנוחה" />}
+                          {c.conflicts.length > 0 && <Chip size="small" color="warning" variant="outlined" label="חופף" />}
                         </Stack>
                       }
                       secondary={
@@ -202,7 +202,7 @@ function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: Dra
           {warn && (
             <Alert severity="warning">
               {chosen!.reasons.length > 0 && <div>לא זכאי: {reasonText(chosen!.reasons)}.</div>}
-              {chosen!.conflicts.length > 0 && <div>חופף לתורנות אחרת או למנוחה שאחריה.</div>}
+              {chosen!.conflicts.length > 0 && <div>חופף לתורנות אחרת.</div>}
               אפשר לשבץ בכל זאת – הנימוק נשמר ביומן.
             </Alert>
           )}
