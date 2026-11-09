@@ -168,7 +168,7 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
         </Toolbar>
       </AppBar>
-      <Drawer anchor="right" open={open} onClose={() => setOpen(false)}>
+      <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280 }} role="navigation">
           <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
             <Box component="img" src="/brand/emblem-mark.png" alt="" sx={{ height: 36 }} />
