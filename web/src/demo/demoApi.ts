@@ -68,21 +68,21 @@ const POPULATIONS: Population[] = [
 const tt = (code: string, name: string, cat: number, weight: number, o: Partial<TaskTypeInput> = {}): TaskType => ({
   id: `t_${code}`, code, name, category_id: `c${cat}`, weight, min_rest_hours: 0, service_restriction: "any",
   requires_weapon: false, is_weekend_type: false, shachar_compatible: false, qualifying_duty: false,
-  eligible_populations: [], rank_min_id: null, rank_max_id: null, gender: null,
+  allowed_rank_ids: null, gender: null,
   default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
 }) as TaskType;
 const DEMO_TASKS: TaskType[] = [
-  tt("hagnash", "הגנ\"ש – חול", 0, 1, { eligible_populations: ["officer", "career"], rank_max_id: "r9", requires_weapon: true, color: "#2f7d5b" }),
-  tt("katzin_toran", "קצין תורן – חול", 1, 1, { eligible_populations: ["officer"], rank_max_id: "r9", color: "#3b6ea8" }),
-  tt("katzin_toran_shabbat", "קצין תורן – שבת", 1, 3, { eligible_populations: ["officer"], rank_max_id: "r9", is_weekend_type: true, color: "#3b6ea8" }),
-  tt("mamlachat_yom", "ממלכ\"ת יום – חול", 3, 0.75, { eligible_populations: ["major"], rank_max_id: "r10", qualifying_duty: true, shachar_compatible: true, default_end_time: "17:00", color: "#6a7ab0" }),
-  tt("mamlachat_layla", "ממלכ\"ת לילה – חול", 3, 1, { eligible_populations: ["major"], rank_max_id: "r10", min_rest_hours: 12, default_start_time: "20:00", color: "#4a5a8a" }),
-  tt("shmirot_chova", "שמירות חובה", 4, 1, { service_restriction: "mandatory", eligible_populations: ["mandatory"], rank_max_id: "r3", requires_weapon: true, min_rest_hours: 24, default_start_time: "13:00", default_end_time: "13:00", color: "#9a6a1f" }),
-  tt("mefaked_shaar", "מפקד שער – חול", 2, 1, { eligible_populations: ["career", "officer"], rank_max_id: "r9", requires_weapon: true, color: "#9a6a1f" }),
-  tt("mesimot_chayliyot", "משימות חיליות", 5, 1, { eligible_populations: ["officer"], rank_max_id: "r10", requires_weapon: true, min_rest_hours: 24, default_start_time: "10:00", default_end_time: "10:00", color: "#7a3e9d" }),
-  tt("rasar", "רס\"ר – חול", 6, 0.75, { service_restriction: "mandatory", eligible_populations: ["mandatory"], rank_max_id: "r3", default_end_time: "17:00", color: "#a04f5e" }),
+  tt("hagnash", "הגנ\"ש – חול", 0, 1, { allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#2f7d5b" }),
+  tt("katzin_toran", "קצין תורן – חול", 1, 1, { allowed_rank_ids: ["r7", "r8", "r9"], color: "#3b6ea8" }),
+  tt("katzin_toran_shabbat", "קצין תורן – שבת", 1, 3, { allowed_rank_ids: ["r7", "r8", "r9"], is_weekend_type: true, color: "#3b6ea8" }),
+  tt("mamlachat_yom", "ממלכ\"ת יום – חול", 3, 0.75, { qualifying_duty: true, shachar_compatible: true, default_end_time: "17:00", color: "#6a7ab0" }),
+  tt("mamlachat_layla", "ממלכ\"ת לילה – חול", 3, 1, { allowed_rank_ids: ["r10"], min_rest_hours: 12, default_start_time: "20:00", color: "#4a5a8a" }),
+  tt("shmirot_chova", "שמירות חובה", 4, 1, { service_restriction: "mandatory", allowed_rank_ids: ["r0", "r1", "r2", "r3"], requires_weapon: true, min_rest_hours: 24, default_start_time: "13:00", default_end_time: "13:00", color: "#9a6a1f" }),
+  tt("mefaked_shaar", "מפקד שער – חול", 2, 1, { allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#9a6a1f" }),
+  tt("mesimot_chayliyot", "משימות חיליות", 5, 1, { allowed_rank_ids: ["r7", "r8", "r9", "r10"], requires_weapon: true, min_rest_hours: 24, default_start_time: "10:00", default_end_time: "10:00", color: "#7a3e9d" }),
+  tt("rasar", "רס\"ר – חול", 6, 0.75, { service_restriction: "mandatory", allowed_rank_ids: ["r0", "r1", "r2", "r3"], default_end_time: "17:00", color: "#a04f5e" }),
   tt("mefaked_toran", "מפקד תורן", 7, 1, {
-    eligible_populations: ["major"], rank_max_id: "r10", min_rest_hours: 24, color: "#8a3b2e",
+    allowed_rank_ids: ["r10"], min_rest_hours: 24, color: "#8a3b2e",
     weekday_hours: { "0": "06:00-08:00+1", "1": "08:00-08:00", "2": "08:00-08:00", "3": "08:00-08:00", "4": "08:00-18:00", after_holiday: "06:00-08:00+1" },
   }),
 ];

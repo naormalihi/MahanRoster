@@ -41,6 +41,7 @@ class TaskType:
     eligible_populations: list[str] = field(default_factory=list)
     rank_min: Optional[int] = None  # rank sort_order, inclusive
     rank_max: Optional[int] = None
+    allowed_ranks: Optional[list[int]] = None  # rank sort_orders; None = any (checked before the range)
     gender: Optional[str] = None  # "male" | "female" | None
     category_id: Optional[str] = None
 

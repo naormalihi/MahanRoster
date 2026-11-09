@@ -6,6 +6,7 @@ export type ServiceRestriction = "any" | "mandatory" | "career";
 
 export interface TaskType {
   id: string;
+  /** internal id for imports and the engine; generated, not shown */
   code: string;
   name: string;
   category_id: string | null;
@@ -16,9 +17,8 @@ export interface TaskType {
   is_weekend_type: boolean;
   shachar_compatible: boolean;
   qualifying_duty: boolean;
-  eligible_populations: string[];
-  rank_min_id: string | null;
-  rank_max_id: string | null;
+  /** ranks that may do it (any of them); null = every rank */
+  allowed_rank_ids: string[] | null;
   gender: "male" | "female" | null;
   default_start_time: string | null; // HH:MM
   default_end_time: string | null;
@@ -35,6 +35,16 @@ export interface Population {
   name: string;
 }
 
+/** A new duty type's internal code. */
+export const newTaskCode = () => `t_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+
+/** "סג״מ, סגן, סרן" – or "רס״ל … סרן (6)" when long; ranks in their order. */
+export function rankListLabel(ids: string[] | null, ranks: { id: string; name: string }[]): string {
+  if (!ids) return "";
+  const names = ranks.filter((r) => ids.includes(r.id)).map((r) => r.name);
+  return names.length > 4 ? `${names[0]} … ${names[names.length - 1]} (${names.length})` : names.join(", ");
+}
+
 export const SERVICE_LABEL: Record<ServiceRestriction, string> = { any: "כולם", mandatory: "חובה", career: "קבע" };
 
 export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" | "code" | "name">[], selfId?: string): string[] {
@@ -42,8 +52,7 @@ export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" |
   const rest = others.filter((o) => o.id !== selfId);
   if (!t.name.trim()) p.push("חסר שם");
   else if (rest.some((o) => o.name.trim() === t.name.trim())) p.push("כבר יש תורנות בשם הזה");
-  if (!/^[a-z][a-z0-9_]{1,40}$/.test(t.code)) p.push("קוד: אותיות לטיניות קטנות, ספרות וקו תחתון");
-  else if (rest.some((o) => o.code === t.code)) p.push("כבר יש תורנות עם הקוד הזה");
+  if (t.allowed_rank_ids && !t.allowed_rank_ids.length) p.push("בחר לפחות דרגה אחת, או \"כל הדרגות\"");
   if (!(t.weight > 0) || t.weight > 99) p.push("משקל חייב להיות גדול מ-0 (עד 99)");
   if (!Number.isInteger(t.min_rest_hours) || t.min_rest_hours < 0) p.push("שעות מנוחה – מספר שלם, 0 ומעלה");
   if (!!t.default_start_time !== !!t.default_end_time) p.push("שעת התחלה וסיום – שתיהן או אף אחת");

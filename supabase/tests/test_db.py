@@ -934,3 +934,26 @@ def test_reset_dynamic_data_keeps_system_settings(conn):
         assert count("reset_backup.soldiers") == soldiers
         assert count("app_users where soldier_id is not null") == 0
         raise psycopg.Rollback()
+
+
+def test_task_rank_list_limits_potential_and_engine_input(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        tid = conn.execute("select id from task_types where is_active and qualifying_duty = false order by code limit 1").fetchone()[0]
+        cat = conn.execute("insert into duty_categories (name) values ('קטגוריה לבדיקת דרגות') returning id").fetchone()[0]
+        conn.execute("update task_types set category_id = %s where id = %s", (cat, tid))
+        rank, order = conn.execute(
+            "select r.id, r.sort_order from cycle_soldier_snapshot sn join ranks r on r.sort_order = sn.rank_order "
+            "where sn.cycle_id = %s limit 1", (cycle,)).fetchone()
+        conn.execute("update task_types set allowed_rank_ids = array[%s]::uuid[], rank_min_id = null, rank_max_id = null, "
+                     "eligible_populations = '{}' where id = %s", (rank, tid))
+        rows = conn.execute(
+            "select sn.rank_order, 'rank' = any(p.reasons) from app.potential_static(%s) p "
+            "join cycle_soldier_snapshot sn on sn.soldier_id = p.soldier_id and sn.cycle_id = %s where p.task_type_id = %s",
+            (cycle, cycle, tid)).fetchall()
+        assert rows and all(blocked == (r != order) for r, blocked in rows)
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        task = next(t for t in doc["task_types"] if t["id"] == str(tid))
+        assert task["allowed_ranks"] == [order]
+        raise psycopg.Rollback()
