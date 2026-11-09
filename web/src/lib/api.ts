@@ -104,6 +104,9 @@ export interface Api {
   soldierDetails(): Promise<SoldierDetail[]>;
   updateSoldiers(ids: string[], patch: SoldierPatch): Promise<void>;
   loadRoles(): Promise<LoadRoleRef[]>;
+  saveLoadRole(id: string | null, role: { name: string; factor: number }): Promise<void>;
+  /** Only a role no soldier has. */
+  deleteLoadRole(id: string): Promise<void>;
   /** Replace the soldier's load-role periods with the given list. */
   setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
   // settings screen

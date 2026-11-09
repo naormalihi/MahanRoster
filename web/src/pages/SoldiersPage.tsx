@@ -38,6 +38,7 @@ import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
   activeLoadRole,
+  activeLoadRoles,
   effectiveHomeNightly,
   effectiveParent,
   effectiveService,
@@ -529,7 +530,21 @@ export function SoldiersPage() {
                         {s.parent_override !== null && <Typography component="span" variant="caption" color="text.secondary"> (ידני)</Typography>}
                         {effectiveHomeNightly(s) && <Chip size="small" variant="outlined" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                       </TableCell>
-                      <TableCell sx={{ whiteSpace: "nowrap" }}>{lr ? `${lr.name} ${lr.factor}` : "—"}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {activeLoadRoles(s).length === 0
+                          ? "—"
+                          : activeLoadRoles(s).map((r) => (
+                              <Chip
+                                key={r.load_role_id + r.valid_from}
+                                size="small"
+                                label={`${r.name} ×${r.factor}`}
+                                color={r.load_role_id === lr?.load_role_id ? "primary" : "default"}
+                                variant={r.load_role_id === lr?.load_role_id ? "filled" : "outlined"}
+                                title={r.load_role_id === lr?.load_role_id ? "ההקלה שחלה (הגדולה מביניהן)" : "לא חלה – יש הקלה גדולה יותר"}
+                                sx={{ ml: 0.5 }}
+                              />
+                            ))}
+                      </TableCell>
                       <TableCell>{fmt(s.second_role_signed_at)}</TableCell>
                       <TableCell padding="checkbox">
                         <IconButton aria-label={`עריכת ${s.full_name}`} onClick={() => setEditing(s)}>

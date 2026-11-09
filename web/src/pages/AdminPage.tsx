@@ -36,6 +36,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import type { LoadRoleRef } from "../lib/soldiers";
 import { UsersTab } from "./UsersTab";
 import {
   DAY_TYPE_LABEL,
@@ -682,6 +683,120 @@ function MultiplierDialog(props: {
   );
 }
 
+/** Relief roles (ראש צוות, כונן מבצעי…): a soldier's points are divided by the factor. */
+function LoadRolesCard() {
+  const { api } = useAuth();
+  const [roles, setRoles] = useState<LoadRoleRef[] | null>(null);
+  const [editing, setEditing] = useState<{ id: string | null; name: string; factor: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => setRoles(await api!.loadRoles()), [api]);
+  useEffect(() => {
+    load().catch((e) => setError((e as Error).message));
+  }, [load]);
+
+  async function run(f: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await f();
+      setEditing(null);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  }
+  function save() {
+    const f = Number(editing!.factor);
+    if (!editing!.name.trim()) return setError("חסר שם");
+    if (!(f > 0) || f > 1) return setError("המקדם – גדול מ-0 ועד 1 (0.5 = חצי מהעומס)");
+    if (roles!.some((r) => r.id !== editing!.id && r.name === editing!.name.trim())) return setError("כבר יש הקלה בשם הזה");
+    void run(() => api!.saveLoadRole(editing!.id, { name: editing!.name, factor: f }));
+  }
+
+  return (
+    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+      <Stack spacing={2}>
+        <Stack direction="row" sx={{ alignItems: "center" }}>
+          <Typography variant="h3" sx={{ flex: 1 }}>
+            מקדמי הקלה (תפקידים)
+          </Typography>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({ id: null, name: "", factor: "0.7" })}>
+            הקלה חדשה
+          </Button>
+        </Stack>
+        <Typography variant="body2" color="text.secondary">
+          חייל עם תפקיד מקבל חלק מהעומס: הניקוד שלו מחולק במקדם (0.5 = חצי מהעומס של חייל רגיל). לחייל עם כמה תפקידים חלה ההקלה הגדולה ביותר – המקדם
+          הנמוך – בלי הכפלה. את התפקיד של כל חייל קובעים במסך חיילים.
+        </Typography>
+        {!roles ? (
+          <Loading />
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>הקלה</TableCell>
+                <TableCell>מקדם</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {roles.map((r) => (
+                <TableRow key={r.id} hover onClick={() => setEditing({ id: r.id, name: r.name, factor: String(r.factor) })} sx={{ cursor: "pointer" }}>
+                  <TableCell sx={{ fontWeight: 600 }}>{r.name}</TableCell>
+                  <TableCell>×{r.factor}</TableCell>
+                  <TableCell>
+                    <IconButton size="small" aria-label="עריכה">
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {error && !editing && <Alert severity="error">{error}</Alert>}
+      </Stack>
+      {editing && (
+        <Dialog open onClose={() => setEditing(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>{editing.id ? "עריכת הקלה" : "הקלה חדשה"}</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <TextField label="שם" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} fullWidth autoFocus />
+              <TextField
+                type="number"
+                label="מקדם"
+                value={editing.factor}
+                onChange={(e) => setEditing({ ...editing, factor: e.target.value })}
+                slotProps={{ htmlInput: { step: 0.05, min: 0.05, max: 1 } }}
+                helperText="0.5 = חצי מהעומס. שינוי חל על שיבוצים חדשים; ניקוד שכבר נשמר לא משתנה."
+                fullWidth
+              />
+            </Stack>
+          </DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mx: 2, mt: 1.5 }}>
+              {error}
+            </Alert>
+          )}
+          <DialogActions>
+            {editing.id && (
+              <Button color="error" disabled={busy} onClick={() => run(() => api!.deleteLoadRole(editing.id!))} sx={{ mr: "auto" }}>
+                מחיקה
+              </Button>
+            )}
+            <Button onClick={() => setEditing(null)}>ביטול</Button>
+            <Button variant="contained" onClick={save} disabled={busy}>
+              שמירה
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+    </Paper>
+  );
+}
+
 function ScoringTab() {
   const { api } = useAuth();
   const [list, setList] = useState<ScoreMultiplier[] | null>(null);
@@ -796,6 +911,8 @@ function ScoringTab() {
           </Box>
         </Stack>
       </Paper>
+
+      <LoadRolesCard />
 
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={2}>

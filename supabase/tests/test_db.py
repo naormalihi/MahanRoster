@@ -1045,3 +1045,17 @@ def test_major_holidays_have_their_own_multiplier(conn):
         assert conn.execute("select app.weekend_units('2031-09-18 08:00+03', '2031-09-19 08:00+03')").fetchone()[0] == 1
         conn.execute("update score_multipliers set value = 8 where name = 'ראש השנה, יום כיפור ופסח'")  # up to 10
         raise psycopg.Rollback()
+
+
+def test_load_roles_settings(conn):
+    with conn.transaction():
+        conn.execute("insert into load_roles (name, factor) values ('כונן מבצעי בדיקה', 0.7)")
+        rid = conn.execute("select id from load_roles where name = 'כונן מבצעי בדיקה'").fetchone()[0]
+        conn.execute("update load_roles set factor = 0.6 where id = %s", (rid,))
+        hist = [float(r[0]) for r in conn.execute("select factor from load_role_factor_history where load_role_id = %s order by id", (rid,))]
+        assert hist == [0.7, 0.6]
+        sid = conn.execute("select id from soldiers where is_active limit 1").fetchone()[0]
+        conn.execute("insert into soldier_load_roles (soldier_id, load_role_id, valid_from) values (%s, %s, '2020-01-01')", (sid, rid))
+        with pytest.raises(psycopg.Error, match="חיילים"):
+            _as_coord(conn, "select public.delete_load_role(%s)", rid)
+        raise psycopg.Rollback()

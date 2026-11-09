@@ -34,7 +34,10 @@ import type { ExistingSoldier, RosterPlan } from "../lib/roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "../lib/soldiers";
 
 type Extra = Omit<SoldierDetail, keyof ExistingSoldier | "gaf_id" | "load_roles"> & { load_roles: SoldierLoadRole[] };
-const LOAD_ROLES: LoadRoleRef[] = [{ id: "lr1", name: "ראש צוות", factor: 0.5 }];
+const LOAD_ROLES: LoadRoleRef[] = [
+  { id: "lr1", name: "ראש צוות", factor: 0.5 },
+  { id: "lr2", name: "כונן מבצעי", factor: 0.7 },
+];
 
 const GAFIM = ["גף מבצעים", "גף טכני", "גף מודיעין", "גף לוגיסטיקה"];
 const RANKS = ["טוראי", "רב\"ט", "סמל", "סמ\"ר", "רס\"ל", "רס\"ר", "רס\"מ", "סגן", "קמ\"א", "סרן", "רס\"ן", "סא\"ל"];
@@ -114,7 +117,8 @@ export class DemoApi implements Api {
   private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5 };
   private multipliers: ScoreMultiplier[] = [
     { id: "m1", name: "סוף שבוע", value: 1.5, day_types: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
-    { id: "m2", name: "חג וערב חג", value: 2, day_types: ["holiday", "holiday_eve"], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
+    { id: "m4", name: "ראש השנה, יום כיפור ופסח", value: 6, day_types: ["major_holiday", "major_holiday_eve"], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
+    { id: "m2", name: "חג וערב חג", value: 2, day_types: ["holiday", "holiday_eve", "major_holiday", "major_holiday_eve"], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
     { id: "m3", name: "לילה", value: 1.25, day_types: [], weekdays: [], time_window: "22:00-06:00", date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
   ];
   private dayTypeList: DayTypeRef[] = Object.entries(DAY_TYPE_LABEL).map(([code, name]) => ({ code, name }));
@@ -320,7 +324,21 @@ export class DemoApi implements Api {
   }
 
   async loadRoles() {
-    return LOAD_ROLES;
+    return LOAD_ROLES.map((r) => ({ ...r })).sort((a, b) => a.factor - b.factor);
+  }
+
+  async saveLoadRole(id: string | null, role: { name: string; factor: number }) {
+    await delay();
+    if (id) Object.assign(LOAD_ROLES.find((r) => r.id === id)!, { name: role.name.trim(), factor: role.factor });
+    else LOAD_ROLES.push({ id: this.nextId("lr"), name: role.name.trim(), factor: role.factor });
+  }
+
+  async deleteLoadRole(id: string) {
+    await delay();
+    if (this.soldierList.some((s) => this.extraOf(s.id).load_roles?.some((r) => r.load_role_id === id)))
+      throw new Error("יש חיילים עם ההקלה הזו, ולכן אי אפשר למחוק אותה. הסר אותה מהם קודם.");
+    const i = LOAD_ROLES.findIndex((r) => r.id === id);
+    if (i >= 0) LOAD_ROLES.splice(i, 1);
   }
 
   async setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]) {
