@@ -401,7 +401,6 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
               <TableCell padding="checkbox" />
               <TableCell>מועד</TableCell>
               <TableCell>תורנות</TableCell>
-              <TableCell>מבצע/עתודה</TableCell>
               <TableCell>דרגות</TableCell>
             </TableRow>
           </TableHead>
@@ -430,9 +429,6 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
                   {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                         {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
                         {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
-                </TableCell>
-                <TableCell>
-                  {s.performers_needed}/{s.reserves_needed}
                 </TableCell>
                 <TableCell>{s.allowed_rank_ids ? s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ") : "לפי הסוג"}</TableCell>
               </TableRow>
