@@ -50,3 +50,12 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres pytest -q su
 3. מריצים את המיגרציות בסדר, דרך `supabase db push` או דרך עורך ה-SQL. את `tests/supabase_stub.sql` **לא מריצים** על פרויקט אמיתי.
 4. יוצרים את המשתמש הראשון ב-Auth, ומריצים:
    `insert into app_users (id, username) values ('<uid>', 'naat'); insert into user_roles (user_id, role) values ('<uid>', 'coordinator');`
+
+## Start over: clear the dynamic data
+
+Irreversible. Run `reset_dynamic_data.sql` in Supabase › SQL Editor before a real run from scratch.
+It deletes cycles, soldiers, duty types and gafim with everything that hangs off them, after
+copying those tables to schema `reset_backup`. System settings stay: settings and multipliers,
+populations, day types, ranks, load roles, duty categories, exemption and absence types, holidays,
+the unit, users (their soldier/gaf link is cleared) and the audit log. The header of the script
+lists every table. When sure: `drop schema reset_backup cascade;`

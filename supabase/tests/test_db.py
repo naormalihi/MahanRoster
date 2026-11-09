@@ -889,3 +889,26 @@ def test_delete_task_type_only_when_unused(conn):
     _as_coord(conn, "select public.delete_task_type(%s)", new)
     assert conn.execute("select count(*) from task_types where id = %s", (new,)).fetchone()[0] == 0
     assert conn.execute("select count(*) from task_type_aliases where alias = 'כינוי למחיקה'").fetchone()[0] == 0
+
+def test_reset_dynamic_data_keeps_system_settings(conn):
+    sql = (ROOT / "supabase/reset_dynamic_data.sql").read_text(encoding="utf-8")
+    body = sql.split("begin;", 1)[1].rsplit("commit;", 1)[0]
+    kept = ("app_users", "settings", "populations", "ranks", "load_roles", "exemption_types", "absence_types",
+            "day_types", "calendar_days", "duty_categories")
+    count = lambda t: conn.execute(f"select count(*) from {t}").fetchone()[0]
+    with conn.transaction():
+        conn.execute("update app_users set soldier_id = (select id from soldiers limit 1) where id = %s", (COORD,))
+        conn.execute("insert into weight_history (multiplier_key, value, effective_from) values ('weekend_multiplier', 2, current_date)")
+        before = {t: count(t) for t in kept}
+        soldiers, multipliers = count("soldiers"), count("weight_history where task_type_id is null")
+        assert soldiers > 0 and count("task_types") > 0
+        conn.execute(body)
+        assert {t: count(t) for t in kept} == before
+        for t in ("cycles", "slots", "assignments", "exemptions", "schedule_jobs", "cycle_soldier_snapshot",
+                  "soldiers", "task_types", "task_type_aliases", "exemption_type_duties"):
+            assert count(t) == 0, t
+        assert count("org_units where kind = 'gaf'") == 0 and count("org_units where kind = 'unit'") == 1
+        assert count("weight_history where task_type_id is null") == multipliers
+        assert count("reset_backup.soldiers") == soldiers
+        assert count("app_users where soldier_id is not null") == 0
+        raise psycopg.Rollback()
