@@ -55,10 +55,11 @@ const STAGE_LINK: Partial<Record<CycleStatus, { to: string; label: string }>> = 
   loading: { to: "/soldiers/import", label: "לטעינת כוח אדם" },
   collecting: { to: "/cycle/constraints", label: "לאילוצים" },
   approving: { to: "/cycle/constraints?tab=exemptions&status=pending", label: "לפטורים הממתינים" },
-  potential: { to: "/cycle/potential", label: "למטריצת הפוטנציאל" },
-  slots: { to: "/cycle/slots", label: "לקליטת לוח הבסיס" },
-  scheduling: { to: "/cycle/schedule", label: "להרצת השיבוץ" },
-  review: { to: "/cycle/schedule", label: "לטיוטה ולפרסום" },
+  potential: { to: "/cycle/potential", label: "לפוטנציאל" },
+  slots: { to: "/cycle/slots", label: "ללוח הבסיס" },
+  scheduling: { to: "/cycle/schedule?view=run", label: "להרצה" },
+  review: { to: "/cycle/schedule?view=draft", label: "לטיוטה" },
+  published: { to: "/cycle/operate", label: "לתפעול" },
 };
 
 /** Stages after this one need screens that do not exist yet; the stepper stops here. */
@@ -210,7 +211,7 @@ export function StagePanel({ cycle, onChanged, inWorkspace }: { cycle: Cycle; on
         </Stack>
         {next && !canAdvance && (
           <Typography variant="caption" color="text.secondary">
-            מכאן השלב מתקדם לבד: הרצת שיבוץ מעבירה ל"שיבוץ" ול"טיוטה להתייחסות", ופרסום מעביר ל"פורסם".
+            מכאן השלב מתקדם לבד: הרצת שיבוץ מעבירה ל"שיבוץ: הרצה" ול"שיבוץ: טיוטה", ופרסום מעביר ל"תפעול".
           </Typography>
         )}
       </Stack>

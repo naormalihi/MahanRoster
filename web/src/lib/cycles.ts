@@ -20,15 +20,15 @@ export type CycleStatus =
   | "closed";
 
 export const STAGES: { status: CycleStatus; label: string; hint: string }[] = [
-  { status: "draft", label: "טיוטה", hint: "המחזור נוצר. קובעים תאריכים ומועד סגירת אילוצים." },
+  { status: "draft", label: "הקמת המחזור", hint: "המחזור נוצר. קובעים תאריכים ומועד סגירת אילוצים." },
   { status: "loading", label: "טעינת כוח אדם", hint: "טוענים את קובץ כוח האדם העדכני ובודקים את רשימת החיילים." },
-  { status: "collecting", label: "איסוף אילוצים", hint: "מזינים פטורים, היעדרויות וחסימות שהגיעו מהגפים, עד מועד הסגירה." },
-  { status: "approving", label: "אישור פטורים", hint: "בודקים אסמכתאות ומאשרים או דוחים כל פטור." },
+  { status: "collecting", label: "אילוצים: איסוף", hint: "מזינים פטורים, היעדרויות וחסימות שהגיעו מהגפים, עד מועד הסגירה." },
+  { status: "approving", label: "אילוצים: אישור פטורים", hint: "בודקים אסמכתאות ומאשרים או דוחים כל פטור." },
   { status: "potential", label: "פוטנציאל", hint: "מפיקים את מטריצת הפוטנציאל ושולחים לבסיס." },
-  { status: "slots", label: "קליטת לוח הבסיס", hint: "טוענים את קובץ המשבצות שהגיע מהבסיס." },
-  { status: "scheduling", label: "שיבוץ", hint: "מריצים שיבוץ ומתקנים ידנית." },
-  { status: "review", label: "טיוטה להתייחסות", hint: "הטיוטה פתוחה להערות הגפים." },
-  { status: "published", label: "פורסם", hint: "הלוח פורסם. מכאן: החלפות, הפלות ועתודות." },
+  { status: "slots", label: "לוח הבסיס", hint: "טוענים את קובץ המשבצות שהגיע מהבסיס." },
+  { status: "scheduling", label: "שיבוץ: הרצה", hint: "מריצים את מנוע השיבוץ." },
+  { status: "review", label: "שיבוץ: טיוטה", hint: "בודקים את הטיוטה, מתקנים ידנית, אוספים הערות מהגפים ומפרסמים." },
+  { status: "published", label: "תפעול", hint: "הלוח פורסם. מכאן: תורנויות חדשות, הקפצות והפעלת עתודות." },
   { status: "closed", label: "סגור", hint: "המחזור הסתיים." },
 ];
 
