@@ -33,7 +33,8 @@ import { TZ } from "../lib/dates";
 import { REASON_LABEL } from "../lib/potential";
 import {
   JOB_STATUS_LABEL,
-  POOL_LABEL,
+  poolName,
+  poolNames,
   elapsed,
   isActive,
   looksStuck,
@@ -157,7 +158,7 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
   );
 }
 
-function Result({ job, slots, tasks }: { job: ScheduleJob; slots: Map<string, SlotRow>; tasks: Map<string, TaskType> }) {
+function Result({ job, slots, tasks, pools }: { job: ScheduleJob; slots: Map<string, SlotRow>; tasks: Map<string, TaskType>; pools: Map<string, string> }) {
   const unfilled = job.unfilled ?? [];
   const missingP = unfilled.filter((u) => u.role === "performer").reduce((n, u) => n + u.missing, 0);
   const missingR = unfilled.filter((u) => u.role === "reserve").reduce((n, u) => n + u.missing, 0);
@@ -211,7 +212,7 @@ function Result({ job, slots, tasks }: { job: ScheduleJob; slots: Map<string, Sl
                 <TableBody>
                   {job.pools.map((p) => (
                     <TableRow key={p.population}>
-                      <TableCell>{POOL_LABEL[p.population] ?? p.population}</TableCell>
+                      <TableCell sx={{ minWidth: 140 }}>{poolName(pools, p.population)}</TableCell>
                       <TableCell>{p.soldiers}</TableCell>
                       <TableCell>{p.mean_before.toFixed(1)}</TableCell>
                       <TableCell>{p.mean_after.toFixed(1)}</TableCell>
@@ -276,6 +277,12 @@ export function SchedulePage() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pools, setPools] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (!cycleId) return;
+    api!.snapshotSoldiers(cycleId).then((sn) => setPools(poolNames(sn))).catch(() => setPools(new Map()));
+  }, [api, cycleId, jobs?.length]);
 
   useEffect(() => {
     Promise.all([api!.cycles(), api!.taskTypes(), api!.dispatchConfigured()])
@@ -375,7 +382,7 @@ export function SchedulePage() {
             </Stack>
           </Paper>
           {!jobs ? <Loading /> : active ? <ActiveJob job={active} onChanged={loadJobs} /> : null}
-          {last && (last.status === "done" || last.status === "failed") && <Result job={last} slots={slotMap} tasks={tasks} />}
+          {last && (last.status === "done" || last.status === "failed") && <Result job={last} slots={slotMap} tasks={tasks} pools={pools} />}
           {jobs && jobs.length > 1 && (
             <Paper variant="outlined">
               <Table size="small">

@@ -48,6 +48,20 @@ export const JOB_STATUS_LABEL: Record<JobStatus, string> = {
 
 export const POOL_LABEL: Record<string, string> = { mandatory: "חובה", career: "קבע" };
 
+/** A fairness group's name: its population and the duty categories its soldiers share. */
+export function poolNames(snapshot: { fairness_group?: string | null; fairness_label?: string | null; balance_population: string }[]) {
+  const names = new Map<string, string>();
+  for (const s of snapshot) {
+    const key = s.fairness_group || s.balance_population;
+    if (!names.has(key)) names.set(key, [POOL_LABEL[s.balance_population] ?? s.balance_population, s.fairness_label].filter(Boolean).join(" · "));
+  }
+  return names;
+}
+
+/** What to show for a pool key; never a raw id. */
+export const poolName = (names: Map<string, string>, key: string) =>
+  names.get(key) ?? POOL_LABEL[key] ?? POOL_LABEL[key.split(":")[0]] ?? key;
+
 export const isActive = (j: Pick<ScheduleJob, "status">) => j.status === "queued" || j.status === "running";
 
 /** Seconds since a timestamp, for "waiting 2:15". */
