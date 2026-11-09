@@ -85,6 +85,8 @@ def seed(c):
     q("truncate populations, day_types, ranks, load_roles, absence_types, exemption_types cascade")
     q("insert into populations (code, name) values ('mandatory','חובה'),('career','קבע'),('officer','קצינים'),('major','רס\"ן ומעלה')")
     q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג'),('memorial','יום זיכרון')")
+    q("update day_types set counts_as_holiday = true where code in ('holiday', 'holiday_eve')")
+    q("insert into day_types (code, name, counts_as_holiday) values ('major_holiday','חג מרכזי',true),('major_holiday_eve','ערב חג מרכזי',true)")
     rank_id = {}
     for name, order in synthetic.RANKS.items():
         rank_id[order] = q(
@@ -1025,4 +1027,21 @@ def test_activate_reserve_whole_and_partial(conn):
         # not twice
         with pytest.raises(psycopg.Error):
             _as_coord(conn, "select public.activate_reserve(%s)", r2)
+        raise psycopg.Rollback()
+
+
+
+def test_major_holidays_have_their_own_multiplier(conn):
+    um = lambda day: float(conn.execute(
+        "select app.unit_multiplier(%s::date, false, (%s::date + time '08:00'), (%s::date + time '08:00' + interval '1 day'))",
+        (day, day, day)).fetchone()[0])
+    with conn.transaction():
+        conn.execute("insert into calendar_days (day, day_type, note) values ('2031-09-18', 'major_holiday', 'ראש השנה א׳'), "
+                     "('2031-10-01', 'holiday', 'סוכות') on conflict (day) do update set day_type = excluded.day_type")
+        assert um("2031-09-18") == 6          # ראש השנה: the dedicated multiplier, not the regular holiday one
+        assert um("2031-10-01") == 2          # a regular holiday
+        assert conn.execute("select app.is_holiday('2031-09-18')").fetchone()[0]
+        # counts as a holiday for weekend balancing (2031-09-18 is a Thursday)
+        assert conn.execute("select app.weekend_units('2031-09-18 08:00+03', '2031-09-19 08:00+03')").fetchone()[0] == 1
+        conn.execute("update score_multipliers set value = 8 where name = 'ראש השנה, יום כיפור ופסח'")  # up to 10
         raise psycopg.Rollback()

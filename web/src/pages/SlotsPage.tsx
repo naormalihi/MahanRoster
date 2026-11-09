@@ -37,7 +37,7 @@ import {
   type RankRef,
   type SlotRow,
 } from "../lib/baseSchedule";
-import type { TaskType } from "../lib/catalog";
+import { HOLIDAY_TYPES, type TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
 import { TZ } from "../lib/dates";
 
@@ -467,7 +467,7 @@ export function SlotsPage() {
     ])
       .then(([c, tasks, categories, ranks, aliases, sc, cal]) => {
         setCycles(c);
-        const holidays = new Set(cal.filter((d) => d.day_type === "holiday" || d.day_type === "holiday_eve").map((d) => d.day));
+        const holidays = new Set(cal.filter((d) => HOLIDAY_TYPES.has(d.day_type)).map((d) => d.day));
         setRefs({ tasks, categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
       })
       .catch((e) => setError((e as Error).message));

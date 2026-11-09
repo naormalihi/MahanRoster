@@ -83,7 +83,7 @@ export function scoringProblems(s: ScoringSettings): string[] {
   const p: string[] = [];
   if (!WINDOW_RE.test(s.night_window)) p.push("חלון לילה בתבנית 22:00-06:00");
   if (!s.weekend_weekdays.length) p.push("בחר לפחות יום אחד של סוף שבוע");
-  if (!(s.surprise_multiplier >= 1) || s.surprise_multiplier > 5) p.push("מקדם הקפצה – בין 1 ל-5");
+  if (!(s.surprise_multiplier >= 1) || s.surprise_multiplier > 10) p.push("מקדם הקפצה – בין 1 ל-10");
   return p;
 }
 
@@ -123,7 +123,7 @@ export function multiplierProblems(m: ScoreMultiplierInput, all: ScoreMultiplier
   const name = m.name.trim();
   if (!name) p.push("חסר שם");
   else if (all.some((x) => x.id !== id && x.name.trim() === name)) p.push("כבר יש מקדם בשם הזה");
-  if (!(m.value >= 1) || m.value > 5) p.push("ערך המקדם – בין 1 ל-5");
+  if (!(m.value >= 1) || m.value > 10) p.push("ערך המקדם – בין 1 ל-10");
   if (m.time_window !== null && !WINDOW_RE.test(m.time_window)) p.push("חלון שעות בתבנית 22:00-06:00");
   if (m.date_from && m.date_to && m.date_from > m.date_to) p.push("תאריך הסיום לפני תאריך ההתחלה");
   if (!m.day_types.length && !m.weekdays.length && !m.time_window && !m.date_from && !m.date_to)
@@ -156,12 +156,17 @@ export interface DayTypeRef {
   name: string;
 }
 
+/** Day types that are holidays (weekend balancing, the holiday calendar of the base file). */
+export const HOLIDAY_TYPES = new Set(["holiday", "holiday_eve", "major_holiday", "major_holiday_eve"]);
+
 /** Day types that are marked on the calendar (weekday/weekend are by the day of the week). */
 export const MARKABLE = (t: DayTypeRef) => t.code !== "weekday" && t.code !== "weekend";
 
 export const DAY_TYPE_LABEL: Record<string, string> = {
   holiday: "חג",
   holiday_eve: "ערב חג",
+  major_holiday: "חג מרכזי",
+  major_holiday_eve: "ערב חג מרכזי",
   memorial: "יום זיכרון",
   weekend: "סופ\"ש",
   weekday: "חול",
@@ -175,23 +180,24 @@ export interface CalendarDay {
 }
 
 /**
- * Days that count in Israel. Holidays and their eves get the holiday multiplier;
+ * Days that count in Israel. Holidays and their eves get the holiday multiplier; ראש השנה,
+ * יום כיפור and פסח (with their eves) are "major" holidays with a multiplier of their own;
  * memorial days are marked for information only. חול המועד is not marked.
  */
 const HOLIDAY_RULES: { match: (desc: string) => boolean; type: DayType; note: string }[] = [
-  { match: (d) => d === "Erev Rosh Hashana", type: "holiday_eve", note: "ערב ראש השנה" },
-  { match: (d) => /^Rosh Hashana \d+$/.test(d), type: "holiday", note: "ראש השנה א׳" },
-  { match: (d) => d === "Rosh Hashana II", type: "holiday", note: "ראש השנה ב׳" },
-  { match: (d) => d === "Erev Yom Kippur", type: "holiday_eve", note: "ערב יום כיפור" },
-  { match: (d) => d === "Yom Kippur", type: "holiday", note: "יום כיפור" },
+  { match: (d) => d === "Erev Rosh Hashana", type: "major_holiday_eve", note: "ערב ראש השנה" },
+  { match: (d) => /^Rosh Hashana \d+$/.test(d), type: "major_holiday", note: "ראש השנה א׳" },
+  { match: (d) => d === "Rosh Hashana II", type: "major_holiday", note: "ראש השנה ב׳" },
+  { match: (d) => d === "Erev Yom Kippur", type: "major_holiday_eve", note: "ערב יום כיפור" },
+  { match: (d) => d === "Yom Kippur", type: "major_holiday", note: "יום כיפור" },
   { match: (d) => d === "Erev Sukkot", type: "holiday_eve", note: "ערב סוכות" },
   { match: (d) => d === "Sukkot I", type: "holiday", note: "סוכות" },
   { match: (d) => d === "Sukkot VII (Hoshana Raba)", type: "holiday_eve", note: "הושענא רבה (ערב שמיני עצרת)" },
   { match: (d) => d === "Shmini Atzeret", type: "holiday", note: "שמיני עצרת / שמחת תורה" },
-  { match: (d) => d === "Erev Pesach", type: "holiday_eve", note: "ערב פסח" },
-  { match: (d) => d === "Pesach I", type: "holiday", note: "פסח" },
-  { match: (d) => d === "Pesach VI (CH''M)", type: "holiday_eve", note: "ערב שביעי של פסח" },
-  { match: (d) => d === "Pesach VII", type: "holiday", note: "שביעי של פסח" },
+  { match: (d) => d === "Erev Pesach", type: "major_holiday_eve", note: "ערב פסח" },
+  { match: (d) => d === "Pesach I", type: "major_holiday", note: "פסח" },
+  { match: (d) => d === "Pesach VI (CH''M)", type: "major_holiday_eve", note: "ערב שביעי של פסח" },
+  { match: (d) => d === "Pesach VII", type: "major_holiday", note: "שביעי של פסח" },
   { match: (d) => d === "Erev Shavuot", type: "holiday_eve", note: "ערב שבועות" },
   { match: (d) => d === "Shavuot", type: "holiday", note: "שבועות" },
   { match: (d) => d === "Yom HaShoah", type: "memorial", note: "יום השואה" },
