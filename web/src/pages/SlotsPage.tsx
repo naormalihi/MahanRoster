@@ -62,6 +62,9 @@ interface Refs {
   holidays: Set<string>;
 }
 
+/** "לא לקלוט" in the duty mapping (an empty value means: not chosen yet). */
+const SKIP = "__skip__";
+
 function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) => void; label?: string }) {
   const groups = props.refs.categories
     .map((c) => ({ c, tasks: props.refs.tasks.filter((t) => t.is_active && t.category_id === c.id) }))
@@ -69,7 +72,7 @@ function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) =
   const loose = props.refs.tasks.filter((t) => t.is_active && !props.refs.categories.some((c) => c.id === t.category_id));
   return (
     <TextField select size="small" label={props.label ?? "סוג תורנות"} value={props.value} onChange={(e) => props.onChange(e.target.value)} sx={{ minWidth: 220 }}>
-      <MenuItem value="">
+      <MenuItem value={SKIP}>
         <em>לא לקלוט</em>
       </MenuItem>
       {groups.flatMap((g) => [
@@ -147,7 +150,7 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
 
   async function applyMapping() {
     const chosen = Object.entries(mapping)
-      .filter(([, id]) => id)
+      .filter(([, id]) => id && id !== SKIP)
       .map(([alias, task_type_id]) => ({ alias, task_type_id }));
     if (remember) await api!.saveTaskTypeAliases(chosen);
     props.onAliases(chosen);
@@ -171,7 +174,9 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
   const holidayMismatch = result?.slots.filter((s) => s.holidayMismatch) ?? [];
   const popMismatch = result?.slots.filter((s) => s.populationMismatch) ?? [];
   const briefingIgnored = result?.slots.filter((s) => s.briefingIgnored) ?? [];
-  const allMapped = result && result.unmapped.every((u) => mapping[u.duty] !== undefined);
+  // every unknown name has a choice; the preview opens once only skipped names are left
+  const allMapped = result && result.unmapped.every((u) => !!mapping[u.duty]);
+  const onlySkipped = result && result.unmapped.every((u) => mapping[u.duty] === SKIP);
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
@@ -239,13 +244,13 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
           </Alert>
         )}
 
-        {result && result.unmapped.every((u) => mapping[u.duty] !== undefined) && (
+        {result && onlySkipped && (
           <>
             <Alert severity={result.slots.length ? "info" : "warning"}>
               <b>{result.slots.length} משבצות ייקלטו</b> ל{cycle.name}.
               {result.outside.length > 0 && ` ${result.outside.length} שורות מתחילות מחוץ למחזור ולא ייקלטו.`}
               {switched > 0 && ` ${switched} משבצות שמתחילות בסוף שבוע הועברו לסוג התורנות של שבת.`}
-              {result.unmapped.some((u) => !mapping[u.duty]) && " שמות שסומנו \"לא לקלוט\" דולגו."}
+              {result.unmapped.length > 0 && ` ${result.unmapped.reduce((n, u) => n + u.count, 0)} שורות של שמות שסומנו "לא לקלוט" דולגו.`}
             </Alert>
             {(errors.length > 0 || unknownRankRows.length > 0) && (
               <Alert severity="warning">
@@ -398,8 +403,6 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
               <TableCell>תורנות</TableCell>
               <TableCell>מבצע/עתודה</TableCell>
               <TableCell>דרגות</TableCell>
-              <TableCell>הנחיות</TableCell>
-              <TableCell>הערות</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -432,19 +435,13 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
                   {s.performers_needed}/{s.reserves_needed}
                 </TableCell>
                 <TableCell>{s.allowed_rank_ids ? s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ") : "לפי הסוג"}</TableCell>
-                <TableCell sx={{ maxWidth: 240, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={s.instructions ?? ""}>
-                  {s.instructions}
-                </TableCell>
-                <TableCell sx={{ maxWidth: 200, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={s.notes ?? ""}>
-                  {s.notes}
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
       <Typography variant="caption" color="text.secondary">
-        ת״ש 7 = משבצת שהבסיס ייעד קודם לחיילים שלנים בבית; אם אין מהם זמין, ישובץ כל חייל זכאי. ההערות (אנשי קשר וטלפונים) נשמרות למשבצת ולא מוצגות בלוח המפורסם. משבצת שכבר שובצה בה תורנות אי אפשר למחוק מכאן.
+        ת״ש 7 = משבצת שהבסיס ייעד קודם לחיילים שלנים בבית; אם אין מהם זמין, ישובץ כל חייל זכאי. משבצת שכבר שובצה בה תורנות אי אפשר למחוק מכאן.
       </Typography>
     </Stack>
   );
