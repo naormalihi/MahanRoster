@@ -405,7 +405,7 @@ def test_score_multipliers_highest_applies(conn):
         "select app.unit_multiplier(%s::date, %s, %s::timestamp, %s::timestamp)", (day, shabbat, a, b)).fetchone()[0])
     # the three fixed ones were moved over from the settings
     assert {r[0] for r in conn.execute("select name from score_multipliers")} >= {"סוף שבוע", "חג וערב חג", "לילה"}
-    assert conn.execute("select count(*) from settings where key like '%%_multiplier'").fetchone()[0] == 0
+    assert conn.execute("select count(*) from settings where key in ('weekend_multiplier', 'holiday_multiplier', 'night_multiplier')").fetchone()[0] == 0
     with conn.transaction():
         conn.execute("insert into calendar_days (day, day_type) values ('2031-01-07', 'memorial') on conflict (day) do update set day_type = 'memorial'")
         conn.execute("insert into score_multipliers (name, value, day_types) values ('יום זיכרון', 1.8, '{memorial}')")
@@ -956,4 +956,73 @@ def test_task_rank_list_limits_potential_and_engine_input(conn):
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
         task = next(t for t in doc["task_types"] if t["id"] == str(tid))
         assert task["allowed_ranks"] == [order]
+        raise psycopg.Rollback()
+
+
+def test_surprise_slot_added_after_publish(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        base = conn.execute("select id, task_type_id, starts_at, ends_at from slots where cycle_id = %s and not is_penalty_slot "
+                            "order by starts_at limit 1", (cycle,)).fetchone()
+        sid = conn.execute("select id from soldiers where is_active limit 1").fetchone()[0]
+        new = conn.execute(
+            "insert into slots (cycle_id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, is_surprise) "
+            "values (%s, %s, %s, %s, 1, 0, true) returning id", (cycle, base[1], base[2], base[3])).fetchone()[0]
+        plain = conn.execute("select raw from app.slot_points(%s, %s)", (base[0], sid)).fetchone()[0]
+        surprise = conn.execute("select raw from app.slot_points(%s, %s)", (new, sid)).fetchone()[0]
+        assert float(surprise) == pytest.approx(float(plain) * 1.5, abs=0.01)
+        doc = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]
+        assert next(s for s in doc["slots"] if s["id"] == str(new))["is_surprise"] is True
+        assert float(doc["settings"]["surprise_multiplier"]) == 1.5
+        # publish only the additions; the cycle stays published
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) "
+                     "select %s, id, gaf_id, 'performer', 'draft' from soldiers where id = %s", (new, sid))
+        n = _as_coord(conn, "select public.publish_additions(%s)", cycle)[0][0]
+        assert n >= 1
+        assert conn.execute("select status from assignments where slot_id = %s", (new,)).fetchone()[0] == "assigned"
+        assert conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "published"
+        raise psycopg.Rollback()
+
+
+def test_activate_reserve_whole_and_partial(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a, b, c, d = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 4").fetchall()]
+
+        # whole duty: performer dropped, reserve performs
+        k1 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                          "(%s, %s, now() + interval '30 days', now() + interval '31 days') returning id", (cycle, tid)).fetchone()[0]
+        p1 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s returning id", (k1, a)).fetchone()[0]
+        r1 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, paired_assignment_id) select %s, id, gaf_id, 'reserve', 'reserve_idle', %s from soldiers where id = %s returning id", (k1, p1, b)).fetchone()[0]
+        _as_coord(conn, "select public.activate_reserve(%s)", r1)
+        assert conn.execute("select status, points from assignments where id = %s", (p1,)).fetchone() == ("dropped", 0)
+        st, pts = conn.execute("select status, points from assignments where id = %s", (r1,)).fetchone()
+        assert st == "reserve_activated" and pts > 0
+        # the board shows the activated reserve as the performer
+        board = conn.execute("select performers, reserves from published_board where slot_id = %s", (k1,)).fetchone()
+        assert board is None or (len(board[0]) == 1 and board[1] == [])
+        # engine input: the activated reserve is the performer; the dropped one is gone
+        doc = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]
+        fixed = [f for f in doc["fixed"] if f["slot_id"] == str(k1)]
+        assert fixed == [{"slot_id": str(k1), "soldier_id": str(b), "role": "performer"}]
+
+        # partial: a 3-day duty, the reserve takes over from day 2
+        k2 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                          "(%s, %s, now() + interval '40 days', now() + interval '43 days') returning id", (cycle, tid)).fetchone()[0]
+        p2 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s returning id", (k2, c)).fetchone()[0]
+        r2 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'reserve', 'reserve_idle' from soldiers where id = %s returning id", (k2, d)).fetchone()[0]
+        full = float(conn.execute("select raw from app.slot_points(%s, %s)", (k2, c)).fetchone()[0])
+        _as_coord(conn, "select public.activate_reserve(%s, 1)", r2)
+        sp, pp = conn.execute("select status, points from assignments where id = %s", (p2,)).fetchone()
+        sr, pr = conn.execute("select status, points from assignments where id = %s", (r2,)).fetchone()
+        assert sp == "done" and sr == "reserve_activated"
+        assert float(pp) + float(pr) == pytest.approx(full, abs=0.02) and 0 < float(pp) < full
+        doc = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]
+        assert [f["soldier_id"] for f in doc["fixed"] if f["slot_id"] == str(k2)] == [str(d)]
+        # not twice
+        with pytest.raises(psycopg.Error):
+            _as_coord(conn, "select public.activate_reserve(%s)", r2)
         raise psycopg.Rollback()

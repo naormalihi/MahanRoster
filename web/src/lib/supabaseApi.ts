@@ -19,7 +19,7 @@ import {
   type ExemptionInput,
   type ExemptionType,
 } from "./cycles";
-import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
@@ -281,6 +281,7 @@ export class SupabaseApi implements Api {
     return {
       night_window: String(v.night_window),
       weekend_weekdays: (v.weekend_weekdays as number[]) ?? [],
+      surprise_multiplier: v.surprise_multiplier == null ? 1.5 : Number(v.surprise_multiplier),
     };
   }
 
@@ -545,7 +546,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("slots")
         .select(
-          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, briefing_at, assignments(status)",
+          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, briefing_at, is_surprise, assignments(status)",
         )
         .eq("cycle_id", cycleId)
         .is("cancelled_at", null)
@@ -613,8 +614,20 @@ export class SupabaseApi implements Api {
     return rows.map((r) => ({ ...r, wall_time: r.wall_time === null ? null : Number(r.wall_time) }));
   }
 
-  async requestSchedule(cycleId: string) {
-    return String(check(await this.sb.rpc("request_schedule", { p_cycle: cycleId })));
+  async requestSchedule(cycleId: string, kind: "full" | "stability" = "full") {
+    return String(check(await this.sb.rpc("request_schedule", { p_cycle: cycleId, p_kind: kind })));
+  }
+
+  async addSlot(cycleId: string, k: NewSlot) {
+    maybe(await this.sb.from("slots").insert({ ...k, cycle_id: cycleId }));
+  }
+
+  async activateReserve(reserveId: string, fromUnit: number, performerId: string | null, note: string | null) {
+    maybe(await this.sb.rpc("activate_reserve", { p_reserve: reserveId, p_from_unit: fromUnit, p_performer: performerId, p_note: note }));
+  }
+
+  async publishAdditions(cycleId: string) {
+    return Number(check(await this.sb.rpc("publish_additions", { p_cycle: cycleId })));
   }
 
   async redispatchSchedule(jobId: string) {

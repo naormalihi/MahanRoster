@@ -51,6 +51,7 @@ function Gate() {
               <Route path="/cycle/potential" element={ro(<CycleWorkspace step="potential" />)} />
               <Route path="/cycle/slots" element={ro(<CycleWorkspace step="slots" />)} />
               <Route path="/cycle/schedule" element={ro(<CycleWorkspace step="schedule" />)} />
+              <Route path="/cycle/operate" element={ro(<CycleWorkspace step="operate" />)} />
               <Route path="/soldiers" element={ro(<SoldiersPage />)} />
             </>
           )}

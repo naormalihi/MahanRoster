@@ -69,9 +69,10 @@ export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" |
 export interface ScoringSettings {
   night_window: string; // "22:00-06:00" – who sleeps at home is not given duties in it
   weekend_weekdays: number[]; // ISO: 1 = Monday … 7 = Sunday – for weekend balancing
+  surprise_multiplier: number; // a duty added after publishing that caught its performer by surprise
 }
 
-export const SCORING_KEYS = ["night_window", "weekend_weekdays"] as const;
+export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier"] as const;
 
 export const ISO_DAY_LABEL: Record<number, string> = { 7: "ראשון", 1: "שני", 2: "שלישי", 3: "רביעי", 4: "חמישי", 5: "שישי", 6: "שבת" };
 export const ISO_WEEK = [7, 1, 2, 3, 4, 5, 6];
@@ -82,6 +83,7 @@ export function scoringProblems(s: ScoringSettings): string[] {
   const p: string[] = [];
   if (!WINDOW_RE.test(s.night_window)) p.push("חלון לילה בתבנית 22:00-06:00");
   if (!s.weekend_weekdays.length) p.push("בחר לפחות יום אחד של סוף שבוע");
+  if (!(s.surprise_multiplier >= 1) || s.surprise_multiplier > 5) p.push("מקדם הקפצה – בין 1 ל-5");
   return p;
 }
 

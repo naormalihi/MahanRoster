@@ -29,6 +29,7 @@ const PotentialPage = lazy(() => import("./PotentialPage").then((m) => ({ defaul
 const SlotsPage = lazy(() => import("./SlotsPage").then((m) => ({ default: m.SlotsPage })));
 const SchedulePage = lazy(() => import("./SchedulePage").then((m) => ({ default: m.SchedulePage })));
 const DraftPage = lazy(() => import("./DraftPage").then((m) => ({ default: m.DraftPage })));
+const OperatePage = lazy(() => import("./OperatePage").then((m) => ({ default: m.OperatePage })));
 
 const fmt = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
@@ -55,6 +56,8 @@ export function useCycleFacts(cycle: Cycle | undefined) {
       pendingExemptions: ex.filter((e) => e.status === "pending").length,
       slots: slots.length,
       job: job && { status: job.status, unfilled: (job.unfilled ?? []).filter((u) => u.role === "performer").reduce((s, u) => s + u.missing, 0) },
+      pendingAdditions:
+        cycle.status === "published" ? slots.filter((k) => k.assigned === 0 && Date.parse(k.ends_at) > Date.now()).length : 0,
     });
   }, [api, cycle]);
   useEffect(() => {
@@ -167,7 +170,7 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
         <Chip label={`שלב: ${stageLabel(cycle.status)}`} color={locked ? "success" : "primary"} variant={locked ? "filled" : "outlined"} />
       </Stack>
       <StepTabs step={step} states={states} />
-      {locked && step !== "overview" && (
+      {locked && step !== "overview" && step !== "operate" && (
         <Alert severity="success" icon={<LockIcon />}>
           המחזור פורסם{cycle.published_at ? ` ב-${fmt(cycle.published_at)}` : ""}. הפוטנציאל, לוח הבסיס והשיבוץ נעולים לעריכה. פטורים והיעדרויות
           אפשר עדיין להזין.
@@ -195,6 +198,7 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
           {step === "potential" && <PotentialPage />}
           {step === "slots" && <SlotsPage />}
           {step === "schedule" && <ScheduleStep facts={facts} />}
+          {step === "operate" && <OperatePage />}
         </Box>
       </Suspense>
     </Stack>

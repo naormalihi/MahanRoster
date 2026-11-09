@@ -18,7 +18,7 @@ import type {
   ExemptionInput,
   ExemptionType,
 } from "./cycles";
-import type { Alias, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
+import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
@@ -165,7 +165,17 @@ export interface Api {
   deleteSlots(ids: string[]): Promise<void>;
   // scheduling runs
   scheduleJobs(cycleId: string): Promise<ScheduleJob[]>;
-  requestSchedule(cycleId: string): Promise<string>;
+  /** "stability" keeps every published assignment and fills the rest (e.g. duties added after publishing). */
+  requestSchedule(cycleId: string, kind?: "full" | "stability"): Promise<string>;
+  /** A duty added by hand to a cycle (after publishing: then filled by a stability run). */
+  addSlot(cycleId: string, slot: NewSlot): Promise<void>;
+  /** Approve the engine's draft for duties added after publishing; the cycle stays published. */
+  publishAdditions(cycleId: string): Promise<number>;
+  /**
+   * The reserve takes over a published duty: from its start (the performer is dropped) or from
+   * day unit fromUnit of a multi-day duty (each keeps the points of their days).
+   */
+  activateReserve(reserveId: string, fromUnit: number, performerId: string | null, note: string | null): Promise<void>;
   redispatchSchedule(jobId: string): Promise<string>;
   cancelScheduleJob(jobId: string): Promise<void>;
   dispatchConfigured(): Promise<boolean>;

@@ -25,7 +25,7 @@ import {
   type ExemptionInput,
   type ExemptionType,
 } from "../lib/cycles";
-import type { Alias, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
+import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
 import type { AppUser } from "../lib/users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
 import type { ScheduleJob } from "../lib/schedule";
@@ -111,7 +111,7 @@ export class DemoApi implements Api {
   private boardRows: BoardRow[] = [];
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
-  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
+  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5 };
   private multipliers: ScoreMultiplier[] = [
     { id: "m1", name: "סוף שבוע", value: 1.5, day_types: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
     { id: "m2", name: "חג וערב חג", value: 2, day_types: ["holiday", "holiday_eve"], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
@@ -628,7 +628,8 @@ export class DemoApi implements Api {
 
   async cycleSlots(cycleId: string) {
     await delay();
-    return (this.slotsByCycle.get(cycleId) ?? []).map((s) => ({ ...s }));
+    const live = (id: string) => this.draft.filter((a) => a.slot_id === id && a.status !== "draft").length;
+    return (this.slotsByCycle.get(cycleId) ?? []).map((s) => ({ ...s, assigned: live(s.id) }));
   }
 
   async importSlots(cycleId: string, slots: SlotDraft[], replace: boolean) {
@@ -674,20 +675,23 @@ export class DemoApi implements Api {
     });
     const c = this.cycleList.find((x) => x.id === j.cycle_id);
     if (c && c.status === "scheduling") c.status = "review";
-    this.fillDraft(j.cycle_id);
+    this.fillDraft(j.cycle_id, j.kind === "stability");
   }
 
   /** Rough demo draft: each slot gets the least-loaded soldiers of a fitting service. */
-  private fillDraft(cycleId: string) {
-    this.draft = this.draft.filter((a) => a.cycle_id !== cycleId || a.source === "manual");
+  private fillDraft(cycleId: string, onlyNew = false) {
+    this.draft = this.draft.filter((a) => a.cycle_id !== cycleId || a.source === "manual" || a.status !== "draft");
     const load = new Map<string, number>();
     const tasks = new Map(this.tasks.map((t) => [t.id, t]));
-    const slots = (this.slotsByCycle.get(cycleId) ?? []).slice(1); // leave the first one unfilled
+    const live = new Set(this.draft.filter((a) => a.cycle_id === cycleId).map((a) => a.slot_id));
+    const slots = onlyNew
+      ? (this.slotsByCycle.get(cycleId) ?? []).filter((k) => !live.has(k.id))
+      : (this.slotsByCycle.get(cycleId) ?? []).slice(1); // leave the first one unfilled
     for (const k of slots) {
       const t = tasks.get(k.task_type_id);
       const pool = this.soldierList.filter((s) => s.is_active && (!t || t.service_restriction === "any" || t.service_restriction === s.service_type));
       const days = Math.max(1, Math.round((Date.parse(k.ends_at) - Date.parse(k.starts_at)) / 86_400_000));
-      const pts = Math.round((t?.weight ?? 1) * days * 100) / 100;
+      const pts = Math.round((t?.weight ?? 1) * days * (k.is_surprise ? this.scoring.surprise_multiplier : 1) * 100) / 100;
       const pick = [...pool].sort((a, b) => (load.get(a.id) ?? 0) - (load.get(b.id) ?? 0) || a.id.localeCompare(b.id)).slice(0, 2);
       pick.forEach((s, i) => {
         const role: DraftRole = i === 0 ? "performer" : "reserve";
@@ -709,18 +713,49 @@ export class DemoApi implements Api {
     return mine.map(({ cycle_id: _c, ...j }) => ({ ...j })).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 
-  async requestSchedule(cycleId: string) {
+  async requestSchedule(cycleId: string, kind: "full" | "stability" = "full") {
     await delay(300);
     if (this.jobs.some((j) => j.cycle_id === cycleId && (j.status === "queued" || j.status === "running")))
       throw new Error("a scheduling run is already in progress for this cycle");
     const id = this.nextId("job");
     this.jobs.push({
-      id, cycle_id: cycleId, status: "queued", kind: "full", progress: 0, created_at: new Date().toISOString(), started_at: null,
+      id, cycle_id: cycleId, status: "queued", kind, progress: 0, created_at: new Date().toISOString(), started_at: null,
       finished_at: null, error: null, params: { dispatch: "sent" }, result_status: null, wall_time: null, unfilled: null, warnings: null, pools: null,
     });
     const c = this.cycleList.find((x) => x.id === cycleId);
     if (c && ["slots", "potential", "review", "scheduling"].includes(c.status)) c.status = "scheduling";
     return id;
+  }
+
+  async addSlot(cycleId: string, k: NewSlot) {
+    await delay();
+    const row: SlotRow = {
+      id: this.nextId("sl"), ...k, allowed_rank_ids: null, gender: null, instructions: null, notes: null, source_line: null,
+      prefer_home_nightly: false, daily_hours: null, briefing_at: null, assigned: 0,
+    };
+    this.slotsByCycle.set(cycleId, [...(this.slotsByCycle.get(cycleId) ?? []), row].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
+  }
+
+  async activateReserve(reserveId: string, fromUnit: number, performerId: string | null) {
+    await delay(300);
+    const r = this.draft.find((a) => a.id === reserveId);
+    if (!r || r.role !== "reserve" || r.status !== "reserve_idle") throw new Error("זו לא עתודה פעילה בלוח המפורסם");
+    const p = this.draft.find((a) => a.slot_id === r.slot_id && a.role === "performer" && a.status === "assigned" && (!performerId || a.id === performerId));
+    if (!p) throw new Error("לא נמצא מבצע להחלפה – בחר את המבצע");
+    const k = [...this.slotsByCycle.values()].flat().find((s) => s.id === r.slot_id)!;
+    const units = Math.max(1, Math.ceil((Date.parse(k.ends_at) - Date.parse(k.starts_at)) / 86_400_000));
+    const per = p.points / units;
+    r.status = "reserve_activated";
+    r.points = r.normalized_points = Math.round(per * (units - fromUnit) * 100) / 100;
+    if (fromUnit === 0) Object.assign(p, { status: "dropped", points: 0, normalized_points: 0 });
+    else Object.assign(p, { status: "done", points: Math.round(per * fromUnit * 100) / 100, normalized_points: Math.round(per * fromUnit * 100) / 100 });
+  }
+
+  async publishAdditions(cycleId: string) {
+    await delay(300);
+    const mine = this.draft.filter((a) => a.cycle_id === cycleId && a.status === "draft");
+    mine.forEach((a) => (a.status = a.role === "performer" ? "assigned" : "reserve_idle"));
+    return mine.length;
   }
 
   async redispatchSchedule() {
@@ -744,7 +779,8 @@ export class DemoApi implements Api {
 
   async draftAssignments(cycleId: string) {
     await delay();
-    return this.draft.filter((a) => a.cycle_id === cycleId).map(({ cycle_id: _c, ...a }) => ({ ...a }));
+    const gone = ["dropped", "cancelled_approved", "swapped_out"];
+    return this.draft.filter((a) => a.cycle_id === cycleId && !gone.includes(a.status)).map(({ cycle_id: _c, ...a }) => ({ ...a }));
   }
 
   async slotCandidates(slotId: string): Promise<Candidate[]> {

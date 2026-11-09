@@ -1,7 +1,7 @@
 /** The cycle workspace: its steps, the state of each one, and what to do next. */
 import { stageIndex, type Cycle, type CycleStatus } from "./cycles";
 
-export type StepKey = "overview" | "constraints" | "potential" | "slots" | "schedule";
+export type StepKey = "overview" | "constraints" | "potential" | "slots" | "schedule" | "operate";
 
 export const STEPS: { key: StepKey; label: string; path: string }[] = [
   { key: "overview", label: "סקירה", path: "/cycle" },
@@ -9,6 +9,7 @@ export const STEPS: { key: StepKey; label: string; path: string }[] = [
   { key: "potential", label: "פוטנציאל", path: "/cycle/potential" },
   { key: "slots", label: "לוח הבסיס", path: "/cycle/slots" },
   { key: "schedule", label: "שיבוץ וטיוטה", path: "/cycle/schedule" },
+  { key: "operate", label: "תפעול", path: "/cycle/operate" },
 ];
 
 export type Tone = "done" | "todo" | "warn" | "busy";
@@ -22,6 +23,8 @@ export interface CycleFacts {
   pendingExemptions: number;
   slots: number;
   job: { status: string; unfilled: number } | null;
+  /** published cycle: duties with nothing published on them yet (added after publishing) */
+  pendingAdditions?: number;
 }
 
 const short = (iso: string) => {
@@ -53,6 +56,11 @@ export function stepStates(cycle: Cycle, f: CycleFacts): Record<Exclude<StepKey,
             ? { tone: "warn", text: `${f.job.unfilled} לא מאוישות` }
             : { tone: "done", text: "טיוטה מוכנה לפרסום" }
           : { tone: "todo", text: "לא שובץ" },
+    operate: !published
+      ? { tone: "todo", text: "אחרי הפרסום" }
+      : f.pendingAdditions
+        ? { tone: "warn", text: `${f.pendingAdditions} ממתינות לשיבוץ` }
+        : { tone: "done", text: "הלוח מאויש" },
   };
 }
 
@@ -66,7 +74,7 @@ export const STAGE_STEP: Record<CycleStatus, StepKey> = {
   slots: "slots",
   scheduling: "schedule",
   review: "schedule",
-  published: "schedule",
+  published: "operate",
   closed: "schedule",
 };
 
@@ -98,6 +106,8 @@ export function nextAction(cycle: Cycle, f: CycleFacts): { text: string; step: S
             ? { text: "לעבור על הטיוטה ולפרסם", step: "schedule" }
             : { text: "להריץ שיבוץ", step: "schedule" };
     default:
-      return { text: "המחזור פורסם. שינויים מכאן – בתפעול השוטף", step: "schedule" };
+      return f.pendingAdditions
+        ? { text: `לשבץ ${f.pendingAdditions} תורנויות שנוספו אחרי הפרסום`, step: "operate" }
+        : { text: "המחזור פורסם. שינויים מכאן – בתפעול השוטף", step: "operate" };
   }
 }

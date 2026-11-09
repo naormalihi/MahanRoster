@@ -83,7 +83,8 @@ def prepare(problem: Problem) -> Prepared:
     warnings: list[str] = []
     for slot in problem.slots:
         task = tasks[slot.task_type_id]
-        raw[slot.id] = 0.0 if slot.is_penalty else raw_points(task, slot.starts_at, slot.ends_at, settings, holidays)
+        surprise = settings.surprise_multiplier if slot.is_surprise else 1.0
+        raw[slot.id] = 0.0 if slot.is_penalty else surprise * raw_points(task, slot.starts_at, slot.ends_at, settings, holidays)
         wk[slot.id] = 0 if slot.is_penalty else weekend_units(slot.starts_at, slot.ends_at, settings, holidays)
         ok, why = [], defaultdict(int)
         for s in problem.soldiers:
@@ -113,7 +114,7 @@ def prepare(problem: Problem) -> Prepared:
             pts[(sid, slot.id)] = (
                 0
                 if slot.is_penalty
-                else round(SCALE * normalized_points(s, task, slot.starts_at, slot.ends_at, settings, holidays))
+                else round(SCALE * surprise * normalized_points(s, task, slot.starts_at, slot.ends_at, settings, holidays))
             )
     return Prepared(eligible, reasons, pts, raw, wk, warnings)
 
