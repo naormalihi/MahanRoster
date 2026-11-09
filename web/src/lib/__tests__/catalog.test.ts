@@ -36,12 +36,12 @@ describe("catalog validation", () => {
     expect(scoringProblems(ok)).toEqual([]);
     expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [], surprise_multiplier: 0.5 })).toHaveLength(3);
   });
-  it("a multiplier needs a name, a value 1–5 and at least one condition", () => {
+  it("a multiplier needs a name, a value 1–10 and at least one condition", () => {
     const all = [{ ...EMPTY_MULTIPLIER, id: "m1", name: "לילה", time_window: "22:00-06:00" }];
     expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "זיכרון", day_types: ["memorial"] }, all)).toEqual([]);
     expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "זיכרון" }, all)[0]).toMatch("לפחות תנאי");
     expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "לילה", weekdays: [4] }, all)[0]).toMatch("כבר יש");
-    expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "x", value: 7, weekdays: [4] }, all)[0]).toMatch("בין 1 ל-5");
+    expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "x", value: 11, weekdays: [4] }, all)[0]).toMatch("בין 1 ל-10");
     expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "x", date_from: "2027-02-01", date_to: "2027-01-01" }, all)[0]).toMatch("לפני");
   });
   it("describes when a multiplier applies", () => {
@@ -54,13 +54,16 @@ describe("Israeli holidays", () => {
   const days = israeliHolidays("2026-09-01", "2027-08-31");
   const at = (d: string) => days.find((x) => x.day === d);
   it("marks the main holidays and eves (Israel schedule)", () => {
-    expect(at("2026-09-11")?.day_type).toBe("holiday_eve");
-    expect(at("2026-09-12")?.day_type).toBe("holiday");
-    expect(at("2026-09-13")?.day_type).toBe("holiday");
+    // ראש השנה, יום כיפור and פסח (and their eves) are major holidays
+    expect(at("2026-09-11")?.day_type).toBe("major_holiday_eve");
+    expect(at("2026-09-12")?.day_type).toBe("major_holiday");
+    expect(at("2026-09-13")?.day_type).toBe("major_holiday");
     expect(at("2026-09-21")?.note).toBe("יום כיפור");
+    expect(at("2026-09-21")?.day_type).toBe("major_holiday");
     expect(at("2026-10-03")?.day_type).toBe("holiday");
-    expect(at("2027-04-22")?.day_type).toBe("holiday");
-    expect(at("2027-04-28")?.day_type).toBe("holiday");
+    expect(at("2027-04-21")?.day_type).toBe("major_holiday_eve");
+    expect(at("2027-04-22")?.day_type).toBe("major_holiday");
+    expect(at("2027-04-28")?.day_type).toBe("major_holiday");
     expect(at("2027-05-11")?.day_type).toBe("memorial");
     expect(at("2027-05-12")?.day_type).toBe("holiday");
     expect(at("2027-06-11")?.note).toBe("שבועות");
@@ -73,7 +76,7 @@ describe("Israeli holidays", () => {
   it("never overwrites manual entries", () => {
     const existing = [
       { day: "2026-09-12", day_type: "holiday" as const, source: "manual" as const, note: "שלי" },
-      { day: "2026-09-21", day_type: "holiday" as const, source: "hebcal" as const, note: "יום כיפור" },
+      { day: "2026-09-21", day_type: "major_holiday" as const, source: "hebcal" as const, note: "יום כיפור" },
     ];
     const { toWrite, keptManual } = mergeHolidays(existing, days);
     expect(keptManual).toBe(1);

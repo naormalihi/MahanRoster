@@ -594,7 +594,7 @@ function MultiplierDialog(props: {
               label="ערך"
               value={m.value}
               onChange={(e) => set("value", Number(e.target.value))}
-              slotProps={{ htmlInput: { step: 0.05, min: 1, max: 5 } }}
+              slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10 } }}
               sx={{ width: 130 }}
             />
           </Stack>
@@ -691,6 +691,21 @@ function ScoringTab() {
   const [saved, setSaved] = useState<ScoringSettings | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [surprise, setSurprise] = useState<string | null>(null);
+
+  async function saveSurprise() {
+    const v = Number(surprise);
+    if (!(v >= 1) || v > 10) return setMsg({ ok: false, text: "מקדם הקפצה – בין 1 ל-10" });
+    try {
+      const next = { ...saved!, surprise_multiplier: v };
+      await api!.saveScoringSettings(next);
+      setSaved(next);
+      setS((x) => (x ? { ...x, surprise_multiplier: v } : x));
+      setSurprise(null);
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    }
+  }
 
   const loadTypes = useCallback(async () => setTypes(await api!.dayTypes()), [api]);
   const load = useCallback(async () => {
@@ -766,6 +781,16 @@ function ScoringTab() {
                     </TableCell>
                   </TableRow>
                 ))}
+                <TableRow hover onClick={() => setSurprise(String(saved?.surprise_multiplier ?? 1.5))} sx={{ cursor: "pointer" }}>
+                  <TableCell sx={{ fontWeight: 600 }}>הקפצה</TableCell>
+                  <TableCell>×{saved?.surprise_multiplier}</TableCell>
+                  <TableCell>תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מוכפל על המקדם של היום</TableCell>
+                  <TableCell>
+                    <IconButton size="small" aria-label="עריכה" onClick={() => setSurprise(String(saved?.surprise_multiplier ?? 1.5))}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </Box>
@@ -806,15 +831,6 @@ function ScoringTab() {
               <TextField type="time" label="לילה – עד" value={nightTo} onChange={(e) => setS({ ...s, night_window: `${nightFrom}-${e.target.value}` })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
             </Stack>
           </Box>
-          <TextField
-            type="number"
-            label="מקדם הקפצה"
-            value={s.surprise_multiplier}
-            onChange={(e) => setS({ ...s, surprise_multiplier: Number(e.target.value) })}
-            slotProps={{ htmlInput: { step: 0.05, min: 1, max: 5 } }}
-            helperText="לתורנות שנוספה אחרי הפרסום והפתיעה את המבצע. מוכפל בניקוד שלה, מעבר למקדם היום."
-            sx={{ maxWidth: 360 }}
-          />
           {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
           <Box>
             <Button variant="contained" onClick={save} disabled={busy || !dirty}>
@@ -824,6 +840,29 @@ function ScoringTab() {
         </Stack>
       </Paper>
 
+      {surprise !== null && (
+        <Dialog open onClose={() => setSurprise(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>מקדם הקפצה</DialogTitle>
+          <DialogContent dividers>
+            <TextField
+              type="number"
+              label="ערך"
+              value={surprise}
+              onChange={(e) => setSurprise(e.target.value)}
+              slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10 } }}
+              helperText="לתורנות שנוספה אחרי הפרסום וסומנה הקפצה. מוכפל בניקוד שלה, מעבר למקדם היום."
+              fullWidth
+              autoFocus
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSurprise(null)}>ביטול</Button>
+            <Button variant="contained" onClick={saveSurprise}>
+              שמירה
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       {editing && (
         <MultiplierDialog
           m={editing === "new" ? null : editing}
@@ -846,6 +885,8 @@ function ScoringTab() {
 // ---------------------------------------------------------------------------
 
 const CHIP_COLOR: Record<string, "error" | "warning" | "default" | "info"> = {
+  major_holiday: "error",
+  major_holiday_eve: "warning",
   holiday: "error",
   holiday_eve: "warning",
   memorial: "default",
