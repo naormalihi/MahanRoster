@@ -405,7 +405,7 @@ def test_score_multipliers_highest_applies(conn):
         "select app.unit_multiplier(%s::date, %s, %s::timestamp, %s::timestamp)", (day, shabbat, a, b)).fetchone()[0])
     # the three fixed ones were moved over from the settings
     assert {r[0] for r in conn.execute("select name from score_multipliers")} >= {"סוף שבוע", "חג וערב חג", "לילה"}
-    assert conn.execute("select count(*) from settings where key like '%%_multiplier'").fetchone()[0] == 0
+    assert conn.execute("select count(*) from settings where key in ('weekend_multiplier', 'holiday_multiplier', 'night_multiplier')").fetchone()[0] == 0
     with conn.transaction():
         conn.execute("insert into calendar_days (day, day_type) values ('2031-01-07', 'memorial') on conflict (day) do update set day_type = 'memorial'")
         conn.execute("insert into score_multipliers (name, value, day_types) values ('יום זיכרון', 1.8, '{memorial}')")
@@ -956,4 +956,30 @@ def test_task_rank_list_limits_potential_and_engine_input(conn):
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
         task = next(t for t in doc["task_types"] if t["id"] == str(tid))
         assert task["allowed_ranks"] == [order]
+        raise psycopg.Rollback()
+
+
+def test_surprise_slot_added_after_publish(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        base = conn.execute("select id, task_type_id, starts_at, ends_at from slots where cycle_id = %s and not is_penalty_slot "
+                            "order by starts_at limit 1", (cycle,)).fetchone()
+        sid = conn.execute("select id from soldiers where is_active limit 1").fetchone()[0]
+        new = conn.execute(
+            "insert into slots (cycle_id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, is_surprise) "
+            "values (%s, %s, %s, %s, 1, 0, true) returning id", (cycle, base[1], base[2], base[3])).fetchone()[0]
+        plain = conn.execute("select raw from app.slot_points(%s, %s)", (base[0], sid)).fetchone()[0]
+        surprise = conn.execute("select raw from app.slot_points(%s, %s)", (new, sid)).fetchone()[0]
+        assert float(surprise) == pytest.approx(float(plain) * 1.5, abs=0.01)
+        doc = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]
+        assert next(s for s in doc["slots"] if s["id"] == str(new))["is_surprise"] is True
+        assert float(doc["settings"]["surprise_multiplier"]) == 1.5
+        # publish only the additions; the cycle stays published
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) "
+                     "select %s, id, gaf_id, 'performer', 'draft' from soldiers where id = %s", (new, sid))
+        n = _as_coord(conn, "select public.publish_additions(%s)", cycle)[0][0]
+        assert n >= 1
+        assert conn.execute("select status from assignments where slot_id = %s", (new,)).fetchone()[0] == "assigned"
+        assert conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "published"
         raise psycopg.Rollback()

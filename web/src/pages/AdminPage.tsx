@@ -816,6 +816,15 @@ function ScoringTab() {
               <TextField type="time" label="לילה – עד" value={nightTo} onChange={(e) => setS({ ...s, night_window: `${nightFrom}-${e.target.value}` })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
             </Stack>
           </Box>
+          <TextField
+            type="number"
+            label="מקדם הקפצה"
+            value={s.surprise_multiplier}
+            onChange={(e) => setS({ ...s, surprise_multiplier: Number(e.target.value) })}
+            slotProps={{ htmlInput: { step: 0.05, min: 1, max: 5 } }}
+            helperText="לתורנות שנוספה אחרי הפרסום והפתיעה את המבצע. מוכפל בניקוד שלה, מעבר למקדם היום."
+            sx={{ maxWidth: 360 }}
+          />
           {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
           <Box>
             <Button variant="contained" onClick={save} disabled={busy || !dirty}>

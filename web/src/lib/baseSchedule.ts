@@ -382,7 +382,19 @@ export interface SlotRow {
   prefer_home_nightly: boolean;
   daily_hours: string | null;
   briefing_at: string | null;
+  /** added after publishing and caught its performer by surprise (הקפצה) */
+  is_surprise?: boolean;
   assigned: number; // assignments that are not drafts
+}
+
+/** A duty added by hand (e.g. after publishing). */
+export interface NewSlot {
+  task_type_id: string;
+  starts_at: string; // ISO
+  ends_at: string;
+  performers_needed: number;
+  reserves_needed: number;
+  is_surprise: boolean;
 }
 
 /** Template for a base file, for manual preparation or testing. */

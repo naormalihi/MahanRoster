@@ -173,6 +173,9 @@ class Slot:
     gender: Optional[str] = None
     is_penalty: bool = False
     penalty_soldier_id: Optional[str] = None
+    # A duty added after publishing that caught its performer by surprise (הקפצה):
+    # its points are multiplied by settings.surprise_multiplier.
+    is_surprise: bool = False
 
 
 @dataclass
@@ -218,6 +221,7 @@ class Settings:
     # Otherwise the three fixed multipliers below apply (night on top of the day multiplier).
     multipliers: Optional[list[Multiplier]] = None
     day_types: dict[str, str] = field(default_factory=dict)  # ISO date -> calendar day type
+    surprise_multiplier: float = 1.0
     weekend_multiplier: float = 1.5
     holiday_multiplier: float = 2.0
     night_multiplier: float = 1.25

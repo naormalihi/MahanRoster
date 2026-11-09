@@ -32,9 +32,9 @@ describe("catalog validation", () => {
     expect(taskTypeProblems({ ...base, default_start_time: "08:00" }, others)).toHaveLength(1);
   });
   it("scoring settings", () => {
-    const ok = { night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
+    const ok = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5 };
     expect(scoringProblems(ok)).toEqual([]);
-    expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [] })).toHaveLength(2);
+    expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [], surprise_multiplier: 0.5 })).toHaveLength(3);
   });
   it("a multiplier needs a name, a value 1–5 and at least one condition", () => {
     const all = [{ ...EMPTY_MULTIPLIER, id: "m1", name: "לילה", time_window: "22:00-06:00" }];

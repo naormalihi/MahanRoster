@@ -139,3 +139,12 @@ def test_pools_follow_fairness_groups():
         settings=FAST,
     )
     assert sorted(ps.population for ps in solve(p).pools) == ["mandatory:x", "mandatory:y"]
+
+
+def test_surprise_duty_scores_with_the_surprise_multiplier():
+    s = Settings(time_limit_seconds=10, workers=2, surprise_multiplier=1.5)
+    k = slot("a", "guard", "2027-01-04T08:00", "2027-01-05T08:00", r=0)
+    k.is_surprise = True
+    sol = solve(problem([soldier("A")], [k], settings=s))
+    (a,) = sol.assignments
+    assert a.points == 1.5 and a.normalized_points == 1.5
