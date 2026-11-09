@@ -32,6 +32,7 @@ import {
   readRows,
   type Alias,
   type BaseRow,
+  BASE_TEMPLATE_HEADERS,
   type BuildResult,
   type RankRef,
   type SlotRow,
@@ -109,8 +110,17 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
     [rows, refs, cycle],
   );
   const taskName = new Map(refs.tasks.map((t) => [t.id, t.name]));
-  const rankName = new Map(refs.ranks.map((r) => [r.id, r.name]));
   const replaceable = props.existing.filter((s) => s.assigned === 0).length;
+
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([BASE_TEMPLATE_HEADERS]);
+    ws["!cols"] = [{ wch: 14 }, { wch: 24 }];
+    const wb = XLSX.utils.book_new();
+    wb.Workbook = { Views: [{ RTL: true }] };
+    XLSX.utils.book_append_sheet(wb, ws, "לוח בסיס");
+    XLSX.writeFile(wb, "תבנית לוח בסיס.xlsx");
+  }
 
   async function read(f: File) {
     setBusy(true);
@@ -123,7 +133,7 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
       const sheetName = wb.SheetNames.find((n) => readRows(XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[n], { header: 1, raw: true, defval: "" })).header) ?? wb.SheetNames[0];
       const data = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: true, defval: "" });
       const r = readRows(data);
-      if (!r.header) setMsg("לא מצאתי שורת כותרות עם העמודות \"תורנות\" ו\"תאריך התחלה\".");
+      if (!r.header) setMsg("לא מצאתי שורת כותרות עם העמודות \"מועד\" ו\"סוג תורנות\".");
       else {
         setFile(f.name);
         setRows(r.rows);
@@ -168,8 +178,8 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
       <Stack spacing={2}>
         <Typography variant="h3">קליטת קובץ המשבצות מהבסיס</Typography>
         <Typography variant="body2" color="text.secondary">
-          שורה בקובץ = משבצת עם מבצע ועתודה. עמודות המבצע, העתודה והגף לא נקראות; הצבעים לא נקראים; החגים לפי לוח השנה. שעות לפי ברירת המחדל של כל
-          סוג תורנות. משבצת שייכת למחזור שבו היא מתחילה.
+          בקובץ נדרשות רק שתי עמודות: <b>מועד</b> ו<b>סוג תורנות</b>. שורה = משבצת עם מבצע ועתודה. כל השאר נגזר: השעות מסוג התורנות (לפי יום
+          בשבוע), גרסת השבת והחגים מהתאריך, ומי יכול לבצע מסוג התורנות. עמודות אחרות בקובץ לא נקראות. משבצת שייכת למחזור שבו היא מתחילה.
         </Typography>
         <Box>
           <Button variant="contained" component="label" startIcon={<UploadIcon />} disabled={busy}>
@@ -184,6 +194,9 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                 if (f) void read(f);
               }}
             />
+          </Button>
+          <Button sx={{ mr: 1 }} onClick={() => void downloadTemplate()}>
+            תבנית ריקה
           </Button>
           {file && rows && (
             <Typography component="span" variant="body2" sx={{ mr: 2 }}>
@@ -298,8 +311,6 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                     <TableCell>מועד</TableCell>
                     <TableCell>בקובץ</TableCell>
                     <TableCell>סוג תורנות</TableCell>
-                    <TableCell>דרגות</TableCell>
-                    <TableCell>הנחיות</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -317,13 +328,6 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                         {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                         {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
                         {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
-                      </TableCell>
-                      <TableCell title={s.ranksText}>
-                        {s.allowed_rank_ids ? s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ") : "לפי סוג התורנות"}
-                        {s.unknownRanks.length > 0 && <Chip size="small" color="warning" label="?" sx={{ mr: 0.5 }} />}
-                      </TableCell>
-                      <TableCell sx={{ maxWidth: 260, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={s.instructions ?? ""}>
-                        {s.instructions}
                       </TableCell>
                     </TableRow>
                   ))}
