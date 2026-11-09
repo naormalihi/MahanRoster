@@ -371,7 +371,8 @@ export function SoldiersPage() {
       (!q || s.full_name.includes(q.trim())) &&
       (!gaf || s.gaf_name === gaf) &&
       (!service || effectiveService(s) === service) &&
-      (!range || rangeState(s.range_valid_until) === range),
+      (!range ||
+        (range === "issues" ? ["expired", "expiring"].includes(rangeState(s.range_valid_until)) : rangeState(s.range_valid_until) === range)),
   );
   const allSelected = shown.length > 0 && shown.every((s) => selected.has(s.id));
   const counts = useMemo(() => {
@@ -403,11 +404,33 @@ export function SoldiersPage() {
       </Stack>
       {rows && (
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
-          <Chip label={`פעילים: ${counts.active}`} />
-          <Chip label={`חובה: ${counts.mandatory}`} />
-          <Chip label={`קבע: ${counts.career}`} />
+          {/* each count is a filter; a second click (or "פעילים") clears it */}
+          <Chip
+            label={`פעילים: ${counts.active}`}
+            color={!service && !range ? "primary" : "default"}
+            onClick={() => {
+              setService("");
+              setRange("");
+              setShowInactive(false);
+            }}
+          />
+          <Chip
+            label={`חובה: ${counts.mandatory}`}
+            color={service === "mandatory" ? "primary" : "default"}
+            onClick={() => setService(service === "mandatory" ? "" : "mandatory")}
+          />
+          <Chip
+            label={`קבע: ${counts.career}`}
+            color={service === "career" ? "primary" : "default"}
+            onClick={() => setService(service === "career" ? "" : "career")}
+          />
           {counts.rangeIssues > 0 && (
-            <Chip color="warning" label={`מטווח פג או עומד לפוג: ${counts.rangeIssues}`} onClick={() => setRange("expired")} />
+            <Chip
+              color="warning"
+              variant={range === "issues" ? "filled" : "outlined"}
+              label={`מטווח פג או עומד לפוג: ${counts.rangeIssues}`}
+              onClick={() => setRange(range === "issues" ? "" : "issues")}
+            />
           )}
         </Stack>
       )}
@@ -436,6 +459,7 @@ export function SoldiersPage() {
             <MenuItem value="missing">לא הוזן</MenuItem>
             <MenuItem value="expired">פג</MenuItem>
             <MenuItem value="expiring">פג בקרוב</MenuItem>
+            <MenuItem value="issues">פג או פג בקרוב</MenuItem>
             <MenuItem value="valid">בתוקף</MenuItem>
           </TextField>
         </Box>
