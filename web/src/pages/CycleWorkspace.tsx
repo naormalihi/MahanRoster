@@ -132,8 +132,8 @@ function ScheduleStep({ facts }: { facts: CycleFacts | null }) {
   return (
     <Stack spacing={2}>
       <ToggleButtonGroup exclusive size="small" value={view} onChange={(_, v) => v && setParams({ view: v }, { replace: true })}>
-        <ToggleButton value="run">הרצת המנוע</ToggleButton>
-        <ToggleButton value="draft">טיוטה, תיקונים ופרסום</ToggleButton>
+        <ToggleButton value="run">הרצה</ToggleButton>
+        <ToggleButton value="draft">טיוטה</ToggleButton>
       </ToggleButtonGroup>
       {view === "run" ? <SchedulePage /> : <DraftPage />}
     </Stack>

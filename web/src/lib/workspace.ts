@@ -8,7 +8,7 @@ export const STEPS: { key: StepKey; label: string; path: string }[] = [
   { key: "constraints", label: "אילוצים", path: "/cycle/constraints" },
   { key: "potential", label: "פוטנציאל", path: "/cycle/potential" },
   { key: "slots", label: "לוח הבסיס", path: "/cycle/slots" },
-  { key: "schedule", label: "שיבוץ וטיוטה", path: "/cycle/schedule" },
+  { key: "schedule", label: "שיבוץ", path: "/cycle/schedule" },
   { key: "operate", label: "תפעול", path: "/cycle/operate" },
 ];
 
@@ -84,7 +84,7 @@ export function nextAction(cycle: Cycle, f: CycleFacts): { text: string; step: S
   switch (cycle.status) {
     case "draft":
     case "loading":
-      return { text: "לטעון את קובץ כוח האדם העדכני ולעבור לאיסוף אילוצים", step: "overview" };
+      return { text: "לטעון את קובץ כוח האדם העדכני ולעבור לאילוצים", step: "overview" };
     case "collecting":
     case "approving":
       return f.pendingExemptions > 0
