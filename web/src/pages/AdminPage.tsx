@@ -165,6 +165,20 @@ function TaskDialog(props: {
   const problems = taskTypeProblems(t, props.all, props.task?.id);
   const weightChanged = props.task && props.task.weight !== t.weight;
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api!.deleteTaskType(props.task!.id);
+      props.onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+      setConfirmDelete(false);
+      setBusy(false);
+    }
+  }
+
   async function save() {
     if (problems.length) return setError(problems[0]);
     setBusy(true);
@@ -343,10 +357,28 @@ function TaskDialog(props: {
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={props.onClose}>ביטול</Button>
-        <Button variant="contained" onClick={save} disabled={busy}>
-          שמירה
-        </Button>
+        {props.task &&
+          (confirmDelete ? (
+            <>
+              <Box sx={{ flex: 1, color: "error.main", fontSize: 14, px: 1 }}>למחוק את "{props.task.name}" לצמיתות?</Box>
+              <Button color="error" variant="contained" onClick={remove} disabled={busy}>
+                מחיקה
+              </Button>
+              <Button onClick={() => setConfirmDelete(false)}>לא</Button>
+            </>
+          ) : (
+            <Button color="error" onClick={() => setConfirmDelete(true)} disabled={busy} sx={{ mr: "auto" }}>
+              מחיקת התורנות
+            </Button>
+          ))}
+        {!confirmDelete && (
+          <>
+            <Button onClick={props.onClose}>ביטול</Button>
+            <Button variant="contained" onClick={save} disabled={busy}>
+              שמירה
+            </Button>
+          </>
+        )}
       </DialogActions>
     </Dialog>
   );

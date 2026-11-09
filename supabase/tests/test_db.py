@@ -873,3 +873,19 @@ def test_gaf_commander_reads_everything_and_writes_nothing(conn):
     _as_coord(conn, "select public.set_user_locked(%s, true)", uid)
     with session_as(conn, uid) as c:
         assert c.execute("select count(*) from soldiers").fetchone()[0] == 0  # locked = no role
+
+
+def test_delete_task_type_only_when_unused(conn):
+    used = conn.execute("select task_type_id from slots limit 1").fetchone()[0]
+    with pytest.raises(psycopg.Error, match="בשימוש"):
+        _as_coord(conn, "select public.delete_task_type(%s)", used)
+    assert conn.execute("select count(*) from task_types where id = %s", (used,)).fetchone()[0] == 1
+
+    new = conn.execute(
+        "insert into task_types (code, name, weight) values ('tmp_del', 'תורנות למחיקה', 1) returning id").fetchone()[0]
+    conn.execute("insert into task_type_aliases (alias, task_type_id) values ('כינוי למחיקה', %s)", (new,))
+    with session_as(conn, VIEWER) as c, pytest.raises(psycopg.Error):
+        c.execute("select public.delete_task_type(%s)", (new,))
+    _as_coord(conn, "select public.delete_task_type(%s)", new)
+    assert conn.execute("select count(*) from task_types where id = %s", (new,)).fetchone()[0] == 0
+    assert conn.execute("select count(*) from task_type_aliases where alias = 'כינוי למחיקה'").fetchone()[0] == 0
