@@ -1072,3 +1072,16 @@ def test_delete_custom_day_type(conn):
         with pytest.raises(psycopg.Error, match="המובנים"):
             _as_coord(conn, "select public.delete_day_type('holiday')")
         raise psycopg.Rollback()
+
+
+def test_tash7_is_an_exemption_type(conn):
+    with conn.transaction():
+        conn.execute("insert into exemption_types (name, home_nightly) values ('ת\"ש 7 בדיקה', true)")
+        tid = conn.execute("select id from exemption_types where name = 'ת\"ש 7 בדיקה'").fetchone()[0]
+        sid = conn.execute("select id from soldiers where is_active and not home_nightly limit 1").fetchone()[0]
+        conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+                        values (%s, %s, 'full', '2020-01-01', '2099-01-01', 'approved', now())""", (sid, tid))
+        kind, hours, scope = conn.execute("select kind, restricted_hours, excluded_task_type_ids from exemptions where soldier_id = %s and exemption_type_id = %s", (sid, tid)).fetchone()
+        assert kind == "partial" and hours == "22:00-06:00" and scope is None
+        assert conn.execute("select app.home_nightly_on(s, current_date) from soldiers s where id = %s", (sid,)).fetchone()[0]
+        raise psycopg.Rollback()

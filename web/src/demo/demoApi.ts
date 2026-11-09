@@ -98,6 +98,7 @@ const EXEMPTION_TYPES: ExemptionType[] = [
   { id: "e_kaps", name: "קפ\"ס", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_shachar", name: "שח\"ר", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_bereaved", name: "משפחה שכולה", qualifies_day_only: false, allows_partial_restriction: true },
+  { id: "e_tash7", name: "ת\"ש 7 – לינה בבית", qualifies_day_only: false, allows_partial_restriction: false, home_nightly: true },
 ];
 const ABSENCE_TYPES = ["חופשה", "קורס", "יציאה לחו\"ל", "מחלה", "אחר"].map((name, i) => ({ id: `a${i}`, name }));
 

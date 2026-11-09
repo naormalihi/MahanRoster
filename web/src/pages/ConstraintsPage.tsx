@@ -270,11 +270,18 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
         <DateInput label="מתאריך" value={e.start_date} onChange={(v) => setE({ ...e, start_date: v })} />
         <DateInput label="עד תאריך" value={e.end_date} onChange={(v) => setE({ ...e, end_date: v })} />
       </Stack>
+      {props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
+        <Alert severity="info" icon={false}>
+          ת״ש 7: החייל לן בבית ולא ישובץ בתאריכים האלה לתורנות שכוללת שעות לילה. במשבצות שהבסיס סימן "ת״ש 7" הוא מקבל עדיפות.
+        </Alert>
+      )}
+      {!props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
       <RadioGroup row value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value as "full" | "partial" })}>
         <FormControlLabel value="full" control={<Radio />} label="לפי סוג הפטור" />
         <FormControlLabel value="partial" control={<Radio />} label="מצומצם לתורנויות או לשעות" />
       </RadioGroup>
-      {e.kind === "partial" && (
+      )}
+      {e.kind === "partial" && !props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
         <>
           <Autocomplete
             multiple

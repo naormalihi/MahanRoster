@@ -118,8 +118,6 @@ function EditDialog(props: {
 
   const problems: string[] = [];
   if (p.parent_override !== null && !p.parent_override_reason?.trim()) problems.push("שינוי ידני של משרת הורה מחייב סיבה");
-  if (p.home_nightly_override !== null && !p.home_nightly_override_reason?.trim()) problems.push("שינוי ידני של ת\"ש 7 מחייב סיבה");
-  if (p.is_shachar && !p.shachar_start_date) problems.push("שח\"ר מחייב תאריך התחלה");
   if (roles.some((r) => !r.load_role_id || !r.valid_from)) problems.push("לכל תפקיד הקלה צריך סוג ותאריך התחלה");
 
   async function save() {
@@ -143,7 +141,6 @@ function EditDialog(props: {
   }
 
   const parentChoice = p.parent_override === null ? "file" : p.parent_override ? "yes" : "no";
-  const homeChoice = p.home_nightly_override === null ? "file" : p.home_nightly_override ? "yes" : "no";
 
   return (
     <Dialog open onClose={props.onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
@@ -207,31 +204,6 @@ function EditDialog(props: {
           </Box>
           <Divider />
           <Box>
-            <Typography variant="h3" gutterBottom>ת״ש 7 – לינה בבית</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              לפי הקובץ: {s.home_nightly ? "כן" : "לא"}. חייל בת״ש 7 לא ישובץ לתורנות שכוללת שעות לילה, ומקבל עדיפות במשבצות שהבסיס סימן "ת״ש 7".
-            </Typography>
-            <Stack spacing={1.5}>
-              <TextField
-                select
-                label="מקור"
-                value={homeChoice}
-                onChange={(e) => set("home_nightly_override", e.target.value === "file" ? null : e.target.value === "yes")}
-              >
-                <MenuItem value="file">לפי הקובץ</MenuItem>
-                <MenuItem value="yes">בת״ש 7 – ידני</MenuItem>
-                <MenuItem value="no">לא בת״ש 7 – ידני</MenuItem>
-              </TextField>
-              {p.home_nightly_override !== null && (
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                  <TextField label="סיבה" value={p.home_nightly_override_reason ?? ""} onChange={(e) => set("home_nightly_override_reason", e.target.value)} fullWidth />
-                  <DateField label="עד תאריך" value={p.home_nightly_override_until} onChange={(v) => set("home_nightly_override_until", v)} />
-                </Stack>
-              )}
-            </Stack>
-          </Box>
-          <Divider />
-          <Box>
             <Typography variant="h3" gutterBottom>תפקיד שני ושח"ר</Typography>
             <Stack spacing={1.5}>
               <DateField
@@ -241,7 +213,6 @@ function EditDialog(props: {
               />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
                 <FormControlLabel control={<Switch checked={p.is_shachar} onChange={(e) => set("is_shachar", e.target.checked)} />} label="שח״ר" />
-                {p.is_shachar && <DateField label="תאריך התחלת שח״ר" value={p.shachar_start_date} onChange={(v) => set("shachar_start_date", v)} />}
               </Stack>
             </Stack>
           </Box>
@@ -269,11 +240,10 @@ function EditDialog(props: {
                     sx={{ minWidth: 160 }}
                   >
                     {props.loadRoles.map((lr) => (
-                      <MenuItem key={lr.id} value={lr.id}>{lr.name} ({lr.factor})</MenuItem>
+                      <MenuItem key={lr.id} value={lr.id}>{lr.name}</MenuItem>
                     ))}
                   </TextField>
                   <DateField label="מתאריך" value={r.valid_from} onChange={(v) => setRoles(roles.map((x, j) => (j === i ? { ...x, valid_from: v ?? "" } : x)))} />
-                  <DateField label="עד תאריך" value={r.valid_to} onChange={(v) => setRoles(roles.map((x, j) => (j === i ? { ...x, valid_to: v } : x)))} />
                   <IconButton aria-label="מחיקה" onClick={() => setRoles(roles.filter((_, j) => j !== i))}>
                     <DeleteIcon />
                   </IconButton>

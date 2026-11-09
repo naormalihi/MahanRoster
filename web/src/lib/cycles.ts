@@ -154,6 +154,8 @@ export interface ExemptionType {
   name: string;
   qualifies_day_only: boolean;
   allows_partial_restriction: boolean;
+  /** ת"ש 7: no duty that covers night hours, for the exemption's dates */
+  home_nightly?: boolean;
 }
 
 export interface Exemption {
