@@ -29,12 +29,13 @@ import { useCycle } from "../lib/cycleContext";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import { stageLabel, type Cycle } from "../lib/cycles";
-import { TZ } from "../lib/dates";
+import { dayLabel, TZ } from "../lib/dates";
 import { REASON_LABEL } from "../lib/potential";
 import {
   JOB_STATUS_LABEL,
   poolName,
   poolNames,
+  warningText,
   elapsed,
   isActive,
   looksStuck,
@@ -158,7 +159,11 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
   );
 }
 
-function Result({ job, slots, tasks, pools }: { job: ScheduleJob; slots: Map<string, SlotRow>; tasks: Map<string, TaskType>; pools: Map<string, string> }) {
+function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: Map<string, SlotRow>; tasks: Map<string, TaskType>; pools: Map<string, string>; names: Map<string, string> }) {
+  const slotLabel = (id: string) => {
+    const k = slots.get(id);
+    return k ? `${tasks.get(k.task_type_id)?.name ?? "תורנות"} (${dayLabel(k.starts_at)})` : "משבצת שנמחקה";
+  };
   const unfilled = job.unfilled ?? [];
   const missingP = unfilled.filter((u) => u.role === "performer").reduce((n, u) => n + u.missing, 0);
   const missingR = unfilled.filter((u) => u.role === "reserve").reduce((n, u) => n + u.missing, 0);
@@ -193,8 +198,9 @@ function Result({ job, slots, tasks, pools }: { job: ScheduleJob; slots: Map<str
         {(job.warnings?.length ?? 0) > 0 && (
           <Alert severity="info">
             {job.warnings!.slice(0, 10).map((w, i) => (
-              <div key={i}>{w}</div>
+              <div key={i}>{warningText(w, slotLabel, (id) => names.get(id) ?? "חייל לא מוכר", REASON_LABEL)}</div>
             ))}
+            {job.warnings!.length > 10 && <div>ועוד {job.warnings!.length - 10} אזהרות.</div>}
           </Alert>
         )}
         {job.pools && job.pools.length > 0 && (
@@ -278,6 +284,10 @@ export function SchedulePage() {
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pools, setPools] = useState<Map<string, string>>(new Map());
+  const [names, setNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    api!.soldiers().then((s) => setNames(new Map(s.map((x) => [x.id, x.full_name])))).catch(() => setNames(new Map()));
+  }, [api]);
 
   useEffect(() => {
     if (!cycleId) return;
@@ -382,7 +392,7 @@ export function SchedulePage() {
             </Stack>
           </Paper>
           {!jobs ? <Loading /> : active ? <ActiveJob job={active} onChanged={loadJobs} /> : null}
-          {last && (last.status === "done" || last.status === "failed") && <Result job={last} slots={slotMap} tasks={tasks} pools={pools} />}
+          {last && (last.status === "done" || last.status === "failed") && <Result job={last} slots={slotMap} tasks={tasks} pools={pools} names={names} />}
           {jobs && jobs.length > 1 && (
             <Paper variant="outlined">
               <Table size="small">

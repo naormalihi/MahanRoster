@@ -80,3 +80,29 @@ export function topReasons(reasons: Record<string, number>, labels: Record<strin
     .map(([k, c]) => `${labels[k] ?? k} (${c})`)
     .join(" · ");
 }
+
+
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const FIXED_BREAKS = new RegExp(`^שיבוץ קבוע במשבצת (${UUID}) לחייל (${UUID}) מפר: (.+)$`);
+const FIXED_UNKNOWN = new RegExp(`^שיבוץ קבוע במשבצת (${UUID}) לחייל לא מוכר (${UUID}) – הושמט$`);
+const PENALTY_CLASH = new RegExp(`^משבצת קנס (${UUID}) מתנגשת אצל (${UUID}): (.+)$`);
+
+/**
+ * An engine warning in words: the duty and its date instead of a slot id, the soldier's name
+ * instead of an id, and the rule in Hebrew instead of its code. Unknown formats pass through.
+ */
+export function warningText(
+  w: string,
+  slot: (id: string) => string,
+  soldier: (id: string) => string,
+  reasons: Record<string, string>,
+): string {
+  const rules = (codes: string) => codes.split(/,\s*/).map((c) => reasons[c] ?? c).join("; ");
+  let m = w.match(FIXED_BREAKS);
+  if (m) return `שיבוץ ידני/מפורסם: ${soldier(m[2])} ב${slot(m[1])} – לא עומד בכלל: ${rules(m[3])}. השיבוץ נשאר; כדאי לבדוק.`;
+  m = w.match(FIXED_UNKNOWN);
+  if (m) return `שיבוץ ב${slot(m[1])} לחייל שכבר לא ברשימה – לא נכלל בהרצה.`;
+  m = w.match(PENALTY_CLASH);
+  if (m) return `משבצת קנס ב${slot(m[1])} של ${soldier(m[2])} מתנגשת: ${rules(m[3])}.`;
+  return w;
+}
