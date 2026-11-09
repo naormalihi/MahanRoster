@@ -131,11 +131,16 @@ describe("the base file", () => {
     ["חובה", "13/07/2026", "20/07/2026", "", "שמירות חובה", "", "", "", "", "כלל הדרגות", "", ""],
     ["חובה", "31/02/2026", "", "X", "שמירות חובה", "", "", "", "", "", "", ""],
   ];
-  it("finds the header and reads the rows", () => {
-    expect(findHeader(file)?.columns).toMatchObject({ population: 0, start: 1, end: 2, duty: 4, ranks: 9, instructions: 10, notes: 11 });
+  it("reads only the date and the duty type; other columns are ignored", () => {
+    expect(findHeader(file)?.columns).toEqual({ start: 1, duty: 4 });
     const r = readRows(file);
     expect(r.rows).toHaveLength(6);
-    expect(r.errors).toEqual([{ line: 9, message: "שמירות חובה: תאריך התחלה לא תקין" }]);
+    expect(r.errors).toEqual([{ line: 9, message: "שמירות חובה: מועד לא תקין" }]);
+    expect(r.rows[0]).toMatchObject({ start: "2026-06-14", end: "2026-06-14", ranksText: "", instructions: "" });
+  });
+  it("a two-column file (מועד, סוג תורנות)", () => {
+    const r = readRows([["מועד", "סוג תורנות"], ["05/07/2026", "קצין תורן"], ["", ""], ["13/07/2026", "שמירות חובה"]]);
+    expect(r.rows.map((x) => [x.start, x.duty])).toEqual([["2026-07-05", "קצין תורן"], ["2026-07-13", "שמירות חובה"]]);
   });
   it("builds slots for the cycle and lists unmapped duties", () => {
     const { rows } = readRows(file);
@@ -149,15 +154,15 @@ describe("the base file", () => {
     });
     expect(res.outside.map((r) => r.line)).toEqual([2]); // starts before the cycle
     expect(res.unmapped).toEqual([
-      { duty: "רס\"ר", count: 1, population: "חובה" },
-      { duty: "ש.ג דרום 7-11", count: 1, population: "קצינים ונגדים" },
+      { duty: "רס\"ר", count: 1, population: "" },
+      { duty: "ש.ג דרום 7-11", count: 1, population: "" },
     ]);
     expect(res.slots.map((s) => s.task_type_id)).toEqual(["kt", "kts", "shmira"]);
-    expect(res.slots[0].unknownRanks).toEqual(["קא\"ב"]);
+    // who may do it comes from the duty type, not the file
+    expect(res.slots.every((s) => s.allowed_rank_ids === null && s.instructions === null)).toBe(true);
     expect(res.slots[1].weekendSwitched).toBe(true);
-    expect(res.slots[2].allowed_rank_ids).toBeNull();
-    // X = not a holiday duty; the calendar decides, a disagreement is flagged
-    expect(res.slots.map((s) => s.holidayMismatch)).toEqual(["calendar_only", null, "file_only"]);
+    // one occurrence from the date, with the duty type's hours
+    expect(res.slots[2].starts_at.slice(0, 10)).toBe("2026-07-13");
   });
 });
 

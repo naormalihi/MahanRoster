@@ -1,7 +1,8 @@
 /**
  * Base schedule file (לוח הבסיס): one row = one slot, one performer + one reserve.
- * The performer / reserve / gaf columns are ignored (they come from the base's systems,
- * not an allocation); colours are not read; holidays come from the Hebrew calendar.
+ * Only two columns are read: the date (מועד) and the duty type (סוג תורנות). Everything else is
+ * derived: the hours from the duty type (by weekday), the Shabbat variant and the holidays from
+ * the date, who may do it from the duty type. Any other column in the file is ignored.
  */
 
 import type { TaskType } from "./catalog";
@@ -9,17 +10,11 @@ import { addDaysIso, isoDate } from "./cycles";
 import { TZ } from "./dates";
 import { toIsoDate } from "./roster";
 
-export type BaseField = "population" | "start" | "end" | "duty" | "ranks" | "instructions" | "notes" | "holiday";
+export type BaseField = "start" | "duty";
 
 const SYNONYMS: Record<BaseField, string[]> = {
-  population: ["אוכלוסיה", "אוכלוסייה"],
-  start: ["תאריךהתחלה", "מתאריך", "התחלה"],
-  end: ["תאריךסיום", "עדתאריך", "סיום"],
-  duty: ["תורנות", "משימה", "סוגמשימה", "סוגתורנות"],
-  ranks: ["דרגות", "דרגה", "טווחדרגות"],
-  instructions: ["הנחיות"],
-  notes: ["הערות"],
-  holiday: ["חג"],
+  start: ["מועד", "תאריך", "תאריךהתחלה", "מתאריך", "התחלה"],
+  duty: ["סוגתורנות", "תורנות", "משימה", "סוגמשימה"],
 };
 
 /** Quotes and gershayim unified, spaces dropped – for matching names. */
@@ -174,22 +169,10 @@ export function readRows(rows: unknown[][]): { rows: BaseRow[]; errors: { line: 
     const startRaw = col(r, "start");
     if (!duty && String(startRaw ?? "").trim() === "") return; // empty / spacer row
     const start = toIsoDate(startRaw);
-    const end = String(col(r, "end") ?? "").trim() === "" ? start : toIsoDate(col(r, "end"));
-    if (!duty) return void errors.push({ line, message: "חסר שם תורנות" });
-    if (!start || start === "invalid") return void errors.push({ line, message: `${duty}: תאריך התחלה לא תקין` });
-    if (!end || end === "invalid") return void errors.push({ line, message: `${duty}: תאריך סיום לא תקין` });
-    if (end < start) return void errors.push({ line, message: `${duty}: תאריך הסיום לפני תאריך ההתחלה` });
-    out.push({
-      line,
-      duty,
-      start,
-      end,
-      population: cleanName(col(r, "population")),
-      ranksText: cleanName(col(r, "ranks")),
-      instructions: String(col(r, "instructions") ?? "").trim(),
-      notes: String(col(r, "notes") ?? "").trim(),
-      holiday: h.columns.holiday === undefined ? null : !/^[xX×✗]$/.test(String(col(r, "holiday") ?? "").trim()),
-    });
+    if (!duty) return void errors.push({ line, message: "חסר סוג תורנות" });
+    if (!start || start === "invalid") return void errors.push({ line, message: `${duty}: מועד לא תקין` });
+    // only the date and the duty type; the rest comes from the duty type and the calendar
+    out.push({ line, duty, start, end: start, population: "", ranksText: "", instructions: "", notes: "", holiday: null });
   });
   return { rows: out, errors, header: true };
 }
@@ -398,7 +381,7 @@ export interface NewSlot {
 }
 
 /** Template for a base file, for manual preparation or testing. */
-export const BASE_TEMPLATE_HEADERS = ["אוכלוסיה", "תאריך התחלה", "תאריך סיום", "תורנות", "מבצע", "גף", "עתודה", "גף", "דרגות", "הנחיות", "הערות"];
+export const BASE_TEMPLATE_HEADERS = ["מועד", "סוג תורנות"];
 
 export const dayOf = (isoTs: string) => {
   const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
