@@ -393,11 +393,33 @@ def test_weight_changes_are_recorded(conn):
             "select changed_by from weight_history where task_type_id = %s order by id desc limit 1", (tid,)
         ).fetchone()[0]
         assert by == COORD
-        conn.execute("update settings set value = '2.5' where key = 'holiday_multiplier'")
+        mid = conn.execute("update score_multipliers set value = 2.5 where name = 'חג וערב חג' returning id").fetchone()[0]
         v = conn.execute(
-            "select value from weight_history where multiplier_key = 'holiday_multiplier' order by id desc limit 1"
+            "select value from weight_history where multiplier_key = %s order by id desc limit 1", (str(mid),)
         ).fetchone()[0]
         assert float(v) == 2.5
+
+
+def test_score_multipliers_highest_applies(conn):
+    um = lambda day, shabbat, a, b: float(conn.execute(
+        "select app.unit_multiplier(%s::date, %s, %s::timestamp, %s::timestamp)", (day, shabbat, a, b)).fetchone()[0])
+    # the three fixed ones were moved over from the settings
+    assert {r[0] for r in conn.execute("select name from score_multipliers")} >= {"סוף שבוע", "חג וערב חג", "לילה"}
+    assert conn.execute("select count(*) from settings where key like '%%_multiplier'").fetchone()[0] == 0
+    with conn.transaction():
+        conn.execute("insert into calendar_days (day, day_type) values ('2031-01-07', 'memorial') on conflict (day) do update set day_type = 'memorial'")
+        conn.execute("insert into score_multipliers (name, value, day_types) values ('יום זיכרון', 1.8, '{memorial}')")
+        conn.execute("insert into score_multipliers (name, value, weekdays, date_from, date_to) values ('חמישי בינואר', 1.3, '{4}', '2031-01-01', '2031-01-31')")
+        assert um("2031-01-07", False, "2031-01-07 08:00", "2031-01-08 08:00") == 1.8      # memorial, a Tuesday
+        assert um("2031-01-09", False, "2031-01-09 08:00", "2031-01-10 08:00") == 1.3      # Thursday in January
+        assert um("2031-02-06", False, "2031-02-06 08:00", "2031-02-07 08:00") == 1.0      # Thursday in February
+        assert um("2031-01-10", True, "2031-01-10 08:00", "2031-01-11 08:00") == 1.0       # Shabbat type on Friday
+        # Friday night: weekend 1.5 and night 1.25 – the highest, not the product
+        assert um("2031-01-17", False, "2031-01-17 20:00", "2031-01-18 08:00") == 1.5
+        assert um("2031-01-14", False, "2031-01-14 20:00", "2031-01-15 08:00") == 1.25     # weekday night
+        with pytest.raises(psycopg.Error):  # a multiplier without a condition
+            conn.execute("insert into score_multipliers (name, value) values ('תמיד', 2)")
+        raise psycopg.Rollback()
 
 
 def test_staff_manage_the_calendar_and_viewer_cannot(conn):

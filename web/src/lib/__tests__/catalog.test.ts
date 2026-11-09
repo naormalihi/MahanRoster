@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { israeliHolidays, mergeHolidays, scoringProblems, taskTypeProblems, type TaskTypeInput } from "../catalog";
+import { EMPTY_MULTIPLIER, describeMultiplier, israeliHolidays, mergeHolidays, multiplierProblems, scoringProblems, taskTypeProblems, type TaskTypeInput } from "../catalog";
 
 const base: TaskTypeInput = {
   code: "new_duty",
@@ -34,9 +34,21 @@ describe("catalog validation", () => {
     expect(taskTypeProblems({ ...base, default_start_time: "08:00" }, others)).toHaveLength(1);
   });
   it("scoring settings", () => {
-    const ok = { weekend_multiplier: 1.5, holiday_multiplier: 2, night_multiplier: 1.25, night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
+    const ok = { night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
     expect(scoringProblems(ok)).toEqual([]);
-    expect(scoringProblems({ ...ok, holiday_multiplier: 0.5, night_window: "22-6", weekend_weekdays: [] })).toHaveLength(3);
+    expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [] })).toHaveLength(2);
+  });
+  it("a multiplier needs a name, a value 1–5 and at least one condition", () => {
+    const all = [{ ...EMPTY_MULTIPLIER, id: "m1", name: "לילה", time_window: "22:00-06:00" }];
+    expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "זיכרון", day_types: ["memorial"] }, all)).toEqual([]);
+    expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "זיכרון" }, all)[0]).toMatch("לפחות תנאי");
+    expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "לילה", weekdays: [4] }, all)[0]).toMatch("כבר יש");
+    expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "x", value: 7, weekdays: [4] }, all)[0]).toMatch("בין 1 ל-5");
+    expect(multiplierProblems({ ...EMPTY_MULTIPLIER, name: "x", date_from: "2027-02-01", date_to: "2027-01-01" }, all)[0]).toMatch("לפני");
+  });
+  it("describes when a multiplier applies", () => {
+    const m = { ...EMPTY_MULTIPLIER, name: "x", day_types: ["holiday"], weekdays: [6, 5], skip_shabbat_types: true };
+    expect(describeMultiplier(m, (c) => (c === "holiday" ? "חג" : c))).toBe("חג · שישי, שבת · לא על תורנויות שבת");
   });
 });
 

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "./api";
 import { usernameToEmail } from "./api";
-import { SCORING_KEYS, type CalendarDay, type Population, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
+import { SCORING_KEYS, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import {
   absenceSpan,
   localMidnight,
@@ -279,9 +279,6 @@ export class SupabaseApi implements Api {
     const rows = check(await this.sb.from("settings").select("key, value").in("key", [...SCORING_KEYS])) as { key: string; value: unknown }[];
     const v = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     return {
-      weekend_multiplier: Number(v.weekend_multiplier),
-      holiday_multiplier: Number(v.holiday_multiplier),
-      night_multiplier: Number(v.night_multiplier),
       night_window: String(v.night_window),
       weekend_weekdays: (v.weekend_weekdays as number[]) ?? [],
     };
@@ -289,6 +286,37 @@ export class SupabaseApi implements Api {
 
   async saveScoringSettings(s: ScoringSettings) {
     maybe(await this.sb.from("settings").upsert(SCORING_KEYS.map((key) => ({ key, value: s[key] }))));
+  }
+
+  async scoreMultipliers(): Promise<ScoreMultiplier[]> {
+    const rows = check(
+      await this.sb
+        .from("score_multipliers")
+        .select("id, name, value, day_types, weekdays, time_window, date_from, date_to, skip_shabbat_types, is_active")
+        .order("sort_order")
+        .order("name"),
+    ) as ScoreMultiplier[];
+    return rows.map((r) => ({ ...r, value: Number(r.value) }));
+  }
+
+  async saveScoreMultiplier(id: string | null, m: ScoreMultiplierInput) {
+    const row = { ...m, name: m.name.trim() };
+    if (id) maybe(await this.sb.from("score_multipliers").update(row).eq("id", id));
+    else maybe(await this.sb.from("score_multipliers").insert({ ...row, sort_order: 100 }));
+  }
+
+  async deleteScoreMultiplier(id: string) {
+    maybe(await this.sb.from("score_multipliers").delete().eq("id", id));
+  }
+
+  async dayTypes(): Promise<DayTypeRef[]> {
+    return check(await this.sb.from("day_types").select("code, name").order("name")) as DayTypeRef[];
+  }
+
+  async addDayType(name: string) {
+    const code = `custom_${Date.now().toString(36)}`;
+    maybe(await this.sb.from("day_types").insert({ code, name: name.trim() }));
+    return code;
   }
 
   async calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]> {

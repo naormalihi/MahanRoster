@@ -56,38 +56,99 @@ export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" |
 // Scoring settings
 // ---------------------------------------------------------------------------
 
+/** General scoring settings; the multipliers themselves are ScoreMultiplier rows. */
 export interface ScoringSettings {
-  weekend_multiplier: number;
-  holiday_multiplier: number;
-  night_multiplier: number;
-  night_window: string; // "22:00-06:00"
-  weekend_weekdays: number[]; // ISO: 1 = Monday … 7 = Sunday
+  night_window: string; // "22:00-06:00" – who sleeps at home is not given duties in it
+  weekend_weekdays: number[]; // ISO: 1 = Monday … 7 = Sunday – for weekend balancing
 }
 
-export const SCORING_KEYS = ["weekend_multiplier", "holiday_multiplier", "night_multiplier", "night_window", "weekend_weekdays"] as const;
+export const SCORING_KEYS = ["night_window", "weekend_weekdays"] as const;
 
 export const ISO_DAY_LABEL: Record<number, string> = { 7: "ראשון", 1: "שני", 2: "שלישי", 3: "רביעי", 4: "חמישי", 5: "שישי", 6: "שבת" };
+export const ISO_WEEK = [7, 1, 2, 3, 4, 5, 6];
+
+const WINDOW_RE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
 
 export function scoringProblems(s: ScoringSettings): string[] {
   const p: string[] = [];
-  for (const [k, label] of [
-    ["weekend_multiplier", "סוף שבוע"],
-    ["holiday_multiplier", "חג"],
-    ["night_multiplier", "לילה"],
-  ] as const)
-    if (!(s[k] >= 1) || s[k] > 5) p.push(`מקדם ${label} – בין 1 ל-5`);
-  if (!/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/.test(s.night_window)) p.push("חלון לילה בתבנית 22:00-06:00");
+  if (!WINDOW_RE.test(s.night_window)) p.push("חלון לילה בתבנית 22:00-06:00");
   if (!s.weekend_weekdays.length) p.push("בחר לפחות יום אחד של סוף שבוע");
   return p;
+}
+
+/**
+ * A scoring multiplier. It applies to a day unit of a duty when all of its conditions hold;
+ * when several apply, the highest one counts.
+ */
+export interface ScoreMultiplierInput {
+  name: string;
+  value: number;
+  day_types: string[]; // calendar day types (any of)
+  weekdays: number[]; // ISO (any of)
+  time_window: string | null; // duty < 24h, most hours in the window
+  date_from: string | null;
+  date_to: string | null;
+  skip_shabbat_types: boolean;
+  is_active: boolean;
+}
+export interface ScoreMultiplier extends ScoreMultiplierInput {
+  id: string;
+}
+
+export const EMPTY_MULTIPLIER: ScoreMultiplierInput = {
+  name: "",
+  value: 1.5,
+  day_types: [],
+  weekdays: [],
+  time_window: null,
+  date_from: null,
+  date_to: null,
+  skip_shabbat_types: false,
+  is_active: true,
+};
+
+export function multiplierProblems(m: ScoreMultiplierInput, all: ScoreMultiplier[], id?: string): string[] {
+  const p: string[] = [];
+  const name = m.name.trim();
+  if (!name) p.push("חסר שם");
+  else if (all.some((x) => x.id !== id && x.name.trim() === name)) p.push("כבר יש מקדם בשם הזה");
+  if (!(m.value >= 1) || m.value > 5) p.push("ערך המקדם – בין 1 ל-5");
+  if (m.time_window !== null && !WINDOW_RE.test(m.time_window)) p.push("חלון שעות בתבנית 22:00-06:00");
+  if (m.date_from && m.date_to && m.date_from > m.date_to) p.push("תאריך הסיום לפני תאריך ההתחלה");
+  if (!m.day_types.length && !m.weekdays.length && !m.time_window && !m.date_from && !m.date_to)
+    p.push("בחר לפחות תנאי אחד: סוג יום, ימים בשבוע, חלון שעות או תאריכים");
+  return p;
+}
+
+const dmy = (iso: string) => iso.split("-").reverse().join("/");
+
+/** "חג, ערב חג · שישי, שבת · 22:00–06:00 · 01/01/2027–31/01/2027" */
+export function describeMultiplier(m: ScoreMultiplierInput, dayTypeName: (code: string) => string): string {
+  const parts: string[] = [];
+  if (m.day_types.length) parts.push(m.day_types.map(dayTypeName).join(", "));
+  if (m.weekdays.length) parts.push(ISO_WEEK.filter((d) => m.weekdays.includes(d)).map((d) => ISO_DAY_LABEL[d]).join(", "));
+  // ⁦…⁩ keeps times and dates left-to-right inside the Hebrew line
+  if (m.time_window) parts.push(`שעות \u2066${m.time_window.replace("-", "–")}\u2069 (תורנות קצרה מ-24 ש׳)`);
+  if (m.date_from || m.date_to) parts.push(`תאריכים \u2066${m.date_from ? dmy(m.date_from) : "…"}–${m.date_to ? dmy(m.date_to) : "…"}\u2069`);
+  return parts.join(" · ") + (m.skip_shabbat_types ? " · לא על תורנויות שבת" : "");
 }
 
 // ---------------------------------------------------------------------------
 // Holiday calendar
 // ---------------------------------------------------------------------------
 
-export type DayType = "holiday" | "holiday_eve" | "memorial" | "weekend" | "weekday";
+/** The built-in calendar day types; more can be added in the settings. */
+export type DayType = string;
 
-export const DAY_TYPE_LABEL: Record<DayType, string> = {
+export interface DayTypeRef {
+  code: string;
+  name: string;
+}
+
+/** Day types that are marked on the calendar (weekday/weekend are by the day of the week). */
+export const MARKABLE = (t: DayTypeRef) => t.code !== "weekday" && t.code !== "weekend";
+
+export const DAY_TYPE_LABEL: Record<string, string> = {
   holiday: "חג",
   holiday_eve: "ערב חג",
   memorial: "יום זיכרון",

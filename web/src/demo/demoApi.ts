@@ -8,7 +8,7 @@
  */
 
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "../lib/api";
-import { israeliHolidays, type CalendarDay, type Population, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
+import { DAY_TYPE_LABEL, israeliHolidays, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
   absenceSpan,
   addDaysIso,
@@ -111,7 +111,13 @@ export class DemoApi implements Api {
   private boardRows: BoardRow[] = [];
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
-  private scoring: ScoringSettings = { weekend_multiplier: 1.5, holiday_multiplier: 2, night_multiplier: 1.25, night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
+  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6] };
+  private multipliers: ScoreMultiplier[] = [
+    { id: "m1", name: "סוף שבוע", value: 1.5, day_types: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
+    { id: "m2", name: "חג וערב חג", value: 2, day_types: ["holiday", "holiday_eve"], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
+    { id: "m3", name: "לילה", value: 1.25, day_types: [], weekdays: [], time_window: "22:00-06:00", date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
+  ];
+  private dayTypeList: DayTypeRef[] = Object.entries(DAY_TYPE_LABEL).map(([code, name]) => ({ code, name }));
   private cycleList: Cycle[] = [
     { id: "c1", name: "יוני–נובמבר 2026", start_date: "2026-06-01", end_date: "2026-11-30", exemption_deadline: null, status: "published", published_at: "2026-05-20T10:00:00Z" },
     { id: "c2", name: "דצמבר 2026 – מאי 2027", start_date: "2026-12-01", end_date: "2027-05-31", exemption_deadline: "2026-10-22T00:00:00+03:00", status: "collecting", published_at: null },
@@ -361,6 +367,34 @@ export class DemoApi implements Api {
   async saveScoringSettings(s: ScoringSettings) {
     await delay();
     this.scoring = { ...s };
+  }
+
+  async scoreMultipliers() {
+    await delay();
+    return this.multipliers.map((m) => ({ ...m }));
+  }
+
+  async saveScoreMultiplier(id: string | null, m: ScoreMultiplierInput) {
+    await delay();
+    if (id) Object.assign(this.multipliers.find((x) => x.id === id)!, m);
+    else this.multipliers.push({ ...m, id: this.nextId("m") });
+  }
+
+  async deleteScoreMultiplier(id: string) {
+    await delay();
+    this.multipliers = this.multipliers.filter((m) => m.id !== id);
+  }
+
+  async dayTypes() {
+    await delay();
+    return this.dayTypeList.map((t) => ({ ...t }));
+  }
+
+  async addDayType(name: string) {
+    await delay();
+    const code = this.nextId("custom");
+    this.dayTypeList.push({ code, name: name.trim() });
+    return code;
   }
 
   async calendarDays(fromIso: string, toIso: string) {

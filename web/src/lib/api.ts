@@ -3,7 +3,7 @@
  * (in-memory fictitious unit, for previews and screenshots without a backend).
  */
 
-import type { CalendarDay, Population, ScoringSettings, TaskType, TaskTypeInput } from "./catalog";
+import type { CalendarDay, DayTypeRef, Population, ScoreMultiplier, ScoreMultiplierInput, ScoringSettings, TaskType, TaskTypeInput } from "./catalog";
 import type {
   Absence,
   AbsenceInput,
@@ -116,6 +116,12 @@ export interface Api {
   populations(): Promise<Population[]>;
   scoringSettings(): Promise<ScoringSettings>;
   saveScoringSettings(s: ScoringSettings): Promise<void>;
+  scoreMultipliers(): Promise<ScoreMultiplier[]>;
+  saveScoreMultiplier(id: string | null, m: ScoreMultiplierInput): Promise<void>;
+  deleteScoreMultiplier(id: string): Promise<void>;
+  dayTypes(): Promise<DayTypeRef[]>;
+  /** A new calendar day type (e.g. "כוננות מוגברת"); returns its code. */
+  addDayType(name: string): Promise<string>;
   calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]>;
   saveCalendarDays(days: CalendarDay[]): Promise<void>;
   deleteCalendarDay(day: string): Promise<void>;

@@ -45,9 +45,16 @@ import {
   mergeHolidays,
   scoringProblems,
   taskTypeProblems,
+  EMPTY_MULTIPLIER,
+  ISO_WEEK,
+  MARKABLE,
+  describeMultiplier,
+  multiplierProblems,
   type CalendarDay,
-  type DayType,
+  type DayTypeRef,
   type Population,
+  type ScoreMultiplier,
+  type ScoreMultiplierInput,
   type ScoringSettings,
   type ServiceRestriction,
   type TaskType,
@@ -512,38 +519,220 @@ function CatalogTab() {
 // Scoring multipliers
 // ---------------------------------------------------------------------------
 
+/** Pick day types (any of), with a quick way to add a new one. */
+function DayTypePicker(props: { types: DayTypeRef[]; value: string[]; onChange: (v: string[]) => void; onAdded: () => Promise<void> }) {
+  const { api } = useAuth();
+  const [adding, setAdding] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const toggle = (code: string) =>
+    props.onChange(props.value.includes(code) ? props.value.filter((x) => x !== code) : [...props.value, code]);
+  async function add() {
+    const name = (adding ?? "").trim();
+    if (!name) return;
+    if (props.types.some((t) => t.name === name)) return setError("כבר יש סוג יום בשם הזה");
+    try {
+      const code = await api!.addDayType(name);
+      await props.onAdded();
+      props.onChange([...props.value, code]);
+      setAdding(null);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  return (
+    <Box>
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+        {props.types.filter(MARKABLE).map((t) => (
+          <Chip
+            key={t.code}
+            label={t.name}
+            color={props.value.includes(t.code) ? "primary" : "default"}
+            variant={props.value.includes(t.code) ? "filled" : "outlined"}
+            onClick={() => toggle(t.code)}
+          />
+        ))}
+        {adding === null ? (
+          <Button size="small" startIcon={<AddIcon />} onClick={() => setAdding("")}>
+            סוג יום חדש
+          </Button>
+        ) : (
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <TextField size="small" label="שם סוג היום" value={adding} onChange={(e) => setAdding(e.target.value)} autoFocus />
+            <Button size="small" variant="outlined" onClick={add}>
+              הוספה
+            </Button>
+            <Button size="small" onClick={() => setAdding(null)}>
+              ביטול
+            </Button>
+          </Stack>
+        )}
+      </Stack>
+      {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+    </Box>
+  );
+}
+
+function MultiplierDialog(props: {
+  m: ScoreMultiplier | null;
+  all: ScoreMultiplier[];
+  types: DayTypeRef[];
+  onTypesChanged: () => Promise<void>;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { api } = useAuth();
+  const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
+  const [m, setM] = useState<ScoreMultiplierInput>(() => {
+    if (!props.m) return EMPTY_MULTIPLIER;
+    const { id: _id, ...rest } = props.m;
+    return rest;
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const set = <K extends keyof ScoreMultiplierInput>(k: K, v: ScoreMultiplierInput[K]) => setM((x) => ({ ...x, [k]: v }));
+  const problems = multiplierProblems(m, props.all, props.m?.id);
+  const [wFrom, wTo] = (m.time_window ?? "22:00-06:00").split("-");
+
+  async function run(f: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await f();
+      props.onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+      setConfirmDelete(false);
+    }
+  }
+
+  return (
+    <Dialog open onClose={props.onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
+      <DialogTitle>{props.m ? `עריכת מקדם – ${props.m.name}` : "מקדם חדש"}</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2.5}>
+          <Stack direction="row" spacing={2}>
+            <TextField label="שם" value={m.name} onChange={(e) => set("name", e.target.value)} fullWidth autoFocus />
+            <TextField
+              type="number"
+              label="ערך"
+              value={m.value}
+              onChange={(e) => set("value", Number(e.target.value))}
+              slotProps={{ htmlInput: { step: 0.05, min: 1, max: 5 } }}
+              sx={{ width: 130 }}
+            />
+          </Stack>
+          <Alert severity="info" icon={false}>
+            המקדם חל על יום של תורנות כשכל התנאים שבחרת מתקיימים. בתוך תנאי מספיק אחת האפשרויות. כשכמה מקדמים חלים, נלקח הגבוה מביניהם.
+          </Alert>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              סוג יום בלוח השנה
+            </Typography>
+            <DayTypePicker types={props.types} value={m.day_types} onChange={(v) => set("day_types", v)} onAdded={props.onTypesChanged} />
+          </Box>
+          <Box>
+            <Typography variant="subtitle2">ימים בשבוע</Typography>
+            <FormGroup row>
+              {ISO_WEEK.map((d) => (
+                <FormControlLabel
+                  key={d}
+                  label={ISO_DAY_LABEL[d]}
+                  control={
+                    <Checkbox
+                      checked={m.weekdays.includes(d)}
+                      onChange={(e) => set("weekdays", e.target.checked ? [...m.weekdays, d].sort() : m.weekdays.filter((x) => x !== d))}
+                    />
+                  }
+                />
+              ))}
+            </FormGroup>
+          </Box>
+          <Box>
+            <FormControlLabel
+              control={<Switch checked={m.time_window !== null} onChange={(e) => set("time_window", e.target.checked ? "22:00-06:00" : null)} />}
+              label="חלון שעות (לתורנות קצרה מ-24 שעות שרוב שעותיה בחלון)"
+            />
+            {m.time_window !== null && (
+              <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                <TextField type="time" label="מ" value={wFrom} onChange={(e) => set("time_window", `${e.target.value}-${wTo}`)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+                <TextField type="time" label="עד" value={wTo} onChange={(e) => set("time_window", `${wFrom}-${e.target.value}`)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              </Stack>
+            )}
+          </Box>
+          <Stack direction="row" spacing={2}>
+            <TextField type="date" label="מתאריך" value={m.date_from ?? ""} onChange={(e) => set("date_from", e.target.value || null)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <TextField type="date" label="עד תאריך" value={m.date_to ?? ""} onChange={(e) => set("date_to", e.target.value || null)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+          </Stack>
+          <FormGroup>
+            <FormControlLabel
+              control={<Switch checked={m.skip_shabbat_types} onChange={(e) => set("skip_shabbat_types", e.target.checked)} />}
+              label="לא לתורנויות שבת (המשקל שלהן כבר כולל את סוף השבוע)"
+            />
+            <FormControlLabel control={<Switch checked={m.is_active} onChange={(e) => set("is_active", e.target.checked)} />} label="פעיל" />
+          </FormGroup>
+          {(error || problems.length > 0) && <Alert severity={error ? "error" : "warning"}>{error ?? problems[0]}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        {props.m &&
+          (confirmDelete ? (
+            <>
+              <Box sx={{ flex: 1, color: "error.main", fontSize: 14, px: 1 }}>למחוק את המקדם "{props.m.name}"?</Box>
+              <Button color="error" variant="contained" disabled={busy} onClick={() => run(() => api!.deleteScoreMultiplier(props.m!.id))}>
+                מחיקה
+              </Button>
+              <Button onClick={() => setConfirmDelete(false)}>לא</Button>
+            </>
+          ) : (
+            <Button color="error" onClick={() => setConfirmDelete(true)} disabled={busy} sx={{ mr: "auto" }}>
+              מחיקת המקדם
+            </Button>
+          ))}
+        {!confirmDelete && (
+          <>
+            <Button onClick={props.onClose}>ביטול</Button>
+            <Button variant="contained" disabled={busy || problems.length > 0} onClick={() => run(() => api!.saveScoreMultiplier(props.m?.id ?? null, m))}>
+              שמירה
+            </Button>
+          </>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function ScoringTab() {
   const { api } = useAuth();
+  const [list, setList] = useState<ScoreMultiplier[] | null>(null);
+  const [types, setTypes] = useState<DayTypeRef[]>([]);
+  const [editing, setEditing] = useState<ScoreMultiplier | "new" | null>(null);
   const [s, setS] = useState<ScoringSettings | null>(null);
   const [saved, setSaved] = useState<ScoringSettings | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    api!
-      .scoringSettings()
-      .then((v) => {
-        setS(v);
-        setSaved(v);
-      })
-      .catch((e) => setMsg({ ok: false, text: (e as Error).message }));
-  }, [api]);
+  const loadTypes = useCallback(async () => setTypes(await api!.dayTypes()), [api]);
+  const load = useCallback(async () => {
+    try {
+      const [l, v] = await Promise.all([api!.scoreMultipliers(), api!.scoringSettings(), loadTypes()]);
+      setList(l);
+      setS(v);
+      setSaved(v);
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    }
+  }, [api, loadTypes]);
+  useEffect(() => void load(), [load]);
 
-  if (!s) return msg ? <Alert severity="error">{msg.text}</Alert> : <Loading />;
+  const typeName = useCallback((code: string) => types.find((t) => t.code === code)?.name ?? DAY_TYPE_LABEL[code] ?? code, [types]);
+
+  if (!s || !list) return msg ? <Alert severity="error">{msg.text}</Alert> : <Loading />;
   const [nightFrom, nightTo] = s.night_window.split("-");
   const problems = scoringProblems(s);
   const dirty = JSON.stringify(s) !== JSON.stringify(saved);
-  const num = (k: "weekend_multiplier" | "holiday_multiplier" | "night_multiplier", label: string, help: string) => (
-    <TextField
-      type="number"
-      label={label}
-      value={s[k]}
-      onChange={(e) => setS({ ...s, [k]: Number(e.target.value) })}
-      slotProps={{ htmlInput: { step: 0.05, min: 1, max: 5 } }}
-      helperText={help}
-      fullWidth
-    />
-  );
 
   async function save() {
     if (problems.length) return setMsg({ ok: false, text: problems[0] });
@@ -551,7 +740,7 @@ function ScoringTab() {
     try {
       await api!.saveScoringSettings(s!);
       setSaved(s);
-      setMsg({ ok: true, text: "נשמר. המקדמים החדשים יחולו על השיבוץ הבא; ניקוד שכבר נצבר לא משתנה." });
+      setMsg({ ok: true, text: "נשמר." });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     }
@@ -559,67 +748,109 @@ function ScoringTab() {
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 760 }}>
-      <Stack spacing={3}>
-        <Typography variant="body2" color="text.secondary">
-          הניקוד של תורנות הוא המשקל שלה לכל יחידת 24 שעות, כפול המקדם של היום. כשחג נופל בסוף שבוע נלקח המקדם הגבוה מבין השניים, הם לא
-          מצטברים. תורנויות שבת לא מקבלות את מקדם סוף השבוע, כי המשקל שלהן כבר כולל אותו.
-        </Typography>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-          {num("weekend_multiplier", "מקדם סוף שבוע", "ימים שמסומנים למטה")}
-          {num("holiday_multiplier", "מקדם חג", "חג וערב חג לפי לוח החגים")}
-          {num("night_multiplier", "מקדם לילה", "לשעות שבחלון הלילה")}
+    <Stack spacing={3} sx={{ maxWidth: 900 }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack spacing={2}>
+          <Stack direction="row" sx={{ alignItems: "center" }}>
+            <Typography variant="h3" sx={{ flex: 1 }}>
+              מקדמי ניקוד
+            </Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
+              מקדם חדש
+            </Button>
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            הניקוד של תורנות הוא המשקל שלה לכל יחידת 24 שעות, כפול המקדם הגבוה מבין המקדמים שחלים על היום. מקדמים לא מצטברים זה על זה. שינוי
+            חל על השיבוץ הבא; ניקוד שכבר נצבר לא משתנה.
+          </Typography>
+          <Box sx={{ overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>מקדם</TableCell>
+                  <TableCell>ערך</TableCell>
+                  <TableCell>מתי חל</TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {list.map((m) => (
+                  <TableRow key={m.id} hover onClick={() => setEditing(m)} sx={{ cursor: "pointer", opacity: m.is_active ? 1 : 0.5 }}>
+                    <TableCell sx={{ fontWeight: 600 }}>
+                      {m.name} {!m.is_active && <Chip size="small" label="לא פעיל" />}
+                    </TableCell>
+                    <TableCell>×{m.value}</TableCell>
+                    <TableCell>{describeMultiplier(m, typeName)}</TableCell>
+                    <TableCell>
+                      <IconButton size="small" aria-label="עריכה" onClick={() => setEditing(m)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         </Stack>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-          <TextField
-            type="time"
-            label="לילה – מ"
-            value={nightFrom}
-            onChange={(e) => setS({ ...s, night_window: `${e.target.value}-${nightTo}` })}
-            slotProps={{ inputLabel: { shrink: true } }}
-            fullWidth
-          />
-          <TextField
-            type="time"
-            label="לילה – עד"
-            value={nightTo}
-            onChange={(e) => setS({ ...s, night_window: `${nightFrom}-${e.target.value}` })}
-            slotProps={{ inputLabel: { shrink: true } }}
-            fullWidth
-          />
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack spacing={2}>
+          <Typography variant="h3">הגדרות כלליות</Typography>
+          <Box>
+            <Typography variant="subtitle2">ימי סוף שבוע (לאיזון סופי השבוע בין החיילים)</Typography>
+            <FormGroup row>
+              {ISO_WEEK.map((d) => (
+                <FormControlLabel
+                  key={d}
+                  label={ISO_DAY_LABEL[d]}
+                  control={
+                    <Checkbox
+                      checked={s.weekend_weekdays.includes(d)}
+                      onChange={(e) =>
+                        setS({
+                          ...s,
+                          weekend_weekdays: e.target.checked ? [...s.weekend_weekdays, d].sort() : s.weekend_weekdays.filter((x) => x !== d),
+                        })
+                      }
+                    />
+                  }
+                />
+              ))}
+            </FormGroup>
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              שעות לילה (מי שלן בבית לא משובץ בהן)
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField type="time" label="לילה – מ" value={nightFrom} onChange={(e) => setS({ ...s, night_window: `${e.target.value}-${nightTo}` })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              <TextField type="time" label="לילה – עד" value={nightTo} onChange={(e) => setS({ ...s, night_window: `${nightFrom}-${e.target.value}` })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            </Stack>
+          </Box>
+          {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
+          <Box>
+            <Button variant="contained" onClick={save} disabled={busy || !dirty}>
+              שמירה
+            </Button>
+          </Box>
         </Stack>
-        <Box>
-          <Typography variant="subtitle2">ימי סוף שבוע</Typography>
-          <FormGroup row>
-            {[7, 1, 2, 3, 4, 5, 6].map((d) => (
-              <FormControlLabel
-                key={d}
-                label={ISO_DAY_LABEL[d]}
-                control={
-                  <Checkbox
-                    checked={s.weekend_weekdays.includes(d)}
-                    onChange={(e) =>
-                      setS({
-                        ...s,
-                        weekend_weekdays: e.target.checked
-                          ? [...s.weekend_weekdays, d].sort()
-                          : s.weekend_weekdays.filter((x) => x !== d),
-                      })
-                    }
-                  />
-                }
-              />
-            ))}
-          </FormGroup>
-        </Box>
-        {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
-        <Box>
-          <Button variant="contained" onClick={save} disabled={busy || !dirty}>
-            שמירה
-          </Button>
-        </Box>
-      </Stack>
-    </Paper>
+      </Paper>
+
+      {editing && (
+        <MultiplierDialog
+          m={editing === "new" ? null : editing}
+          all={list}
+          types={types}
+          onTypesChanged={loadTypes}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            void load();
+          }}
+        />
+      )}
+    </Stack>
   );
 }
 
@@ -627,7 +858,7 @@ function ScoringTab() {
 // Holiday calendar
 // ---------------------------------------------------------------------------
 
-const CHIP_COLOR: Record<DayType, "error" | "warning" | "default" | "info"> = {
+const CHIP_COLOR: Record<string, "error" | "warning" | "default" | "info"> = {
   holiday: "error",
   holiday_eve: "warning",
   memorial: "default",
@@ -635,7 +866,7 @@ const CHIP_COLOR: Record<DayType, "error" | "warning" | "default" | "info"> = {
   weekday: "default",
 };
 
-function DayDialog(props: { day: CalendarDay | null; onClose: () => void; onSaved: () => void }) {
+function DayDialog(props: { day: CalendarDay | null; types: DayTypeRef[]; onClose: () => void; onSaved: () => void }) {
   const { api } = useAuth();
   const [d, setD] = useState<CalendarDay>(props.day ?? { day: "", day_type: "holiday", source: "manual", note: "" });
   const [error, setError] = useState<string | null>(null);
@@ -661,10 +892,10 @@ function DayDialog(props: { day: CalendarDay | null; onClose: () => void; onSave
             onChange={(e) => setD({ ...d, day: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }}
           />
-          <TextField select label="סוג" value={d.day_type} onChange={(e) => setD({ ...d, day_type: e.target.value as DayType })}>
-            {(["holiday", "holiday_eve", "memorial"] as DayType[]).map((k) => (
-              <MenuItem key={k} value={k}>
-                {DAY_TYPE_LABEL[k]}
+          <TextField select label="סוג" value={d.day_type} onChange={(e) => setD({ ...d, day_type: e.target.value })}>
+            {props.types.filter(MARKABLE).map((t) => (
+              <MenuItem key={t.code} value={t.code}>
+                {t.name}
               </MenuItem>
             ))}
           </TextField>
@@ -690,6 +921,7 @@ function CalendarTab() {
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
   const [days, setDays] = useState<CalendarDay[] | null>(null);
+  const [types, setTypes] = useState<DayTypeRef[]>([]);
   const [editing, setEditing] = useState<CalendarDay | "new" | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -706,6 +938,10 @@ function CalendarTab() {
     }
   }, [api, from, to]);
   useEffect(() => void load(), [load]);
+  useEffect(() => {
+    api!.dayTypes().then(setTypes).catch(() => setTypes([]));
+  }, [api]);
+  const typeName = (code: string) => types.find((t) => t.code === code)?.name ?? DAY_TYPE_LABEL[code] ?? code;
 
   async function autoLoad() {
     setBusy(true);
@@ -753,7 +989,7 @@ function CalendarTab() {
         </Button>
       </Stack>
       <Typography variant="body2" color="text.secondary">
-        חגי ישראל לשנים 2026–2035 כבר טעונים. חג וערב חג מקבלים את מקדם החג ונספרים כימי סוף שבוע באיזון. חול המועד לא מסומן; אפשר להוסיף אותו ידנית. יום זיכרון מסומן לידיעה בלבד. "רענון" משלים ימים שנמחקו ולא נוגע בימים שנערכו ידנית.
+        חגי ישראל לשנים 2026–2035 כבר טעונים. חג וערב חג נספרים כימי סוף שבוע באיזון. המקדם של כל סוג יום נקבע בלשונית "מקדמי ניקוד". חול המועד לא מסומן; אפשר להוסיף אותו ידנית, וגם סוגי יום חדשים. "רענון" משלים ימים שנמחקו ולא נוגע בימים שנערכו ידנית.
       </Typography>
       {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
       {!days ? (
@@ -779,7 +1015,7 @@ function CalendarTab() {
                   <TableCell sx={{ whiteSpace: "nowrap" }}>{fmt(d.day)}</TableCell>
                   <TableCell>{weekdayOf(d.day)}</TableCell>
                   <TableCell>
-                    <Chip size="small" color={CHIP_COLOR[d.day_type]} label={DAY_TYPE_LABEL[d.day_type]} />
+                    <Chip size="small" color={CHIP_COLOR[d.day_type] ?? "info"} label={typeName(d.day_type)} />
                   </TableCell>
                   <TableCell>{d.note ?? "—"}</TableCell>
                   <TableCell>{d.source === "manual" ? "ידני" : "אוטומטי"}</TableCell>
@@ -800,6 +1036,7 @@ function CalendarTab() {
       {editing && (
         <DayDialog
           day={editing === "new" ? null : editing}
+          types={types}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);

@@ -198,7 +198,25 @@ class Weights:
 
 
 @dataclass
+class Multiplier:
+    """A user-defined scoring multiplier. It applies to a day unit when all its conditions hold."""
+
+    name: str
+    value: float
+    day_types: list[str] = field(default_factory=list)  # calendar day types of the unit's day
+    weekdays: list[int] = field(default_factory=list)  # Python weekdays (Monday = 0)
+    time_window: Optional[str] = None  # duty < 24h with most of its hours in the window
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    skip_shabbat_types: bool = False
+
+
+@dataclass
 class Settings:
+    # When multipliers is given (from the database), points use them – the highest that applies.
+    # Otherwise the three fixed multipliers below apply (night on top of the day multiplier).
+    multipliers: Optional[list[Multiplier]] = None
+    day_types: dict[str, str] = field(default_factory=dict)  # ISO date -> calendar day type
     weekend_multiplier: float = 1.5
     holiday_multiplier: float = 2.0
     night_multiplier: float = 1.25
