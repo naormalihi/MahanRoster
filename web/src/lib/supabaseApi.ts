@@ -236,6 +236,16 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("soldiers").update(patch).in("id", ids));
   }
 
+  async saveLoadRole(id: string | null, role: { name: string; factor: number }) {
+    const row = { name: role.name.trim(), factor: role.factor };
+    if (id) maybe(await this.sb.from("load_roles").update(row).eq("id", id));
+    else maybe(await this.sb.from("load_roles").insert(row));
+  }
+
+  async deleteLoadRole(id: string) {
+    maybe(await this.sb.rpc("delete_load_role", { p_role: id }));
+  }
+
   async loadRoles(): Promise<LoadRoleRef[]> {
     const rows = check(await this.sb.from("load_roles").select("id, name, factor").order("factor"));
     return rows.map((r) => ({ ...r, factor: Number(r.factor) }));

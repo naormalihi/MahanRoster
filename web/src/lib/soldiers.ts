@@ -101,7 +101,12 @@ export function effectiveHomeNightly(
   return s.home_nightly;
 }
 
+/** The soldier's relief roles in force today, largest relief (lowest factor) first. */
+export function activeLoadRoles(s: Pick<SoldierDetail, "load_roles">, today = todayIso()): SoldierLoadRole[] {
+  return s.load_roles.filter((r) => r.valid_from <= today && (!r.valid_to || r.valid_to >= today)).sort((a, b) => a.factor - b.factor);
+}
+
+/** The relief that applies: the largest one (lowest factor) – roles never multiply. */
 export function activeLoadRole(s: Pick<SoldierDetail, "load_roles">, today = todayIso()): SoldierLoadRole | null {
-  const active = s.load_roles.filter((r) => r.valid_from <= today && (!r.valid_to || r.valid_to >= today));
-  return active.sort((a, b) => a.factor - b.factor)[0] ?? null;
+  return activeLoadRoles(s, today)[0] ?? null;
 }
