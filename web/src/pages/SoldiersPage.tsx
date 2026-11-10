@@ -204,7 +204,7 @@ function EditDialog(props: {
           </Box>
           <Divider />
           <Box>
-            <Typography variant="h3" gutterBottom>תפקיד שני ושח"ר</Typography>
+            <Typography variant="h3" gutterBottom>תפקיד שני</Typography>
             <Stack spacing={1.5}>
               <DateField
                 label="תאריך חתימה על המשך שירות קבע (תפקיד שני)"
