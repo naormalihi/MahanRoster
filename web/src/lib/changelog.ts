@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.2.0",
+    date: "2026-11-10",
+    items: ["מסך חיילים: סינון לפי דרגה (כולל דרגת מינוי) ולפי הקלה – עם הקלה, בלי הקלה, או תפקיד הקלה מסוים"],
+  },
+  {
     version: "1.1.0",
     date: "2026-11-10",
     items: [
