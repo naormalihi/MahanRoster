@@ -1127,3 +1127,32 @@ def test_cycle_stage_follows_the_data(conn):
         n = _as_coord(conn, "select public.refresh_cycle_stages()")[0][0]
         assert n >= 1 and conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "slots"
         raise psycopg.Rollback()
+
+
+def test_new_soldier_opens_at_group_average(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("insert into roster_imports (kind, status, created_at) values ('roster', 'applied', now() - interval '30 days')")
+        peer = conn.execute(
+            "select s.id, s.service_type, s.gaf_id, s.computed_rank_id from soldiers s where s.is_active and s.is_shachar = false "
+            "and s.release_date is null order by s.full_name limit 1").fetchone()
+        new = conn.execute(
+            """insert into soldiers (soldier_key, full_name, service_type, gaf_id, computed_rank_id, unit_join_date)
+               values (repeat('a', 64), 'חייל חדש', %s, %s, %s, current_date) returning id""", peer[1:]).fetchone()[0]
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        group = conn.execute("select fairness_group from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
+                             (cycle, new)).fetchone()[0]
+        mean = conn.execute(
+            "select round(avg(baseline_score), 2) from cycle_soldier_snapshot where cycle_id = %s and fairness_group = %s and soldier_id <> %s",
+            (cycle, group, new)).fetchone()[0]
+        opening, at = conn.execute("select opening_score, opening_score_at from soldiers where id = %s", (new,)).fetchone()
+        assert at is not None and opening == mean
+        base = conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
+                            (cycle, new)).fetchone()[0]
+        assert base == opening
+        # a second snapshot keeps the same opening, and old soldiers get none
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        assert conn.execute("select opening_score from soldiers where id = %s", (new,)).fetchone()[0] == opening
+        assert conn.execute("select count(*) from soldiers where opening_score_at > now() - interval '1 minute' and id <> %s",
+                            (new,)).fetchone()[0] == 0
+        raise psycopg.Rollback()
