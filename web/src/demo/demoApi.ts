@@ -289,6 +289,16 @@ export class DemoApi implements Api {
     this.keyCheck = v;
   }
 
+  async rekeySoldiers(pairs: { id: string; key: string }[], check: string) {
+    await delay(300);
+    for (const p of pairs) {
+      const s = this.soldierList.find((x) => x.id === p.id);
+      if (s) s.soldier_key = p.key;
+    }
+    this.keyCheck = check;
+    return pairs.length;
+  }
+
   async applyRoster(plan: RosterPlan): Promise<ApplyResult> {
     await delay(400);
     this.rosterAt = new Date().toISOString();

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { canRead, getApi, type Api, type Me, type MfaState } from "./api";
+import { forgetUnitKey } from "./hmac";
 
 /**
  * Where the signed-in user stands:
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [api]);
 
   const signOut = useCallback(async () => {
+    forgetUnitKey();
     await api?.signOut();
     setMe(null);
     setStage("signedOut");

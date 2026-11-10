@@ -1156,3 +1156,23 @@ def test_new_soldier_opens_at_group_average(conn):
         assert conn.execute("select count(*) from soldiers where opening_score_at > now() - interval '1 minute' and id <> %s",
                             (new,)).fetchone()[0] == 0
         raise psycopg.Rollback()
+
+
+def test_rekey_moves_soldiers_to_the_new_key(conn):
+    with conn.transaction():
+        a, b = [r[0] for r in conn.execute("select id from soldiers order by full_name limit 2").fetchall()]
+        pairs = json.dumps([{"id": str(a), "key": "1" * 64}, {"id": str(b), "key": "2" * 64}])
+        n = _as_coord(conn, "select public.rekey_soldiers(%s::jsonb, %s)", pairs, "f" * 64)
+        assert n[0][0] == 2
+        assert conn.execute("select soldier_key from soldiers where id = %s", (a,)).fetchone()[0] == "1" * 64
+        assert conn.execute("select value #>> '{}' from settings where key = 'unit_key_check'").fetchone()[0] == "f" * 64
+        raise psycopg.Rollback()
+    with conn.transaction():
+        a = conn.execute("select id from soldiers limit 1").fetchone()[0]
+        twice = json.dumps([{"id": str(a), "key": "1" * 64}, {"id": str(a), "key": "2" * 64}])
+        with pytest.raises(psycopg.errors.RaiseException):
+            _as_coord(conn, "select public.rekey_soldiers(%s::jsonb, %s)", twice, "f" * 64)
+        raise psycopg.Rollback()
+    with pytest.raises(psycopg.Error):
+        with session_as(conn, VIEWER) as c:
+            c.execute("select public.rekey_soldiers('[]'::jsonb, %s)", ("f" * 64,))

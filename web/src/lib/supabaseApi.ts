@@ -146,6 +146,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("settings").upsert({ key: "unit_key_check", value }));
   }
 
+  async rekeySoldiers(pairs: { id: string; key: string }[], fingerprint: string): Promise<number> {
+    return check(await this.sb.rpc("rekey_soldiers", { p_pairs: pairs, p_check: fingerprint })) as number;
+  }
+
   async applyRoster(plan: RosterPlan): Promise<ApplyResult> {
     let gafimCreated = 0;
     if (plan.unknownGafim.length) {

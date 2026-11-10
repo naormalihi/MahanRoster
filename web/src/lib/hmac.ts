@@ -4,8 +4,35 @@
  * The personal number (מ"א) never leaves the browser. It is turned into
  * soldier_key = HMAC-SHA256(unit key, personal number) here, and only the key
  * is sent to the server. The unit key is a passphrase held by נע"ת התורנויות;
- * it is kept in memory for the session only and never stored or sent.
+ * it is never sent. After it is confirmed it stays in this tab (sessionStorage) until sign-out
+ * or the tab closes, so it is typed once per working session.
  */
+
+const SESSION_KEY = "mahanroster.unitKey";
+
+export function rememberUnitKey(key: string) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, key);
+  } catch {
+    /* storage blocked: the key is typed again next time */
+  }
+}
+
+export function rememberedUnitKey(): string {
+  try {
+    return sessionStorage.getItem(SESSION_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function forgetUnitKey() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* nothing stored */
+  }
+}
 
 const enc = new TextEncoder();
 const KEY_CHECK_INPUT = "mahanroster-unit-key-check";
