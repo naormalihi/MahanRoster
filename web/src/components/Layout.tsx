@@ -22,6 +22,10 @@ import {
   Toolbar,
   Typography,
   useMediaQuery,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
 } from "@mui/material";
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -29,6 +33,7 @@ import { canRead, isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
+import { APP_VERSION, BUILD_DATE, BUILD_SHA, CHANGELOG } from "../lib/changelog";
 
 const ROLE_LABEL: Record<string, string> = {
   coordinator: "נע\"ת תורנויות",
@@ -111,6 +116,74 @@ function CycleSwitcher({ dark }: { dark?: boolean }) {
   );
 }
 
+function VersionFooter() {
+  const [open, setOpen] = useState(false);
+  const built = BUILD_DATE ? new Date(BUILD_DATE).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" }) : "";
+  return (
+    <>
+      <Box
+        component="button"
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`גרסה ${APP_VERSION} – מה חדש`}
+        sx={{
+          all: "unset",
+          cursor: "pointer",
+          px: 2,
+          py: 1.25,
+          borderTop: 1,
+          borderColor: "divider",
+          color: "text.secondary",
+          fontSize: 12,
+          "&:hover": { color: "primary.main" },
+          "&:focus-visible": { outline: 2, outlineColor: "primary.main" },
+        }}
+      >
+        גרסה {APP_VERSION}
+        <Box component="span" sx={{ mx: 0.75, opacity: 0.6 }}>
+          ·
+        </Box>
+        <Box component="span" sx={{ fontFamily: "monospace", direction: "ltr", unicodeBidi: "isolate" }}>
+          {BUILD_SHA}
+        </Box>
+        {built && (
+          <>
+            <Box component="span" sx={{ mx: 0.75, opacity: 0.6 }}>
+              ·
+            </Box>
+            {built}
+          </>
+        )}
+      </Box>
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>מה חדש</DialogTitle>
+        <DialogContent dividers>
+          {CHANGELOG.map((r) => (
+            <Box key={r.version} sx={{ "& + &": { mt: 2 } }}>
+              <Typography sx={{ fontWeight: 700 }}>
+                גרסה {r.version}
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                  {r.date.split("-").reverse().join("/")}
+                </Typography>
+              </Typography>
+              <Box component="ul" sx={{ m: 0, pr: 2.5, pl: 0 }}>
+                {r.items.map((t) => (
+                  <Typography component="li" variant="body2" key={t}>
+                    {t}
+                  </Typography>
+                ))}
+              </Box>
+            </Box>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>סגירה</Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const { me, api, signOut } = useAuth();
   const staff = isStaff(me);
@@ -169,7 +242,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </Toolbar>
       </AppBar>
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
-        <Box sx={{ width: 280 }} role="navigation">
+        <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
           <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
             <Box component="img" src="/brand/emblem-mark.png" alt="" sx={{ height: 36 }} />
             <Box>
@@ -199,6 +272,8 @@ export function Layout({ children }: { children: ReactNode }) {
               <ListItemText primary="יציאה" />
             </ListItemButton>
           </List>
+          <Box sx={{ flex: 1 }} />
+          <VersionFooter />
         </Box>
       </Drawer>
       <Box sx={{ display: "none", "@media print": { display: "flex" }, alignItems: "center", gap: 2, px: 1, pt: 1, pb: 2, borderBottom: "2px solid #e8700f" }}>
