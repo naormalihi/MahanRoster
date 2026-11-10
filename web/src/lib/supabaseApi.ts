@@ -11,13 +11,13 @@ import {
   type AbsenceType,
   type Cycle,
   type CycleInput,
-  type CycleStatus,
   type DateBlock,
   type DateBlockInput,
   type Exemption,
   type ExemptionDecision,
   type ExemptionInput,
   type ExemptionType,
+  type StageState,
 } from "./cycles";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
@@ -366,8 +366,12 @@ export class SupabaseApi implements Api {
     else maybe(await this.sb.from("cycles").insert(c));
   }
 
-  async setCycleStatus(id: string, status: CycleStatus) {
-    maybe(await this.sb.from("cycles").update({ status }).eq("id", id));
+  async cycleStages(cycleId: string): Promise<StageState[]> {
+    return check(await this.sb.rpc("cycle_stages", { p_cycle: cycleId })) as StageState[];
+  }
+
+  async refreshCycleStages(): Promise<number> {
+    return check(await this.sb.rpc("refresh_cycle_stages")) as number;
   }
 
   // ----- constraints -----

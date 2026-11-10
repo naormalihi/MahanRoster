@@ -100,7 +100,7 @@ function StepTabs({ step, states }: { step: StepKey; states: ReturnType<typeof s
   );
 }
 
-function Overview({ cycle, facts, onChanged }: { cycle: Cycle; facts: CycleFacts | null; onChanged: () => void }) {
+function Overview({ cycle, facts }: { cycle: Cycle; facts: CycleFacts | null }) {
   const navigate = useNavigate();
   const next = facts ? nextAction(cycle, facts) : null;
   return (
@@ -119,7 +119,7 @@ function Overview({ cycle, facts, onChanged }: { cycle: Cycle; facts: CycleFacts
           <b>הצעד הבא:</b> {next.text}
         </Alert>
       )}
-      <StagePanel cycle={cycle} onChanged={onChanged} inWorkspace />
+      <StagePanel cycle={cycle} inWorkspace />
     </Stack>
   );
 }
@@ -141,8 +141,8 @@ function ScheduleStep({ facts }: { facts: CycleFacts | null }) {
 }
 
 export function CycleWorkspace({ step }: { step: StepKey }) {
-  const { cycles, cycle, locked, reload } = useCycle();
-  const { facts, reload: reloadFacts } = useCycleFacts(cycle);
+  const { cycles, cycle, locked } = useCycle();
+  const { facts } = useCycleFacts(cycle);
 
   if (!cycles)
     return (
@@ -185,14 +185,7 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
       >
         <Box key={`${cycle.id}-${step}`}>
           {step === "overview" && (
-            <Overview
-              cycle={cycle}
-              facts={facts}
-              onChanged={() => {
-                void reload();
-                void reloadFacts();
-              }}
-            />
+            <Overview cycle={cycle} facts={facts} />
           )}
           {step === "constraints" && <ConstraintsPage />}
           {step === "potential" && <PotentialPage />}

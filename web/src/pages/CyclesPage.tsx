@@ -1,6 +1,7 @@
 import AddIcon from "@mui/icons-material/Add";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorIcon from "@mui/icons-material/Error";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import {
   Alert,
@@ -28,8 +29,8 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
@@ -45,23 +46,13 @@ import {
   type Cycle,
   type CycleInput,
   type CycleStatus,
+  type StageState,
+  type StageTone,
 } from "../lib/cycles";
 import { dayKey } from "../lib/dates";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const today = () => dayKey(new Date());
-
-/** Stages the app already has a screen for, and where it is. */
-const STAGE_LINK: Partial<Record<CycleStatus, { to: string; label: string }>> = {
-  loading: { to: "/soldiers/import", label: "לטעינת כוח אדם" },
-  collecting: { to: "/cycle/constraints", label: "לאילוצים" },
-  approving: { to: "/cycle/constraints?tab=exemptions&status=pending", label: "לפטורים הממתינים" },
-  potential: { to: "/cycle/potential", label: "לפוטנציאל" },
-  slots: { to: "/cycle/slots", label: "ללוח הבסיס" },
-  scheduling: { to: "/cycle/schedule?view=run", label: "להרצה" },
-  review: { to: "/cycle/schedule?view=draft", label: "לטיוטה" },
-  published: { to: "/cycle/operate", label: "לתפעול" },
-};
 
 /** The screen each stage is worked on – every step of the stepper opens it. */
 const STAGE_SCREEN: Record<CycleStatus, { staff: string; reader: string }> = {
@@ -77,8 +68,12 @@ const STAGE_SCREEN: Record<CycleStatus, { staff: string; reader: string }> = {
   closed: { staff: "/board", reader: "/board" },
 };
 
-/** Stages after this one need screens that do not exist yet; the stepper stops here. */
-const LAST_MANUAL_STAGE: CycleStatus = "slots";
+const TONE_ICON: Record<StageTone, ReactNode> = {
+  done: <CheckCircleIcon color="success" />,
+  warn: <ErrorIcon color="warning" />,
+  busy: <CircularProgress size={22} />,
+  todo: <RadioButtonUncheckedIcon color="disabled" />,
+};
 
 function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => void; onSaved: () => void }) {
   const { api } = useAuth();
@@ -145,32 +140,23 @@ function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => 
   );
 }
 
-export function StagePanel({ cycle, onChanged, inWorkspace }: { cycle: Cycle; onChanged: () => void; inWorkspace?: boolean }) {
+export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?: boolean }) {
   const { api, me } = useAuth();
   const staff = isStaff(me);
   const navigate = useNavigate();
   const vertical = useMediaQuery(useTheme().breakpoints.down("md"));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [states, setStates] = useState<StageState[] | null>(null);
   const i = stageIndex(cycle.status);
   const stage = STAGES[i];
-  const next = STAGES[i + 1];
-  const prev = STAGES[i - 1];
-  const canAdvance = !!next && i < stageIndex(LAST_MANUAL_STAGE);
-  const link = STAGE_LINK[cycle.status];
   const deadlinePassed = cycle.exemption_deadline && Date.parse(cycle.exemption_deadline) < Date.now();
 
-  async function move(to: CycleStatus) {
-    setBusy(true);
-    setError(null);
-    try {
-      await api!.setCycleStatus(cycle.id, to);
-      onChanged();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-    setBusy(false);
-  }
+  useEffect(() => {
+    let live = true;
+    api!.cycleStages(cycle.id).then((s) => live && setStates(s), () => live && setStates(null));
+    return () => {
+      live = false;
+    };
+  }, [api, cycle.id, cycle.status, cycle.exemption_deadline, cycle.potential_computed_at, cycle.published_at]);
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
@@ -194,49 +180,40 @@ export function StagePanel({ cycle, onChanged, inWorkspace }: { cycle: Cycle; on
           )}
         </Stack>
         <Stepper nonLinear activeStep={i} orientation={vertical ? "vertical" : "horizontal"} alternativeLabel={!vertical}>
-          {STAGES.map((s) => (
-            <Step key={s.status} completed={stageIndex(s.status) < i}>
-              <StepButton
-                data-read
-                onClick={() => navigate(STAGE_SCREEN[s.status][staff ? "staff" : "reader"])}
-                sx={{ textAlign: "start", borderRadius: 1, "&:hover .MuiStepLabel-label": { color: "primary.main", textDecoration: "underline" } }}
-              >
-                {s.label}
-              </StepButton>
-            </Step>
-          ))}
+          {STAGES.map((s) => {
+            const st = states?.find((x) => x.stage === s.status);
+            return (
+              <Step key={s.status} completed={st ? st.tone === "done" : stageIndex(s.status) < i}>
+                <StepButton
+                  data-read
+                  icon={st ? TONE_ICON[st.tone] : undefined}
+                  optional={
+                    st?.note ? (
+                      <Typography variant="caption" color={st.tone === "warn" ? "warning.main" : "text.secondary"}>
+                        {st.note}
+                      </Typography>
+                    ) : undefined
+                  }
+                  onClick={() => navigate(STAGE_SCREEN[s.status][staff ? "staff" : "reader"])}
+                  sx={{
+                    textAlign: "start",
+                    borderRadius: 1,
+                    "& .MuiStepLabel-label.Mui-active": { fontWeight: 700 },
+                    "&:hover .MuiStepLabel-label": { color: "primary.main", textDecoration: "underline" },
+                  }}
+                >
+                  {s.label}
+                </StepButton>
+              </Step>
+            );
+          })}
         </Stepper>
         <Alert severity="info" icon={false}>
           <b>{stage.label}:</b> {stage.hint}
         </Alert>
-        {error && <Alert severity="error">{error}</Alert>}
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-          {link && (
-            <Button variant="contained" component={RouterLink} to={link.to}>
-              {link.label}
-            </Button>
-          )}
-          {next && (
-            <Button
-              variant="outlined"
-              endIcon={<ArrowBackIcon />}
-              disabled={busy || !canAdvance}
-              onClick={() => move(next.status)}
-            >
-              מעבר לשלב: {next.label}
-            </Button>
-          )}
-          {prev && (
-            <Button startIcon={<ArrowForwardIcon />} disabled={busy || i > stageIndex(LAST_MANUAL_STAGE)} onClick={() => move(prev.status)}>
-              חזרה לשלב הקודם
-            </Button>
-          )}
-        </Stack>
-        {next && !canAdvance && (
-          <Typography variant="caption" color="text.secondary">
-            מכאן השלב מתקדם לבד: הרצת שיבוץ מעבירה ל"שיבוץ: הרצה" ול"שיבוץ: טיוטה", ופרסום מעביר ל"תפעול".
-          </Typography>
-        )}
+        <Typography variant="caption" color="text.secondary">
+          השלב מתקדם לבד לפי מה שבוצע בפועל. לחיצה על שלב פותחת את המסך שלו.
+        </Typography>
       </Stack>
     </Paper>
   );
@@ -279,7 +256,7 @@ export function CyclesPage() {
         </Button>
       </Stack>
       {shown ? (
-        <StagePanel cycle={shown} onChanged={load} />
+        <StagePanel cycle={shown} />
       ) : (
         <Alert severity="info">עוד אין מחזורים. צור את המחזור הראשון: חצי שנה, עם מועד סגירה לאילוצים ולפטורים.</Alert>
       )}
