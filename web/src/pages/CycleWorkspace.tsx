@@ -143,6 +143,7 @@ function ScheduleStep({ facts }: { facts: CycleFacts | null }) {
 export function CycleWorkspace({ step }: { step: StepKey }) {
   const { cycles, cycle, locked } = useCycle();
   const { facts } = useCycleFacts(cycle);
+  const navigate = useNavigate();
 
   if (!cycles)
     return (
@@ -171,9 +172,19 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
       </Stack>
       <StepTabs step={step} states={states} />
       {locked && step !== "overview" && step !== "operate" && (
-        <Alert severity="success" icon={<LockIcon />}>
-          המחזור פורסם{cycle.published_at ? ` ב-${fmt(cycle.published_at)}` : ""}. הפוטנציאל, לוח הבסיס והשיבוץ נעולים לעריכה. פטורים והיעדרויות
-          אפשר עדיין להזין.
+        <Alert
+          severity="success"
+          icon={<LockIcon />}
+          action={
+            cycle.status === "published" && (
+              <Button data-read color="inherit" size="small" onClick={() => navigate("/cycle/operate")}>
+                לתפעול
+              </Button>
+            )
+          }
+        >
+          המחזור פורסם{cycle.published_at ? ` ב-${fmt(cycle.published_at)}` : ""}. הפוטנציאל, לוח הבסיס והשיבוץ נעולים; שינויים נעשים בתפעול.
+          פטורים והיעדרויות אפשר עדיין להזין.
         </Alert>
       )}
       <Suspense
