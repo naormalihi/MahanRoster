@@ -178,7 +178,10 @@ export class SupabaseApi implements Api {
       home_nightly: r.home_nightly ?? undefined, // no column in the file: keep / default
       is_active: true,
     });
-    if (plan.added.length) maybe(await this.sb.from("soldiers").insert(plan.added.map(toRow)));
+    // A bulk insert sends one column list for all rows, so a value missing in one row would be sent
+    // as null (not the column default): a new soldier with no ת"ש 7 column in the file is "no".
+    if (plan.added.length)
+      maybe(await this.sb.from("soldiers").insert(plan.added.map((r) => ({ ...toRow(r), home_nightly: r.home_nightly ?? false }))));
     for (const u of plan.updated) {
       const row = toRow(u.after);
       // keep values the file left empty
