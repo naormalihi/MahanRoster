@@ -720,8 +720,12 @@ export class DemoApi implements Api {
     if (age < 4) return;
     if (j.status === "queued") Object.assign(j, { status: "running", started_at: new Date().toISOString(), params: { ...j.params, run_url: "https://github.com/" } });
     j.progress = Math.min(95, Math.round(5 + ((age - 4) / 12) * 90));
-    if (age < 16) return;
     const slots = this.slotsByCycle.get(j.cycle_id) ?? [];
+    // like the worker: duties staffed so far, month by month
+    const months = Math.max(1, new Set(slots.map((k) => k.starts_at.slice(0, 7))).size);
+    const month = Math.min(months, Math.floor(((age - 4) / 12) * months));
+    j.params = { ...j.params, slots: slots.length, months, month, staffed: Math.round((slots.length * month) / months) };
+    if (age < 16) return;
     Object.assign(j, {
       status: "done",
       progress: 100,

@@ -105,6 +105,12 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
           <Typography variant="h3" sx={{ flex: 1 }}>
             {job.status === "queued" ? "ממתין שמנוע השיבוץ יתחיל" : "מנוע השיבוץ רץ"}
           </Typography>
+          {job.status === "running" && job.params.slots ? (
+            <Typography variant="body2" sx={{ fontWeight: 700 }} title="משבצות שאוישו עד עכשיו מתוך כל המשבצות">
+              {`\u2066${job.params.staffed ?? 0}/${job.params.slots}\u2069`} שובצו
+              {job.params.months && job.params.months > 1 ? ` · חודש ${Math.min((job.params.month ?? 0) + 1, job.params.months)} מתוך ${job.params.months}` : ""}
+            </Typography>
+          ) : null}
           <Typography variant="body2" color="text.secondary">
             {mmss(elapsed(job.started_at ?? job.created_at, now))}
           </Typography>

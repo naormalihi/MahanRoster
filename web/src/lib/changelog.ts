@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.6.0",
+    date: "2026-11-10",
+    items: ["בזמן הרצת המנוע: כמה משבצות שובצו עד עכשיו מתוך כולן (למשל 108/180) ובאיזה חודש המנוע נמצא, ליד הזמן"],
+  },
+  {
     version: "1.5.0",
     date: "2026-11-10",
     items: [

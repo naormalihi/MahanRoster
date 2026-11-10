@@ -342,6 +342,7 @@ export function OperatePage() {
             <Box>
               <Typography variant="body2" gutterBottom>
                 המנוע משבץ את התורנויות החדשות…
+                {running.status === "running" && running.params.slots ? <b>{` \u2066${running.params.staffed ?? 0}/${running.params.slots}\u2069 שובצו`}</b> : null}
               </Typography>
               <LinearProgress variant={running.status === "running" ? "determinate" : "indeterminate"} value={running.progress} />
             </Box>

@@ -208,3 +208,13 @@ def test_unfilled_slot_says_what_held_the_eligible_back():
     sol = solve(problem([A], slots))
     assert len(sol.unfilled) == 1
     assert sol.unfilled[0].reasons.get("busy") == 1
+
+
+def test_rolling_reports_duties_staffed_month_by_month():
+    from mahanroster_solver.rolling import solve_rolling
+
+    A, B = soldier("A"), soldier("B")
+    slots = [slot("j", "guard", "2027-01-10T08:00", "2027-01-11T08:00", r=0), slot("f", "guard", "2027-02-10T08:00", "2027-02-11T08:00", r=0)]
+    calls = []
+    solve_rolling(problem([A, B], slots), on_progress=lambda *a: calls.append(a))
+    assert calls[0] == (0, 2, 0, 2) and calls[-1] == (2, 2, 2, 2)

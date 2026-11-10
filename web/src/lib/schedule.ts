@@ -31,7 +31,16 @@ export interface ScheduleJob {
   started_at: string | null;
   finished_at: string | null;
   error: string | null;
-  params: { dispatch?: "sent" | "no_token" | "unavailable"; run_url?: string | null; dispatched_at?: string };
+  params: {
+    dispatch?: "sent" | "no_token" | "unavailable";
+    run_url?: string | null;
+    dispatched_at?: string;
+    /** while running: duties staffed so far of all, and the month being solved */
+    staffed?: number;
+    slots?: number;
+    month?: number;
+    months?: number;
+  };
   result_status: string | null;
   wall_time: number | null;
   unfilled: UnfilledOut[] | null;
