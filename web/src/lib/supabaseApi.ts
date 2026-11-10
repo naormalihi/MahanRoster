@@ -292,6 +292,7 @@ export class SupabaseApi implements Api {
       night_window: String(v.night_window),
       weekend_weekdays: (v.weekend_weekdays as number[]) ?? [],
       surprise_multiplier: v.surprise_multiplier == null ? 1.5 : Number(v.surprise_multiplier),
+      exemption_deadline_days: v.exemption_deadline_days == null ? 40 : Number(v.exemption_deadline_days),
     };
   }
 

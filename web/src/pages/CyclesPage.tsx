@@ -39,7 +39,8 @@ import {
   addDaysIso,
   planningCycle,
   cycleProblems,
-  localMidnight,
+  deadlineDay,
+  endOfDay,
   stageIndex,
   stageLabel,
   suggestCycle,
@@ -50,6 +51,7 @@ import {
   type StageTone,
 } from "../lib/cycles";
 import { dayKey } from "../lib/dates";
+import { DeadlineEditor } from "../components/DeadlineEditor";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const today = () => dayKey(new Date());
@@ -85,7 +87,16 @@ function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => 
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [days, setDays] = useState(40);
   const problems = cycleProblems(c, props.all, props.cycle?.id);
+  const isNew = !props.cycle;
+  // the default distance comes from the settings; a new cycle takes it as soon as it is known
+  useEffect(() => {
+    api!.scoringSettings().then((s) => {
+      setDays(s.exemption_deadline_days);
+      if (isNew) setC((cur) => (cur.start_date ? { ...cur, exemption_deadline: endOfDay(addDaysIso(cur.start_date, -s.exemption_deadline_days)) } : cur));
+    }, () => undefined);
+  }, [api, isNew]);
 
   async function save() {
     if (problems.length) return setError(problems[0]);
@@ -122,10 +133,12 @@ function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => 
             {date("סוף המחזור", c.end_date, (v) => setC({ ...c, end_date: v }))}
           </Stack>
           {date(
-            "מועד סגירת אילוצים ופטורים",
-            c.exemption_deadline?.slice(0, 10) ?? "",
-            (v) => setC({ ...c, exemption_deadline: v ? localMidnight(v) : null }),
-            c.start_date ? `לפי הנוהל: 40 יום לפני תחילת המחזור (${fmt(addDaysIso(c.start_date, -40))})` : undefined,
+            "סגירת אילוצים ופטורים – היום האחרון",
+            c.exemption_deadline ? deadlineDay(c.exemption_deadline) : "",
+            (v) => setC({ ...c, exemption_deadline: v ? endOfDay(v) : null }),
+            c.start_date
+              ? `עד 23:59 ביום הזה. ברירת המחדל: ${days} יום לפני תחילת המחזור (${fmt(addDaysIso(c.start_date, -days))}). אפשר לשנות גם אחר כך, במסך האילוצים.`
+              : undefined,
           )}
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
@@ -148,7 +161,6 @@ export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?:
   const [states, setStates] = useState<StageState[] | null>(null);
   const i = stageIndex(cycle.status);
   const stage = STAGES[i];
-  const deadlinePassed = cycle.exemption_deadline && Date.parse(cycle.exemption_deadline) < Date.now();
 
   useEffect(() => {
     let live = true;
@@ -170,14 +182,7 @@ export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?:
               {fmt(cycle.start_date)} – {fmt(cycle.end_date)}
             </Typography>
           )}
-          {cycle.exemption_deadline && (
-            <Chip
-              size="small"
-              color={deadlinePassed ? "default" : "warning"}
-              variant="outlined"
-              label={`סגירת אילוצים: ${fmt(cycle.exemption_deadline)}${deadlinePassed ? " (עבר)" : ""}`}
-            />
-          )}
+          <DeadlineEditor cycle={cycle} />
         </Stack>
         <Stepper nonLinear activeStep={i} orientation={vertical ? "vertical" : "horizontal"} alternativeLabel={!vertical}>
           {STAGES.map((s) => {
@@ -279,7 +284,7 @@ export function CyclesPage() {
                   <TableCell sx={{ whiteSpace: "nowrap" }}>
                     {fmt(c.start_date)} – {fmt(c.end_date)}
                   </TableCell>
-                  <TableCell>{fmt(c.exemption_deadline)}</TableCell>
+                  <TableCell>{c.exemption_deadline ? fmt(deadlineDay(c.exemption_deadline)) : "—"}</TableCell>
                   <TableCell>
                     <Chip size="small" label={stageLabel(c.status)} color={c.status === "published" ? "success" : "default"} />
                   </TableCell>

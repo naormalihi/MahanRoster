@@ -962,6 +962,20 @@ function ScoringTab() {
               <TextField type="time" label="לילה – עד" value={nightTo} onChange={(e) => setS({ ...s, night_window: `${nightFrom}-${e.target.value}` })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
             </Stack>
           </Box>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              סגירת אילוצים ופטורים במחזור חדש
+            </Typography>
+            <TextField
+              type="number"
+              label="ימים לפני תחילת המחזור"
+              value={s.exemption_deadline_days}
+              onChange={(e) => setS({ ...s, exemption_deadline_days: Math.round(Number(e.target.value)) })}
+              slotProps={{ htmlInput: { min: 1, max: 180, step: 1 } }}
+              helperText="ברירת המחדל כשיוצרים מחזור. את המועד של כל מחזור אפשר לשנות במסך האילוצים שלו."
+              sx={{ maxWidth: 320 }}
+            />
+          </Box>
           {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
           <Box>
             <Button variant="contained" onClick={save} disabled={busy || !dirty}>
