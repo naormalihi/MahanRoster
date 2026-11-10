@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "./api";
+import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
 import { SCORING_KEYS, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import {
@@ -646,6 +646,35 @@ export class SupabaseApi implements Api {
 
   async addSlot(cycleId: string, k: NewSlot) {
     maybe(await this.sb.from("slots").insert({ ...k, cycle_id: cycleId }));
+  }
+
+  async slotPeople(slotId: string): Promise<SlotPeople | null> {
+    const { data: sl, error } = await this.sb
+      .from("slots")
+      .select("id, cycle_id, starts_at, ends_at, task_types(name), cycles(status)")
+      .eq("id", slotId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!sl) return null;
+    const rows = check(
+      await this.sb.from("assignments").select("id, role, status, replaced_assignment_id, soldiers(full_name)").eq("slot_id", slotId).neq("status", "draft"),
+    ) as unknown as { id: string; role: "performer" | "reserve"; status: string; replaced_assignment_id: string | null; soldiers: { full_name: string } | null }[];
+    const s = sl as unknown as { id: string; cycle_id: string; starts_at: string; ends_at: string; task_types: { name: string } | null; cycles: { status: string } | null };
+    return {
+      slot: {
+        id: s.id,
+        cycle_id: s.cycle_id,
+        starts_at: s.starts_at,
+        ends_at: s.ends_at,
+        task_name: s.task_types?.name ?? "",
+        published: s.cycles?.status === "published",
+      },
+      people: rows.map((r) => ({ id: r.id, name: r.soldiers?.full_name ?? "?", role: r.role, status: r.status, replaced_id: r.replaced_assignment_id })),
+    };
+  }
+
+  async undoReserveActivation(reserveId: string) {
+    maybe(await this.sb.rpc("undo_reserve_activation", { p_reserve: reserveId }));
   }
 
   async activateReserve(reserveId: string, fromUnit: number, performerId: string | null, note: string | null) {

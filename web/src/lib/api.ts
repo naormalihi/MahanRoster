@@ -69,6 +69,23 @@ export interface BoardRow {
   /** The gaf of each performer / reserve, in the order of the names. */
   performer_gafim?: string[];
   reserve_gafim?: string[];
+  cycle_id?: string;
+  /** performers who came in as an activated reserve, and the performers they replaced */
+  activated?: string[];
+  replaced?: string[];
+}
+
+/** The people of one published duty, for the actions on it (staff). */
+export interface SlotPerson {
+  id: string; // assignment id
+  name: string;
+  role: "performer" | "reserve";
+  status: string;
+  replaced_id: string | null; // an activated reserve: the performer he replaced
+}
+export interface SlotPeople {
+  slot: { id: string; cycle_id: string; starts_at: string; ends_at: string; task_name: string; published: boolean };
+  people: SlotPerson[];
 }
 
 export interface NamedRef {
@@ -102,6 +119,10 @@ export interface Api {
   setUnitKeyCheck(value: string): Promise<void>;
   /** A forgotten unit key: moves the approved soldiers to keys made with the new one, and stores its fingerprint. */
   rekeySoldiers(pairs: { id: string; key: string }[], check: string): Promise<number>;
+  /** The people of a published duty with their assignment ids (staff). */
+  slotPeople(slotId: string): Promise<SlotPeople | null>;
+  /** Undoes a reserve activation while the duty has not started. */
+  undoReserveActivation(reserveId: string): Promise<void>;
   applyRoster(plan: RosterPlan): Promise<ApplyResult>;
   soldierDetails(): Promise<SoldierDetail[]>;
   updateSoldiers(ids: string[], patch: SoldierPatch): Promise<void>;

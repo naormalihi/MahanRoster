@@ -34,9 +34,12 @@ import { useAuth } from "../lib/auth";
 import type { NewSlot, SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import { useCycle } from "../lib/cycleContext";
-import { dayLabel, timeLabel } from "../lib/dates";
+import { dayKey, dayLabel, timeLabel } from "../lib/dates";
+import { announceBoardChange, SlotActionsDialog } from "../components/SlotActions";
+import SearchIcon from "@mui/icons-material/Search";
 import type { DraftAssignment } from "../lib/draft";
 import { isActive, type ScheduleJob } from "../lib/schedule";
+import { pendingSlots } from "../lib/workspace";
 
 /** "2026-11-10T08:00" in Israel time for a date + "HH:MM" (the browser runs in Israel time). */
 const localInput = (d: Date) => {
@@ -145,94 +148,6 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
 const live = (a: DraftAssignment) => a.status !== "draft";
 const performs = (a: DraftAssignment) => a.role === "performer" || a.status === "reserve_activated";
 
-/** Day units of a duty (24 h each from its start; a remainder is one more). */
-export const dayUnits = (startIso: string, endIso: string) =>
-  Math.max(1, Math.ceil((Date.parse(endIso) - Date.parse(startIso)) / 86_400_000 - 1e-9));
-
-function ActivateDialog(props: {
-  slot: SlotRow;
-  taskName: string;
-  reserve: DraftAssignment;
-  performers: DraftAssignment[];
-  name: (id: string) => string;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const { api } = useAuth();
-  const units = dayUnits(props.slot.starts_at, props.slot.ends_at);
-  const [from, setFrom] = useState(0);
-  const [performer, setPerformer] = useState(props.performers[0]?.id ?? "");
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const dayOf = (i: number) => {
-    const d = new Date(Date.parse(props.slot.starts_at) + i * 86_400_000).toISOString();
-    return `${dayLabel(d)} ${timeLabel(d)}`;
-  };
-  async function save() {
-    setBusy(true);
-    try {
-      await api!.activateReserve(props.reserve.id, from, performer || null, note.trim() || null);
-      props.onDone();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  }
-  return (
-    <Dialog open onClose={props.onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>הפעלת עתודה – {props.taskName}</DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={2}>
-          <Typography>
-            העתודה <b>{props.name(props.reserve.soldier_id)}</b> מחליפה את המבצע.
-          </Typography>
-          {props.performers.length > 1 && (
-            <TextField select label="המבצע שמוחלף" value={performer} onChange={(e) => setPerformer(e.target.value)} fullWidth>
-              {props.performers.map((p) => (
-                <MenuItem key={p.id} value={p.id}>
-                  {props.name(p.soldier_id)}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
-          {props.performers.length === 1 && (
-            <Typography variant="body2" color="text.secondary">
-              המבצע שמוחלף: {props.name(props.performers[0].soldier_id)}
-            </Typography>
-          )}
-          {units > 1 && (
-            <TextField select label="העתודה מבצעת מ" value={from} onChange={(e) => setFrom(Number(e.target.value))} fullWidth
-              helperText="כל אחד מקבל ניקוד על היממות שביצע">
-              {Array.from({ length: units }, (_, i) => (
-                <MenuItem key={i} value={i}>
-                  {i === 0 ? "תחילת התורנות – המבצע לא ביצע כלל" : `היממה ה-${i + 1} (${dayOf(i)})`}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
-          <TextField label="סיבה (לא חובה)" value={note} onChange={(e) => setNote(e.target.value)} fullWidth />
-          <Alert severity="info" icon={false}>
-            {from === 0 ? "המבצע יסומן \"הופל\" ולא יקבל ניקוד. " : ""}
-            אחרי ההפעלה חסרה עתודה לתורנות; היא תופיע למעלה, וההרצה תציע עתודה חדשה.
-          </Alert>
-        </Stack>
-      </DialogContent>
-      {error && (
-        <Alert severity="error" sx={{ mx: 2, mt: 1.5 }}>
-          {error}
-        </Alert>
-      )}
-      <DialogActions>
-        <Button onClick={props.onClose}>ביטול</Button>
-        <Button variant="contained" color="warning" onClick={save} disabled={busy || !performer}>
-          הפעלת העתודה
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
 export function OperatePage() {
   const { api } = useAuth();
   const { cycle, cycleId } = useCycle();
@@ -242,8 +157,8 @@ export function OperatePage() {
   const [assignments, setAssignments] = useState<DraftAssignment[]>([]);
   const [jobs, setJobs] = useState<ScheduleJob[]>([]);
   const [adding, setAdding] = useState(false);
-  const [activating, setActivating] = useState<{ slot: SlotRow; reserve: DraftAssignment } | null>(null);
-  const [days, setDays] = useState(14);
+  const [openSlot, setOpenSlot] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -264,6 +179,7 @@ export function OperatePage() {
     setSlots(sl);
     setAssignments(as);
     setJobs(jb);
+    announceBoardChange(); // the cycle's step marks follow
   }, [api, cycleId]);
   useEffect(() => {
     load().catch((e) => setMsg({ ok: false, text: (e as Error).message }));
@@ -282,19 +198,24 @@ export function OperatePage() {
     return <Alert severity="info">התפעול השוטף נפתח אחרי שהמחזור מתפרסם. עד אז כל שינוי נעשה בטיוטה.</Alert>;
 
   const of = (id: string) => assignments.filter((a) => a.slot_id === id);
-  // future duties missing a published performer or reserve: added after publishing, left
-  // unfilled, or a reserve that was activated
-  const pending = slots.filter((k) => {
-    if (Date.parse(k.ends_at) <= Date.now()) return false;
-    const mine = of(k.id).filter(live);
-    return mine.filter(performs).length < k.performers_needed || mine.filter((a) => !performs(a)).length < k.reserves_needed;
-  });
+  const pending = pendingSlots(slots, assignments);
   const drafts = (id: string) => of(id).filter((a) => a.status === "draft");
-  const horizon = Date.now() + days * 86_400_000;
-  const upcoming = slots.filter((k) => Date.parse(k.ends_at) > Date.now() && Date.parse(k.starts_at) < horizon && of(k.id).some(live));
   const withDraft = pending.filter((k) => drafts(k.id).length > 0);
   const lastStability = jobs.find((j) => j.kind === "stability");
   const name = (id: string) => soldiers.get(id)?.full_name ?? "?";
+  // search: soldier name, duty name or a date like 6.1 / 06/01
+  const terms = search.trim().split(/\s+/).filter(Boolean);
+  const dateOf = (iso: string) => {
+    const [y, m, d] = dayKey(iso).split("-").map(Number);
+    return [`${d}.${m}`, `${d}/${m}`, `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`, `${d}.${m}.${y}`, `${d}/${m}/${y}`];
+  };
+  const found = terms.length
+    ? slots.filter((k) => {
+        if (Date.parse(k.ends_at) <= Date.now() || !of(k.id).some(live)) return false;
+        const hay = [taskName.get(k.task_type_id) ?? "", ...of(k.id).filter(live).map((a) => name(a.soldier_id)), ...dateOf(k.starts_at)].join(" ");
+        return terms.every((t) => hay.includes(t));
+      })
+    : [];
 
   async function run(f: () => Promise<unknown>, ok: string | null) {
     setBusy(true);
@@ -404,85 +325,57 @@ export function OperatePage() {
       </Paper>
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={2}>
-          <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-            <Typography variant="h3" sx={{ flex: 1 }}>
-              הפעלת עתודה
-            </Typography>
-            <TextField select size="small" label="טווח" value={days} onChange={(e) => setDays(Number(e.target.value))} sx={{ width: 150 }}>
-              {[7, 14, 30, 90, 200].map((d) => (
-                <MenuItem key={d} value={d}>
-                  {d === 200 ? "עד סוף המחזור" : `${d} ימים קדימה`}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
-          {upcoming.length === 0 ? (
-            <Typography color="text.secondary">אין תורנויות מפורסמות בטווח הזה.</Typography>
-          ) : (
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>מועד</TableCell>
-                    <TableCell>תורנות</TableCell>
-                    <TableCell>מבצע</TableCell>
-                    <TableCell>עתודה</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {upcoming.map((k) => {
-                    const mine = of(k.id).filter(live);
-                    return (
-                      <TableRow key={k.id}>
-                        <TableCell sx={{ whiteSpace: "nowrap" }}>
-                          {dayLabel(k.starts_at)} {timeLabel(k.starts_at)}
-                        </TableCell>
-                        <TableCell>{taskName.get(k.task_type_id) ?? "?"}</TableCell>
-                        <TableCell>
-                          {mine.filter(performs).map((a) => (
-                            <Typography key={a.id} variant="body2">
-                              {name(a.soldier_id)}
-                              {a.status === "reserve_activated" && <Chip size="small" color="warning" label="עתודה שהופעלה" sx={{ mx: 0.75 }} />}
-                              {a.status === "done" && <Chip size="small" label="ביצע חלק" sx={{ mx: 0.75 }} />}
-                            </Typography>
-                          ))}
-                        </TableCell>
-                        <TableCell>
-                          {mine
-                            .filter((a) => a.role === "reserve" && a.status === "reserve_idle")
-                            .map((a) => (
-                              <Stack key={a.id} direction="row" sx={{ alignItems: "center", gap: 1 }}>
-                                <Typography variant="body2">{name(a.soldier_id)}</Typography>
-                                <Button size="small" color="warning" onClick={() => setActivating({ slot: k, reserve: a })}>
-                                  הפעלה
-                                </Button>
-                              </Stack>
-                            ))}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Box>
+          <Typography variant="h3">הפעלת עתודה וביטול הפעלה</Typography>
+          <Typography variant="body2" color="text.secondary">
+            הדרך המהירה: בלוח המפורסם לוחצים על התורנות. כאן אפשר לחפש תורנות לפי שם חייל, שם תורנות או תאריך, בכל המחזור.
+          </Typography>
+          <TextField
+            size="small"
+            label="חיפוש"
+            placeholder="למשל: כהן, קצין תורן, 6.1"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            slotProps={{ input: { startAdornment: <SearchIcon fontSize="small" sx={{ ml: 1, color: "text.secondary" }} /> } }}
+            sx={{ maxWidth: 420 }}
+          />
+          {search.trim() && (
+            found.length === 0 ? (
+              <Typography color="text.secondary">לא נמצאו תורנויות מפורסמות שעוד לא הסתיימו.</Typography>
+            ) : (
+              <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+                {found.slice(0, 30).map((k) => {
+                  const mine = of(k.id).filter(live);
+                  return (
+                    <Box
+                      key={k.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setOpenSlot(k.id)}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setOpenSlot(k.id))}
+                      sx={{ py: 1, px: 0.5, cursor: "pointer", borderRadius: 1, "&:hover": { bgcolor: "action.hover" } }}
+                    >
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {taskName.get(k.task_type_id) ?? "?"} · {dayLabel(k.starts_at)} {timeLabel(k.starts_at)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {mine.filter(performs).map((a) => name(a.soldier_id) + (a.status === "reserve_activated" ? " (עתודה שהופעלה)" : "")).join(", ") || "לא מאויש"}
+                        {" · עתודה: "}
+                        {mine.filter((a) => a.role === "reserve" && a.status === "reserve_idle").map((a) => name(a.soldier_id)).join(", ") || "—"}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+                {found.length > 30 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ pt: 1 }}>
+                    ועוד {found.length - 30} – צמצם את החיפוש
+                  </Typography>
+                )}
+              </Stack>
+            )
           )}
         </Stack>
       </Paper>
-      {activating && (
-        <ActivateDialog
-          slot={activating.slot}
-          taskName={taskName.get(activating.slot.task_type_id) ?? ""}
-          reserve={activating.reserve}
-          performers={of(activating.slot.id).filter((a) => a.role === "performer" && a.status === "assigned")}
-          name={name}
-          onClose={() => setActivating(null)}
-          onDone={() => {
-            setActivating(null);
-            setMsg({ ok: true, text: "העתודה הופעלה. התורנות מחכה לעתודה חדשה למעלה." });
-            void load();
-          }}
-        />
-      )}
+      {openSlot && <SlotActionsDialog slotId={openSlot} onClose={() => setOpenSlot(null)} onChanged={() => void load()} />}
       {adding && (
         <AddSlotDialog
           tasks={tasks}

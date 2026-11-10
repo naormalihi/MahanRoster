@@ -21,7 +21,7 @@ import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-d
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel, type Cycle } from "../lib/cycles";
-import { nextAction, STEPS, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
+import { pendingSlots, nextAction, STEPS, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
 import { StagePanel } from "./CyclesPage";
 
 const ConstraintsPage = lazy(() => import("./ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
@@ -46,22 +46,29 @@ export function useCycleFacts(cycle: Cycle | undefined) {
   const [facts, setFacts] = useState<CycleFacts | null>(null);
   const load = useCallback(async () => {
     if (!cycle) return setFacts(null);
-    const [ex, slots, jobs] = await Promise.all([
+    const published = cycle.status === "published";
+    const [ex, slots, jobs, assignments] = await Promise.all([
       api!.exemptions(cycle.start_date, cycle.end_date),
       api!.cycleSlots(cycle.id),
       api!.scheduleJobs(cycle.id),
+      published ? api!.draftAssignments(cycle.id) : Promise.resolve([]),
     ]);
     const job = jobs.find((j) => j.kind === "full" || j.kind === "stability") ?? null;
     setFacts({
       pendingExemptions: ex.filter((e) => e.status === "pending").length,
       slots: slots.length,
       job: job && { status: job.status, unfilled: (job.unfilled ?? []).filter((u) => u.role === "performer").reduce((s, u) => s + u.missing, 0) },
-      pendingAdditions:
-        cycle.status === "published" ? slots.filter((k) => k.assigned === 0 && Date.parse(k.ends_at) > Date.now()).length : 0,
+      pendingAdditions: published ? pendingSlots(slots, assignments).length : 0,
     });
   }, [api, cycle]);
   useEffect(() => {
     load().catch(() => setFacts({ pendingExemptions: 0, slots: 0, job: null }));
+  }, [load]);
+  // a change on the published board (activation, staffing) updates the step marks
+  useEffect(() => {
+    const on = () => void load().catch(() => undefined);
+    window.addEventListener("mahanroster:board-changed", on);
+    return () => window.removeEventListener("mahanroster:board-changed", on);
   }, [load]);
   return { facts, reload: load };
 }
