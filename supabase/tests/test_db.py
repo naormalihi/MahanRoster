@@ -1084,4 +1084,25 @@ def test_tash7_is_an_exemption_type(conn):
         kind, hours, scope = conn.execute("select kind, restricted_hours, excluded_task_type_ids from exemptions where soldier_id = %s and exemption_type_id = %s", (sid, tid)).fetchone()
         assert kind == "partial" and hours == "22:00-06:00" and scope is None
         assert conn.execute("select app.home_nightly_on(s, current_date) from soldiers s where id = %s", (sid,)).fetchone()[0]
+def test_exemption_after_publish_activates_the_reserve(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a, b, c = [r[0] for r in conn.execute("select id from soldiers where is_active order by id desc limit 3").fetchall()]
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '10 days', now() + interval '11 days') returning id", (cycle, tid)).fetchone()[0]
+        p = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
+        r = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, paired_assignment_id) select %s, id, gaf_id, 'reserve', 'reserve_idle', %s from soldiers where id = %s returning id", (k, p, b)).fetchone()[0]
+        k2 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                          "(%s, %s, now() + interval '12 days', now() + interval '13 days') returning id", (cycle, tid)).fetchone()[0]
+        r2 = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'reserve', 'reserve_idle' from soldiers where id = %s returning id", (k2, a)).fetchone()[0]
+        etype = conn.execute("select id from exemption_types where not qualifies_day_only limit 1").fetchone()[0]
+        conn.execute("delete from exemption_type_duties where exemption_type_id = %s", (etype,))
+        conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+                        values (%s, %s, 'full', current_date, current_date + 20, 'approved', now())""", (a, etype))
+        assert conn.execute("select status from assignments where id = %s", (p,)).fetchone()[0] == "dropped"
+        st, pts = conn.execute("select status, points from assignments where id = %s", (r,)).fetchone()
+        assert st == "reserve_activated" and pts > 0
+        assert conn.execute("select status from assignments where id = %s", (r2,)).fetchone()[0] == "dropped"
         raise psycopg.Rollback()
