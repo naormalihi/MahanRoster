@@ -28,3 +28,15 @@ describe("fairness verdict", () => {
     expect(shortGroupName("קבע · ממלכ\"ת")).toBe("קבע · ממלכ\"ת");
   });
 });
+
+describe("why few duties", () => {
+  it("sums the reasons over the slots", async () => {
+    const { summarizeReasons } = await import("../draft");
+    const c = (reasons: string[], conflicts = 0, in_slot: "performer" | null = null) => ({
+      soldier_id: "a", reasons, conflicts: Array.from({ length: conflicts }, () => ({ slot_id: "k", task: "x", role: "performer" as const, starts_at: "", ends_at: "" })), cycle_points: 0, cycle_duties: 0, in_slot,
+    });
+    const out = summarizeReasons([c(["weapon_range"]), c(["weapon_range", "exemption"]), c([], 1), c([]), c([], 0, "performer"), undefined]);
+    expect(out[0]).toEqual({ reason: "weapon_range", slots: 2 });
+    expect(Object.fromEntries(out.map((x) => [x.reason, x.slots]))).toMatchObject({ exemption: 1, busy: 1, free: 1, assigned: 1 });
+  });
+});
