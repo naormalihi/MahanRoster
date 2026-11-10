@@ -964,6 +964,20 @@ function ScoringTab() {
           </Box>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
+              הוגנות בטיוטה
+            </Typography>
+            <TextField
+              type="number"
+              label="טווח מותר מהממוצע (%)"
+              value={s.fairness_tolerance_pct}
+              onChange={(e) => setS({ ...s, fairness_tolerance_pct: Number(e.target.value) })}
+              slotProps={{ htmlInput: { min: 1, max: 100, step: 1 } }}
+              helperText="במסך העומס, חייל שרחוק יותר מזה מממוצע מי שזכאים לאותן תורנויות מסומן כחורג (לפחות חצי נקודה)."
+              sx={{ maxWidth: 320 }}
+            />
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
               סגירת אילוצים ופטורים במחזור חדש
             </Typography>
             <TextField

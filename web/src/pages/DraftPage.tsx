@@ -1,6 +1,12 @@
 import PublishIcon from "@mui/icons-material/Publish";
 import SearchIcon from "@mui/icons-material/Search";
+import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
+import WarningIcon from "@mui/icons-material/WarningAmber";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -23,7 +29,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Tabs,
@@ -43,12 +48,12 @@ import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
+import { fairRows, shortGroupName, verdicts, type FairRow } from "../lib/fairness";
 import {
   ROLE_LABEL,
   byProfile,
   bySlot,
   loads,
-  poolMeans,
   rankCandidates,
   weeksOf,
   type Candidate,
@@ -251,7 +256,19 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
 
 type Only = "" | "missing" | "manual";
 
-function SlotsTab({ ctx, only, setOnly }: { ctx: Ctx; only: Only; setOnly: (o: Only) => void }) {
+function SlotsTab({
+  ctx,
+  only,
+  setOnly,
+  who,
+  setWho,
+}: {
+  ctx: Ctx;
+  only: Only;
+  setOnly: (o: Only) => void;
+  who?: string | null;
+  setWho?: (id: string | null) => void;
+}) {
   const weeks = useMemo(() => weeksOf(ctx.cycle.start_date, ctx.cycle.end_date), [ctx.cycle]);
   const firstWithWork = useMemo(() => {
     const first = ctx.slots[0]?.starts_at;
@@ -273,6 +290,7 @@ function SlotsTab({ ctx, only, setOnly }: { ctx: Ctx; only: Only; setOnly: (o: O
   const shown = ctx.slots.filter((s) => {
     const d = dayKey(s.starts_at);
     const v = views.get(s.id)!;
+    if (who) return [...v.performers, ...v.reserves].some((a) => a.soldier_id === who);
     if (only === "missing") return v.missingPerformers + v.missingReserves > 0 && (!task || s.task_type_id === task);
     if (only === "manual") return [...v.performers, ...v.reserves].some((a) => a.source === "manual") && (!task || s.task_type_id === task);
     return d >= wk && d <= wkEnd && (!task || s.task_type_id === task);
@@ -307,8 +325,13 @@ function SlotsTab({ ctx, only, setOnly }: { ctx: Ctx; only: Only; setOnly: (o: O
 
   return (
     <Stack spacing={2}>
+      {who && (
+        <Alert severity="info" action={<Button color="inherit" size="small" onClick={() => setWho?.(null)}>הצגת הכול</Button>}>
+          מוצגות התורנויות של <b>{ctx.soldiers.get(who)?.full_name}</b> בכל המחזור.
+        </Alert>
+      )}
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-        <TextField select size="small" label="שבוע" value={wk} onChange={(e) => setWeek(e.target.value)} disabled={!!only} sx={{ minWidth: 150 }}>
+        <TextField select size="small" label="שבוע" value={wk} onChange={(e) => setWeek(e.target.value)} disabled={!!only || !!who} sx={{ minWidth: 150 }}>
           {weeks.map((w) => (
             <MenuItem key={w} value={w}>
               {fmtDay(w)}
@@ -377,116 +400,349 @@ function SlotsTab({ ctx, only, setOnly }: { ctx: Ctx; only: Only; setOnly: (o: O
 // Load per soldier
 // ---------------------------------------------------------------------------
 
-function LoadTab({ ctx, snapshot, cells, categories }: { ctx: Ctx; snapshot: SnapshotSoldier[]; cells: PotentialCell[] | null; categories: Map<string, string> }) {
+function LoadTab({
+  ctx,
+  snapshot,
+  cells,
+  categories,
+  tolerance,
+  onShowSoldier,
+}: {
+  ctx: Ctx;
+  snapshot: SnapshotSoldier[];
+  cells: PotentialCell[] | null;
+  categories: Map<string, string>;
+  tolerance: number;
+  onShowSoldier: (soldierId: string) => void;
+}) {
   const ls = useMemo(() => loads(snapshot, ctx.assignments), [snapshot, ctx.assignments]);
-  const means = poolMeans(ls);
-  // a group's name: its population and the duty categories its soldiers share
   const groupName = useMemo(() => poolNames(snapshot), [snapshot]);
-  const keys = [...means.keys()].sort((a, b) => ls.filter((l) => l.pool === b).length - ls.filter((l) => l.pool === a).length);
+  const rank = new Map(snapshot.map((s) => [s.soldier_id, s.rank_name]));
+  // the duty categories each soldier is open to, by name (the potential matrix)
+  const openNames = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const c of cells ?? []) if (effective(c) > 0) m.set(c.soldier_id, [...(m.get(c.soldier_id) ?? []), categories.get(c.category_id) ?? "?"]);
+    return m;
+  }, [cells, categories]);
+  const profileOf = useCallback(
+    (id: string) => (cells ? [...(openNames.get(id) ?? [])].sort((a, b) => a.localeCompare(b, "he")).join(" + ") : "הכול"),
+    [cells, openNames],
+  );
+  const rows = useMemo(() => fairRows(ls, profileOf, tolerance), [ls, profileOf, tolerance]);
+  const verdict = useMemo(() => verdicts(rows), [rows]);
+  const keys = [...verdict.keys()].sort((a, b) => verdict.get(b)!.soldiers - verdict.get(a)!.soldiers);
   const [picked, setPool] = useState("");
   const pool = keys.includes(picked) ? picked : keys[0] ?? "";
+  const v = verdict.get(pool);
   const credited = ls.some((l) => l.creditDays > 0);
-  const rank = new Map(snapshot.map((s) => [s.soldier_id, s.rank_name]));
-  const open = new Map<string, number>();
-  for (const c of cells ?? []) if (effective(c) > 0) open.set(c.soldier_id, (open.get(c.soldier_id) ?? 0) + 1);
-  const shown = ls.filter((l) => l.pool === pool).sort((a, b) => b.expected - a.expected);
-  const mean = means.get(pool) ?? 0;
-  const zeroOpen = shown.filter((l) => cells && !open.get(l.soldier_id)).length;
-  const openNames = new Map<string, string[]>();
-  for (const c of cells ?? [])
-    if (effective(c) > 0) openNames.set(c.soldier_id, [...(openNames.get(c.soldier_id) ?? []), categories.get(c.category_id) ?? "?"]);
-  const profiles = cells ? byProfile(shown, (id) => [...(openNames.get(id) ?? [])]) : [];
+
+  const [q, setQ] = useState("");
+  const [gaf, setGaf] = useState("");
+  const [onlyOut, setOnlyOut] = useState(false);
+  const [sort, setSort] = useState<"diff" | "score" | "name">("score");
+  const [open, setOpen] = useState<FairRow | null>(null);
+
+  const inPool = rows.filter((r) => r.pool === pool);
+  const gafim = [...new Set(inPool.map((r) => ctx.soldiers.get(r.soldier_id)?.gaf_name ?? ""))].filter(Boolean).sort();
+  const name = (id: string) => ctx.soldiers.get(id)?.full_name ?? "?";
+  const shown = inPool
+    .filter((r) => (!q || name(r.soldier_id).includes(q.trim())) && (!gaf || ctx.soldiers.get(r.soldier_id)?.gaf_name === gaf) && (!onlyOut || r.outlier))
+    .sort((a, b) =>
+      sort === "name" ? name(a.soldier_id).localeCompare(name(b.soldier_id), "he") : sort === "diff" ? Math.abs(b.diff) - Math.abs(a.diff) : b.expected - a.expected,
+    );
+  const top = Math.max(1, ...inPool.map((r) => Math.max(r.expected, r.ref + r.limit)));
+  const profiles = cells ? byProfile(inPool, (id) => [...(openNames.get(id) ?? [])]) : [];
+  const notCompared = inPool.filter((r) => !r.compared).length;
+  // a signed number keeps its sign on the left inside Hebrew text
+  const sign = (n: number) => `\u2066${n > 0 ? "+" : ""}${n.toFixed(1)}\u2069`;
+
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-        {keys.map((p) => (
-          <Chip
-            key={p}
-            label={`${poolName(groupName, p)} · ${ls.filter((l) => l.pool === p).length} · ממוצע ${(means.get(p) ?? 0).toFixed(1)}`}
-            color={p === pool ? "primary" : "default"}
-            onClick={() => setPool(p)}
-          />
-        ))}
+        {keys.map((p) => {
+          const g = verdict.get(p)!;
+          const bad = g.outliers.length > 0;
+          return (
+            <Tooltip key={p} title={poolName(groupName, p)}>
+              <Chip
+                icon={bad ? <WarningIcon /> : <CheckIcon />}
+                label={`${shortGroupName(poolName(groupName, p))} (${g.soldiers})${bad ? ` · ${g.outliers.length} חורגים` : ""}`}
+                color={p === pool ? "primary" : bad ? "warning" : "default"}
+                variant={p === pool ? "filled" : "outlined"}
+                onClick={() => setPool(p)}
+              />
+            </Tooltip>
+          );
+        })}
       </Stack>
-      <Typography variant="body2" color="text.secondary">
-        כל קבוצה כוללת חיילים מאותה אוכלוסייה שיכולים להתחלק בעומס (יש להם קטגוריות תורנות משותפות). ההוגנות והממוצע נמדדים בתוך הקבוצה.
-        {credited && " זיכוי = ימים מחוץ ליחידה שלא מבחירה (לפני גיוס, אחרי שחרור, חודש חסד, פטור מלא, קורס או מחלה ארוכים) כפול העומס היומי הממוצע של הקבוצה."}
-      </Typography>
-      {cells && zeroOpen > 0 && (
-        <Alert severity="info">
-          {zeroOpen} חיילים בקבוצה הזו לא זכאים לאף קטגוריית תורנות לפי מטריצת הפוטנציאל, ולכן הניקוד שלהם 0. הם נכללים בממוצע ומושכים אותו למטה – זה
-          לא חוסר הוגנות בשיבוץ.
-        </Alert>
-      )}
-      {profiles.length > 0 && (
-        <Paper variant="outlined" sx={{ p: 1.5 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            לפי מה שהחיילים יכולים לעשות – הוגנות נמדדת בין מי שזכאים לאותן תורנויות
-          </Typography>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                {["קטגוריות פתוחות", "חיילים", "ממוצע", "מינימום", "מקסימום"].map((h) => (
-                  <TableCell key={h}>{h}</TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {profiles.map((p) => (
-                <TableRow key={p.key}>
-                  <TableCell>{p.key}</TableCell>
-                  <TableCell>{p.soldiers}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{p.mean.toFixed(1)}</TableCell>
-                  <TableCell>{p.min.toFixed(1)}</TableCell>
-                  <TableCell sx={{ color: p.max - p.min > 8 ? "error.main" : undefined }}>{p.max.toFixed(1)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
-      )}
-      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: "65vh" }}>
-        <Table size="small" stickyHeader>
-          <TableHead>
-            <TableRow>
-              {["חייל", "גף", "דרגה", "ניקוד קודם", ...(credited ? ["זיכוי"] : []), "במחזור", "צפוי", "מול הממוצע", "תורנויות", "עתודות", "סופ״ש", "קטגוריות פתוחות"].map((h) => (
-                <TableCell key={h} sx={{ whiteSpace: "nowrap" }}>
-                  {h}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {shown.map((l) => {
-              const s = ctx.soldiers.get(l.soldier_id);
-              const diff = l.expected - mean;
-              return (
-                <TableRow key={l.soldier_id} hover>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>
+
+      {v &&
+        (v.outliers.length === 0 ? (
+          <Alert severity="success">
+            <b>הוגן:</b> כל {v.compared} החיילים שנבדקו בקבוצה בטווח של ±{tolerance}% מממוצע מי שזכאים לאותן תורנויות.
+          </Alert>
+        ) : (
+          <Alert severity="warning">
+            <b>{v.outliers.length} חורגים</b> מטווח ±{tolerance}%. הכי רחוק: {name(v.outliers[0].soldier_id)} {sign(v.outliers[0].diff)} נק׳ (ממוצע
+            עמיתיו {v.outliers[0].ref.toFixed(1)}).
+            <Button size="small" sx={{ mr: 1 }} onClick={() => setOnlyOut(true)}>
+              הצגת החורגים
+            </Button>
+          </Alert>
+        ))}
+
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "2fr 1fr 1fr auto" }, alignItems: "center", mb: 1.5 }}>
+          <TextField
+            size="small"
+            placeholder="חיפוש לפי שם"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+            sx={{ gridColumn: { xs: "1 / -1", sm: "auto" } }}
+          />
+          <TextField size="small" select label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)}>
+            <MenuItem value="">כל הגפים</MenuItem>
+            {gafim.map((g) => (
+              <MenuItem key={g} value={g}>
+                {g}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField size="small" select label="מיון" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <MenuItem value="score">לפי ניקוד</MenuItem>
+            <MenuItem value="diff">לפי פער מהממוצע</MenuItem>
+            <MenuItem value="name">לפי שם</MenuItem>
+          </TextField>
+          <FormControlLabel control={<Switch checked={onlyOut} onChange={(e) => setOnlyOut(e.target.checked)} />} label="רק חורגים" />
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+          הפס = הניקוד הצפוי (קודם + זיכוי + המחזור). הקו = ממוצע מי שזכאים לאותן תורנויות, והרקע סביבו = הטווח המותר. לחיצה על חייל מציגה את
+          הפירוט.
+        </Typography>
+        <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+          {shown.map((r) => {
+            const s = ctx.soldiers.get(r.soldier_id);
+            const pct = (n: number) => `${Math.max(0, Math.min(100, (n / top) * 100))}%`;
+            return (
+              <Box
+                key={r.soldier_id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpen(r)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setOpen(r))}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr 76px", sm: "200px 1fr 92px" },
+                  gap: { xs: 0.5, sm: 1.5 },
+                  alignItems: "center",
+                  py: 0.75,
+                  px: 0.5,
+                  cursor: "pointer",
+                  borderRadius: 1,
+                  "&:hover": { bgcolor: "action.hover" },
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 14 }} noWrap>
                     {s?.full_name}
-                    {l.manual > 0 && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5 }} />}
-                  </TableCell>
-                  <TableCell>{s?.gaf_name}</TableCell>
-                  <TableCell>{rank.get(l.soldier_id)}</TableCell>
-                  <TableCell>{l.baseline.toFixed(1)}</TableCell>
-                  {credited && <TableCell title={l.creditDays ? `${l.creditDays} ימים` : undefined}>{l.creditDays ? `${l.credit.toFixed(1)} (${l.creditDays} י׳)` : ""}</TableCell>}
-                  <TableCell>{l.points.toFixed(1)}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{l.expected.toFixed(1)}</TableCell>
-                  <TableCell sx={{ color: Math.abs(diff) > 5 ? (diff > 0 ? "error.main" : "info.main") : undefined }}>
-                    {diff > 0 ? "+" : ""}
-                    {diff.toFixed(1)}
-                  </TableCell>
-                  <TableCell>{l.duties}</TableCell>
-                  <TableCell>{l.reserves}</TableCell>
-                  <TableCell>{l.weekends}</TableCell>
-                  <TableCell>{cells ? open.get(l.soldier_id) ?? 0 : "—"}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                    {r.manual > 0 && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5, height: 18 }} />}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap component="div">
+                    {s?.gaf_name} · {rank.get(r.soldier_id)} · {r.duties} תורנויות{r.weekends ? ` · ${r.weekends} סופ״ש` : ""}
+                    {r.reserves ? ` · ${r.reserves} עתודות` : ""}
+                  </Typography>
+                </Box>
+                <Box sx={{ position: "relative", height: 14, gridColumn: { xs: "1 / -1", sm: "auto" }, gridRow: { xs: 2, sm: "auto" } }}>
+                  {r.compared && (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        insetInlineStart: pct(Math.max(0, r.ref - r.limit)),
+                        width: `calc(${pct(r.ref + r.limit)} - ${pct(Math.max(0, r.ref - r.limit))})`,
+                        top: 0,
+                        bottom: 0,
+                        bgcolor: "action.selected",
+                        borderRadius: 0.5,
+                      }}
+                    />
+                  )}
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      insetInlineStart: 0,
+                      width: pct(r.expected),
+                      top: 3,
+                      bottom: 3,
+                      borderRadius: 0.5,
+                      bgcolor: !r.compared ? "grey.400" : r.outlier ? (r.diff > 0 ? "warning.main" : "info.main") : "primary.main",
+                    }}
+                  />
+                  {r.compared && (
+                    <Box sx={{ position: "absolute", insetInlineStart: pct(r.ref), top: -2, bottom: -2, width: 2, bgcolor: "text.primary" }} />
+                  )}
+                </Box>
+                <Box sx={{ textAlign: "end" }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 14 }}>{r.expected.toFixed(1)}</Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: !r.compared ? "text.disabled" : r.outlier ? (r.diff > 0 ? "warning.dark" : "info.dark") : "text.secondary" }}
+                  >
+                    {r.compared ? sign(r.diff) : "לא נבדק"}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+          {shown.length === 0 && (
+            <Typography color="text.secondary" sx={{ py: 2 }}>
+              {onlyOut ? "אין חורגים בקבוצה הזו." : "אין חיילים שמתאימים לחיפוש."}
+            </Typography>
+          )}
+        </Stack>
+      </Paper>
+
+      <Accordion variant="outlined" disableGutters>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2">פירוט לפי קטגוריות{notCompared ? ` · ${notCompared} לא נבדקו` : ""}</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Stack spacing={1.5}>
+            <Typography variant="body2" color="text.secondary">
+              קבוצה = חיילים מאותה אוכלוסייה שיכולים להתחלק בעומס. בתוכה, כל חייל נמדד מול מי שזכאים לאותן קטגוריות תורנות. חייל שלא זכאי לאף
+              קטגוריה, או שהוא היחיד בצירוף שלו, לא נבדק.
+              {credited && " זיכוי = ימים מחוץ ליחידה שלא מבחירה, כפול העומס היומי הממוצע של הקבוצה."}
+            </Typography>
+            {profiles.length > 0 && (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    {["קטגוריות פתוחות", "חיילים", "ממוצע", "מינימום", "מקסימום"].map((h) => (
+                      <TableCell key={h}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {profiles.map((p) => (
+                    <TableRow key={p.key}>
+                      <TableCell>{p.key}</TableCell>
+                      <TableCell>{p.soldiers}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{p.mean.toFixed(1)}</TableCell>
+                      <TableCell>{p.min.toFixed(1)}</TableCell>
+                      <TableCell>{p.max.toFixed(1)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
+
+      {open && (
+        <SoldierLoadDialog
+          ctx={ctx}
+          row={open}
+          rankName={rank.get(open.soldier_id) ?? ""}
+          tolerance={tolerance}
+          onClose={() => setOpen(null)}
+          onShowSlots={() => {
+            onShowSoldier(open.soldier_id);
+            setOpen(null);
+          }}
+        />
+      )}
     </Stack>
+  );
+}
+
+/** One soldier's load: how the score is built, and his duties in the draft. */
+function SoldierLoadDialog(props: { ctx: Ctx; row: FairRow; rankName: string; tolerance: number; onClose: () => void; onShowSlots: () => void }) {
+  const { ctx, row: r } = props;
+  const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
+  const s = ctx.soldiers.get(r.soldier_id);
+  const slotOf = new Map(ctx.slots.map((k) => [k.id, k]));
+  const mine = ctx.assignments
+    .filter((a) => a.soldier_id === r.soldier_id && !["dropped", "swapped_out", "cancelled_approved"].includes(a.status))
+    .map((a) => ({ a, k: slotOf.get(a.slot_id) }))
+    .filter((x) => x.k)
+    .sort((x, y) => x.k!.starts_at.localeCompare(y.k!.starts_at));
+  return (
+    <Dialog open onClose={props.onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        {s?.full_name}
+        <Typography variant="body2" color="text.secondary">
+          {s?.gaf_name} · {props.rankName}
+          {r.profile && r.profile !== "הכול" ? ` · זכאי ל: ${r.profile}` : ""}
+        </Typography>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, textAlign: "center" }}>
+            {(
+              [
+                ["קודם", r.baseline],
+                ["זיכוי", r.credit],
+                ["במחזור", r.points],
+                ["צפוי", r.expected],
+              ] as [string, number][]
+            ).map(([label, n]) => (
+              <Paper key={label} variant="outlined" sx={{ p: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {label}
+                </Typography>
+                <Typography sx={{ fontWeight: label === "צפוי" ? 700 : 500 }}>{n.toFixed(1)}</Typography>
+              </Paper>
+            ))}
+          </Box>
+          {r.creditDays > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              זיכוי על {r.creditDays} ימים מחוץ ליחידה שלא מבחירה.
+            </Typography>
+          )}
+          {r.compared ? (
+            <Alert severity={r.outlier ? "warning" : "success"} icon={false}>
+              ממוצע מי שזכאים לאותן תורנויות: {r.ref.toFixed(1)} · הפער: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`} (מותר ±
+              {r.limit.toFixed(1)}, {props.tolerance}%){r.outlier ? " – חורג" : " – בטווח"}
+            </Alert>
+          ) : (
+            <Alert severity="info" icon={false}>
+              לא נבדק: {r.profile ? "הוא היחיד בקבוצה עם הצירוף הזה של תורנויות" : "לא זכאי לאף קטגוריית תורנות"}.
+            </Alert>
+          )}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              התורנויות שלו בטיוטה ({mine.length})
+            </Typography>
+            {mine.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                אין.
+              </Typography>
+            ) : (
+              <Table size="small">
+                <TableBody>
+                  {mine.map(({ a, k }) => (
+                    <TableRow key={a.id}>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{dayFmt.format(new Date(k!.starts_at))}</TableCell>
+                      <TableCell>
+                        {ctx.tasks.get(k!.task_type_id)?.name}
+                        {a.role === "reserve" && <Chip size="small" variant="outlined" label="עתודה" sx={{ mr: 0.5 }} />}
+                        {a.source === "manual" && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5 }} />}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: "end" }}>{a.role === "performer" ? `${a.normalized_points} נק׳` : ""}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Box>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={props.onShowSlots}>הצגה ב"לפי משבצת"</Button>
+        <Button onClick={props.onClose}>סגירה</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -506,12 +762,15 @@ export function DraftPage() {
   const [categories, setCategories] = useState<Map<string, string>>(new Map());
   const [tab, setTab] = useState<"slots" | "load">("slots");
   const [only, setOnly] = useState<Only>("");
+  const [who, setWho] = useState<string | null>(null); // the slots list shows one soldier's duties
+  const [tolerance, setTolerance] = useState(20);
   const navigate = useNavigate();
   const [publishing, setPublishing] = useState(false);
   const [unpublishing, setUnpublishing] = useState<UnpublishImpact | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
+    api!.scoringSettings().then((x) => setTolerance(x.fairness_tolerance_pct), () => undefined);
     Promise.all([api!.cycles(), api!.taskTypes(), api!.soldiers(), api!.dutyCategories()])
       .then(([c, t, s, cats]) => {
         setCategories(new Map(cats.map((x) => [x.id, x.name])));
@@ -589,9 +848,10 @@ export function DraftPage() {
                 // the counters are the filters of the slot list; after publishing, gaps are filled in operations
                 const show = (o: Only) => {
                   setTab("slots");
+                  setWho(null);
                   setOnly(o);
                 };
-                const active = (o: Only) => tab === "slots" && only === o;
+                const active = (o: Only) => tab === "slots" && only === o && !who;
                 const manualCount = assignments.filter((a) => a.source === "manual").length;
                 const gaps = missing + missingR > 0;
                 return (
@@ -642,7 +902,22 @@ export function DraftPage() {
           </Tabs>
           {(() => {
             const ctx: Ctx = { cycle, slots, tasks, soldiers, assignments, reload: load, locked: locked || !canEdit };
-            return tab === "slots" ? <SlotsTab ctx={ctx} only={only} setOnly={setOnly} /> : <LoadTab ctx={ctx} snapshot={snapshot} cells={cells} categories={categories} />;
+            return tab === "slots" ? (
+              <SlotsTab ctx={ctx} only={only} setOnly={setOnly} who={who} setWho={setWho} />
+            ) : (
+              <LoadTab
+                ctx={ctx}
+                snapshot={snapshot}
+                cells={cells}
+                categories={categories}
+                tolerance={tolerance}
+                onShowSoldier={(id) => {
+                  setWho(id);
+                  setOnly("");
+                  setTab("slots");
+                }}
+              />
+            );
           })()}
           {cycle.status === "published" && me?.roles.includes("coordinator") && (() => {
             const now = Date.now();

@@ -300,6 +300,7 @@ export class SupabaseApi implements Api {
       weekend_weekdays: (v.weekend_weekdays as number[]) ?? [],
       surprise_multiplier: v.surprise_multiplier == null ? 1.5 : Number(v.surprise_multiplier),
       exemption_deadline_days: v.exemption_deadline_days == null ? 40 : Number(v.exemption_deadline_days),
+      fairness_tolerance_pct: v.fairness_tolerance_pct == null ? 20 : Number(v.fairness_tolerance_pct),
     };
   }
 
