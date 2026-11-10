@@ -315,3 +315,24 @@ export function planImport(
   plan.unknownRanks = [...new Set(incoming.map((r) => r.rank_name).filter((r) => !rankSet.has(r)))].sort();
   return plan;
 }
+
+/** One field change of an existing soldier, as approved (or not) in the preview. */
+export const changeKey = (id: string, field: keyof SoldierRecord) => `${id}:${field}`;
+
+/**
+ * Keeps only the approved changes of existing soldiers: a change not approved is cleared from
+ * the record, so the load leaves the stored value as it is. A soldier left with no change is
+ * counted as unchanged – unless he returns to activity, which the file itself decides.
+ */
+export function approvePlan(plan: RosterPlan, approved: Set<string>): RosterPlan {
+  const updated: RosterPlan["updated"] = [];
+  let unchanged = plan.unchanged;
+  for (const u of plan.updated) {
+    const changes = u.changes.filter((f) => approved.has(changeKey(u.id, f)));
+    const after = { ...u.after } as Record<keyof SoldierRecord, unknown>;
+    for (const f of u.changes) if (!changes.includes(f)) after[f] = null;
+    if (changes.length || !u.before.is_active) updated.push({ ...u, after: after as unknown as SoldierRecord, changes });
+    else unchanged++;
+  }
+  return { ...plan, updated, unchanged };
+}

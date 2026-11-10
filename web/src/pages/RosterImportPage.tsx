@@ -6,6 +6,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   LinearProgress,
   MenuItem,
@@ -33,6 +34,8 @@ import { soldierKey, unitKeyCheck, unitKeyProblems } from "../lib/hmac";
 import {
   FIELDS,
   RECORD_LABELS,
+  approvePlan,
+  changeKey,
   detectMapping,
   mappingProblems,
   parseRows,
@@ -41,6 +44,7 @@ import {
   type Mapping,
   type ParseResult,
   type RosterPlan,
+  type SoldierRecord,
 } from "../lib/roster";
 
 const SERVICE_LABEL = { mandatory: "חובה", career: "קבע" } as const;
@@ -78,10 +82,43 @@ export function RosterImportPage() {
   const [mapping, setMapping] = useState<Mapping>({});
   const [parsed, setParsed] = useState<ParseResult | null>(null);
   const [plan, setPlan] = useState<RosterPlan | null>(null);
+  // changes of existing soldiers load only when approved here (nothing is approved by default)
+  const [approved, setApproved] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ApplyResult | null>(null);
+
+  const changes = useMemo(
+    () =>
+      (plan?.updated ?? []).flatMap((u) =>
+        u.changes.map((field) => ({
+          key: changeKey(u.id, field),
+          field,
+          name: u.before.full_name,
+          before: show(u.before[field]),
+          after: show(u.after[field]),
+        })),
+      ),
+    [plan],
+  );
+  const approvedCount = changes.filter((c) => approved.has(c.key)).length;
+  const fieldGroups = useMemo(() => {
+    const m = new Map<keyof SoldierRecord, string[]>();
+    for (const c of changes) m.set(c.field, [...(m.get(c.field) ?? []), c.key]);
+    return [...m.entries()];
+  }, [changes]);
+  function setMany(keys: string[], on: boolean) {
+    setApproved((cur) => {
+      const next = new Set(cur);
+      for (const k of keys) {
+        if (on) next.add(k);
+        else next.delete(k);
+      }
+      return next;
+    });
+  }
+  const toggle = (keys: string[]) => setMany(keys, !approved.has(keys[0]));
 
   // The unit key lives only in this component's memory: leaving the page forgets it.
   useEffect(() => () => setUnitKey(""), []);
@@ -122,6 +159,7 @@ export function RosterImportPage() {
       const incoming = await Promise.all(result.rows.map(async (r) => toRecord(r, await soldierKey(unitKey, r.personalNumber))));
       const [existing, gafim, ranks] = await Promise.all([api!.soldiers(), api!.gafim(), api!.ranks()]);
       setPlan(planImport(incoming, existing, gafim.map((g) => g.name), ranks.map((r) => r.name)));
+      setApproved(new Set());
       setStep(2);
     } catch (e) {
       setError((e as Error).message);
@@ -135,7 +173,7 @@ export function RosterImportPage() {
     setBusy(true);
     setError(null);
     try {
-      setDone(await api!.applyRoster(plan));
+      setDone(await api!.applyRoster(approvePlan(plan, approved)));
       setStep(3);
     } catch (e) {
       setError((e as Error).message);
@@ -256,7 +294,7 @@ export function RosterImportPage() {
           <Stack spacing={2}>
             <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
               <Chip color="success" label={`חדשים: ${plan.added.length}`} />
-              <Chip color="info" label={`עודכנו: ${plan.updated.length}`} />
+              <Chip color="info" label={`שינויים לאישור: ${changes.length} (אושרו ${approvedCount})`} />
               <Chip color="warning" label={`לא בקובץ (יסומנו לא פעילים): ${plan.removed.length}`} />
               <Chip label={`ללא שינוי: ${plan.unchanged}`} />
               {parsed.errors.length > 0 && <Chip color="error" label={`שורות שגויות: ${parsed.errors.length}`} />}
@@ -287,9 +325,35 @@ export function RosterImportPage() {
                 כל החיילים בקובץ מזוהים כחדשים, וכל הקיימים כחסרים. זה קורה בדרך כלל כשמפתח היחידה שגוי. מומלץ לבדוק לפני שממשיכים.
               </Alert>
             )}
+            {changes.length > 0 && (
+              <Alert severity="info">
+                נמצאו {changes.length} שינויים אצל חיילים קיימים (בלשונית "שינויים לאישור"). רק שינוי שמסומן לאישור ייטען; שינוי שלא אושר
+                לא דורס את הערך שבמערכת. מה שהוזן ידנית (שח"ר, תפקיד הקלה, דרגת מינוי, עקיפות) לא משתנה בטעינה בכל מקרה.
+                <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap", rowGap: 1 }}>
+                  {fieldGroups.map(([field, keys]) => {
+                    const all = keys.every((k) => approved.has(k));
+                    return (
+                      <Chip
+                        key={field}
+                        size="small"
+                        color={all ? "primary" : "default"}
+                        variant={all ? "filled" : "outlined"}
+                        label={`${all ? "✓ " : ""}${RECORD_LABELS[field]} (${keys.length})`}
+                        onClick={() => setMany(keys, !all)}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Alert>
+            )}
+            {plan.updated.some((u) => !u.before.is_active) && (
+              <Alert severity="info">
+                חוזרים לפעילות: {plan.updated.filter((u) => !u.before.is_active).map((u) => u.after.full_name).join(", ")}
+              </Alert>
+            )}
             <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable">
               <Tab label={`חדשים (${plan.added.length})`} />
-              <Tab label={`עודכנו (${plan.updated.length})`} />
+              <Tab label={`שינויים לאישור (${changes.length})`} />
               <Tab label={`לא בקובץ (${plan.removed.length})`} />
               <Tab label={`שגיאות (${parsed.errors.length})`} />
             </Tabs>
@@ -320,18 +384,27 @@ export function RosterImportPage() {
                   <>
                     <TableHead>
                       <TableRow>
-                        <TableCell>שם</TableCell>
-                        <TableCell>שינויים</TableCell>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={changes.length > 0 && approvedCount === changes.length}
+                            indeterminate={approvedCount > 0 && approvedCount < changes.length}
+                            onChange={(e) => setApproved(new Set(e.target.checked ? changes.map((c) => c.key) : []))}
+                            slotProps={{ input: { "aria-label": "אישור כל השינויים" } }}
+                          />
+                        </TableCell>
+                        {["שם", "שדה", "במערכת", "בקובץ"].map((h) => <TableCell key={h}>{h}</TableCell>)}
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {plan.updated.map((u) => (
-                        <TableRow key={u.id}>
-                          <TableCell>{u.after.full_name}</TableCell>
-                          <TableCell>
-                            {!u.before.is_active && <Chip size="small" label="חוזר לפעילות" sx={{ ml: 1 }} />}
-                            {u.changes.map((c) => `${RECORD_LABELS[c]}: ${show(u.before[c])} ← ${show(u.after[c])}`).join(" · ")}
+                      {changes.map((c) => (
+                        <TableRow key={c.key} hover selected={approved.has(c.key)} onClick={() => toggle([c.key])} sx={{ cursor: "pointer" }}>
+                          <TableCell padding="checkbox">
+                            <Checkbox checked={approved.has(c.key)} slotProps={{ input: { "aria-label": `אישור ${RECORD_LABELS[c.field]} – ${c.name}` } }} />
                           </TableCell>
+                          <TableCell>{c.name}</TableCell>
+                          <TableCell>{RECORD_LABELS[c.field]}</TableCell>
+                          <TableCell sx={{ color: "text.secondary" }}>{c.before}</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>{c.after}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

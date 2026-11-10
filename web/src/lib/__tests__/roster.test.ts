@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectMapping, mappingProblems, parseRows, planImport, serviceOf, toRecord, type ExistingSoldier } from "../roster";
+import { approvePlan, changeKey, detectMapping, mappingProblems, parseRows, planImport, serviceOf, toRecord, type ExistingSoldier } from "../roster";
 
 const headers = ["מ\"א", "שם פרטי", "שם משפחה", "סוג שירות", "גף", "דרגה", "מין", "תאריך גיוס", "תאריך שחרור", "תוקף מטווח", "משרת הורה"];
 
@@ -85,6 +85,15 @@ describe("plan", () => {
     expect(plan.unchanged).toBe(1); // gender is empty in the file, so it is kept
     expect(plan.unknownGafim).toEqual(["גף חדש"]);
     expect(plan.unknownRanks).toEqual([]);
+  });
+  it("loads only the approved changes of existing soldiers", () => {
+    const plan = planImport([rec("k1", { rank_name: "רס\"ן", gaf_name: "גף ב" }), rec("k2", { rank_name: "רס\"ן" })],
+      [existing("k1"), existing("k2")], ["גף א", "גף ב"], ["סרן", "רס\"ן"]);
+    const out = approvePlan(plan, new Set([changeKey("id-k1", "rank_name")]));
+    expect(out.updated.map((u) => [u.id, u.changes])).toEqual([["id-k1", ["rank_name"]]]);
+    expect(out.updated[0].after.rank_name).toBe("רס\"ן");
+    expect(out.updated[0].after.gaf_name).toBeNull(); // not approved: the stored gaf stays
+    expect(out.unchanged).toBe(1);
   });
   it("reactivates a returning soldier", () => {
     const plan = planImport([rec("k1")], [existing("k1", { is_active: false })], ["גף א"], ["סרן"]);
