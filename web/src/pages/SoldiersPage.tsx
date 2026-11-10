@@ -50,6 +50,7 @@ import {
   type SoldierLoadRole,
   type SoldierPatch,
 } from "../lib/soldiers";
+import type { Exemption, ExemptionType } from "../lib/cycles";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
 const RANGE_CHIP: Record<RangeState, { label: string; color: "default" | "error" | "warning" | "success" }> = {
@@ -60,6 +61,7 @@ const RANGE_CHIP: Record<RangeState, { label: string; color: "default" | "error"
 };
 
 const fmt = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
+const ddmm = (iso: string) => iso.slice(5, 10).split("-").reverse().join("/");
 
 function RangeChip({ until }: { until: string | null }) {
   const st = rangeState(until);
@@ -316,6 +318,10 @@ export function SoldiersPage() {
   const [range, setRange] = useState("");
   const [rank, setRank] = useState("");
   const [relief, setRelief] = useState(""); // "" all · "any" · "none" · a load role id
+  // exemptions from today on (approved and pending), shown like the relief roles
+  const [exemptions, setExemptions] = useState<Exemption[]>([]);
+  const [exTypes, setExTypes] = useState<ExemptionType[]>([]);
+  const [exFilter, setExFilter] = useState(""); // "" all · "now" · "any" · "pending" · "none"
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SoldierDetail | null>(null);
@@ -323,10 +329,19 @@ export function SoldiersPage() {
 
   const load = useCallback(async () => {
     try {
-      const [s, r, lr] = await Promise.all([api!.soldierDetails(), api!.ranks(), api!.loadRoles()]);
+      const horizon = new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10);
+      const [s, r, lr, ex, et] = await Promise.all([
+        api!.soldierDetails(),
+        api!.ranks(),
+        api!.loadRoles(),
+        api!.exemptions(todayIso(), horizon),
+        api!.exemptionTypes(),
+      ]);
       setRows(s);
       setRanks(r);
       setLoadRoles(lr);
+      setExemptions(ex.filter((e) => e.status === "approved" || e.status === "pending"));
+      setExTypes(et);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -339,6 +354,21 @@ export function SoldiersPage() {
   const gafim = useMemo(() => [...new Set((rows ?? []).map((s) => s.gaf_name))].sort(), [rows]);
   const rankName = useMemo(() => new Map(ranks.map((r) => [r.id, r.name])), [ranks]);
   // a rank appointment in force counts as the soldier's rank too (סרן במינוי רס"ן appears under both)
+  const today = todayIso();
+  const exTypeName = useMemo(() => new Map(exTypes.map((t) => [t.id, t.name])), [exTypes]);
+  const exBySoldier = useMemo(() => {
+    const m = new Map<string, Exemption[]>();
+    for (const e of exemptions) m.set(e.soldier_id, [...(m.get(e.soldier_id) ?? []), e]);
+    return m;
+  }, [exemptions]);
+  const exMatch = (id: string) => {
+    const l = exBySoldier.get(id) ?? [];
+    if (exFilter === "now") return l.some((e) => e.status === "approved" && e.start_date <= today);
+    if (exFilter === "any") return l.length > 0;
+    if (exFilter === "pending") return l.some((e) => e.status === "pending");
+    if (exFilter === "none") return l.length === 0;
+    return true;
+  };
   const appointedNow = (s: SoldierDetail) => !!s.appointment_rank_id && (!s.appointment_rank_until || s.appointment_rank_until >= todayIso());
   // ranks present among the soldiers, in the catalog's order
   const rankOptions = useMemo(() => {
@@ -354,6 +384,7 @@ export function SoldiersPage() {
       (!gaf || s.gaf_name === gaf) &&
       (!service || effectiveService(s) === service) &&
       (!rank || s.rank_name === rank || (appointedNow(s) && rankName.get(s.appointment_rank_id!) === rank)) &&
+      exMatch(s.id) &&
       (!relief ||
         (relief === "any"
           ? activeLoadRoles(s).length > 0
@@ -425,7 +456,7 @@ export function SoldiersPage() {
       )}
 
       <Paper sx={{ p: 2 }}>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", md: "2fr repeat(5, 1fr)" } }}>
+        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", md: "2fr repeat(6, 1fr)" } }}>
           <TextField
             sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}
             placeholder="חיפוש לפי שם"
@@ -456,6 +487,13 @@ export function SoldiersPage() {
                 {r.name}
               </MenuItem>
             ))}
+          </TextField>
+          <TextField select label="פטור" value={exFilter} onChange={(e) => setExFilter(e.target.value)}>
+            <MenuItem value="">הכול</MenuItem>
+            <MenuItem value="now">בפטור היום</MenuItem>
+            <MenuItem value="any">עם פטור</MenuItem>
+            <MenuItem value="pending">ממתין לאישור</MenuItem>
+            <MenuItem value="none">בלי פטור</MenuItem>
           </TextField>
           <TextField select label="שירות" value={service} onChange={(e) => setService(e.target.value)}>
             <MenuItem value="">הכול</MenuItem>
@@ -506,7 +544,7 @@ export function SoldiersPage() {
                       slotProps={{ input: { "aria-label": "בחירת כל המוצגים" } }}
                     />
                   </TableCell>
-                  {["שם", "דרגה", "גף", "שירות", "מטווח", "הורה / ת״ש", "הקלה", "תפקיד שני", ""].map((h, i) => (
+                  {["שם", "דרגה", "גף", "שירות", "מטווח", "הורה / ת״ש", "הקלה", "פטורים", "תפקיד שני", ""].map((h, i) => (
                     <TableCell key={i}>{h}</TableCell>
                   ))}
                 </TableRow>
@@ -551,6 +589,26 @@ export function SoldiersPage() {
                                 sx={{ ml: 0.5 }}
                               />
                             ))}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {(exBySoldier.get(s.id) ?? []).length === 0
+                          ? "—"
+                          : (exBySoldier.get(s.id) ?? []).map((e) => {
+                              const now = e.start_date <= today;
+                              const pending = e.status === "pending";
+                              const type = exTypeName.get(e.exemption_type_id) ?? "פטור";
+                              return (
+                                <Chip
+                                  key={e.id}
+                                  size="small"
+                                  label={`${type}${e.kind === "partial" ? " (חלקי)" : ""} · ${now ? `עד ${ddmm(e.end_date)}` : `מ-${ddmm(e.start_date)}`}${pending ? " · ממתין" : ""}`}
+                                  color={pending ? "warning" : now ? "info" : "default"}
+                                  variant={now && !pending ? "filled" : "outlined"}
+                                  title={`${type}: ${fmt(e.start_date)} – ${fmt(e.end_date)}${pending ? " · ממתין לאישור" : ""}`}
+                                  sx={{ ml: 0.5 }}
+                                />
+                              );
+                            })}
                       </TableCell>
                       <TableCell>{fmt(s.second_role_signed_at)}</TableCell>
                       <TableCell padding="checkbox">
