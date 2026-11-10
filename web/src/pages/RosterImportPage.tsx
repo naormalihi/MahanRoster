@@ -30,7 +30,8 @@ import { Link as RouterLink } from "react-router-dom";
 import * as XLSX from "xlsx";
 import type { ApplyResult } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { soldierKey, unitKeyCheck, unitKeyProblems } from "../lib/hmac";
+import { forgetUnitKey, rememberUnitKey, rememberedUnitKey, soldierKey, unitKeyCheck, unitKeyProblems } from "../lib/hmac";
+import { defaultPicks, doublePicks, matchForRekey, rekeyPairs, type RekeyRow } from "../lib/rekey";
 import {
   FIELDS,
   RECORD_LABELS,
@@ -44,6 +45,7 @@ import {
   type Mapping,
   type ParseResult,
   type RosterPlan,
+  type ExistingSoldier,
   type SoldierRecord,
 } from "../lib/roster";
 
@@ -120,20 +122,79 @@ export function RosterImportPage() {
   }
   const toggle = (keys: string[]) => setMany(keys, !approved.has(keys[0]));
 
-  // The unit key lives only in this component's memory: leaving the page forgets it.
-  useEffect(() => () => setUnitKey(""), []);
+  // first key of the unit (nothing stored yet) – then the key must be saved outside the system
+  const [firstKey, setFirstKey] = useState(false);
+  const [mismatch, setMismatch] = useState(false);
+  // a forgotten key: the file is loaded with a new key and matched to the soldiers by name
+  const [rekey, setRekey] = useState(false);
+  const [rekeyRows, setRekeyRows] = useState<RekeyRow[] | null>(null);
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [existingNow, setExistingNow] = useState<ExistingSoldier[]>([]);
 
-  async function confirmKey() {
-    const p = unitKeyProblems(unitKey);
+  // the key confirmed earlier in this tab is used again (sign-out or closing the tab forgets it)
+  useEffect(() => {
+    api!.unitKeyCheck().then((c) => setFirstKey(!c), () => undefined);
+    const k = rememberedUnitKey();
+    if (k) {
+      setUnitKey(k);
+      void confirmKey(k);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function confirmKey(key = unitKey) {
+    const p = unitKeyProblems(key);
     if (p) return setKeyError(p);
-    const check = await unitKeyCheck(unitKey);
+    if (rekey) {
+      // the new key is stored only when the matches are approved
+      setKeyError(null);
+      return setStep(1);
+    }
+    const check = await unitKeyCheck(key);
     const stored = await api!.unitKeyCheck();
     if (stored && stored !== check) {
+      forgetUnitKey();
+      setMismatch(true);
       return setKeyError("המפתח לא תואם למפתח שבו נטענו החיילים בעבר. בדוק שהוקלד נכון.");
     }
     if (!stored) await api!.setUnitKeyCheck(check); // first import fixes the key
+    rememberUnitKey(key);
+    setMismatch(false);
     setKeyError(null);
     setStep(1);
+  }
+
+  function downloadKeyBackup() {
+    const text = [
+      "MahanRoster – מפתח היחידה לטעינת כוח אדם",
+      `נשמר: ${new Date().toLocaleString("he-IL")}`,
+      "",
+      unitKey,
+      "",
+      "שמור את הקובץ במקום מאובטח (מנהל סיסמאות או כונן מוצפן) ומחק אותו מתיקיית ההורדות.",
+      "בלי המפתח המערכת לא מזהה חיילים קיימים בטעינה.",
+    ].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    a.download = "mahanroster-unit-key.txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function approveRekey() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api!.rekeySoldiers(rekeyPairs(picks), await unitKeyCheck(unitKey));
+      rememberUnitKey(unitKey);
+      setRekey(false);
+      setRekeyRows(null);
+      setFirstKey(false);
+      await buildPreview(false);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
   }
 
   async function readFile(file: File) {
@@ -150,13 +211,22 @@ export function RosterImportPage() {
 
   const mapProblems = useMemo(() => mappingProblems(mapping), [mapping]);
 
-  async function buildPreview() {
+  async function buildPreview(matching = rekey) {
     setBusy(true);
     setError(null);
     try {
       const result = parseRows(records, mapping);
       setParsed(result);
       const incoming = await Promise.all(result.rows.map(async (r) => toRecord(r, await soldierKey(unitKey, r.personalNumber))));
+      if (matching) {
+        const existing = await api!.soldiers();
+        const rows = matchForRekey(incoming, existing);
+        setExistingNow(existing);
+        setRekeyRows(rows);
+        setPicks(defaultPicks(rows));
+        setStep(2);
+        return;
+      }
       const [existing, gafim, ranks] = await Promise.all([api!.soldiers(), api!.gafim(), api!.ranks()]);
       setPlan(planImport(incoming, existing, gafim.map((g) => g.name), ranks.map((r) => r.name)));
       setApproved(new Set());
@@ -218,8 +288,24 @@ export function RosterImportPage() {
             </Stack>
             <Typography variant="body2">
               המספרים האישיים לא יוצאים מהמחשב הזה. הדפדפן הופך כל מספר אישי למזהה מוצפן בעזרת מפתח היחידה, ורק המזהה נשלח לשרת.
-              המפתח לא נשמר בשום מקום, וצריך להזין אותו מחדש בכל טעינה. אם המפתח יאבד, יהיה צורך לשייך את החיילים מחדש לפי שם ותאריך גיוס.
+              המפתח לא נשלח לשרת. אחרי שהוזן הוא נשמר בלשונית הזו עד היציאה מהמערכת או סגירת הלשונית.
             </Typography>
+            {rekey && (
+              <Alert severity="warning">
+                החלפת מפתח: הזן מפתח חדש וטען את קובץ כוח האדם המלא. המערכת תתאים כל שורה לחייל קיים לפי השם, ואחרי שתאשר את ההתאמות החיילים יעברו
+                למפתח החדש עם כל ההיסטוריה שלהם. המפתח הישן יפסיק לעבוד.
+              </Alert>
+            )}
+            {(firstKey || rekey) && (
+              <Alert severity="info">
+                שמור את המפתח במנהל סיסמאות או במקום מאובטח אחר. בלעדיו המערכת לא מזהה חיילים קיימים בטעינה הבאה.
+                <Box sx={{ mt: 1 }}>
+                  <Button size="small" variant="outlined" startIcon={<DownloadIcon />} disabled={!!unitKeyProblems(unitKey)} onClick={downloadKeyBackup}>
+                    הורדת קובץ גיבוי של המפתח
+                  </Button>
+                </Box>
+              </Alert>
+            )}
             <TextField
               label="מפתח היחידה"
               type="password"
@@ -231,9 +317,27 @@ export function RosterImportPage() {
               slotProps={{ htmlInput: { dir: "ltr" } }}
             />
             <Box>
-              <Button variant="contained" onClick={confirmKey} disabled={!unitKey}>
+              <Button variant="contained" onClick={() => confirmKey()} disabled={!unitKey}>
                 המשך
               </Button>
+              {mismatch && !rekey && (
+                <Button
+                  sx={{ mr: 1 }}
+                  onClick={() => {
+                    setRekey(true);
+                    setMismatch(false);
+                    setKeyError(null);
+                    setUnitKey("");
+                  }}
+                >
+                  שכחתי את המפתח – החלפת מפתח
+                </Button>
+              )}
+              {rekey && (
+                <Button sx={{ mr: 1 }} onClick={() => setRekey(false)}>
+                  ביטול החלפת מפתח
+                </Button>
+              )}
             </Box>
           </Stack>
         </Paper>
@@ -278,7 +382,7 @@ export function RosterImportPage() {
                   <Alert key={p} severity="warning">{p}</Alert>
                 ))}
                 <Box>
-                  <Button variant="contained" onClick={buildPreview} disabled={busy || mapProblems.length > 0}>
+                  <Button variant="contained" onClick={() => buildPreview()} disabled={busy || mapProblems.length > 0}>
                     תצוגה מקדימה
                   </Button>
                 </Box>
@@ -289,7 +393,22 @@ export function RosterImportPage() {
         </Paper>
       )}
 
-      {step === 2 && plan && parsed && (
+      {step === 2 && rekeyRows && (
+        <RekeyPanel
+          rows={rekeyRows}
+          existing={existingNow}
+          picks={picks}
+          setPicks={setPicks}
+          busy={busy}
+          onApprove={approveRekey}
+          onCancel={() => {
+            setRekeyRows(null);
+            setStep(1);
+          }}
+        />
+      )}
+
+      {step === 2 && !rekeyRows && plan && parsed && (
         <Paper sx={{ p: 3 }}>
           <Stack spacing={2}>
             <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
@@ -480,5 +599,120 @@ export function RosterImportPage() {
         </Paper>
       )}
     </Stack>
+  );
+}
+
+function RekeyPanel(props: {
+  rows: RekeyRow[];
+  existing: ExistingSoldier[];
+  picks: Record<string, string>;
+  setPicks: (p: Record<string, string>) => void;
+  busy: boolean;
+  onApprove: () => void;
+  onCancel: () => void;
+}) {
+  const { rows, existing, picks, setPicks } = props;
+  const [only, setOnly] = useState<"check" | "all">("check");
+  const twice = new Set(doublePicks(picks));
+  const sure = rows.filter((r) => r.sure && picks[r.incoming.soldier_key] === r.candidates[0]?.id).length;
+  const matched = Object.keys(picks).length;
+  const picked = new Set(Object.values(picks));
+  const left = existing.filter((s) => s.is_active && !picked.has(s.id));
+  const shown = rows
+    .filter((r) => only === "all" || !(r.sure && picks[r.incoming.soldier_key] === r.candidates[0]?.id))
+    .sort((a, b) => b.candidates.length - a.candidates.length);
+  const who = (s: ExistingSoldier) => [s.full_name, s.gaf_name, s.rank_name, s.enlistment_date ? show(s.enlistment_date) : ""].filter(Boolean).join(" · ");
+  return (
+    <Paper sx={{ p: 3 }}>
+      <Stack spacing={2}>
+        <Typography variant="h2">התאמת חיילים למפתח החדש</Typography>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+          <Chip color="success" label={`התאמה ודאית: ${sure}`} />
+          <Chip color="warning" label={`לבדיקה: ${rows.length - sure}`} />
+          <Chip color="info" label={`יותאמו: ${matched} מתוך ${rows.length}`} />
+          <Chip label={`קיימים שלא הותאמו: ${left.length}`} />
+        </Stack>
+        <Alert severity="info">
+          ודאי = שם יחיד בשני הצדדים, ורוב הפרטים (גף, דרגה, מין, גיוס) זהים. בשורות לבדיקה בחר את החייל הקיים, או "חייל חדש" אם אין לו התאמה. שורה בלי
+          התאמה תיטען כחייל חדש, וחייל קיים שלא הותאם יופיע בטעינה כ"לא בקובץ".
+        </Alert>
+        <Tabs value={only} onChange={(_, v) => setOnly(v)}>
+          <Tab value="check" label={`לבדיקה (${rows.length - sure})`} />
+          <Tab value="all" label={`הכל (${rows.length})`} />
+        </Tabs>
+        <Box sx={{ maxHeight: 460, overflow: "auto" }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {["בקובץ", "גף · דרגה · גיוס", "חייל קיים במערכת"].map((h) => (
+                  <TableCell key={h}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {shown.map((r) => {
+                const k = r.incoming.soldier_key;
+                const v = picks[k] ?? "";
+                return (
+                  <TableRow key={k}>
+                    <TableCell>
+                      {r.incoming.full_name}
+                      {r.sure && v === r.candidates[0]?.id && <Chip size="small" color="success" variant="outlined" label="ודאי" sx={{ mr: 1 }} />}
+                    </TableCell>
+                    <TableCell>{[r.incoming.gaf_name, r.incoming.rank_name, show(r.incoming.enlistment_date)].join(" · ")}</TableCell>
+                    <TableCell sx={{ minWidth: 260 }}>
+                      <TextField
+                        select
+                        size="small"
+                        fullWidth
+                        value={v}
+                        error={!!v && twice.has(v)}
+                        helperText={v && twice.has(v) ? "נבחר כבר בשורה אחרת" : undefined}
+                        onChange={(e) => {
+                          const next = { ...picks };
+                          if (e.target.value) next[k] = e.target.value;
+                          else delete next[k];
+                          setPicks(next);
+                        }}
+                        slotProps={{ select: { displayEmpty: true } }}
+                      >
+                        <MenuItem value="">חייל חדש (ללא התאמה)</MenuItem>
+                        {r.candidates.map((c) => (
+                          <MenuItem key={c.id} value={c.id}>
+                            {who(c)}
+                            {!c.is_active ? " (לא פעיל)" : ""}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {shown.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3}>כל השורות הותאמו בוודאות.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </Box>
+        {left.length > 0 && (
+          <Alert severity="warning">
+            {left.length} חיילים פעילים במערכת לא הותאמו: {left.slice(0, 12).map((s) => s.full_name).join(", ")}
+            {left.length > 12 ? " ועוד" : ""}. הם ישארו עם המפתח הישן ויסומנו בטעינה כ"לא בקובץ".
+          </Alert>
+        )}
+        <Alert severity="warning">אחרי האישור המפתח הישן מפסיק לעבוד. מיד אחר כך תוצג התצוגה המקדימה הרגילה של הטעינה.</Alert>
+        <Stack direction="row" spacing={1.5}>
+          <Button variant="contained" onClick={props.onApprove} disabled={props.busy || twice.size > 0 || matched === 0}>
+            אישור והחלפת מפתח
+          </Button>
+          <Button onClick={props.onCancel} disabled={props.busy}>
+            חזרה
+          </Button>
+        </Stack>
+        {props.busy && <LinearProgress />}
+      </Stack>
+    </Paper>
   );
 }

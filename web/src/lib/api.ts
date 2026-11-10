@@ -100,6 +100,8 @@ export interface Api {
   ranks(): Promise<NamedRef[]>;
   unitKeyCheck(): Promise<string | null>;
   setUnitKeyCheck(value: string): Promise<void>;
+  /** A forgotten unit key: moves the approved soldiers to keys made with the new one, and stores its fingerprint. */
+  rekeySoldiers(pairs: { id: string; key: string }[], check: string): Promise<number>;
   applyRoster(plan: RosterPlan): Promise<ApplyResult>;
   soldierDetails(): Promise<SoldierDetail[]>;
   updateSoldiers(ids: string[], patch: SoldierPatch): Promise<void>;
