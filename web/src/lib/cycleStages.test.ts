@@ -32,3 +32,12 @@ describe("automatic cycle stages", () => {
     expect(s.scheduling.tone).toBe("todo");
   });
 });
+
+describe("constraints deadline", () => {
+  it("is the end of the chosen local day", async () => {
+    const { endOfDay, deadlineDay } = await import("./cycles");
+    expect(endOfDay("2026-10-22")).toBe("2026-10-22T23:59:59+03:00");
+    expect(endOfDay("2027-01-10")).toBe("2027-01-10T23:59:59+02:00");
+    expect(deadlineDay(endOfDay("2027-01-10"))).toBe("2027-01-10");
+  });
+});

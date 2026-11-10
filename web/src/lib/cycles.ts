@@ -1,6 +1,6 @@
 /** Cycles and the constraints collected for them (exemptions, absences, date blocks). */
 
-import { TZ } from "./dates";
+import { TZ, dayKey } from "./dates";
 import { toIsoDate } from "./roster";
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ export function suggestCycle(existing: Pick<Cycle, "end_date">[], today: string,
   const [sy, sm] = start.split("-").map(Number);
   const [ey, em] = end.split("-").map(Number);
   const name = sy === ey ? `${HEB_MONTH[sm - 1]}–${HEB_MONTH[em - 1]} ${sy}` : `${HEB_MONTH[sm - 1]} ${sy} – ${HEB_MONTH[em - 1]} ${ey}`;
-  return { name, start_date: start, end_date: end, exemption_deadline: localMidnight(addDaysIso(start, -deadlineDays)) };
+  return { name, start_date: start, end_date: end, exemption_deadline: endOfDay(addDaysIso(start, -deadlineDays)) };
 }
 
 export function cycleProblems(c: CycleInput, others: Cycle[], selfId?: string): string[] {
@@ -120,6 +120,15 @@ function offsetAt(instant: Date): string {
 }
 
 /** Midnight at the start of a local day, as an ISO timestamp with offset. */
+/** The constraints deadline is the last day to submit, until 23:59 local time. */
+export function endOfDay(day: string): string {
+  const off = offsetAt(new Date(`${day}T12:00:00Z`));
+  return `${day}T23:59:59${off}`;
+}
+
+/** The local day of a deadline timestamp (YYYY-MM-DD). */
+export const deadlineDay = (iso: string) => dayKey(iso);
+
 export function localMidnight(day: string): string {
   // the offset at local noon is the day's offset (DST switches happen at night)
   const off = offsetAt(new Date(`${day}T12:00:00Z`));
@@ -411,7 +420,7 @@ export function stageStates(c: Cycle, f: StageFacts, now: Date): StageState[] {
     {
       stage: "collecting",
       tone: closedAt === null ? "warn" : deadlinePassed ? "done" : "todo",
-      note: closedAt === null ? "לא נקבע מועד סגירה" : `${deadlinePassed ? "נסגר" : "פתוח עד"} ${ddmm(c.exemption_deadline!)}`,
+      note: closedAt === null ? "לא נקבע מועד סגירה" : `${deadlinePassed ? "נסגר" : "פתוח עד"} ${ddmm(deadlineDay(c.exemption_deadline!))}`,
     },
     { stage: "approving", tone: f.pending > 0 ? "warn" : deadlinePassed ? "done" : "todo", note: f.pending > 0 ? `${f.pending} ממתינים` : "אין ממתינים" },
     {

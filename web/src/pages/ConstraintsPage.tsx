@@ -66,6 +66,7 @@ import {
   type RequestStatus,
 } from "../lib/cycles";
 import type { ExistingSoldier } from "../lib/roster";
+import { DeadlineEditor } from "../components/DeadlineEditor";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
@@ -943,6 +944,7 @@ export function ConstraintsPage() {
   const [soldiers, setSoldiers] = useState<ExistingSoldier[]>([]);
   const { cycleId } = useCycle();
   const [version, setVersion] = useState(0);
+  const [cyclesVersion, setCyclesVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -952,7 +954,7 @@ export function ConstraintsPage() {
         setSoldiers(s);
       })
       .catch((e) => setError((e as Error).message));
-  }, [api]);
+  }, [api, cyclesVersion]);
 
   const byId = useMemo(() => new Map(soldiers.map((s) => [s.id, s])), [soldiers]);
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -966,6 +968,9 @@ export function ConstraintsPage() {
         <Alert severity="info">כדי להזין אילוצים צריך קודם ליצור מחזור בניהול המחזורים.</Alert>
       ) : (
         <>
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+            <DeadlineEditor cycle={ctx.cycle} onSaved={() => setCyclesVersion((v) => v + 1)} />
+          </Stack>
           <Tabs value={tab} onChange={(_, v) => setParams({ tab: v }, { replace: true })} variant="scrollable" allowScrollButtonsMobile>
             {TABS.map((t) => (
               <Tab key={t.key} value={t.key} label={t.label} />

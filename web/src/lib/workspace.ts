@@ -1,5 +1,5 @@
 /** The cycle workspace: its steps, the state of each one, and what to do next. */
-import { stageIndex, type Cycle, type CycleStatus } from "./cycles";
+import { deadlineDay, stageIndex, type Cycle, type CycleStatus } from "./cycles";
 
 export type StepKey = "overview" | "constraints" | "potential" | "slots" | "schedule" | "operate";
 
@@ -41,7 +41,7 @@ export function stepStates(cycle: Cycle, f: CycleFacts): Record<Exclude<StepKey,
       f.pendingExemptions > 0
         ? { tone: "warn", text: `${f.pendingExemptions} פטורים ממתינים` }
         : at <= stageIndex("collecting") && deadline && Date.parse(deadline) > Date.now()
-          ? { tone: "todo", text: `איסוף עד ${short(deadline)}` }
+          ? { tone: "todo", text: `איסוף עד ${short(deadlineDay(deadline))}` }
           : { tone: "done", text: "אין ממתינים" },
     potential: cycle.potential_computed_at
       ? { tone: "done", text: `חושב ${short(cycle.potential_computed_at)}` }

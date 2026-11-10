@@ -24,7 +24,7 @@ describe("cycles", () => {
     const s = suggestCycle([], "2026-11-07");
     expect(s.start_date).toBe("2026-12-01");
     expect(s.end_date).toBe("2027-05-31");
-    expect(s.exemption_deadline).toBe("2026-10-22T00:00:00+03:00");
+    expect(s.exemption_deadline).toBe("2026-10-22T23:59:59+03:00");
     const next = suggestCycle([cyc("a", "2026-12-01", "2027-05-31")], "2026-11-07");
     expect(next.start_date).toBe("2027-06-01");
     expect(next.end_date).toBe("2027-11-30");
