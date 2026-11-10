@@ -30,3 +30,19 @@ describe("cycle workspace", () => {
     expect(defaultCycle(cs, "2026-11-08")?.id).toBe("b");
   });
 });
+
+describe("pending duties after publishing", () => {
+  it("counts a duty missing a performer or a reserve, including after an activation", async () => {
+    const { pendingSlots } = await import("../workspace");
+    const k = (id: string, ends = "2099-01-01T00:00:00Z") => ({ id, ends_at: ends, performers_needed: 1, reserves_needed: 1 });
+    const slots = [k("full"), k("activated"), k("added"), k("past", "2000-01-01T00:00:00Z")];
+    const as = [
+      { slot_id: "full", role: "performer", status: "assigned" },
+      { slot_id: "full", role: "reserve", status: "reserve_idle" },
+      { slot_id: "activated", role: "performer", status: "dropped" },
+      { slot_id: "activated", role: "reserve", status: "reserve_activated" },
+      { slot_id: "added", role: "performer", status: "draft" },
+    ];
+    expect(pendingSlots(slots, as).map((s) => s.id)).toEqual(["activated", "added"]);
+  });
+});

@@ -31,9 +31,10 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { BoardRow } from "../lib/api";
+import { isStaff, type BoardRow } from "../lib/api";
+import { SlotActionsDialog } from "../components/SlotActions";
 import { useAuth } from "../lib/auth";
 import { daySummaries, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix, type Person } from "../lib/board";
 import { addDays, dayKey, dayLabel, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
@@ -85,8 +86,12 @@ function People({ list, query, strong, empty }: { list: Person[]; query: string;
   );
 }
 
+/** Staff open the actions of a duty by clicking it (null for everyone else). */
+const OpenSlot = createContext<((slotId: string) => void) | null>(null);
+
 function DutyRow({ r, query }: { r: BoardRow; query: string }) {
   const [open, setOpen] = useState(false);
+  const openSlot = useContext(OpenSlot);
   const t = span(r.starts_at, r.ends_at);
   const performers = people(r.performers, r.performer_gafim ?? (r.gafim.length === 1 ? r.performers.map(() => r.gafim[0]) : undefined));
   const reserves = people(r.reserves, r.reserve_gafim);
@@ -102,7 +107,21 @@ function DutyRow({ r, query }: { r: BoardRow; query: string }) {
   );
 
   return (
-    <Box sx={{ position: "relative", pr: 1.75, pl: 1, py: 1.25, bgcolor: unstaffed ? "rgba(211,47,47,0.04)" : undefined }}>
+    <Box
+      onClick={openSlot ? () => openSlot(r.slot_id) : undefined}
+      onKeyDown={openSlot ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openSlot(r.slot_id)) : undefined}
+      role={openSlot ? "button" : undefined}
+      tabIndex={openSlot ? 0 : undefined}
+      aria-label={openSlot ? `פעולות על ${r.task_name}` : undefined}
+      sx={{
+        position: "relative",
+        pr: 1.75,
+        pl: 1,
+        py: 1.25,
+        bgcolor: unstaffed ? "rgba(211,47,47,0.04)" : undefined,
+        ...(openSlot && { cursor: "pointer", "&:hover": { bgcolor: "action.hover" }, "&:focus-visible": { outline: 2, outlineColor: "primary.main", outlineOffset: -2 } }),
+      }}
+    >
       <Box sx={{ position: "absolute", insetInlineStart: 0, top: 8, bottom: 8, width: 4, borderRadius: 2, bgcolor: r.color ?? "grey.400" }} />
       <Box
         sx={{
@@ -133,6 +152,20 @@ function DutyRow({ r, query }: { r: BoardRow; query: string }) {
               </Typography>
             }
           />
+          {!!r.activated?.length && (
+            <Box sx={{ fontSize: 12, color: "warning.dark", mt: 0.25 }}>
+              עתודה הופעלה: {r.activated.join(", ")}
+              {!!r.replaced?.length && (
+                <>
+                  {" "}
+                  · במקום{" "}
+                  <Box component="span" sx={{ textDecoration: "line-through", color: "text.secondary" }}>
+                    {r.replaced.join(", ")}
+                  </Box>
+                </>
+              )}
+            </Box>
+          )}
         </Box>
         <Box sx={{ gridArea: "res", minWidth: 0, display: "flex", gap: 0.75, alignItems: "baseline", fontSize: 14, color: "text.secondary" }}>
           <Box component="span" sx={{ fontSize: 12, flexShrink: 0 }}>
@@ -142,7 +175,15 @@ function DutyRow({ r, query }: { r: BoardRow; query: string }) {
         </Box>
         <Box sx={{ gridArea: "info", "@media print": { display: "none" } }}>
           {details && (
-            <IconButton size="small" aria-label={open ? "הסתרת הנחיות" : "הנחיות"} aria-expanded={open} onClick={() => setOpen(!open)}>
+            <IconButton
+              size="small"
+              aria-label={open ? "הסתרת הנחיות" : "הנחיות"}
+              aria-expanded={open}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(!open);
+              }}
+            >
               {open ? <ExpandLessIcon fontSize="small" /> : <InfoIcon fontSize="small" />}
             </IconButton>
           )}
@@ -462,7 +503,10 @@ function CalendarExport({ query }: { query: string }) {
 }
 
 export function BoardPage() {
-  const { api } = useAuth();
+  const { api, me } = useAuth();
+  const staff = isStaff(me);
+  const [slotOpen, setSlotOpen] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
   const [params, setParams] = useSearchParams();
   const view: View = params.get("view") === "month" ? "month" : params.get("view") === "week" ? "week" : "list";
   const setView = (v: View) => setParams(v === "list" ? {} : { view: v }, { replace: true });
@@ -486,18 +530,25 @@ export function BoardPage() {
     return rangeOf(range, month);
   }, [view, range, month, sunday]);
 
+  // a new range shows a spinner; a change made on the board refreshes in place (no jump)
+  const rangeKey = `${from.toISOString()}|${to.toISOString()}`;
+  const [loadedKey, setLoadedKey] = useState("");
   useEffect(() => {
-    setRows(null);
-    setNext(null);
+    if (loadedKey !== rangeKey) {
+      setRows(null);
+      setNext(null);
+    }
     api!
       .board(from.toISOString(), to.toISOString())
       .then((r) => {
         setRows(r);
+        setLoadedKey(rangeKey);
         // nothing here: offer the next published date (a cycle is published about two months ahead)
         if (!r.length) api!.nextPublished(to.toISOString()).then(setNext).catch(() => setNext(null));
       })
       .catch((e) => setError((e as Error).message));
-  }, [api, from, to]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, from, to, version]);
 
   const jumpTo = (iso: string) => {
     const d = new Date(iso);
@@ -538,6 +589,7 @@ export function BoardPage() {
   );
 
   return (
+    <OpenSlot.Provider value={staff ? setSlotOpen : null}>
     <Stack spacing={1.5} sx={{ maxWidth: view === "week" ? 1400 : 1100, mx: "auto", width: "100%" }}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
         <Box sx={{ flex: 1 }}>
@@ -682,5 +734,13 @@ export function BoardPage() {
           </Box>
         ))}
     </Stack>
+      {slotOpen && (
+        <SlotActionsDialog
+          slotId={slotOpen}
+          onClose={() => setSlotOpen(null)}
+          onChanged={() => setVersion((v) => v + 1)}
+        />
+      )}
+    </OpenSlot.Provider>
   );
 }

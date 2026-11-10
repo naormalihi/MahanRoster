@@ -114,3 +114,26 @@ export function nextAction(cycle: Cycle, f: CycleFacts): { text: string; step: S
         : { text: "המחזור פורסם. שינויים מכאן – בתפעול השוטף", step: "operate" };
   }
 }
+
+/** A published assignment that is live on the board (not a draft). */
+const liveA = (a: { status: string }) => a.status !== "draft";
+/** Who performs: a performer, or a reserve that was activated. */
+const performsA = (a: { role: string; status: string }) => a.role === "performer" || a.status === "reserve_activated";
+
+/**
+ * Duties of a published cycle that wait for staffing: not ended, and missing a published performer
+ * or reserve (added after publishing, left unfilled, or a reserve that was activated).
+ */
+export function pendingSlots<S extends { id: string; ends_at: string; performers_needed: number; reserves_needed: number }>(
+  slots: S[],
+  assignments: { slot_id: string; role: string; status: string }[],
+  now = Date.now(),
+): S[] {
+  const bySlot = new Map<string, { role: string; status: string }[]>();
+  for (const a of assignments) if (liveA(a) && !["dropped", "swapped_out", "cancelled_approved"].includes(a.status)) bySlot.set(a.slot_id, [...(bySlot.get(a.slot_id) ?? []), a]);
+  return slots.filter((k) => {
+    if (Date.parse(k.ends_at) <= now) return false;
+    const mine = bySlot.get(k.id) ?? [];
+    return mine.filter(performsA).length < k.performers_needed || mine.filter((a) => !performsA(a)).length < k.reserves_needed;
+  });
+}

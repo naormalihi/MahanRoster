@@ -1176,3 +1176,30 @@ def test_rekey_moves_soldiers_to_the_new_key(conn):
     with pytest.raises(psycopg.Error):
         with session_as(conn, VIEWER) as c:
             c.execute("select public.rekey_soldiers('[]'::jsonb, %s)", ("f" * 64,))
+
+
+def test_undo_reserve_activation_before_the_duty(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a, b = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 2").fetchall()]
+        conn.execute("delete from exemptions where soldier_id = %s", (a,))
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '30 days', now() + interval '31 days') returning id", (cycle, tid)).fetchone()[0]
+        p = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
+        r = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'reserve', 'reserve_idle' from soldiers where id = %s returning id", (k, b)).fetchone()[0]
+        _as_coord(conn, "select public.activate_reserve(%s)", r)
+        names = conn.execute("select full_name from soldiers where id in (%s, %s) order by id = %s desc", (a, b, a)).fetchall()
+        board = conn.execute("select activated, replaced from published_board where slot_id = %s", (k,)).fetchone()
+        assert board is None or (board[0] == [names[1][0]] and board[1] == [names[0][0]])
+        _as_coord(conn, "select public.undo_reserve_activation(%s)", r)
+        sp, pp = conn.execute("select status, points from assignments where id = %s", (p,)).fetchone()
+        sr, rep = conn.execute("select status, replaced_assignment_id from assignments where id = %s", (r,)).fetchone()
+        assert sp == "assigned" and float(pp) > 0 and sr == "reserve_idle" and rep is None
+        # a duty that has started cannot be undone
+        conn.execute("update slots set starts_at = now() - interval '1 hour' where id = %s", (k,))
+        _as_coord(conn, "select public.activate_reserve(%s)", r)
+        with pytest.raises(psycopg.Error):
+            _as_coord(conn, "select public.undo_reserve_activation(%s)", r)
+        raise psycopg.Rollback()

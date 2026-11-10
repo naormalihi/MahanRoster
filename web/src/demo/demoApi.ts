@@ -7,7 +7,7 @@
  *                       new.user – a viewer who must change the password first
  */
 
-import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role } from "../lib/api";
+import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role, SlotPeople, SlotPerson } from "../lib/api";
 import { DAY_TYPE_LABEL, israeliHolidays, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
   absenceSpan,
@@ -116,6 +116,8 @@ export class DemoApi implements Api {
   private rankList: NamedRef[] = RANKS.map((name, i) => ({ id: `r${i}`, name }));
   private keyCheck: string | null = null;
   private boardRows: BoardRow[] = [];
+  // the people of a demo board duty, made on first use (the demo board is not built from assignments)
+  private boardPeople = new Map<string, SlotPerson[]>();
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
   private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, exemption_deadline_days: 40 };
@@ -796,8 +798,84 @@ export class DemoApi implements Api {
     this.slotsByCycle.set(cycleId, [...(this.slotsByCycle.get(cycleId) ?? []), row].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
   }
 
+  private peopleOf(row: BoardRow): SlotPerson[] {
+    let list = this.boardPeople.get(row.slot_id);
+    if (!list) {
+      list = [
+        ...row.performers.map((name, i) => ({ id: `bp|${row.slot_id}|p${i}`, name, role: "performer" as const, status: "assigned", replaced_id: null })),
+        ...row.reserves.map((name, i) => ({ id: `bp|${row.slot_id}|r${i}`, name, role: "reserve" as const, status: "reserve_idle", replaced_id: null })),
+      ];
+      this.boardPeople.set(row.slot_id, list);
+    }
+    return list;
+  }
+
+  private syncBoard(row: BoardRow) {
+    const list = this.peopleOf(row);
+    const performs = (p: SlotPerson) => (p.role === "performer" && p.status !== "dropped") || p.status === "reserve_activated";
+    row.performers = list.filter(performs).map((p) => p.name);
+    row.reserves = list.filter((p) => p.role === "reserve" && p.status === "reserve_idle").map((p) => p.name);
+    row.activated = list.filter((p) => p.status === "reserve_activated").map((p) => p.name);
+    row.replaced = list.filter((p) => list.some((x) => x.replaced_id === p.id)).map((p) => p.name);
+    row.changed_after_publish = true;
+    row.updated_at = new Date().toISOString();
+    row.performer_gafim = undefined;
+    row.reserve_gafim = undefined;
+  }
+
+  async slotPeople(slotId: string): Promise<SlotPeople | null> {
+    await delay();
+    const row = this.boardRows.find((r) => r.slot_id === slotId);
+    if (row) {
+      return {
+        slot: { id: row.slot_id, cycle_id: "c1", starts_at: row.starts_at, ends_at: row.ends_at, task_name: row.task_name, published: true },
+        people: this.peopleOf(row).map((p) => ({ ...p })),
+      };
+    }
+    const k = [...this.slotsByCycle.entries()].flatMap(([cycle_id, l]) => l.map((s) => ({ ...s, cycle_id }))).find((s) => s.id === slotId);
+    if (!k) return null;
+    const names = new Map(this.soldierList.map((s) => [s.id, s.full_name]));
+    return {
+      slot: { id: k.id, cycle_id: k.cycle_id, starts_at: k.starts_at, ends_at: k.ends_at, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "", published: this.cycleList.find((c) => c.id === k.cycle_id)?.status === "published" },
+      people: this.draft
+        .filter((a) => a.slot_id === slotId && a.status !== "draft")
+        .map((a) => ({ id: a.id, name: names.get(a.soldier_id) ?? "?", role: a.role, status: a.status, replaced_id: (a as { replaced_id?: string }).replaced_id ?? null })),
+    };
+  }
+
+  async undoReserveActivation(reserveId: string) {
+    await delay(300);
+    if (reserveId.startsWith("bp|")) {
+      const row = this.boardRows.find((r) => r.slot_id === reserveId.split("|")[1])!;
+      if (Date.parse(row.starts_at) <= Date.now()) throw new Error("התורנות כבר התחילה – אי אפשר לבטל את ההפעלה");
+      const list = this.peopleOf(row);
+      const r = list.find((p) => p.id === reserveId)!;
+      const p = list.find((x) => x.id === r.replaced_id)!;
+      Object.assign(p, { status: "assigned" });
+      Object.assign(r, { status: "reserve_idle", replaced_id: null });
+      return this.syncBoard(row);
+    }
+    const r = this.draft.find((a) => a.id === reserveId) as (DraftAssignment & { replaced_id?: string }) | undefined;
+    if (!r || r.status !== "reserve_activated") throw new Error("זו לא עתודה שהופעלה");
+    const p = this.draft.find((a) => a.id === r.replaced_id);
+    if (p) p.status = "assigned";
+    r.status = "reserve_idle";
+    r.replaced_id = undefined;
+  }
+
   async activateReserve(reserveId: string, fromUnit: number, performerId: string | null) {
     await delay(300);
+    if (reserveId.startsWith("bp|")) {
+      const row = this.boardRows.find((x) => x.slot_id === reserveId.split("|")[1])!;
+      const list = this.peopleOf(row);
+      const r = list.find((x) => x.id === reserveId);
+      if (!r || r.status !== "reserve_idle") throw new Error("זו לא עתודה פעילה בלוח המפורסם");
+      const p = list.find((x) => x.role === "performer" && x.status === "assigned" && (!performerId || x.id === performerId));
+      if (!p) throw new Error("לא נמצא מבצע להחלפה – בחר את המבצע");
+      p.status = fromUnit === 0 ? "dropped" : "done";
+      Object.assign(r, { status: "reserve_activated", replaced_id: p.id });
+      return this.syncBoard(row);
+    }
     const r = this.draft.find((a) => a.id === reserveId);
     if (!r || r.role !== "reserve" || r.status !== "reserve_idle") throw new Error("זו לא עתודה פעילה בלוח המפורסם");
     const p = this.draft.find((a) => a.slot_id === r.slot_id && a.role === "performer" && a.status === "assigned" && (!performerId || a.id === performerId));
@@ -806,6 +884,7 @@ export class DemoApi implements Api {
     const units = Math.max(1, Math.ceil((Date.parse(k.ends_at) - Date.parse(k.starts_at)) / 86_400_000));
     const per = p.points / units;
     r.status = "reserve_activated";
+    (r as DraftAssignment & { replaced_id?: string }).replaced_id = p.id;
     r.points = r.normalized_points = Math.round(per * (units - fromUnit) * 100) / 100;
     if (fromUnit === 0) Object.assign(p, { status: "dropped", points: 0, normalized_points: 0 });
     else Object.assign(p, { status: "done", points: Math.round(per * fromUnit * 100) / 100, normalized_points: Math.round(per * fromUnit * 100) / 100 });
