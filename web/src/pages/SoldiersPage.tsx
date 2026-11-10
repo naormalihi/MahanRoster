@@ -39,6 +39,7 @@ import { useAuth } from "../lib/auth";
 import {
   activeLoadRole,
   activeLoadRoles,
+  todayIso,
   effectiveHomeNightly,
   effectiveParent,
   effectiveService,
@@ -313,6 +314,8 @@ export function SoldiersPage() {
   const [gaf, setGaf] = useState("");
   const [service, setService] = useState("");
   const [range, setRange] = useState("");
+  const [rank, setRank] = useState("");
+  const [relief, setRelief] = useState(""); // "" all · "any" · "none" · a load role id
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SoldierDetail | null>(null);
@@ -335,6 +338,14 @@ export function SoldiersPage() {
 
   const gafim = useMemo(() => [...new Set((rows ?? []).map((s) => s.gaf_name))].sort(), [rows]);
   const rankName = useMemo(() => new Map(ranks.map((r) => [r.id, r.name])), [ranks]);
+  // a rank appointment in force counts as the soldier's rank too (סרן במינוי רס"ן appears under both)
+  const appointedNow = (s: SoldierDetail) => !!s.appointment_rank_id && (!s.appointment_rank_until || s.appointment_rank_until >= todayIso());
+  // ranks present among the soldiers, in the catalog's order
+  const rankOptions = useMemo(() => {
+    const present = new Set((rows ?? []).flatMap((s) => [s.rank_name, appointedNow(s) ? rankName.get(s.appointment_rank_id!) : undefined]));
+    return ranks.map((r) => r.name).filter((n) => present.has(n));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, ranks, rankName]);
 
   const shown = (rows ?? []).filter(
     (s) =>
@@ -342,6 +353,13 @@ export function SoldiersPage() {
       (!q || s.full_name.includes(q.trim())) &&
       (!gaf || s.gaf_name === gaf) &&
       (!service || effectiveService(s) === service) &&
+      (!rank || s.rank_name === rank || (appointedNow(s) && rankName.get(s.appointment_rank_id!) === rank)) &&
+      (!relief ||
+        (relief === "any"
+          ? activeLoadRoles(s).length > 0
+          : relief === "none"
+            ? activeLoadRoles(s).length === 0
+            : activeLoadRoles(s).some((r) => r.load_role_id === relief))) &&
       (!range ||
         (range === "issues" ? ["expired", "expiring"].includes(rangeState(s.range_valid_until)) : rangeState(s.range_valid_until) === range)),
   );
@@ -407,8 +425,9 @@ export function SoldiersPage() {
       )}
 
       <Paper sx={{ p: 2 }}>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "2fr 1fr 1fr 1fr" } }}>
+        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", md: "2fr repeat(5, 1fr)" } }}>
           <TextField
+            sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}
             placeholder="חיפוש לפי שם"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -418,6 +437,24 @@ export function SoldiersPage() {
             <MenuItem value="">כל הגפים</MenuItem>
             {gafim.map((g) => (
               <MenuItem key={g} value={g}>{g}</MenuItem>
+            ))}
+          </TextField>
+          <TextField select label="דרגה" value={rank} onChange={(e) => setRank(e.target.value)}>
+            <MenuItem value="">כל הדרגות</MenuItem>
+            {rankOptions.map((r) => (
+              <MenuItem key={r} value={r}>
+                {r}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField select label="הקלה" value={relief} onChange={(e) => setRelief(e.target.value)}>
+            <MenuItem value="">הכול</MenuItem>
+            <MenuItem value="any">עם הקלה</MenuItem>
+            <MenuItem value="none">בלי הקלה</MenuItem>
+            {loadRoles.map((r) => (
+              <MenuItem key={r.id} value={r.id}>
+                {r.name}
+              </MenuItem>
             ))}
           </TextField>
           <TextField select label="שירות" value={service} onChange={(e) => setService(e.target.value)}>
