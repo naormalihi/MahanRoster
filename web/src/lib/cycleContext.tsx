@@ -4,7 +4,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { canRead } from "./api";
+import { canRead, isStaff } from "./api";
 import { useAuth } from "./auth";
 import { planningCycle, type Cycle } from "./cycles";
 import { dayKey } from "./dates";
@@ -45,10 +45,12 @@ export function CycleProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     if (!staff) return;
+    // the stage follows the facts: let it catch up before reading (staff only; readers just read)
+    if (isStaff(me)) await api!.refreshCycleStages().catch(() => 0);
     const c = await api!.cycles();
     setCycles(c);
     setId((id) => (c.some((x) => x.id === id) ? id : defaultCycle(c, dayKey(new Date()))?.id ?? ""));
-  }, [api, staff]);
+  }, [api, staff, me]);
 
   // a stage can change on any screen (publish, a new run): refresh on navigation
   useEffect(() => {

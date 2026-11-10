@@ -1106,3 +1106,24 @@ def test_exemption_after_publish_activates_the_reserve(conn):
         assert st == "reserve_activated" and pts > 0
         assert conn.execute("select status from assignments where id = %s", (r2,)).fetchone()[0] == "dropped"
         raise psycopg.Rollback()
+
+
+def test_cycle_stage_follows_the_data(conn):
+    cycle = conn.cycle_id
+    auto = lambda: conn.execute("select app.cycle_auto_status(c) from cycles c where id = %s", (cycle,)).fetchone()[0]
+    with conn.transaction():
+        conn.execute("update cycles set status = 'draft', exemption_deadline = now() + interval '3 days', potential_computed_at = null where id = %s", (cycle,))
+        conn.execute("delete from roster_imports where kind = 'roster'")
+        assert auto() == "loading"
+        conn.execute("insert into roster_imports (kind, status) values ('roster', 'applied')")
+        assert auto() == "collecting"
+        conn.execute("update cycles set exemption_deadline = now() - interval '1 hour' where id = %s", (cycle,))
+        conn.execute("update exemptions set status = 'approved', proof_checked_at = now() where status = 'pending'")
+        assert auto() == "potential"
+        conn.execute("update cycles set potential_computed_at = now() where id = %s", (cycle,))
+        assert auto() == "slots"
+        stages = _as_coord(conn, "select stage, tone from public.cycle_stages(%s)", cycle)
+        assert len(stages) == 10 and dict(stages)["loading"] == "done"
+        n = _as_coord(conn, "select public.refresh_cycle_stages()")[0][0]
+        assert n >= 1 and conn.execute("select status from cycles where id = %s", (cycle,)).fetchone()[0] == "slots"
+        raise psycopg.Rollback()

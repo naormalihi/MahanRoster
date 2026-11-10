@@ -17,14 +17,17 @@ import {
   type AbsenceInput,
   type Cycle,
   type CycleInput,
-  type CycleStatus,
   type DateBlock,
   type DateBlockInput,
   type Exemption,
   type ExemptionDecision,
   type ExemptionInput,
   type ExemptionType,
+  autoStatus,
+  stageStates,
+  type StageFacts,
 } from "../lib/cycles";
+import { dayKey } from "../lib/dates";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
 import type { AppUser } from "../lib/users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
@@ -128,6 +131,7 @@ export class DemoApi implements Api {
     { id: "c2", name: "דצמבר 2026 – מאי 2027", start_date: "2026-12-01", end_date: "2027-05-31", exemption_deadline: "2026-10-22T00:00:00+03:00", status: "collecting", published_at: null },
   ];
   private exemptionList: Exemption[] = [];
+  private rosterAt: string | null = "2026-11-01T08:00:00Z";
   private absenceList: Absence[] = [];
   private blockList: DateBlock[] = [];
   private seq = 0;
@@ -287,6 +291,7 @@ export class DemoApi implements Api {
 
   async applyRoster(plan: RosterPlan): Promise<ApplyResult> {
     await delay(400);
+    this.rosterAt = new Date().toISOString();
     for (const g of plan.unknownGafim) this.gafList.push({ id: `g${this.gafList.length}`, name: g });
     let n = this.soldierList.length;
     for (const a of plan.added) this.soldierList.push({ ...a, home_nightly: !!a.home_nightly, id: `s${n++}`, is_active: true });
@@ -472,9 +477,28 @@ export class DemoApi implements Api {
     else this.cycleList.push({ ...c, id: this.nextId("c"), status: "draft", published_at: null });
   }
 
-  async setCycleStatus(id: string, status: CycleStatus) {
+  private stageFacts(c: Cycle): StageFacts {
+    const pending = this.exemptionList.filter((e) => e.status === "pending" && e.start_date <= c.end_date && e.end_date >= c.start_date).length;
+    const job = this.jobs.filter((j) => j.cycle_id === c.id).at(-1)?.status ?? null;
+    return { rosterAt: this.rosterAt, pending, slots: (this.slotsByCycle.get(c.id) ?? []).length, job: job as StageFacts["job"] };
+  }
+
+  async cycleStages(cycleId: string) {
     await delay();
-    this.cycleList.find((x) => x.id === id)!.status = status;
+    const c = this.cycleList.find((x) => x.id === cycleId)!;
+    return stageStates(c, this.stageFacts(c), new Date());
+  }
+
+  async refreshCycleStages() {
+    let n = 0;
+    for (const c of this.cycleList) {
+      const to = autoStatus(c, this.stageFacts(c), new Date(), dayKey(new Date()));
+      if (to !== c.status) {
+        c.status = to;
+        n++;
+      }
+    }
+    return n;
   }
 
   async exemptionTypes() {

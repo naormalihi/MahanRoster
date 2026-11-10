@@ -10,13 +10,13 @@ import type {
   AbsenceType,
   Cycle,
   CycleInput,
-  CycleStatus,
   DateBlock,
   DateBlockInput,
   Exemption,
   ExemptionDecision,
   ExemptionInput,
   ExemptionType,
+  StageState,
 } from "./cycles";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
@@ -133,7 +133,10 @@ export interface Api {
   // cycles
   cycles(): Promise<Cycle[]>;
   saveCycle(id: string | null, c: CycleInput): Promise<void>;
-  setCycleStatus(id: string, status: CycleStatus): Promise<void>;
+  /** Each stage of the cycle with its state (done / warn / todo / busy) and a note. */
+  cycleStages(cycleId: string): Promise<StageState[]>;
+  /** Moves every cycle to the stage its facts put it in (staff); returns how many moved. */
+  refreshCycleStages(): Promise<number>;
   // constraints
   exemptionTypes(): Promise<ExemptionType[]>;
   absenceTypes(): Promise<AbsenceType[]>;

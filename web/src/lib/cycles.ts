@@ -369,3 +369,64 @@ export function dedupeConstraints(
   const absences = parsed.absences.filter((a) => !ak.has(`${a.soldier_id}|${a.absence_type_id}|${a.from}|${a.to}`));
   return { blocks, absences, skipped: parsed.blocks.length - blocks.length + parsed.absences.length - absences.length };
 }
+
+// ----- automatic stages: the stage follows what was done (see migration 39) -----
+
+export type StageTone = "done" | "warn" | "todo" | "busy";
+export interface StageState {
+  stage: CycleStatus;
+  tone: StageTone;
+  note: string;
+}
+/** What the stages are judged by, besides the cycle row itself. */
+export interface StageFacts {
+  rosterAt: string | null; // last personnel file loaded since the cycle was created
+  pending: number; // exemptions of the cycle waiting for a decision
+  slots: number;
+  job: "queued" | "running" | "done" | "failed" | null; // the last run
+}
+
+const EARLY: CycleStatus[] = ["draft", "loading", "collecting", "approving", "potential", "slots"];
+const ddmm = (iso: string) => iso.slice(5, 10).split("-").reverse().join("/");
+
+/** The stage a cycle is in by its facts – the same rule as app.cycle_auto_status. */
+export function autoStatus(c: Cycle, f: StageFacts, now: Date, today: string): CycleStatus {
+  if (c.status === "published" && c.end_date < today) return "closed";
+  if (!EARLY.includes(c.status)) return c.status;
+  if (!f.rosterAt) return "loading";
+  if (!c.exemption_deadline || Date.parse(c.exemption_deadline) > now.getTime()) return "collecting";
+  if (f.pending > 0) return "approving";
+  if (!c.potential_computed_at) return "potential";
+  return "slots";
+}
+
+/** Each stage with its state and a short note – the same as public.cycle_stages. */
+export function stageStates(c: Cycle, f: StageFacts, now: Date): StageState[] {
+  const closedAt = c.exemption_deadline ? Date.parse(c.exemption_deadline) : null;
+  const deadlinePassed = closedAt !== null && closedAt <= now.getTime();
+  const out = c.status === "published" || c.status === "closed";
+  return [
+    { stage: "draft", tone: "done", note: "" },
+    { stage: "loading", tone: f.rosterAt ? "done" : "todo", note: f.rosterAt ? `נטען ${ddmm(f.rosterAt)}` : "צריך לטעון קובץ כוח אדם עדכני" },
+    {
+      stage: "collecting",
+      tone: closedAt === null ? "warn" : deadlinePassed ? "done" : "todo",
+      note: closedAt === null ? "לא נקבע מועד סגירה" : `${deadlinePassed ? "נסגר" : "פתוח עד"} ${ddmm(c.exemption_deadline!)}`,
+    },
+    { stage: "approving", tone: f.pending > 0 ? "warn" : deadlinePassed ? "done" : "todo", note: f.pending > 0 ? `${f.pending} ממתינים` : "אין ממתינים" },
+    {
+      stage: "potential",
+      tone: c.potential_computed_at ? "done" : "todo",
+      note: c.potential_computed_at ? `חושב ${ddmm(c.potential_computed_at)}` : "לא חושב",
+    },
+    { stage: "slots", tone: f.slots > 0 ? "done" : "todo", note: f.slots > 0 ? `${f.slots} משבצות` : "לא נקלט" },
+    {
+      stage: "scheduling",
+      tone: f.job === "queued" || f.job === "running" ? "busy" : f.job === "done" ? "done" : f.job === "failed" ? "warn" : "todo",
+      note: f.job === "queued" || f.job === "running" ? "רץ" : f.job === "done" ? "הושלם" : f.job === "failed" ? "נכשל" : "לא הורץ",
+    },
+    { stage: "review", tone: out ? "done" : "todo", note: out ? "אושרה" : f.job === "done" ? "מחכה לבדיקה ולפרסום" : "" },
+    { stage: "published", tone: out ? "done" : "todo", note: c.published_at ? `פורסם ${ddmm(c.published_at)}` : "" },
+    { stage: "closed", tone: c.status === "closed" ? "done" : "todo", note: `אחרי ${ddmm(c.end_date)}` },
+  ];
+}
