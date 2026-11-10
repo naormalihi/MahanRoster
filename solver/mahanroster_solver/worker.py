@@ -10,6 +10,7 @@ exits, so it costs nothing while idle.
 from __future__ import annotations
 
 import json
+import time
 import logging
 import os
 import sys
@@ -44,13 +45,22 @@ def claim(conn):
 def run_one(conn, job_id, payload) -> str:
     problem = models.load_problem(json.dumps(payload))
 
-    def progress(done: int, total: int, staffed: int = 0, slots: int = 0) -> None:
-        # 5–95 % while solving month by month, and how many duties are staffed so far ("108/180")
+    last = [0.0]
+
+    def progress(done: int, total: int, staffed: int = 0, slots: int = 0, phase: str = "searching") -> None:
+        # 5–95 % while solving month by month, how many duties are staffed so far ("108/180"), and
+        # whether the current month is still searching or already balancing; at most every 3 s
+        # inside a month, so better solutions do not flood the database
+        now = time.monotonic()
+        if phase == "improving" and now - last[0] < 3:
+            return
+        last[0] = now
         conn.execute(
             """update schedule_jobs set progress = %s,
-                 params = params || jsonb_build_object('staffed', %s::int, 'slots', %s::int, 'month', %s::int, 'months', %s::int)
+                 params = params || jsonb_build_object('staffed', %s::int, 'slots', %s::int, 'month', %s::int,
+                                                       'months', %s::int, 'phase', %s::text)
                where id = %s""",
-            (5 + int(90 * done / max(total, 1)), staffed, slots, done, total, job_id),
+            (5 + int(90 * done / max(total, 1)), staffed, slots, done, total, phase, job_id),
         )
 
     progress(0, 1, 0, len(problem.slots))

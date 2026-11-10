@@ -40,6 +40,8 @@ export interface ScheduleJob {
     slots?: number;
     month?: number;
     months?: number;
+    /** searching for a first solution of the month, or improving the balance of one already found */
+    phase?: "searching" | "improving";
   };
   result_status: string | null;
   wall_time: number | null;

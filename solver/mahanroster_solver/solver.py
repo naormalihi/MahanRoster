@@ -235,10 +235,12 @@ def diagnose(problem: Problem) -> str:
     return "לא נמצא כלל אחד שחוסם; כנראה שילוב של כמה כללים או נתון חסר."
 
 
-def solve(problem: Problem, log: bool = False, relax: frozenset[str] = frozenset()) -> Solution:
+def solve(problem: Problem, log: bool = False, relax: frozenset[str] = frozenset(), on_solution=None) -> Solution:
     """Solves the problem. Published (fixed) assignments are facts: they count toward load, take
     the soldier's time and fill the slot's needs, but never make the run infeasible on their own.
-    On a failure all the same, the solution carries a diagnosis (unless this already is one)."""
+    On a failure all the same, the solution carries a diagnosis (unless this already is one).
+    on_solution(staffed_slots, found) is called on each better solution while solving: how many of
+    this problem's slots have all their performers, and how many solutions were found so far."""
     from ortools.sat.python import cp_model  # imported lazily so the rest works without OR-Tools
 
     t0 = _time.time()
@@ -515,7 +517,24 @@ def solve(problem: Problem, log: bool = False, relax: frozenset[str] = frozenset
     solver.parameters.num_search_workers = max(1, min(settings.workers, os.cpu_count() or 1))
     solver.parameters.random_seed = settings.random_seed
     solver.parameters.log_search_progress = log
-    status = solver.Solve(m)
+    if on_solution is not None:
+
+        class _Progress(cp_model.CpSolverSolutionCallback):
+            def __init__(self) -> None:
+                super().__init__()
+                self.found = 0
+
+            def on_solution_callback(self) -> None:
+                self.found += 1
+                staffed = sum(1 for v in unfilled_p.values() if self.Value(v) == 0)
+                try:
+                    on_solution(staffed, self.found)
+                except Exception:  # progress must never stop the solve
+                    pass
+
+        status = solver.Solve(m, _Progress())
+    else:
+        status = solver.Solve(m)
     status_name = solver.StatusName(status)
 
     sol = Solution(

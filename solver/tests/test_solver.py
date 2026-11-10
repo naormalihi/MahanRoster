@@ -217,4 +217,6 @@ def test_rolling_reports_duties_staffed_month_by_month():
     slots = [slot("j", "guard", "2027-01-10T08:00", "2027-01-11T08:00", r=0), slot("f", "guard", "2027-02-10T08:00", "2027-02-11T08:00", r=0)]
     calls = []
     solve_rolling(problem([A, B], slots), on_progress=lambda *a: calls.append(a))
-    assert calls[0] == (0, 2, 0, 2) and calls[-1] == (2, 2, 2, 2)
+    assert calls[0] == (0, 2, 0, 2, "searching") and calls[-1] == (2, 2, 2, 2, "searching")
+    # inside each month, better solutions report as they come
+    assert any(c[4] == "improving" for c in calls)

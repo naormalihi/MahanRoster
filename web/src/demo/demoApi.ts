@@ -724,7 +724,7 @@ export class DemoApi implements Api {
     // like the worker: duties staffed so far, month by month
     const months = Math.max(1, new Set(slots.map((k) => k.starts_at.slice(0, 7))).size);
     const month = Math.min(months, Math.floor(((age - 4) / 12) * months));
-    j.params = { ...j.params, slots: slots.length, months, month, staffed: Math.round((slots.length * month) / months) };
+    j.params = { ...j.params, slots: slots.length, months, month, staffed: Math.round((slots.length * month) / months), phase: age > 6 ? "improving" : "searching" };
     if (age < 16) return;
     Object.assign(j, {
       status: "done",
