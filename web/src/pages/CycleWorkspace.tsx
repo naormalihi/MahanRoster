@@ -12,17 +12,16 @@ import {
   Stack,
   Tab,
   Tabs,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
-import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel, type Cycle } from "../lib/cycles";
 import { pendingSlots, nextAction, STEPS, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
 import { StagePanel } from "./CyclesPage";
+import { announceBoardChange } from "../components/SlotActions";
 
 const ConstraintsPage = lazy(() => import("./ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
 const PotentialPage = lazy(() => import("./PotentialPage").then((m) => ({ default: m.PotentialPage })));
@@ -131,18 +130,20 @@ function Overview({ cycle, facts }: { cycle: Cycle; facts: CycleFacts | null }) 
   );
 }
 
-/** Run and draft are one job: run the engine, then review, fix and publish – on one screen. */
-function ScheduleStep({ facts }: { facts: CycleFacts | null }) {
-  const [params, setParams] = useSearchParams();
-  const hasDraft = facts?.job?.status === "done";
-  const view = params.get("view") ?? (hasDraft ? "draft" : "run");
+/**
+ * Run and draft are one job, on one screen: the engine's status card on top (run / running /
+ * draft ready), and the draft under it – health tiles, the board and the soldiers.
+ */
+function ScheduleStep() {
+  const [draftVersion, setDraftVersion] = useState(0);
+  const onDone = useCallback(() => {
+    setDraftVersion((v) => v + 1);
+    announceBoardChange(); // the step marks (e.g. "המנוע רץ") follow
+  }, []);
   return (
-    <Stack spacing={2}>
-      <ToggleButtonGroup exclusive size="small" value={view} onChange={(_, v) => v && setParams({ view: v }, { replace: true })}>
-        <ToggleButton value="run">הרצה</ToggleButton>
-        <ToggleButton value="draft">טיוטה</ToggleButton>
-      </ToggleButtonGroup>
-      {view === "run" ? <SchedulePage /> : <DraftPage />}
+    <Stack spacing={2} sx={{ minWidth: 0 }}>
+      <SchedulePage onDone={onDone} />
+      <DraftPage key={draftVersion} />
     </Stack>
   );
 }
@@ -208,7 +209,7 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
           {step === "constraints" && <ConstraintsPage />}
           {step === "potential" && <PotentialPage />}
           {step === "slots" && <SlotsPage />}
-          {step === "schedule" && <ScheduleStep facts={facts} />}
+          {step === "schedule" && <ScheduleStep />}
           {step === "operate" && <OperatePage />}
         </Box>
       </Suspense>

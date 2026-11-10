@@ -37,9 +37,10 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  Menu,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { useCanEdit } from "../components/ReadOnly";
@@ -56,7 +57,7 @@ import {
   loads,
   rankCandidates,
   summarizeReasons,
-  weeksOf,
+  type SlotView,
   type Candidate,
   type DraftAssignment,
   type Role,
@@ -72,7 +73,6 @@ const span = (a: string, b: string) => {
   const sameDay = dayKey(a) === dayKey(b);
   return `${hm.format(new Date(a))} – ${sameDay ? "" : dm.format(new Date(b)) + " "}${hm.format(new Date(b))}`;
 };
-const fmtDay = (d: string) => d.split("-").reverse().join("/");
 
 function Loading() {
   return (
@@ -255,50 +255,64 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
 // By slot
 // ---------------------------------------------------------------------------
 
-type Only = "" | "missing" | "manual";
+type BoardFilter = "" | "missing" | "manual" | "weekend";
 
-function SlotsTab({
+/**
+ * The whole cycle as one list, day by day (the day stays on top while scrolling). One search finds
+ * a soldier, a duty or a date ("6.1"); chips narrow to gaps, manual changes or weekends. A name
+ * opens a menu: the soldier's details, or replacing him.
+ */
+function BoardView({
   ctx,
-  only,
-  setOnly,
+  q,
+  filter,
+  setFilter,
   who,
   setWho,
+  onOpenSoldier,
 }: {
   ctx: Ctx;
-  only: Only;
-  setOnly: (o: Only) => void;
-  who?: string | null;
-  setWho?: (id: string | null) => void;
+  q: string;
+  filter: BoardFilter;
+  setFilter: (f: BoardFilter) => void;
+  who: string | null;
+  setWho: (id: string | null) => void;
+  onOpenSoldier: (id: string) => void;
 }) {
-  const weeks = useMemo(() => weeksOf(ctx.cycle.start_date, ctx.cycle.end_date), [ctx.cycle]);
-  const firstWithWork = useMemo(() => {
-    const first = ctx.slots[0]?.starts_at;
-    if (!first) return weeks[0];
-    const d = dayKey(first);
-    return [...weeks].reverse().find((w) => w <= d) ?? weeks[0];
-  }, [ctx.slots, weeks]);
-  const [week, setWeek] = useState<string>("");
-  const [task, setTask] = useState("");
   const [editing, setEditing] = useState<{ slot: SlotRow; role: Role; current: DraftAssignment | null } | null>(null);
+  const [menu, setMenu] = useState<{ el: HTMLElement; a: DraftAssignment; slot: SlotRow } | null>(null);
   const views = useMemo(() => bySlot(ctx.slots, ctx.assignments), [ctx.slots, ctx.assignments]);
-  const wk = week || firstWithWork;
-  const wkEnd = useMemo(() => {
-    const d = new Date(wk + "T12:00:00Z");
-    d.setUTCDate(d.getUTCDate() + 6);
-    return d.toISOString().slice(0, 10);
-  }, [wk]);
+  const name = (id: string) => ctx.soldiers.get(id)?.full_name ?? "";
+  const terms = q.trim().split(/\s+/).filter(Boolean);
+  const dateWords = (iso: string) => {
+    const [y, m, d] = dayKey(iso).split("-").map(Number);
+    return `${d}.${m} ${d}/${m} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")} ${d}.${m}.${y}`;
+  };
+  const isWeekend = (k: SlotRow, v: SlotView) =>
+    [...v.performers, ...v.reserves].some((a) => (a.weekend_units ?? 0) > 0) || [5, 6].includes(new Date(dayKey(k.starts_at) + "T12:00:00Z").getUTCDay());
 
-  const shown = ctx.slots.filter((s) => {
-    const d = dayKey(s.starts_at);
-    const v = views.get(s.id)!;
-    if (who) return [...v.performers, ...v.reserves].some((a) => a.soldier_id === who);
-    if (only === "missing") return v.missingPerformers + v.missingReserves > 0 && (!task || s.task_type_id === task);
-    if (only === "manual") return [...v.performers, ...v.reserves].some((a) => a.source === "manual") && (!task || s.task_type_id === task);
-    return d >= wk && d <= wkEnd && (!task || s.task_type_id === task);
+  const counts = { missing: 0, manual: 0, weekend: 0 };
+  for (const k of ctx.slots) {
+    const v = views.get(k.id)!;
+    if (v.missingPerformers + v.missingReserves > 0) counts.missing++;
+    if ([...v.performers, ...v.reserves].some((a) => a.source === "manual")) counts.manual++;
+    if (isWeekend(k, v)) counts.weekend++;
+  }
+  const shown = ctx.slots.filter((k) => {
+    const v = views.get(k.id)!;
+    const people = [...v.performers, ...v.reserves];
+    if (who && !people.some((a) => a.soldier_id === who)) return false;
+    if (filter === "missing" && v.missingPerformers + v.missingReserves === 0) return false;
+    if (filter === "manual" && !people.some((a) => a.source === "manual")) return false;
+    if (filter === "weekend" && !isWeekend(k, v)) return false;
+    if (terms.length) {
+      const hay = [ctx.tasks.get(k.task_type_id)?.name ?? "", ...people.map((a) => name(a.soldier_id)), dateWords(k.starts_at)].join(" ");
+      if (!terms.every((t) => hay.includes(t))) return false;
+    }
+    return true;
   });
   const byDay = new Map<string, SlotRow[]>();
-  for (const s of shown) byDay.set(dayKey(s.starts_at), [...(byDay.get(dayKey(s.starts_at)) ?? []), s]);
-  const taskIds = [...new Set(ctx.slots.map((s) => s.task_type_id))];
+  for (const k of shown) byDay.set(dayKey(k.starts_at), [...(byDay.get(dayKey(k.starts_at)) ?? []), k]);
 
   const Name = ({ a, slot }: { a: DraftAssignment; slot: SlotRow }) => {
     const s = ctx.soldiers.get(a.soldier_id);
@@ -308,8 +322,9 @@ function SlotsTab({
           size="small"
           variant={a.role === "performer" ? "filled" : "outlined"}
           color={a.source === "manual" ? "secondary" : "default"}
-          label={`${s?.full_name ?? "?"} · ${s?.gaf_name ?? ""}`}
-          onClick={ctx.locked ? undefined : () => setEditing({ slot, role: a.role, current: a })}
+          label={`${a.role === "reserve" ? "עתודה: " : ""}${s?.full_name ?? "?"}`}
+          onClick={(e) => setMenu({ el: e.currentTarget, a, slot })}
+          sx={{ maxWidth: "100%" }}
         />
       </Tooltip>
     );
@@ -323,68 +338,87 @@ function SlotsTab({
         onClick={ctx.locked ? undefined : () => setEditing({ slot, role, current: null })}
       />
     ) : null;
+  const chip = (f: BoardFilter, label: string) => (
+    <Chip
+      key={f || "all"}
+      label={label}
+      color={filter === f ? "primary" : "default"}
+      variant={filter === f ? "filled" : "outlined"}
+      onClick={() => setFilter(f)}
+    />
+  );
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={1.5}>
+      <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5, "& > *": { flexShrink: 0 } }}>
+        {chip("", `הכל · ${ctx.slots.length}`)}
+        {counts.missing > 0 && chip("missing", `חסרים · ${counts.missing}`)}
+        {counts.manual > 0 && chip("manual", `ידני · ${counts.manual}`)}
+        {chip("weekend", `סופ״ש וחגים · ${counts.weekend}`)}
+      </Stack>
       {who && (
-        <Alert severity="info" action={<Button color="inherit" size="small" onClick={() => setWho?.(null)}>הצגת הכול</Button>}>
-          מוצגות התורנויות של <b>{ctx.soldiers.get(who)?.full_name}</b> בכל המחזור.
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" onClick={() => setWho(null)}>
+              הכול
+            </Button>
+          }
+        >
+          {shown.length ? (
+            <>
+              התורנויות של <b>{name(who)}</b> ({shown.length})
+            </>
+          ) : (
+            <>
+              ל<b>{name(who)}</b> אין תורנויות בטיוטה.{" "}
+              <Button size="small" onClick={() => onOpenSoldier(who)}>
+                למה?
+              </Button>
+            </>
+          )}
         </Alert>
       )}
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-        <TextField select size="small" label="שבוע" value={wk} onChange={(e) => setWeek(e.target.value)} disabled={!!only || !!who} sx={{ minWidth: 150 }}>
-          {weeks.map((w) => (
-            <MenuItem key={w} value={w}>
-              {fmtDay(w)}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField select size="small" label="תורנות" value={task} onChange={(e) => setTask(e.target.value)} sx={{ minWidth: 170 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-          <MenuItem value="">הכל</MenuItem>
-          {taskIds.map((id) => (
-            <MenuItem key={id} value={id}>
-              {ctx.tasks.get(id)?.name}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField select size="small" label="הצג" value={only} onChange={(e) => setOnly(e.target.value as Only)} sx={{ minWidth: 170 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-          <MenuItem value="">השבוע שנבחר</MenuItem>
-          <MenuItem value="missing">כל המשבצות החסרות</MenuItem>
-          <MenuItem value="manual">כל השינויים הידניים</MenuItem>
-        </TextField>
-      </Stack>
-      <Typography variant="caption" color="text.secondary">
-        לחיצה על שם פותחת החלפה; לחיצה על "חסר" פותחת שיבוץ. מעבר עם העכבר מראה את ההסבר. סגול = שינוי ידני.
-      </Typography>
-      {shown.length === 0 && <Alert severity="info">אין משבצות להצגה.</Alert>}
+      {shown.length === 0 && !who && <Alert severity="info">אין משבצות שמתאימות לחיפוש.</Alert>}
       {[...byDay].map(([day, list]) => (
         <Box key={day}>
-          <Typography variant="h3" sx={{ mb: 1, color: "primary.main" }}>
+          <Typography
+            variant="subtitle1"
+            sx={{
+              position: "sticky",
+              top: { xs: 56, sm: 64 },
+              zIndex: 2,
+              bgcolor: "background.default",
+              py: 0.5,
+              fontWeight: 700,
+              color: "primary.main",
+            }}
+          >
             {dayFmt.format(new Date(day + "T12:00:00Z"))}
           </Typography>
           <Stack spacing={1}>
-            {list.map((s) => {
-              const v = views.get(s.id)!;
-              const t = ctx.tasks.get(s.task_type_id);
+            {list.map((k) => {
+              const v = views.get(k.id)!;
+              const t = ctx.tasks.get(k.task_type_id);
               return (
-                <Paper key={s.id} variant="outlined" sx={{ p: 1.25, borderInlineStart: `4px solid ${t?.color ?? "#999"}` }}>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
-                    <Box sx={{ minWidth: 210 }}>
-                      <Typography sx={{ fontWeight: 600 }}>{t?.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {span(s.starts_at, s.ends_at)}
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", gap: 0.75, flex: 1 }}>
-                      {v.performers.map((a) => (
-                        <Name key={a.id} a={a} slot={s} />
-                      ))}
-                      <Missing slot={s} role="performer" n={v.missingPerformers} />
-                      {v.reserves.map((a) => (
-                        <Name key={a.id} a={a} slot={s} />
-                      ))}
-                      <Missing slot={s} role="reserve" n={v.missingReserves} />
-                    </Stack>
+                <Paper key={k.id} variant="outlined" sx={{ p: 1.25, borderInlineStart: `4px solid ${t?.color ?? "#999"}`, minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mb: 0.75 }}>
+                    <Typography sx={{ fontWeight: 600, flex: 1, minWidth: 0 }} noWrap>
+                      {t?.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+                      {span(k.starts_at, k.ends_at)}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
+                    {v.performers.map((a) => (
+                      <Name key={a.id} a={a} slot={k} />
+                    ))}
+                    <Missing slot={k} role="performer" n={v.missingPerformers} />
+                    {v.reserves.map((a) => (
+                      <Name key={a.id} a={a} slot={k} />
+                    ))}
+                    <Missing slot={k} role="reserve" n={v.missingReserves} />
                   </Stack>
                 </Paper>
               );
@@ -392,6 +426,26 @@ function SlotsTab({
           </Stack>
         </Box>
       ))}
+      <Menu open={!!menu} anchorEl={menu?.el} onClose={() => setMenu(null)}>
+        <MenuItem
+          onClick={() => {
+            onOpenSoldier(menu!.a.soldier_id);
+            setMenu(null);
+          }}
+        >
+          פרטי {name(menu?.a.soldier_id ?? "")}
+        </MenuItem>
+        {!ctx.locked && (
+          <MenuItem
+            onClick={() => {
+              setEditing({ slot: menu!.slot, role: menu!.a.role, current: menu!.a });
+              setMenu(null);
+            }}
+          >
+            החלפה או הסרה
+          </MenuItem>
+        )}
+      </Menu>
       {editing && <AssignDialog ctx={ctx} {...editing} onClose={() => setEditing(null)} />}
     </Stack>
   );
@@ -401,24 +455,11 @@ function SlotsTab({
 // Load per soldier
 // ---------------------------------------------------------------------------
 
-function LoadTab({
-  ctx,
-  snapshot,
-  cells,
-  categories,
-  tolerance,
-  onShowSoldier,
-}: {
-  ctx: Ctx;
-  snapshot: SnapshotSoldier[];
-  cells: PotentialCell[] | null;
-  categories: Map<string, string>;
-  tolerance: number;
-  onShowSoldier: (soldierId: string) => void;
-}) {
+/** The fairness picture of the draft – shared by the health tile and the soldiers view. */
+function useFairness(ctx: Ctx, snapshot: SnapshotSoldier[], cells: PotentialCell[] | null, categories: Map<string, string>, tolerance: number) {
   const ls = useMemo(() => loads(snapshot, ctx.assignments), [snapshot, ctx.assignments]);
   const groupName = useMemo(() => poolNames(snapshot), [snapshot]);
-  const rank = new Map(snapshot.map((s) => [s.soldier_id, s.rank_name]));
+  const rank = useMemo(() => new Map(snapshot.map((s) => [s.soldier_id, s.rank_name])), [snapshot]);
   // the duty categories each soldier is open to, by name (the potential matrix)
   const openNames = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -431,17 +472,36 @@ function LoadTab({
   );
   const rows = useMemo(() => fairRows(ls, profileOf, tolerance), [ls, profileOf, tolerance]);
   const verdict = useMemo(() => verdicts(rows), [rows]);
+  const outliers = useMemo(() => rows.filter((r) => r.outlier).length, [rows]);
+  return { ls, groupName, rank, openNames, rows, verdict, outliers, tolerance, hasCells: !!cells };
+}
+type Fairness = ReturnType<typeof useFairness>;
+
+function LoadTab({
+  ctx,
+  fair,
+  q,
+  onlyOut,
+  setOnlyOut,
+  onOpen,
+}: {
+  ctx: Ctx;
+  fair: Fairness;
+  q: string;
+  onlyOut: boolean;
+  setOnlyOut: (v: boolean) => void;
+  onOpen: (soldierId: string) => void;
+}) {
+  const { ls, groupName, rank, openNames, rows, verdict, tolerance } = fair;
   const keys = [...verdict.keys()].sort((a, b) => verdict.get(b)!.soldiers - verdict.get(a)!.soldiers);
   const [picked, setPool] = useState("");
-  const pool = keys.includes(picked) ? picked : keys[0] ?? "";
+  // "only outliers" from the health tile opens the first group that has some
+  const pool = keys.includes(picked) ? picked : (onlyOut ? keys.find((k) => verdict.get(k)!.outliers.length) : undefined) ?? keys[0] ?? "";
   const v = verdict.get(pool);
   const credited = ls.some((l) => l.creditDays > 0);
 
-  const [q, setQ] = useState("");
   const [gaf, setGaf] = useState("");
-  const [onlyOut, setOnlyOut] = useState(false);
   const [sort, setSort] = useState<"diff" | "score" | "name">("score");
-  const [open, setOpen] = useState<FairRow | null>(null);
 
   const inPool = rows.filter((r) => r.pool === pool);
   const gafim = [...new Set(inPool.map((r) => ctx.soldiers.get(r.soldier_id)?.gaf_name ?? ""))].filter(Boolean).sort();
@@ -452,7 +512,7 @@ function LoadTab({
       sort === "name" ? name(a.soldier_id).localeCompare(name(b.soldier_id), "he") : sort === "diff" ? Math.abs(b.diff) - Math.abs(a.diff) : b.expected - a.expected,
     );
   const top = Math.max(1, ...inPool.map((r) => Math.max(r.expected, r.ref + r.limit)));
-  const profiles = cells ? byProfile(inPool, (id) => [...(openNames.get(id) ?? [])]) : [];
+  const profiles = fair.hasCells ? byProfile(inPool, (id) => [...(openNames.get(id) ?? [])]) : [];
   const notCompared = inPool.filter((r) => !r.compared).length;
   // a signed number keeps its sign on the left inside Hebrew text
   const sign = (n: number) => `\u2066${n > 0 ? "+" : ""}${n.toFixed(1)}\u2069`;
@@ -493,15 +553,7 @@ function LoadTab({
         ))}
 
       <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "2fr 1fr 1fr auto" }, alignItems: "center", mb: 1.5 }}>
-          <TextField
-            size="small"
-            placeholder="חיפוש לפי שם"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
-            sx={{ gridColumn: { xs: "1 / -1", sm: "auto" } }}
-          />
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr auto" }, alignItems: "center", mb: 1.5 }}>
           <TextField size="small" select label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)}>
             <MenuItem value="">כל הגפים</MenuItem>
             {gafim.map((g) => (
@@ -530,8 +582,8 @@ function LoadTab({
                 key={r.soldier_id}
                 role="button"
                 tabIndex={0}
-                onClick={() => setOpen(r)}
-                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setOpen(r))}
+                onClick={() => onOpen(r.soldier_id)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen(r.soldier_id))}
                 sx={{
                   display: "grid",
                   gridTemplateColumns: { xs: "1fr 76px", sm: "200px 1fr 92px" },
@@ -640,19 +692,6 @@ function LoadTab({
         </AccordionDetails>
       </Accordion>
 
-      {open && (
-        <SoldierLoadDialog
-          ctx={ctx}
-          row={open}
-          rankName={rank.get(open.soldier_id) ?? ""}
-          tolerance={tolerance}
-          onClose={() => setOpen(null)}
-          onShowSlots={() => {
-            onShowSoldier(open.soldier_id);
-            setOpen(null);
-          }}
-        />
-      )}
     </Stack>
   );
 }
@@ -797,6 +836,157 @@ function SoldierLoadDialog(props: { ctx: Ctx; row: FairRow; rankName: string; to
 
 // ---------------------------------------------------------------------------
 
+/**
+ * The draft, on one screen: three health tiles (gaps, fairness, manual changes) with the publish
+ * button, one search for both views, and the two views – the board (duties day by day) and the
+ * soldiers (load and fairness). A soldier's details open from either view.
+ */
+function DraftBody(props: {
+  ctx: Ctx;
+  snapshot: SnapshotSoldier[];
+  cells: PotentialCell[] | null;
+  categories: Map<string, string>;
+  tolerance: number;
+  missing: number;
+  missingR: number;
+  published: boolean;
+  onPublish: () => void;
+}) {
+  const { ctx } = props;
+  const navigate = useNavigate();
+  const fair = useFairness(ctx, props.snapshot, props.cells, props.categories, props.tolerance);
+  const [view, setView] = useState<"board" | "soldiers">("board");
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<BoardFilter>("");
+  const [who, setWho] = useState<string | null>(null);
+  const [onlyOut, setOnlyOut] = useState(false);
+  const [soldier, setSoldier] = useState<string | null>(null);
+  const manual = ctx.assignments.filter((a) => a.source === "manual").length;
+  const gaps = props.missing + props.missingR;
+  const row = soldier ? fair.rows.find((r) => r.soldier_id === soldier) : undefined;
+
+  const Tile = (p: { tone: "error" | "success" | "warning" | "secondary" | "default"; title: string; value: string; onClick?: () => void }) => (
+    <Paper
+      variant="outlined"
+      component={p.onClick ? "button" : "div"}
+      onClick={p.onClick}
+      sx={{
+        all: p.onClick ? "unset" : undefined,
+        boxSizing: "border-box",
+        flex: "1 0 120px",
+        p: 1.25,
+        borderRadius: 2,
+        border: 1,
+        borderColor: p.tone === "default" ? "divider" : `${p.tone}.main`,
+        bgcolor: "background.paper",
+        cursor: p.onClick ? "pointer" : "default",
+        textAlign: "start",
+        "&:hover": p.onClick ? { bgcolor: "action.hover" } : undefined,
+        "&:focus-visible": { outline: 2, outlineColor: "primary.main" },
+      }}
+    >
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+        {p.title}
+      </Typography>
+      <Typography sx={{ fontWeight: 700, color: p.tone === "default" ? "text.primary" : `${p.tone}.main` }}>{p.value}</Typography>
+    </Paper>
+  );
+
+  return (
+    <Stack spacing={2} sx={{ minWidth: 0 }}>
+      <Stack direction="row" sx={{ gap: 1, overflowX: "auto", pb: 0.5, alignItems: "stretch" }}>
+        <Tile
+          tone={gaps ? "error" : "success"}
+          title={gaps ? "חסרים" : "איוש"}
+          value={
+            gaps
+              ? [props.missing ? `${props.missing} מבצעים` : "", props.missingR ? `${props.missingR} עתודות` : ""].filter(Boolean).join(" · ")
+              : "✓ הכול מאויש"
+          }
+          onClick={
+            gaps
+              ? () => {
+                  if (props.published) return navigate("/cycle/operate");
+                  setView("board");
+                  setWho(null);
+                  setFilter("missing");
+                }
+              : undefined
+          }
+        />
+        <Tile
+          tone={fair.outliers ? "warning" : "success"}
+          title={`הוגנות (±${props.tolerance}%)`}
+          value={fair.outliers ? `${fair.outliers} חורגים` : "✓ הוגן"}
+          onClick={() => {
+            setView("soldiers");
+            setOnlyOut(fair.outliers > 0);
+          }}
+        />
+        <Tile
+          tone={manual ? "secondary" : "default"}
+          title="שינויים ידניים"
+          value={String(manual)}
+          onClick={
+            manual
+              ? () => {
+                  setView("board");
+                  setWho(null);
+                  setFilter("manual");
+                }
+              : undefined
+          }
+        />
+        {!props.published && (
+          <Box sx={{ display: "flex", alignItems: "center", flex: "1 0 auto", justifyContent: "flex-end" }}>
+            <Button variant="contained" startIcon={<PublishIcon />} onClick={props.onPublish}>
+              פרסום
+            </Button>
+          </Box>
+        )}
+      </Stack>
+
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
+        <Tabs value={view} onChange={(_, v) => setView(v)} sx={{ minHeight: 40, "& .MuiTab-root": { minHeight: 40 } }}>
+          <Tab value="board" label="לוח" />
+          <Tab value="soldiers" label="חיילים" />
+        </Tabs>
+        <TextField
+          size="small"
+          placeholder={view === "board" ? "חיפוש: חייל, תורנות או תאריך (6.1)" : "חיפוש לפי שם"}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+          sx={{ flex: 1 }}
+        />
+      </Stack>
+
+      {view === "board" ? (
+        <BoardView ctx={ctx} q={q} filter={filter} setFilter={setFilter} who={who} setWho={setWho} onOpenSoldier={setSoldier} />
+      ) : (
+        <LoadTab ctx={ctx} fair={fair} q={q} onlyOut={onlyOut} setOnlyOut={setOnlyOut} onOpen={setSoldier} />
+      )}
+
+      {soldier && row && (
+        <SoldierLoadDialog
+          ctx={ctx}
+          row={row}
+          rankName={fair.rank.get(soldier) ?? ""}
+          tolerance={props.tolerance}
+          onClose={() => setSoldier(null)}
+          onShowSlots={() => {
+            setWho(soldier);
+            setFilter("");
+            setQ("");
+            setView("board");
+            setSoldier(null);
+          }}
+        />
+      )}
+    </Stack>
+  );
+}
+
 export function DraftPage() {
   const { api, me } = useAuth();
   const canEdit = useCanEdit();
@@ -809,11 +999,7 @@ export function DraftPage() {
   const [snapshot, setSnapshot] = useState<SnapshotSoldier[]>([]);
   const [cells, setCells] = useState<PotentialCell[] | null>(null);
   const [categories, setCategories] = useState<Map<string, string>>(new Map());
-  const [tab, setTab] = useState<"slots" | "load">("slots");
-  const [only, setOnly] = useState<Only>("");
-  const [who, setWho] = useState<string | null>(null); // the slots list shows one soldier's duties
   const [tolerance, setTolerance] = useState(20);
-  const navigate = useNavigate();
   const [publishing, setPublishing] = useState(false);
   const [unpublishing, setUnpublishing] = useState<UnpublishImpact | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -881,93 +1067,19 @@ export function DraftPage() {
         <Alert severity="info">אין מחזור.</Alert>
       ) : !slots || !assignments ? (
         <Loading />
-      ) : assignments.length === 0 ? (
-        <Alert severity="info">
-          אין עדיין טיוטה למחזור הזה. הרץ שיבוץ במסך{" "}
-          <RouterLink to="/cycle/schedule?view=run" style={{ color: "inherit" }}>
-            שיבוץ
-          </RouterLink>
-          .
-        </Alert>
-      ) : (
+      ) : assignments.length === 0 ? null : (
         <>
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-              {(() => {
-                // the counters are the filters of the slot list; after publishing, gaps are filled in operations
-                const show = (o: Only) => {
-                  setTab("slots");
-                  setWho(null);
-                  setOnly(o);
-                };
-                const active = (o: Only) => tab === "slots" && only === o && !who;
-                const manualCount = assignments.filter((a) => a.source === "manual").length;
-                const gaps = missing + missingR > 0;
-                return (
-                  <>
-                    <Chip
-                      label={`כל המשבצות · ${slots.length}`}
-                      color={active("") ? "primary" : "default"}
-                      variant={active("") ? "filled" : "outlined"}
-                      onClick={() => show("")}
-                    />
-                    {gaps ? (
-                      <Chip
-                        color="error"
-                        variant={active("missing") ? "filled" : "outlined"}
-                        label={[missing ? `חסרים ${missing} מבצעים` : "", missingR ? `חסרות ${missingR} עתודות` : ""].filter(Boolean).join(" · ")}
-                        onClick={() => (locked ? navigate("/cycle/operate") : show("missing"))}
-                      />
-                    ) : (
-                      <Chip color="success" variant="outlined" label="כל המשבצות מאוישות" />
-                    )}
-                    {manualCount > 0 && (
-                      <Chip
-                        color="secondary"
-                        variant={active("manual") ? "filled" : "outlined"}
-                        label={`${manualCount} שינויים ידניים`}
-                        onClick={() => show("manual")}
-                      />
-                    )}
-                    {locked && gaps && (
-                      <Typography variant="caption" color="text.secondary">
-                        משלימים בתפעול
-                      </Typography>
-                    )}
-                  </>
-                );
-              })()}
-              <Box sx={{ flex: 1 }} />
-              {!locked && (
-                <Button variant="contained" startIcon={<PublishIcon />} onClick={() => setPublishing(true)}>
-                  פרסום
-                </Button>
-              )}
-            </Stack>
-          </Paper>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-            <Tab value="slots" label="לפי משבצת" />
-            <Tab value="load" label="עומס לפי חייל" />
-          </Tabs>
-          {(() => {
-            const ctx: Ctx = { cycle, slots, tasks, soldiers, assignments, reload: load, locked: locked || !canEdit };
-            return tab === "slots" ? (
-              <SlotsTab ctx={ctx} only={only} setOnly={setOnly} who={who} setWho={setWho} />
-            ) : (
-              <LoadTab
-                ctx={ctx}
-                snapshot={snapshot}
-                cells={cells}
-                categories={categories}
-                tolerance={tolerance}
-                onShowSoldier={(id) => {
-                  setWho(id);
-                  setOnly("");
-                  setTab("slots");
-                }}
-              />
-            );
-          })()}
+          <DraftBody
+            ctx={{ cycle, slots, tasks, soldiers, assignments, reload: load, locked: locked || !canEdit }}
+            snapshot={snapshot}
+            cells={cells}
+            categories={categories}
+            tolerance={tolerance}
+            missing={missing}
+            missingR={missingR}
+            published={locked}
+            onPublish={() => setPublishing(true)}
+          />
           {cycle.status === "published" && me?.roles.includes("coordinator") && (() => {
             const now = Date.now();
             const started = cycle.start_date <= dayKey(new Date()) || slots.some((s) => Date.parse(s.starts_at) <= now);

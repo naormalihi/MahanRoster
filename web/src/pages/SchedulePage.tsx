@@ -1,3 +1,5 @@
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import {
   Alert,
@@ -21,8 +23,11 @@ import {
   TableHead,
   TableRow,
   Typography,
+  IconButton,
+  Menu,
+  MenuItem,
 } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
@@ -283,7 +288,12 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
   );
 }
 
-export function SchedulePage() {
+/**
+ * The engine's status card at the top of the scheduling screen: a run in progress, the draft that is
+ * ready (re-run and run details in the ⋮ menu), or – before any run, or after a failed one – the run
+ * button with what it does. onDone fires when a run finishes, so the draft below reloads.
+ */
+export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle } = useCycle();
@@ -337,6 +347,14 @@ export function SchedulePage() {
     const t = setInterval(() => void loadJobs(), 4000);
     return () => clearInterval(t);
   }, [active, loadJobs]);
+  // a run that just finished: the draft below reloads
+  const wasActive = useRef(false);
+  useEffect(() => {
+    if (wasActive.current && jobs && !active) onDone?.();
+    wasActive.current = !!active;
+  }, [active, jobs, onDone]);
+  const [menu, setMenu] = useState<HTMLElement | null>(null);
+  const [details, setDetails] = useState(false);
 
   async function run() {
     setConfirm(false);
@@ -364,68 +382,124 @@ export function SchedulePage() {
       ) : (
         <>
           {configured === false && <SetupHelp />}
-          <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-            <Stack spacing={1.5}>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-                <Chip label={slots ? `${slots.length} משבצות` : "…"} color={slots && !slots.length ? "warning" : "default"} />
-                <Chip
-                  label={cycle.potential_computed_at ? "דרגות ואוכלוסיות נעולות" : "פוטנציאל לא חושב – יינעל בהרצה"}
-                  color={cycle.potential_computed_at ? "default" : "warning"}
-                  variant="outlined"
-                />
+          {!jobs ? (
+            <Loading />
+          ) : active ? (
+            <ActiveJob job={active} onChanged={loadJobs} />
+          ) : last?.status === "done" ? (
+            <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                <CheckCircleIcon color="success" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700 }}>
+                    {cycle.status === "published" || cycle.status === "closed" ? "הלוח פורסם" : "טיוטה מוכנה"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    הרצה אחרונה {fmtTs(last.finished_at ?? last.created_at)}
+                    {last.wall_time ? ` · ${Math.round(last.wall_time)} ש׳` : ""}
+                    {last.unfilled?.length ? ` · ${last.unfilled.reduce((n, u) => n + u.missing, 0)} לא אוישו` : ""}
+                  </Typography>
+                </Box>
+                <IconButton aria-label="פעולות על ההרצה" onClick={(e) => setMenu(e.currentTarget)}>
+                  <MoreVertIcon />
+                </IconButton>
+                <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
+                  <MenuItem
+                    disabled={!slots?.length || cycle.status === "published" || cycle.status === "closed"}
+                    onClick={() => {
+                      setMenu(null);
+                      setConfirm(true);
+                    }}
+                  >
+                    הרצה מחדש
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setMenu(null);
+                      setDetails(true);
+                    }}
+                  >
+                    פרטי ההרצה וההיסטוריה
+                  </MenuItem>
+                </Menu>
               </Stack>
-              <Typography variant="body2" color="text.secondary">
-                המנוע משבץ מבצע ועתודה לכל משבצת, לפי כללי הזכאות, החפיפות והאילוצים, ומאזן ניקוד, סופי שבוע ועתודות בתוך כל אוכלוסייה. הרצה חדשה
-                מחליפה את הטיוטה הקודמת של המנוע; שיבוצים ידניים נשמרים.
-              </Typography>
-              <Box>
-                <Button
-                  variant="contained"
-                  startIcon={<PlayArrowIcon />}
-                  disabled={!!active || !slots?.length || !jobs || cycle.status === "published" || cycle.status === "closed"}
-                  onClick={() => setConfirm(true)}
-                >
-                  הרצת שיבוץ
-                </Button>
-                {(cycle.status === "published" || cycle.status === "closed") && (
-                  <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 1.5 }}>
-                    המחזור פורסם – שינויים מעכשיו דרך הניהול השוטף.
-                  </Typography>
-                )}
-                {slots && !slots.length && (
-                  <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 1.5 }}>
-                    קודם צריך לקלוט את לוח הבסיס.
-                  </Typography>
-                )}
-              </Box>
-            </Stack>
-          </Paper>
-          {!jobs ? <Loading /> : active ? <ActiveJob job={active} onChanged={loadJobs} /> : null}
-          {last && (last.status === "done" || last.status === "failed") && <Result job={last} slots={slotMap} tasks={tasks} pools={pools} names={names} />}
-          {jobs && jobs.length > 1 && (
-            <Paper variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>הרצה</TableCell>
-                    <TableCell>סטטוס</TableCell>
-                    <TableCell>משך</TableCell>
-                    <TableCell>חוסרים</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {jobs.map((j) => (
-                    <TableRow key={j.id}>
-                      <TableCell>{fmtTs(j.created_at)}</TableCell>
-                      <TableCell>{JOB_STATUS_LABEL[j.status]}</TableCell>
-                      <TableCell>{j.wall_time ? `${Math.round(j.wall_time)} ש׳` : "—"}</TableCell>
-                      <TableCell>{j.unfilled ? j.unfilled.reduce((n, u) => n + u.missing, 0) : "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </Paper>
+          ) : (
+            <>
+          <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+              <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                  <Chip label={slots ? `${slots.length} משבצות` : "…"} color={slots && !slots.length ? "warning" : "default"} />
+                  <Chip
+                    label={cycle.potential_computed_at ? "דרגות ואוכלוסיות נעולות" : "פוטנציאל לא חושב – יינעל בהרצה"}
+                    color={cycle.potential_computed_at ? "default" : "warning"}
+                    variant="outlined"
+                  />
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  המנוע משבץ מבצע ועתודה לכל משבצת, לפי כללי הזכאות, החפיפות והאילוצים, ומאזן ניקוד, סופי שבוע ועתודות בתוך כל אוכלוסייה. הרצה חדשה
+                  מחליפה את הטיוטה הקודמת של המנוע; שיבוצים ידניים נשמרים.
+                </Typography>
+                <Box>
+                  <Button
+                    variant="contained"
+                    startIcon={<PlayArrowIcon />}
+                    disabled={!!active || !slots?.length || !jobs || cycle.status === "published" || cycle.status === "closed"}
+                    onClick={() => setConfirm(true)}
+                  >
+                    הרצת שיבוץ
+                  </Button>
+                  {(cycle.status === "published" || cycle.status === "closed") && (
+                    <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 1.5 }}>
+                      המחזור פורסם – שינויים מעכשיו דרך הניהול השוטף.
+                    </Typography>
+                  )}
+                  {slots && !slots.length && (
+                    <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 1.5 }}>
+                      קודם צריך לקלוט את לוח הבסיס.
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
+            </Paper>
+              {last?.status === "failed" && <Result job={last} slots={slotMap} tasks={tasks} pools={pools} names={names} />}
+            </>
           )}
+          <Dialog open={details} onClose={() => setDetails(false)} maxWidth="md" fullWidth>
+            <DialogTitle>פרטי ההרצה</DialogTitle>
+            <DialogContent dividers>
+              <Stack spacing={2}>
+                {last && <Result job={last} slots={slotMap} tasks={tasks} pools={pools} names={names} />}
+                {jobs && jobs.length > 1 && (
+            <Paper variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>הרצה</TableCell>
+                          <TableCell>סטטוס</TableCell>
+                          <TableCell>משך</TableCell>
+                          <TableCell>חוסרים</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {jobs.map((j) => (
+                          <TableRow key={j.id}>
+                            <TableCell>{fmtTs(j.created_at)}</TableCell>
+                            <TableCell>{JOB_STATUS_LABEL[j.status]}</TableCell>
+                            <TableCell>{j.wall_time ? `${Math.round(j.wall_time)} ש׳` : "—"}</TableCell>
+                            <TableCell>{j.unfilled ? j.unfilled.reduce((n, u) => n + u.missing, 0) : "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Paper>
+                      )}
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDetails(false)}>סגירה</Button>
+            </DialogActions>
+          </Dialog>
         </>
       )}
       <Dialog open={confirm} onClose={() => setConfirm(false)} maxWidth="xs" fullWidth>
