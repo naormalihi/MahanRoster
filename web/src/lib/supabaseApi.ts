@@ -631,7 +631,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("schedule_jobs")
         .select(
-          "id, status, kind, progress, created_at, started_at, finished_at, error, params, result_status:result->>status, wall_time:result->wall_time_seconds, unfilled:result->unfilled, warnings:result->warnings, pools:result->pools",
+          "id, status, kind, progress, created_at, started_at, finished_at, error, params, result_status:result->>status, wall_time:result->wall_time_seconds, unfilled:result->unfilled, warnings:result->warnings, diagnosis:result->>diagnosis, pools:result->pools",
         )
         .eq("cycle_id", cycleId)
         .order("created_at", { ascending: false })
@@ -734,6 +734,10 @@ export class SupabaseApi implements Api {
   async slotCandidates(slotId: string): Promise<Candidate[]> {
     const rows = check(await this.sb.rpc("slot_candidates", { p_slot: slotId })) as Candidate[];
     return rows.map((r) => ({ ...r, cycle_points: Number(r.cycle_points), conflicts: r.conflicts ?? [] }));
+  }
+
+  async assignPublished(slotId: string, role: DraftRole, soldierId: string, reason: string | null): Promise<string> {
+    return check(await this.sb.rpc("assign_published", { p_slot: slotId, p_role: role, p_soldier: soldierId, p_reason: reason })) as string;
   }
 
   async manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string) {

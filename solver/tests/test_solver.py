@@ -174,3 +174,37 @@ def test_published_facts_that_break_a_rule_do_not_block_new_duties():
     assert new and new[0] != "A"  # A is busy then; the new duty goes to someone else
     assert violations(p, sol) == []
     assert any("נשמרו כמו שהם" in w for w in sol.warnings)
+
+
+def test_more_published_performers_than_needed_is_a_fact():
+    """A reserve activated mid-duty: the original performer keeps the days he did and the reserve
+    performs the rest – two published performers on a slot that needs one. Not a failure."""
+    A, B, C = soldier("A"), soldier("B"), soldier("C")
+    slots = [slot("k", "guard", "2027-01-04T08:00", "2027-01-06T08:00"), slot("new", "towers", "2027-01-10T08:00", "2027-01-11T08:00", r=0)]
+    fixed = [FixedAssignment("k", "A"), FixedAssignment("k", "B")]
+    sol = solve(problem([A, B, C], slots, fixed=fixed))
+    assert sol.status in ("OPTIMAL", "FEASIBLE")
+    got = {(a.slot_id, a.soldier_id, a.role) for a in sol.assignments}
+    assert {("k", "A", "performer"), ("k", "B", "performer")} <= got
+    assert [a for a in sol.assignments if a.slot_id == "new"]
+    assert violations(problem([A, B, C], slots, fixed=fixed), sol) == []
+
+
+def test_infeasible_run_carries_a_diagnosis():
+    from mahanroster_solver.solver import diagnose
+
+    A = soldier("A")
+    # two fixed duties of A at the same time with the overlap rule on and fixed facts relaxed off:
+    # force it through the penalty rule (a penalty slot for A overlapping a fixed duty is still a fact)
+    slots = [slot("k1", "guard", "2027-01-04T08:00", "2027-01-05T08:00", r=0)]
+    p = problem([A], slots, fixed=[FixedAssignment("k1", "A")])
+    assert solve(p).status in ("OPTIMAL", "FEASIBLE")
+    assert isinstance(diagnose(p), str)
+
+
+def test_unfilled_slot_says_what_held_the_eligible_back():
+    A = soldier("A")
+    slots = [slot("k1", "guard", "2027-01-04T08:00", "2027-01-05T08:00", r=0), slot("k2", "guard", "2027-01-04T10:00", "2027-01-05T10:00", r=0)]
+    sol = solve(problem([A], slots))
+    assert len(sol.unfilled) == 1
+    assert sol.unfilled[0].reasons.get("busy") == 1

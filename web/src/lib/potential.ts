@@ -54,6 +54,9 @@ export const REASON_LABEL: Record<string, string> = {
   personal_constraint: "אילוץ אישי",
   penalty_other: "משבצת קנס של חייל אחר",
   busy: "משובץ בתורנות סמוכה (כולל מנוחה)",
+  at_cap: "בתקרה החודשית",
+  gaf_rule: "עתודת חובה – רק מגף המבצע",
+  other_role: "כבר משובץ בתורנות הזו בתפקיד אחר",
 };
 
 export const reasonText = (reasons: string[]) => reasons.map((r) => REASON_LABEL[r] ?? r).join(" · ");

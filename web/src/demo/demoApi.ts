@@ -965,6 +965,21 @@ export class DemoApi implements Api {
     return id;
   }
 
+  async assignPublished(slotId: string, role: DraftRole, soldierId: string, reason: string | null) {
+    await delay();
+    const cycleId = [...this.slotsByCycle].find(([, v]) => v.some((s) => s.id === slotId))?.[0] ?? "";
+    if (this.draft.some((a) => a.slot_id === slotId && a.soldier_id === soldierId && !["draft", "dropped"].includes(a.status)))
+      throw new Error("החייל כבר משובץ בתורנות הזו");
+    this.draft = this.draft.filter((a) => !(a.slot_id === slotId && a.status === "draft" && (a.role === role || a.soldier_id === soldierId)));
+    const id = this.nextId("as");
+    this.draft.push({
+      id, cycle_id: cycleId, slot_id: slotId, soldier_id: soldierId, role, status: role === "performer" ? "assigned" : "reserve_idle", source: "manual",
+      points: 1, normalized_points: 1, weekend_units: 0,
+      explanation: `שיבוץ ידני אחרי פרסום${reason ? `: ${reason}` : ""}`, manual_reason: reason ?? "שיבוץ ידני אחרי פרסום",
+    });
+    return id;
+  }
+
   async removeAssignment(assignmentId: string) {
     await delay();
     this.draft = this.draft.filter((a) => a.id !== assignmentId);

@@ -37,11 +37,13 @@ import type { TaskType } from "../lib/catalog";
 import { useCycle } from "../lib/cycleContext";
 import { dayKey, dayLabel, timeLabel } from "../lib/dates";
 import { announceBoardChange, SlotActionsDialog } from "../components/SlotActions";
+import { AssignDialog } from "./DraftPage";
 import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import MoreIcon from "@mui/icons-material/MoreHoriz";
 import type { DraftAssignment } from "../lib/draft";
-import { isActive, jobErrorText, type ScheduleJob } from "../lib/schedule";
+import { isActive, jobErrorText, topReasons, type ScheduleJob } from "../lib/schedule";
+import { REASON_LABEL } from "../lib/potential";
 import { pendingSlots } from "../lib/workspace";
 
 /** "2026-11-10T08:00" in Israel time for a date + "HH:MM" (the browser runs in Israel time). */
@@ -162,6 +164,7 @@ export function OperatePage() {
   const [adding, setAdding] = useState(false);
   const [openSlot, setOpenSlot] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<SlotRow | null>(null);
+  const [assigning, setAssigning] = useState<{ slot: SlotRow; role: "performer" | "reserve" } | null>(null);
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -203,6 +206,23 @@ export function OperatePage() {
 
   const of = (id: string) => assignments.filter((a) => a.slot_id === id);
   const pending = pendingSlots(slots, assignments);
+  // the roles a waiting duty still misses on the board (published people only)
+  const missingRoles = (k: SlotRow): ("performer" | "reserve")[] => {
+    const mine = of(k.id).filter((a) => live(a) && !["dropped", "swapped_out", "cancelled_approved"].includes(a.status));
+    const out: ("performer" | "reserve")[] = [];
+    if (mine.filter(performs).length < k.performers_needed) out.push("performer");
+    if (mine.filter((a) => a.role === "reserve" && a.status === "reserve_idle").length < k.reserves_needed) out.push("reserve");
+    return out;
+  };
+  // why the last run left a duty empty – who is not eligible and what held back the eligible
+  const unfilledWhy = (slotId: string) => {
+    if (!lastStability || lastStability.status !== "done") return "";
+    const u = (lastStability.unfilled ?? []).filter((x) => x.slot_id === slotId);
+    if (!u.length) return "";
+    const merged: Record<string, number> = {};
+    for (const x of u) for (const [r, n] of Object.entries(x.reasons)) merged[r] = Math.max(merged[r] ?? 0, n);
+    return topReasons(merged, REASON_LABEL, 3) || (u[0].eligible_count === 0 ? "אין אף חייל זכאי" : "");
+  };
   const drafts = (id: string) => of(id).filter((a) => a.status === "draft");
   const withDraft = pending.filter((k) => drafts(k.id).length > 0);
   const lastStability = jobs.find((j) => j.kind === "stability");
@@ -276,9 +296,16 @@ export function OperatePage() {
                         </TableCell>
                         <TableCell>
                           {d.length === 0 ? (
-                            <Typography variant="body2" color="text.secondary">
-                              עוד לא שובץ
-                            </Typography>
+                            <>
+                              <Typography variant="body2" color="text.secondary">
+                                עוד לא שובץ
+                              </Typography>
+                              {unfilledWhy(k.id) && (
+                                <Typography variant="caption" color="warning.dark" sx={{ display: "block" }}>
+                                  המנוע לא מצא: {unfilledWhy(k.id)}
+                                </Typography>
+                              )}
+                            </>
                           ) : (
                             d.map((a) => (
                               <Typography key={a.id} variant="body2">
@@ -288,7 +315,12 @@ export function OperatePage() {
                             ))
                           )}
                         </TableCell>
-                        <TableCell padding="checkbox">
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>
+                          {missingRoles(k).map((role) => (
+                            <Button key={role} size="small" variant="outlined" onClick={() => setAssigning({ slot: k, role })} sx={{ ml: 0.5, mb: 0.5 }}>
+                              שיבוץ {role === "performer" ? "מבצע" : "עתודה"}
+                            </Button>
+                          ))}
                           {of(k.id).some(live) ? (
                             <IconButton size="small" aria-label="פעולות על התורנות" onClick={() => setOpenSlot(k.id)}>
                               <MoreIcon fontSize="small" />
@@ -314,7 +346,7 @@ export function OperatePage() {
               <LinearProgress variant={running.status === "running" ? "determinate" : "indeterminate"} value={running.progress} />
             </Box>
           )}
-          {!running && lastStability?.status === "failed" && <Alert severity="error">ההרצה האחרונה נכשלה: {jobErrorText(lastStability.error)}</Alert>}
+          {!running && lastStability?.status === "failed" && <Alert severity="error">ההרצה האחרונה נכשלה: {jobErrorText(lastStability.error, lastStability.diagnosis)}</Alert>}
           {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
           {pending.length > 0 && (
             <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
@@ -391,6 +423,24 @@ export function OperatePage() {
           )}
         </Stack>
       </Paper>
+      {assigning && cycle && (
+        <AssignDialog
+          ctx={{
+            cycle,
+            slots: slots ?? [],
+            tasks: new Map(tasks.map((t) => [t.id, t])),
+            soldiers,
+            assignments,
+            reload: () => void load(),
+            locked: true,
+          }}
+          slot={assigning.slot}
+          role={assigning.role}
+          current={null}
+          published
+          onClose={() => setAssigning(null)}
+        />
+      )}
       {deleting && (
         <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
           <DialogTitle>מחיקת תורנות</DialogTitle>
