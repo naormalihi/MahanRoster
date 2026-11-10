@@ -260,9 +260,10 @@ export function CyclesPage() {
           מחזור חדש
         </Button>
       </Stack>
-      {shown ? (
-        <StagePanel cycle={shown} />
-      ) : (
+      <Typography variant="body2" color="text.secondary">
+        הגדרת המחזורים: שם, תאריכים ומועד סגירת האילוצים. לחיצה על שורה בוחרת את המחזור שבעבודה; ההתקדמות והשלבים מופיעים במסך המחזור.
+      </Typography>
+      {cycles.length === 0 && (
         <Alert severity="info">עוד אין מחזורים. צור את המחזור הראשון: חצי שנה, עם מועד סגירה לאילוצים ולפטורים.</Alert>
       )}
       {cycles.length > 0 && (
@@ -271,7 +272,7 @@ export function CyclesPage() {
             <TableHead>
               <TableRow>
                 <TableCell>מחזור</TableCell>
-                <TableCell>תאריכים</TableCell>
+                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>תאריכים</TableCell>
                 <TableCell>סגירת אילוצים</TableCell>
                 <TableCell>שלב</TableCell>
                 <TableCell />
@@ -280,8 +281,14 @@ export function CyclesPage() {
             <TableBody>
               {cycles.map((c) => (
                 <TableRow key={c.id} hover selected={c.id === shown?.id} onClick={() => setSelected(c.id)} sx={{ cursor: "pointer" }}>
-                  <TableCell>{c.name}</TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>
+                  <TableCell sx={{ minWidth: 150 }}>
+                    {c.name}
+                    {c.id === shown?.id && <Chip size="small" variant="outlined" color="primary" label="בעבודה" sx={{ mr: 1 }} />}
+                    <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "block", sm: "none" }, whiteSpace: "nowrap" }}>
+                      {fmt(c.start_date)} – {fmt(c.end_date)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap", display: { xs: "none", sm: "table-cell" } }}>
                     {fmt(c.start_date)} – {fmt(c.end_date)}
                   </TableCell>
                   <TableCell>{c.exemption_deadline ? fmt(deadlineDay(c.exemption_deadline)) : "—"}</TableCell>

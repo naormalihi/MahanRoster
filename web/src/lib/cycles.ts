@@ -25,7 +25,7 @@ export const STAGES: { status: CycleStatus; label: string; hint: string }[] = [
   { status: "collecting", label: "אילוצים: איסוף", hint: "מזינים פטורים, היעדרויות וחסימות שהגיעו מהגפים, עד מועד הסגירה." },
   { status: "approving", label: "אילוצים: אישור פטורים", hint: "בודקים אסמכתאות ומאשרים או דוחים כל פטור." },
   { status: "potential", label: "פוטנציאל", hint: "מפיקים את מטריצת הפוטנציאל ושולחים לבסיס." },
-  { status: "slots", label: "לוח הבסיס", hint: "טוענים את קובץ המשבצות שהגיע מהבסיס." },
+  { status: "slots", label: "לוח הבסיס", hint: "טוענים את קובץ המשימות שהגיע מהבסיס." },
   { status: "scheduling", label: "שיבוץ: הרצה", hint: "מריצים את מנוע השיבוץ." },
   { status: "review", label: "שיבוץ: טיוטה", hint: "בודקים את הטיוטה, מתקנים ידנית, אוספים הערות מהגפים ומפרסמים." },
   { status: "published", label: "תפעול", hint: "הלוח פורסם. מכאן: תורנויות חדשות, הקפצות והפעלת עתודות." },
@@ -428,7 +428,7 @@ export function stageStates(c: Cycle, f: StageFacts, now: Date): StageState[] {
       tone: c.potential_computed_at ? "done" : "todo",
       note: c.potential_computed_at ? `חושב ${ddmm(c.potential_computed_at)}` : "לא חושב",
     },
-    { stage: "slots", tone: f.slots > 0 ? "done" : "todo", note: f.slots > 0 ? `${f.slots} משבצות` : "לא נקלט" },
+    { stage: "slots", tone: f.slots > 0 ? "done" : "todo", note: f.slots > 0 ? `${f.slots} משימות` : "לא נקלט" },
     {
       stage: "scheduling",
       tone: f.job === "queued" || f.job === "running" ? "busy" : f.job === "done" ? "done" : f.job === "failed" ? "warn" : "todo",

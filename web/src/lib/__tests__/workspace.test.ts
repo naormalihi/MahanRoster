@@ -12,9 +12,11 @@ const facts = { pendingExemptions: 0, slots: 0, job: null };
 describe("cycle workspace", () => {
   it("shows what blocks each step", () => {
     const s = stepStates(cycle(), { pendingExemptions: 3, slots: 307, job: { status: "done", unfilled: 2 } });
-    expect(s.constraints).toEqual({ tone: "warn", text: "3 פטורים ממתינים" });
+    expect(s.constraints).toEqual({ tone: "warn", text: "לא נקבע מועד סגירה · 3 פטורים ממתינים" });
+    const closed = stepStates(cycle({ exemption_deadline: "2026-11-11T23:59:59+02:00" }), { ...facts, pendingExemptions: 0 });
+    expect(closed.constraints.text).toMatch(/^(נסגר|איסוף עד) 11\.11/);
     expect(s.potential.tone).toBe("todo");
-    expect(s.slots.text).toBe("307 משבצות");
+    expect(s.slots.text).toBe("307 משימות");
     expect(s.schedule).toEqual({ tone: "warn", text: "2 לא מאוישות" });
     expect(stepStates(cycle({ status: "published", published_at: "2026-11-08T10:00:00Z" }), facts).schedule.text).toBe("פורסם 8.11");
   });
