@@ -1241,3 +1241,21 @@ def test_assign_published_staffs_a_waiting_duty(conn):
         with pytest.raises(psycopg.Error):  # performer already staffed
             _as_coord(conn, "select public.assign_published(%s, 'performer', %s, null)", k, c)
         raise psycopg.Rollback()
+
+
+def test_new_run_saves_when_a_manual_reserve_points_at_an_old_engine_performer(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'review' where id = %s", (cycle,))
+        k = conn.execute("select id from slots where cycle_id = %s order by starts_at limit 1", (cycle,)).fetchone()[0]
+        a, b = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 2").fetchall()]
+        conn.execute("delete from assignments where slot_id = %s", (k,))
+        p = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source) select %s, id, gaf_id, 'performer', 'draft', 'solver' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, paired_assignment_id) select %s, id, gaf_id, 'reserve', 'draft', 'manual', 'בדיקה', %s from soldiers where id = %s", (k, p, b))
+        job = conn.execute("insert into schedule_jobs (cycle_id, kind, input, status) values (%s, 'full', '{}'::jsonb, 'running') returning id", (cycle,)).fetchone()[0]
+        result = json.dumps({"status": "FEASIBLE", "assignments": [{"slot_id": str(k), "soldier_id": str(a), "role": "performer", "points": 1, "normalized_points": 1, "explanation": "x"}]})
+        _as_coord(conn, "select public.apply_solver_result(%s, %s::jsonb)", job, result)
+        res_pair = conn.execute("select paired_assignment_id from assignments where slot_id = %s and role = 'reserve'", (k,)).fetchone()[0]
+        new_p = conn.execute("select id from assignments where slot_id = %s and role = 'performer'", (k,)).fetchone()[0]
+        assert res_pair == new_p
+        raise psycopg.Rollback()

@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.4.1",
+    date: "2026-11-10",
+    items: ["תיקון: הרצת שיבוץ נכשלה בשמירה כשעתודה ידנית הייתה מצוותת למבצע מהרצה קודמת"],
+  },
+  {
     version: "1.4.0",
     date: "2026-11-10",
     items: [
