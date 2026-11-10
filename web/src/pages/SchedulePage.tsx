@@ -42,6 +42,7 @@ import {
   mmss,
   topReasons,
   type ScheduleJob,
+  jobErrorText,
 } from "../lib/schedule";
 
 const tsFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -182,7 +183,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
         </Stack>
         {!ok ? (
           <Alert severity="error">
-            ההרצה נכשלה{job.result_status ? ` (${job.result_status})` : ""}. {job.error?.split("\n").slice(-2).join(" ")}
+            ההרצה נכשלה. {jobErrorText(job.error?.split("\n").slice(-2).join(" ") || job.result_status)}
           </Alert>
         ) : (
           <Alert severity={missingP ? "warning" : "success"}>

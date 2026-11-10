@@ -123,6 +123,8 @@ export interface Api {
   slotPeople(slotId: string): Promise<SlotPeople | null>;
   /** Undoes a reserve activation while the duty has not started. */
   undoReserveActivation(reserveId: string): Promise<void>;
+  /** Deletes a duty that waits for staffing and has nothing published on it. */
+  deletePendingSlot(slotId: string): Promise<void>;
   applyRoster(plan: RosterPlan): Promise<ApplyResult>;
   soldierDetails(): Promise<SoldierDetail[]>;
   updateSoldiers(ids: string[], patch: SoldierPatch): Promise<void>;

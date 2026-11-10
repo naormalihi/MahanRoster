@@ -260,6 +260,30 @@ def solve(problem: Problem, log: bool = False) -> Solution:
     by_soldier = defaultdict(list)
     for (sid, kid) in x:
         by_soldier[sid].append(kid)
+
+    def window(kid: str) -> tuple[int, int]:
+        k = slots[kid]
+        return _minutes(k.starts_at, origin), _minutes(k.ends_at, origin) + 60 * tasks[k.task_type_id].min_rest_hours
+
+    def overlaps(a: str, b: str) -> bool:
+        (s1, e1), (s2, e2) = window(a), window(b)
+        return s1 < e2 and s2 < e1
+
+    # Published facts (fixed) may already break rest/overlap between themselves – e.g. a reserve
+    # activated next to another duty. They are kept as given (with a warning) instead of making the
+    # run infeasible; new choices still may not touch their time.
+    fixed_by_soldier = defaultdict(list)
+    for (sid, kid) in fixed:
+        if (sid, kid) in x:
+            fixed_by_soldier[sid].append(kid)
+    clash: dict[str, set[str]] = defaultdict(set)
+    for sid, fk in fixed_by_soldier.items():
+        for i, a in enumerate(fk):
+            for b in fk[i + 1 :]:
+                if overlaps(a, b):
+                    clash[sid] |= {a, b}
+                    prep.warnings.append(f"שיבוצים מפורסמים של {sid} במשבצות {a} ו-{b} חופפים או בלי מנוחה – נשמרו כמו שהם")
+
     present: dict[tuple[str, str], object] = {}
     for sid, kids in by_soldier.items():
         intervals = []
@@ -271,6 +295,11 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             else:
                 y = x[sid, kid]
             present[sid, kid] = y
+            if kid in clash[sid]:
+                continue  # a fixed fact in conflict: kept out of the no-overlap set
+            if clash[sid] and (sid, kid) not in fixed and any(overlaps(kid, c) for c in clash[sid]):
+                m.Add(y == 0)  # nothing new on top of those facts
+                continue
             start = _minutes(k.starts_at, origin)
             end = _minutes(k.ends_at, origin) + 60 * tasks[k.task_type_id].min_rest_hours
             intervals.append(m.NewOptionalIntervalVar(start, end - start, end, y, f"i_{sid}_{kid}"))
@@ -294,6 +323,8 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             m.Add(z[g] <= sum(x[sid, k.id] for sid in members))
         for sid in elig:
             g = soldiers[sid].gaf_id
+            if fixed.get((sid, k.id)) == ROLE_RESERVE:
+                continue  # a published reserve stays, whatever the gaf
             if soldiers[sid].service_type == SERVICE_MANDATORY:
                 m.Add(r[sid, k.id] <= z[g])
             else:
@@ -308,8 +339,14 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             k = slots[kid]
             if not k.is_penalty:
                 per_month[sid, k.starts_at.year, k.starts_at.month].append(v)
-        for vars_ in per_month.values():
-            m.Add(sum(vars_) <= settings.duty_cap_per_month)
+        fixed_month = defaultdict(int)
+        for (sid, kid), role in fixed.items():
+            k = slots.get(kid)
+            if k is not None and role == ROLE_PERFORMER and not k.is_penalty and (sid, kid) in x:
+                fixed_month[sid, k.starts_at.year, k.starts_at.month] += 1
+        for key, vars_ in per_month.items():
+            # published duties already over the cap are facts: no new duty that month, but no failure
+            m.Add(sum(vars_) <= max(settings.duty_cap_per_month, fixed_month[key]))
 
     # ---- fairness, per pool ---------------------------------------------------
     pools = defaultdict(list)

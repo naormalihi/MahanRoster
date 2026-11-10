@@ -106,3 +106,13 @@ export function warningText(
   if (m) return `משבצת קנס ב${slot(m[1])} של ${soldier(m[2])} מתנגשת: ${rules(m[3])}.`;
   return w;
 }
+
+/** A failed run's error in words: the engine statuses become an explanation. */
+export function jobErrorText(error: string | null | undefined): string {
+  const e = (error ?? "").trim();
+  if (/INFEASIBLE/.test(e))
+    return "המנוע לא מצא שיבוץ שעומד בכל הכללים הקשיחים. בדרך כלל זה שיבוץ קבוע שמתנגש בכלל (חפיפה, תקרה חודשית, עתודה מגף אחר) – בדוק את השיבוצים שתוקנו ידנית והרץ שוב.";
+  if (/MODEL_INVALID/.test(e)) return "הבדיקה העצמאית מצאה הפרה של כלל קשיח בתוצאה, ולכן היא לא נשמרה.";
+  if (/UNKNOWN/.test(e)) return "המנוע לא הספיק למצוא פתרון בזמן שהוקצב. נסה להריץ שוב.";
+  return e;
+}
