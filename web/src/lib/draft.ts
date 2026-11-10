@@ -176,3 +176,21 @@ export function byProfile(ls: SoldierLoad[], openOf: (soldierId: string) => stri
     }))
     .sort((a, b) => b.soldiers - a.soldiers);
 }
+
+/**
+ * Why a soldier has few duties: over the cycle's slots, what kept him out – each ineligibility
+ * reason with its number of slots, "busy" (another duty then), "assigned" (he is in it), and
+ * "free" (eligible and free: the engine chose others for balance).
+ */
+export function summarizeReasons(perSlot: (Candidate | undefined)[]): { reason: string; slots: number }[] {
+  const n = new Map<string, number>();
+  const add = (r: string) => n.set(r, (n.get(r) ?? 0) + 1);
+  for (const c of perSlot) {
+    if (!c) continue;
+    if (c.in_slot) add("assigned");
+    else if (c.reasons.length) c.reasons.forEach(add);
+    else if (c.conflicts.length) add("busy");
+    else add("free");
+  }
+  return [...n].map(([reason, slots]) => ({ reason, slots })).sort((a, b) => b.slots - a.slots);
+}

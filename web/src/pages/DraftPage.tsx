@@ -55,12 +55,13 @@ import {
   bySlot,
   loads,
   rankCandidates,
+  summarizeReasons,
   weeksOf,
   type Candidate,
   type DraftAssignment,
   type Role,
 } from "../lib/draft";
-import { effective, reasonText, type PotentialCell, type SnapshotSoldier } from "../lib/potential";
+import { effective, REASON_LABEL, reasonText, type PotentialCell, type SnapshotSoldier } from "../lib/potential";
 import type { ExistingSoldier } from "../lib/roster";
 import { poolName, poolNames } from "../lib/schedule";
 
@@ -659,9 +660,31 @@ function LoadTab({
 /** One soldier's load: how the score is built, and his duties in the draft. */
 function SoldierLoadDialog(props: { ctx: Ctx; row: FairRow; rankName: string; tolerance: number; onClose: () => void; onShowSlots: () => void }) {
   const { ctx, row: r } = props;
+  const { api } = useAuth();
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
   const s = ctx.soldiers.get(r.soldier_id);
   const slotOf = new Map(ctx.slots.map((k) => [k.id, k]));
+  // "why few duties": the candidate check of every slot, a few at a time, summed for him
+  const [why, setWhy] = useState<{ reason: string; slots: number }[] | null>(null);
+  const [whyProgress, setWhyProgress] = useState<number | null>(null);
+  async function checkWhy() {
+    const ids = ctx.slots.map((k) => k.id);
+    const found: (Candidate | undefined)[] = [];
+    setWhyProgress(0);
+    for (let i = 0; i < ids.length; i += 8) {
+      const batch = await Promise.all(ids.slice(i, i + 8).map((id) => api!.slotCandidates(id).catch(() => [] as Candidate[])));
+      for (const cs of batch) found.push(cs.find((c) => c.soldier_id === r.soldier_id));
+      setWhyProgress(Math.min(ids.length, i + 8) / ids.length);
+    }
+    setWhy(summarizeReasons(found));
+    setWhyProgress(null);
+  }
+  const WHY_LABEL: Record<string, string> = {
+    ...REASON_LABEL,
+    busy: "משובץ באותו זמן בתורנות אחרת (כולל מנוחה)",
+    assigned: "משובץ בה",
+    free: "זכאי ופנוי – המנוע בחר אחרים לטובת האיזון",
+  };
   const mine = ctx.assignments
     .filter((a) => a.soldier_id === r.soldier_id && !["dropped", "swapped_out", "cancelled_approved"].includes(a.status))
     .map((a) => ({ a, k: slotOf.get(a.slot_id) }))
@@ -710,6 +733,32 @@ function SoldierLoadDialog(props: { ctx: Ctx; row: FairRow; rankName: string; to
               לא נבדק: {r.profile ? "הוא היחיד בקבוצה עם הצירוף הזה של תורנויות" : "לא זכאי לאף קטגוריית תורנות"}.
             </Alert>
           )}
+          <Box>
+            {why === null ? (
+              <Button size="small" variant="outlined" onClick={checkWhy} disabled={whyProgress !== null}>
+                {whyProgress === null ? "למה מעט תורנויות? בדיקת כל המשבצות" : `בודק… ${Math.round(whyProgress * 100)}%`}
+              </Button>
+            ) : (
+              <>
+                <Typography variant="subtitle2" gutterBottom>
+                  מה מנע תורנויות ({ctx.slots.length} משבצות במחזור)
+                </Typography>
+                <Table size="small">
+                  <TableBody>
+                    {why.map((w) => (
+                      <TableRow key={w.reason}>
+                        <TableCell sx={{ width: 64, fontWeight: 600 }}>{w.slots}</TableCell>
+                        <TableCell sx={{ color: w.reason === "free" ? "success.main" : undefined }}>{WHY_LABEL[w.reason] ?? w.reason}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <Typography variant="caption" color="text.secondary">
+                  משבצת אחת יכולה להיספר בכמה סיבות.
+                </Typography>
+              </>
+            )}
+          </Box>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
               התורנויות שלו בטיוטה ({mine.length})
