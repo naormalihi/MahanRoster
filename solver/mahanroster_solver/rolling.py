@@ -29,12 +29,15 @@ def windows(problem: Problem) -> list[list]:
 
 
 def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solution:
-    """on_progress(done_windows, total_windows, staffed_slots, total_slots) is called before the
-    first month and after each one, if given: how far the run is, in months and in duties staffed."""
+    """on_progress(done_windows, total_windows, staffed_slots, total_slots, phase) is called before
+    the first month, on each better solution inside a month and after each month, if given: how far
+    the run is, in months and in duties staffed. phase: "searching" until a month has a first
+    solution, then "improving" (balancing the load) until it is done."""
     t0 = _time.time()
     groups = windows(problem)
     if len(groups) <= 1:
-        return solve(problem, log=log)
+        n = len(problem.slots)
+        return solve(problem, log=log, on_solution=(lambda s, _f: on_progress(0, 1, s, n, "improving")) if on_progress else None)
 
     tasks = {t.id: t for t in problem.task_types}
     per_window_time = max(10.0, problem.settings.time_limit_seconds / len(groups))
@@ -49,7 +52,7 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
     total_slots = sum(len(g) for g in groups)
     staffed = 0
     if on_progress:
-        on_progress(0, len(groups), 0, total_slots)
+        on_progress(0, len(groups), 0, total_slots, "searching")
     for i, slots in enumerate(groups):
         ids = {k.id for k in slots}
         window_start = min(k.starts_at for k in slots)
@@ -64,7 +67,12 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
             busy=list(problem.busy) + [b for b in carried if b.ends_at > window_start],
             settings=replace(problem.settings, time_limit_seconds=per_window_time),
         )
-        sol = solve(sub, log=log)
+        before = staffed
+        sol = solve(
+            sub,
+            log=log,
+            on_solution=(lambda s, _f, i=i, before=before: on_progress(i, len(groups), before + s, total_slots, "improving")) if on_progress else None,
+        )
         # a duty counts as staffed once it has all its performers
         got = defaultdict(int)
         for a in sol.assignments:
@@ -72,7 +80,7 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
                 got[a.slot_id] += 1
         staffed += sum(1 for k in slots if got[k.id] >= k.performers_needed)
         if on_progress:
-            on_progress(i + 1, len(groups), staffed, total_slots)
+            on_progress(i + 1, len(groups), staffed, total_slots, "searching")
         statuses.append(sol.status)
         unfilled += sol.unfilled
         warnings += sol.warnings
