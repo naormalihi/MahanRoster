@@ -34,14 +34,14 @@ import {
   useTheme,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { useCanEdit } from "../components/ReadOnly";
 import { UnpublishDialog, type UnpublishImpact } from "../components/UnpublishDialog";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
-import { stageLabel, type Cycle } from "../lib/cycles";
+import type { Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
 import {
   ROLE_LABEL,
@@ -233,7 +233,9 @@ function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: Dra
 // By slot
 // ---------------------------------------------------------------------------
 
-function SlotsTab({ ctx }: { ctx: Ctx }) {
+type Only = "" | "missing" | "manual";
+
+function SlotsTab({ ctx, only, setOnly }: { ctx: Ctx; only: Only; setOnly: (o: Only) => void }) {
   const weeks = useMemo(() => weeksOf(ctx.cycle.start_date, ctx.cycle.end_date), [ctx.cycle]);
   const firstWithWork = useMemo(() => {
     const first = ctx.slots[0]?.starts_at;
@@ -243,7 +245,6 @@ function SlotsTab({ ctx }: { ctx: Ctx }) {
   }, [ctx.slots, weeks]);
   const [week, setWeek] = useState<string>("");
   const [task, setTask] = useState("");
-  const [only, setOnly] = useState<"" | "missing" | "manual">("");
   const [editing, setEditing] = useState<{ slot: SlotRow; role: Role; current: DraftAssignment | null } | null>(null);
   const views = useMemo(() => bySlot(ctx.slots, ctx.assignments), [ctx.slots, ctx.assignments]);
   const wk = week || firstWithWork;
@@ -306,7 +307,7 @@ function SlotsTab({ ctx }: { ctx: Ctx }) {
             </MenuItem>
           ))}
         </TextField>
-        <TextField select size="small" label="הצג" value={only} onChange={(e) => setOnly(e.target.value as "" | "missing" | "manual")} sx={{ minWidth: 170 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
+        <TextField select size="small" label="הצג" value={only} onChange={(e) => setOnly(e.target.value as Only)} sx={{ minWidth: 170 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
           <MenuItem value="">השבוע שנבחר</MenuItem>
           <MenuItem value="missing">כל המשבצות החסרות</MenuItem>
           <MenuItem value="manual">כל השינויים הידניים</MenuItem>
@@ -488,6 +489,8 @@ export function DraftPage() {
   const [cells, setCells] = useState<PotentialCell[] | null>(null);
   const [categories, setCategories] = useState<Map<string, string>>(new Map());
   const [tab, setTab] = useState<"slots" | "load">("slots");
+  const [only, setOnly] = useState<Only>("");
+  const navigate = useNavigate();
   const [publishing, setPublishing] = useState(false);
   const [unpublishing, setUnpublishing] = useState<UnpublishImpact | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -566,18 +569,55 @@ export function DraftPage() {
         <>
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-              <Chip label={`שלב: ${stageLabel(cycle.status)}`} />
-              <Chip label={`${slots.length} משבצות`} />
-              <Chip color={missing ? "error" : "success"} label={missing ? `חסרים ${missing} מבצעים` : "כל המבצעים שובצו"} />
-              {missingR > 0 && <Chip color="warning" variant="outlined" label={`חסרות ${missingR} עתודות`} />}
-              <Chip variant="outlined" label={`${assignments.filter((a) => a.source === "manual").length} שינויים ידניים`} />
+              {(() => {
+                // the counters are the filters of the slot list; after publishing, gaps are filled in operations
+                const show = (o: Only) => {
+                  setTab("slots");
+                  setOnly(o);
+                };
+                const active = (o: Only) => tab === "slots" && only === o;
+                const manualCount = assignments.filter((a) => a.source === "manual").length;
+                const gaps = missing + missingR > 0;
+                return (
+                  <>
+                    <Chip
+                      label={`כל המשבצות · ${slots.length}`}
+                      color={active("") ? "primary" : "default"}
+                      variant={active("") ? "filled" : "outlined"}
+                      onClick={() => show("")}
+                    />
+                    {gaps ? (
+                      <Chip
+                        color="error"
+                        variant={active("missing") ? "filled" : "outlined"}
+                        label={[missing ? `חסרים ${missing} מבצעים` : "", missingR ? `חסרות ${missingR} עתודות` : ""].filter(Boolean).join(" · ")}
+                        onClick={() => (locked ? navigate("/cycle/operate") : show("missing"))}
+                      />
+                    ) : (
+                      <Chip color="success" variant="outlined" label="כל המשבצות מאוישות" />
+                    )}
+                    {manualCount > 0 && (
+                      <Chip
+                        color="secondary"
+                        variant={active("manual") ? "filled" : "outlined"}
+                        label={`${manualCount} שינויים ידניים`}
+                        onClick={() => show("manual")}
+                      />
+                    )}
+                    {locked && gaps && (
+                      <Typography variant="caption" color="text.secondary">
+                        משלימים בתפעול
+                      </Typography>
+                    )}
+                  </>
+                );
+              })()}
               <Box sx={{ flex: 1 }} />
               {!locked && (
                 <Button variant="contained" startIcon={<PublishIcon />} onClick={() => setPublishing(true)}>
                   פרסום
                 </Button>
               )}
-              {locked && <Chip color="success" label="פורסם – שינויים מעכשיו דרך החלפות והפלות" />}
             </Stack>
           </Paper>
           <Tabs value={tab} onChange={(_, v) => setTab(v)}>
@@ -586,7 +626,7 @@ export function DraftPage() {
           </Tabs>
           {(() => {
             const ctx: Ctx = { cycle, slots, tasks, soldiers, assignments, reload: load, locked: locked || !canEdit };
-            return tab === "slots" ? <SlotsTab ctx={ctx} /> : <LoadTab ctx={ctx} snapshot={snapshot} cells={cells} categories={categories} />;
+            return tab === "slots" ? <SlotsTab ctx={ctx} only={only} setOnly={setOnly} /> : <LoadTab ctx={ctx} snapshot={snapshot} cells={cells} categories={categories} />;
           })()}
           {cycle.status === "published" && me?.roles.includes("coordinator") && (() => {
             const now = Date.now();

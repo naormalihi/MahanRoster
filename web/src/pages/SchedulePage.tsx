@@ -28,7 +28,7 @@ import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
-import { stageLabel, type Cycle } from "../lib/cycles";
+import type { Cycle } from "../lib/cycles";
 import { dayLabel, TZ } from "../lib/dates";
 import { REASON_LABEL } from "../lib/potential";
 import {
@@ -357,7 +357,6 @@ export function SchedulePage() {
           <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
             <Stack spacing={1.5}>
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-                <Chip label={`שלב: ${stageLabel(cycle.status)}`} />
                 <Chip label={slots ? `${slots.length} משבצות` : "…"} color={slots && !slots.length ? "warning" : "default"} />
                 <Chip
                   label={cycle.potential_computed_at ? "דרגות ואוכלוסיות נעולות" : "פוטנציאל לא חושב – יינעל בהרצה"}
