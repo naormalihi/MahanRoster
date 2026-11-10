@@ -12,6 +12,7 @@ import {
   Chip,
   CircularProgress,
   Dialog,
+  IconButton,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -37,6 +38,8 @@ import { useCycle } from "../lib/cycleContext";
 import { dayKey, dayLabel, timeLabel } from "../lib/dates";
 import { announceBoardChange, SlotActionsDialog } from "../components/SlotActions";
 import SearchIcon from "@mui/icons-material/Search";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import MoreIcon from "@mui/icons-material/MoreHoriz";
 import type { DraftAssignment } from "../lib/draft";
 import { isActive, jobErrorText, type ScheduleJob } from "../lib/schedule";
 import { pendingSlots } from "../lib/workspace";
@@ -158,6 +161,7 @@ export function OperatePage() {
   const [jobs, setJobs] = useState<ScheduleJob[]>([]);
   const [adding, setAdding] = useState(false);
   const [openSlot, setOpenSlot] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<SlotRow | null>(null);
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -255,6 +259,7 @@ export function OperatePage() {
                     <TableCell>מועד</TableCell>
                     <TableCell>תורנות</TableCell>
                     <TableCell>הצעת המנוע</TableCell>
+                    <TableCell />
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -281,6 +286,17 @@ export function OperatePage() {
                                 {a.role === "performer" ? ` · ${a.points} נק׳` : ""}
                               </Typography>
                             ))
+                          )}
+                        </TableCell>
+                        <TableCell padding="checkbox">
+                          {of(k.id).some(live) ? (
+                            <IconButton size="small" aria-label="פעולות על התורנות" onClick={() => setOpenSlot(k.id)}>
+                              <MoreIcon fontSize="small" />
+                            </IconButton>
+                          ) : (
+                            <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting(k)}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
                           )}
                         </TableCell>
                       </TableRow>
@@ -375,6 +391,34 @@ export function OperatePage() {
           )}
         </Stack>
       </Paper>
+      {deleting && (
+        <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>מחיקת תורנות</DialogTitle>
+          <DialogContent dividers>
+            <Typography>
+              למחוק את <b>{taskName.get(deleting.task_type_id) ?? "התורנות"}</b> ב{dayLabel(deleting.starts_at)} {timeLabel(deleting.starts_at)}?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              אין עליה שיבוץ מפורסם. הצעות המנוע לתורנות, אם יש, יימחקו איתה.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleting(null)}>ביטול</Button>
+            <Button
+              color="error"
+              variant="contained"
+              disabled={busy}
+              onClick={() => {
+                const k = deleting;
+                setDeleting(null);
+                void run(() => api!.deletePendingSlot(k.id), "התורנות נמחקה.");
+              }}
+            >
+              מחיקה
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       {openSlot && <SlotActionsDialog slotId={openSlot} onClose={() => setOpenSlot(null)} onChanged={() => void load()} />}
       {adding && (
         <AddSlotDialog

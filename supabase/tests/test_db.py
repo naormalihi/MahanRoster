@@ -1203,3 +1203,21 @@ def test_undo_reserve_activation_before_the_duty(conn):
         with pytest.raises(psycopg.Error):
             _as_coord(conn, "select public.undo_reserve_activation(%s)", r)
         raise psycopg.Rollback()
+
+
+def test_delete_pending_slot_only_without_published_people(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a = conn.execute("select id from soldiers where is_active limit 1").fetchone()[0]
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '30 days', now() + interval '31 days') returning id", (cycle, tid)).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'draft' from soldiers where id = %s", (k, a))
+        _as_coord(conn, "select public.delete_pending_slot(%s)", k)
+        assert conn.execute("select count(*) from slots where id = %s", (k,)).fetchone()[0] == 0
+        k2 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                          "(%s, %s, now() + interval '30 days', now() + interval '31 days') returning id", (cycle, tid)).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (k2, a))
+        with pytest.raises(psycopg.Error):
+            _as_coord(conn, "select public.delete_pending_slot(%s)", k2)
+        raise psycopg.Rollback()
