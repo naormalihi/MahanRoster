@@ -38,7 +38,7 @@ import { dayKey, dayLabel, timeLabel } from "../lib/dates";
 import { announceBoardChange, SlotActionsDialog } from "../components/SlotActions";
 import SearchIcon from "@mui/icons-material/Search";
 import type { DraftAssignment } from "../lib/draft";
-import { isActive, type ScheduleJob } from "../lib/schedule";
+import { isActive, jobErrorText, type ScheduleJob } from "../lib/schedule";
 import { pendingSlots } from "../lib/workspace";
 
 /** "2026-11-10T08:00" in Israel time for a date + "HH:MM" (the browser runs in Israel time). */
@@ -298,7 +298,7 @@ export function OperatePage() {
               <LinearProgress variant={running.status === "running" ? "determinate" : "indeterminate"} value={running.progress} />
             </Box>
           )}
-          {!running && lastStability?.status === "failed" && <Alert severity="error">ההרצה האחרונה נכשלה: {lastStability.error}</Alert>}
+          {!running && lastStability?.status === "failed" && <Alert severity="error">ההרצה האחרונה נכשלה: {jobErrorText(lastStability.error)}</Alert>}
           {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
           {pending.length > 0 && (
             <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>

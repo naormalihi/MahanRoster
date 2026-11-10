@@ -148,3 +148,29 @@ def test_surprise_duty_scores_with_the_surprise_multiplier():
     sol = solve(problem([soldier("A")], [k], settings=s))
     (a,) = sol.assignments
     assert a.points == 1.5 and a.normalized_points == 1.5
+
+
+def test_published_facts_that_break_a_rule_do_not_block_new_duties():
+    """Stability run: what is already published (fixed) may break a hard rule – two duties too
+    close, a mandatory reserve from another gaf, over the monthly cap. Those are facts; the run
+    still fills the new duty instead of failing as infeasible, and keeps them out of new choices."""
+    A, B, C = soldier("A", gaf="G1"), soldier("B", gaf="G2"), soldier("C", gaf="G1")
+    slots = [
+        slot("f1", "guard", "2027-01-04T08:00", "2027-01-05T08:00"),
+        slot("f2", "guard", "2027-01-05T10:00", "2027-01-06T10:00", r=0),  # A again, 2h after f1 (rest 12h)
+        slot("new", "towers", "2027-01-05T12:00", "2027-01-06T12:00", r=0),
+    ]
+    fixed = [
+        FixedAssignment("f1", "A"),
+        FixedAssignment("f1", "B", "reserve"),  # mandatory reserve from another gaf
+        FixedAssignment("f2", "A"),
+    ]
+    p = problem([A, B, C], slots, fixed=fixed, settings=Settings(time_limit_seconds=10, workers=2, duty_cap_per_month=1))
+    sol = solve(p)
+    assert sol.status in ("OPTIMAL", "FEASIBLE")
+    got = {(a.slot_id, a.soldier_id, a.role) for a in sol.assignments}
+    assert {("f1", "A", "performer"), ("f1", "B", "reserve"), ("f2", "A", "performer")} <= got
+    new = [a.soldier_id for a in sol.assignments if a.slot_id == "new"]
+    assert new and new[0] != "A"  # A is busy then; the new duty goes to someone else
+    assert violations(p, sol) == []
+    assert any("נשמרו כמו שהם" in w for w in sol.warnings)
