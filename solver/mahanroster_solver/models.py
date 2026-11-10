@@ -305,6 +305,7 @@ class Solution:
     pools: list[PoolStats] = field(default_factory=list)
     credits: list[CreditOut] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    diagnosis: Optional[str] = None  # on INFEASIBLE: which rule family blocks, in words
 
 
 # ---------------------------------------------------------------------------

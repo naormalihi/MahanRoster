@@ -41,6 +41,7 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
     carried: list[Absence] = []
     chosen: list[tuple[str, str, str]] = []
     unfilled, warnings, statuses = [], [], []
+    diagnoses: list = []
     credit_days: dict[str, int] = defaultdict(int)
     credit_pts: dict[str, float] = defaultdict(float)
 
@@ -64,6 +65,7 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
         statuses.append(sol.status)
         unfilled += sol.unfilled
         warnings += sol.warnings
+        diagnoses.append(sol.diagnosis)
         slot_by_id = {k.id: k for k in slots}
         # availability credits of this month go into the running score like points
         for c in sol.credits:
@@ -96,4 +98,5 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
         pools=pool_stats(problem, prep, chosen, credit_pts),
         credits=[CreditOut(sid, credit_days[sid], round(credit_pts[sid], 2)) for sid in sorted(credit_days)],
         warnings=warnings,
+        diagnosis=next((d for d in diagnoses if d), None),
     )

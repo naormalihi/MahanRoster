@@ -33,7 +33,7 @@ from __future__ import annotations
 import os
 import time as _time
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import replace, dataclass
 from datetime import date, datetime, timedelta
 from statistics import mean, pstdev
 from typing import Optional
@@ -214,7 +214,31 @@ def _weekend_key(d: date) -> date:
     return d - timedelta(days=(d.weekday() - 4) % 7)
 
 
-def solve(problem: Problem, log: bool = False) -> Solution:
+# Rule families a diagnosis run may switch off, one at a time, to tell which one blocks.
+RELAXABLE = ("fixed", "overlap", "cap", "gaf", "penalty")
+
+DIAGNOSIS = {
+    "fixed": "השיבוצים הקבועים (המפורסמים) לא מתיישבים זה עם זה או עם הגדרות התורנות.",
+    "overlap": "כלל החפיפה והמנוחה חוסם: יש חייל ששיבוציו הקבועים לא משאירים מקום.",
+    "cap": "התקרה החודשית חוסמת: שיבוצים קבועים כבר מעבר לתקרה.",
+    "gaf": "כלל העתודה מאותו הגף (בחובה) חוסם.",
+    "penalty": "תורנות עונש קבועה מתנגשת בשיבוץ אחר.",
+}
+
+
+def diagnose(problem: Problem) -> str:
+    """Which rule family makes the model infeasible: solve again with one family off at a time."""
+    quick = replace(problem, settings=replace(problem.settings, time_limit_seconds=min(20, problem.settings.time_limit_seconds)))
+    for fam in RELAXABLE:
+        if solve(quick, relax=frozenset({fam})).status in ("OPTIMAL", "FEASIBLE"):
+            return DIAGNOSIS[fam]
+    return "לא נמצא כלל אחד שחוסם; כנראה שילוב של כמה כללים או נתון חסר."
+
+
+def solve(problem: Problem, log: bool = False, relax: frozenset[str] = frozenset()) -> Solution:
+    """Solves the problem. Published (fixed) assignments are facts: they count toward load, take
+    the soldier's time and fill the slot's needs, but never make the run infeasible on their own.
+    On a failure all the same, the solution carries a diagnosis (unless this already is one)."""
     from ortools.sat.python import cp_model  # imported lazily so the rest works without OR-Tools
 
     t0 = _time.time()
@@ -233,6 +257,18 @@ def solve(problem: Problem, log: bool = False) -> Solution:
     unfilled_r: dict[str, cp_model.IntVar] = {}
 
     fixed = {(f.soldier_id, f.slot_id): f.role for f in problem.fixed if f.soldier_id in soldiers}
+    if "fixed" in relax:
+        fixed = {}
+    # a penalty slot's soldier is a fact too
+    if "penalty" not in relax:
+        for k in problem.slots:
+            if k.is_penalty and k.penalty_soldier_id and k.penalty_soldier_id in soldiers:
+                fixed.setdefault((k.penalty_soldier_id, k.id), ROLE_PERFORMER)
+
+    # Published people per slot and role: those the model can hold as a variable, and those it
+    # cannot (no longer eligible, no reserve role on the slot) – the latter still fill the need.
+    fixed_in = defaultdict(int)
+    fixed_out = defaultdict(int)
 
     for k in problem.slots:
         elig = prep.eligible[k.id]
@@ -241,20 +277,28 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             if k.reserves_needed > 0 and not k.is_penalty:
                 r[sid, k.id] = m.NewBoolVar(f"r_{sid}_{k.id}")
                 m.Add(x[sid, k.id] + r[sid, k.id] <= 1)
-        unfilled_p[k.id] = m.NewIntVar(0, k.performers_needed, f"up_{k.id}")
-        m.Add(sum(x[sid, k.id] for sid in elig) + unfilled_p[k.id] == k.performers_needed)
-        if k.reserves_needed > 0 and not k.is_penalty:
-            unfilled_r[k.id] = m.NewIntVar(0, k.reserves_needed, f"ur_{k.id}")
-            m.Add(sum(r[sid, k.id] for sid in elig) + unfilled_r[k.id] == k.reserves_needed)
-
-    # Fixed assignments and penalty slots.
     for (sid, kid), role in fixed.items():
-        var = (x if role == ROLE_PERFORMER else r).get((sid, kid))
-        if var is not None:
-            m.Add(var == 1)
+        if kid not in slots:
+            continue
+        holder = x if role == ROLE_PERFORMER else r
+        if (sid, kid) in holder:
+            m.Add(holder[sid, kid] == 1)
+            fixed_in[kid, role] += 1
+        else:
+            fixed_out[kid, role] += 1
+            prep.warnings.append(f"שיבוץ קבוע של {sid} במשבצת {kid} לא נכנס לחישוב (לא כשיר או אין תפקיד כזה) – נחשב כמאויש")
+
+    # Coverage: published people fill the need first; more published than needed is a fact,
+    # not a failure (e.g. a reserve activated mid-duty next to the performer who did part of it).
     for k in problem.slots:
-        if k.is_penalty and k.penalty_soldier_id and (k.penalty_soldier_id, k.id) in x:
-            m.Add(x[k.penalty_soldier_id, k.id] == 1)
+        elig = prep.eligible[k.id]
+        need = max(k.performers_needed, fixed_in[k.id, ROLE_PERFORMER] + fixed_out[k.id, ROLE_PERFORMER])
+        unfilled_p[k.id] = m.NewIntVar(0, k.performers_needed, f"up_{k.id}")
+        m.Add(sum(x[sid, k.id] for sid in elig) + unfilled_p[k.id] == need - fixed_out[k.id, ROLE_PERFORMER])
+        if k.reserves_needed > 0 and not k.is_penalty:
+            need_r = max(k.reserves_needed, fixed_in[k.id, ROLE_RESERVE] + fixed_out[k.id, ROLE_RESERVE])
+            unfilled_r[k.id] = m.NewIntVar(0, k.reserves_needed, f"ur_{k.id}")
+            m.Add(sum(r[sid, k.id] for sid in elig) + unfilled_r[k.id] == need_r - fixed_out[k.id, ROLE_RESERVE])
 
     # Rest and no overlap, per soldier.
     by_soldier = defaultdict(list)
@@ -304,7 +348,8 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             end = _minutes(k.ends_at, origin) + 60 * tasks[k.task_type_id].min_rest_hours
             intervals.append(m.NewOptionalIntervalVar(start, end - start, end, y, f"i_{sid}_{kid}"))
         if len(intervals) > 1:
-            m.AddNoOverlap(intervals)
+            if "overlap" not in relax:
+                m.AddNoOverlap(intervals)
 
     # Reserve from the performer's gaf: hard for mandatory reserves, soft for career reserves.
     cross_gaf_terms = []
@@ -325,7 +370,7 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             g = soldiers[sid].gaf_id
             if fixed.get((sid, k.id)) == ROLE_RESERVE:
                 continue  # a published reserve stays, whatever the gaf
-            if soldiers[sid].service_type == SERVICE_MANDATORY:
+            if soldiers[sid].service_type == SERVICE_MANDATORY and "gaf" not in relax:
                 m.Add(r[sid, k.id] <= z[g])
             else:
                 c = m.NewBoolVar(f"cg_{sid}_{k.id}")
@@ -346,7 +391,8 @@ def solve(problem: Problem, log: bool = False) -> Solution:
                 fixed_month[sid, k.starts_at.year, k.starts_at.month] += 1
         for key, vars_ in per_month.items():
             # published duties already over the cap are facts: no new duty that month, but no failure
-            m.Add(sum(vars_) <= max(settings.duty_cap_per_month, fixed_month[key]))
+            if "cap" not in relax:
+                m.Add(sum(vars_) <= max(settings.duty_cap_per_month, fixed_month[key]))
 
     # ---- fairness, per pool ---------------------------------------------------
     pools = defaultdict(list)
@@ -480,6 +526,8 @@ def solve(problem: Problem, log: bool = False) -> Solution:
         warnings=list(prep.warnings),
     )
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        if status == cp_model.INFEASIBLE and not relax:
+            sol.diagnosis = diagnose(problem)
         return sol
 
     chosen = []
@@ -491,12 +539,33 @@ def solve(problem: Problem, log: bool = False) -> Solution:
             chosen.append((sid, kid, ROLE_RESERVE))
     credits = {sid: v / SCALE for sid, (_, v) in credit.items()}
     sol.assignments = build_assignments(problem, prep, chosen, credits)
+    # Why an unfilled slot stayed empty: besides who is not eligible at all (prep.reasons), say what
+    # held back the eligible ones in this solution – busy then, at the monthly cap, the gaf rule.
+    mine = defaultdict(list)
+    for sid, kid, role in chosen:
+        mine[sid].append((kid, role))
     for k in problem.slots:
         for role, var in ((ROLE_PERFORMER, unfilled_p.get(k.id)), (ROLE_RESERVE, unfilled_r.get(k.id))):
             if var is not None and solver.Value(var) > 0:
-                sol.unfilled.append(
-                    UnfilledOut(k.id, role, solver.Value(var), len(prep.eligible[k.id]), prep.reasons[k.id])
-                )
+                why = dict(prep.reasons[k.id])
+                perf_gafs = {soldiers[sid].gaf_id for sid, kid, rl in chosen if kid == k.id and rl == ROLE_PERFORMER}
+                for sid in prep.eligible[k.id]:
+                    others = [kid for kid, _ in mine[sid] if kid != k.id]
+                    if any(kid == k.id for kid, _ in mine[sid]):
+                        key = "other_role"
+                    elif any(overlaps(k.id, kid) for kid in others):
+                        key = "busy"
+                    elif role == ROLE_PERFORMER and settings.duty_cap_per_month and sum(
+                        1 for kid, rl in mine[sid] if rl == ROLE_PERFORMER and not slots[kid].is_penalty
+                        and (slots[kid].starts_at.year, slots[kid].starts_at.month) == (k.starts_at.year, k.starts_at.month)
+                    ) >= settings.duty_cap_per_month:
+                        key = "at_cap"
+                    elif role == ROLE_RESERVE and soldiers[sid].service_type == SERVICE_MANDATORY and soldiers[sid].gaf_id not in perf_gafs:
+                        key = "gaf_rule"
+                    else:
+                        continue
+                    why[key] = why.get(key, 0) + 1
+                sol.unfilled.append(UnfilledOut(k.id, role, solver.Value(var), len(prep.eligible[k.id]), why))
     sol.pools = pool_stats(problem, prep, chosen, credits)
     sol.credits = [CreditOut(sid, d, round(v / SCALE, 2)) for sid, (d, v) in sorted(credit.items())]
     return sol

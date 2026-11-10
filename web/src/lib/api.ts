@@ -217,6 +217,8 @@ export interface Api {
   draftAssignments(cycleId: string): Promise<DraftAssignment[]>;
   slotCandidates(slotId: string): Promise<Candidate[]>;
   manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string): Promise<string>;
+  /** Staffs a waiting duty of a published cycle straight onto the board (reason when a rule is broken). */
+  assignPublished(slotId: string, role: DraftRole, soldierId: string, reason: string | null): Promise<string>;
   removeAssignment(assignmentId: string, reason: string): Promise<void>;
   publishCycle(cycleId: string): Promise<number>;
   /** Back to draft; only before the cycle starts, by the coordinator. */

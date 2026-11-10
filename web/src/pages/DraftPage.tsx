@@ -76,7 +76,7 @@ function Loading() {
   );
 }
 
-interface Ctx {
+export interface Ctx {
   cycle: Cycle;
   slots: SlotRow[];
   tasks: Map<string, TaskType>;
@@ -90,7 +90,12 @@ interface Ctx {
 // Assign / replace dialog
 // ---------------------------------------------------------------------------
 
-function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: DraftAssignment | null; onClose: () => void }) {
+/**
+ * Picks a soldier for a duty: candidates ranked by fit and load, with what each one breaks.
+ * Before publishing it edits the draft (a reason always); after publishing ("published") it puts
+ * the soldier straight onto the board, and asks for a reason only when a rule is broken.
+ */
+export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: DraftAssignment | null; onClose: () => void; published?: boolean }) {
   const { api } = useAuth();
   const { ctx, slot, current } = props;
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
@@ -117,7 +122,7 @@ function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: Dra
   });
 
   async function run(f: () => Promise<unknown>) {
-    if (!reason.trim()) return setError("חובה לכתוב נימוק");
+    if (!reason.trim() && (!props.published || warn)) return setError(props.published ? "החייל מפר כלל – חובה לכתוב סיבה" : "חובה לכתוב נימוק");
     setBusy(true);
     setError(null);
     try {
@@ -203,10 +208,15 @@ function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: Dra
             <Alert severity="warning">
               {chosen!.reasons.length > 0 && <div>לא זכאי: {reasonText(chosen!.reasons)}.</div>}
               {chosen!.conflicts.length > 0 && <div>חופף לתורנות אחרת.</div>}
-              אפשר לשבץ בכל זאת – הנימוק נשמר ביומן.
+              אפשר לשבץ בכל זאת – {props.published ? "עם סיבה, שנשמרת ביומן" : "הנימוק נשמר ביומן"}.
             </Alert>
           )}
-          <TextField label="נימוק (חובה)" value={reason} onChange={(e) => setReason(e.target.value)} fullWidth />
+          <TextField
+            label={props.published ? (warn ? "סיבה (חובה – החייל מפר כלל)" : "הערה (לא חובה)") : "נימוק (חובה)"}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            fullWidth
+          />
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
@@ -220,7 +230,13 @@ function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: Dra
         <Button
           variant="contained"
           disabled={busy || !chosen}
-          onClick={() => run(() => api!.manualAssign(slot.id, props.role, chosen!.soldier_id, current?.id ?? null, reason))}
+          onClick={() =>
+            run(() =>
+              props.published
+                ? api!.assignPublished(slot.id, props.role, chosen!.soldier_id, reason.trim() || null)
+                : api!.manualAssign(slot.id, props.role, chosen!.soldier_id, current?.id ?? null, reason),
+            )
+          }
         >
           {current ? "החלפה" : "שיבוץ"}
         </Button>

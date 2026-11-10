@@ -38,9 +38,12 @@ def violations(problem: Problem, solution: Solution) -> list[str]:
 
     for kid, roles in per_slot.items():
         k = slots[kid]
-        if len(roles[ROLE_PERFORMER]) > k.performers_needed:
+        # more than needed is a violation only when something new was added on top
+        new_p = [sid for sid in roles[ROLE_PERFORMER] if (sid, kid, ROLE_PERFORMER) not in fixed]
+        new_r = [sid for sid in roles[ROLE_RESERVE] if (sid, kid, ROLE_RESERVE) not in fixed]
+        if len(roles[ROLE_PERFORMER]) > k.performers_needed and new_p:
             out.append(f"{kid}: יותר מבצעים מהנדרש")
-        if len(roles[ROLE_RESERVE]) > k.reserves_needed:
+        if len(roles[ROLE_RESERVE]) > k.reserves_needed and new_r:
             out.append(f"{kid}: יותר עתודות מהנדרש")
         both = set(roles[ROLE_PERFORMER]) & set(roles[ROLE_RESERVE])
         if both:

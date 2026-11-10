@@ -36,6 +36,8 @@ export interface ScheduleJob {
   wall_time: number | null;
   unfilled: UnfilledOut[] | null;
   warnings: string[] | null;
+  /** on a failed run: which rule blocks, in words (from the engine's diagnosis) */
+  diagnosis?: string | null;
   pools: PoolStats[] | null;
 }
 
@@ -108,8 +110,9 @@ export function warningText(
 }
 
 /** A failed run's error in words: the engine statuses become an explanation. */
-export function jobErrorText(error: string | null | undefined): string {
+export function jobErrorText(error: string | null | undefined, diagnosis?: string | null): string {
   const e = (error ?? "").trim();
+  if (diagnosis) return `המנוע לא מצא שיבוץ שעומד בכל הכללים. ${diagnosis}`;
   if (/INFEASIBLE/.test(e))
     return "המנוע לא מצא שיבוץ שעומד בכל הכללים הקשיחים. בדרך כלל זה שיבוץ קבוע שמתנגש בכלל (חפיפה, תקרה חודשית, עתודה מגף אחר) – בדוק את השיבוצים שתוקנו ידנית והרץ שוב.";
   if (/MODEL_INVALID/.test(e)) return "הבדיקה העצמאית מצאה הפרה של כלל קשיח בתוצאה, ולכן היא לא נשמרה.";

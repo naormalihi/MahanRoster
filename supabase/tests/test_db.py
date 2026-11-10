@@ -1221,3 +1221,23 @@ def test_delete_pending_slot_only_without_published_people(conn):
         with pytest.raises(psycopg.Error):
             _as_coord(conn, "select public.delete_pending_slot(%s)", k2)
         raise psycopg.Rollback()
+
+
+def test_assign_published_staffs_a_waiting_duty(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a, b, c = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 3").fetchall()]
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '30 days', now() + interval '31 days') returning id", (cycle, tid)).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'draft' from soldiers where id = %s", (k, c))
+        p = _as_coord(conn, "select public.assign_published(%s, 'performer', %s, null)", k, a)[0][0]
+        st, src = conn.execute("select status, source from assignments where id = %s", (p,)).fetchone()
+        assert st == "assigned" and src == "manual"
+        assert conn.execute("select count(*) from assignments where slot_id = %s and status = 'draft' and role = 'performer'", (k,)).fetchone()[0] == 0
+        r = _as_coord(conn, "select public.assign_published(%s, 'reserve', %s, 'אין אחר')", k, b)[0][0]
+        assert conn.execute("select status, paired_assignment_id from assignments where id = %s", (r,)).fetchone() == ("reserve_idle", p)
+        with pytest.raises(psycopg.Error):  # performer already staffed
+            _as_coord(conn, "select public.assign_published(%s, 'performer', %s, null)", k, c)
+        raise psycopg.Rollback()

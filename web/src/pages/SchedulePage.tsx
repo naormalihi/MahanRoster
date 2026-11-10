@@ -183,7 +183,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
         </Stack>
         {!ok ? (
           <Alert severity="error">
-            ההרצה נכשלה. {jobErrorText(job.error?.split("\n").slice(-2).join(" ") || job.result_status)}
+            ההרצה נכשלה. {jobErrorText(job.error?.split("\n").slice(-2).join(" ") || job.result_status, job.diagnosis)}
           </Alert>
         ) : (
           <Alert severity={missingP ? "warning" : "success"}>
