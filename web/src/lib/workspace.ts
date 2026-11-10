@@ -37,16 +37,19 @@ export function stepStates(cycle: Cycle, f: CycleFacts): Record<Exclude<StepKey,
   const published = at >= stageIndex("published");
   const deadline = cycle.exemption_deadline;
   return {
-    constraints:
-      f.pendingExemptions > 0
-        ? { tone: "warn", text: `${f.pendingExemptions} פטורים ממתינים` }
-        : at <= stageIndex("collecting") && deadline && Date.parse(deadline) > Date.now()
-          ? { tone: "todo", text: `איסוף עד ${short(deadlineDay(deadline))}` }
-          : { tone: "done", text: "אין ממתינים" },
+    // the constraints row always carries the deadline: "איסוף עד 11.11" / "נסגר 11.11"
+    constraints: (() => {
+      const open = !!deadline && Date.parse(deadline) > Date.now();
+      const when = deadline ? `${open ? "איסוף עד" : "נסגר"} ${short(deadlineDay(deadline))}` : "לא נקבע מועד סגירה";
+      if (f.pendingExemptions > 0) return { tone: "warn", text: `${when} · ${f.pendingExemptions} פטורים ממתינים` };
+      if (!deadline && !published) return { tone: "warn", text: when };
+      if (open && at <= stageIndex("collecting")) return { tone: "todo", text: when };
+      return { tone: "done", text: deadline ? `${when} · אין ממתינים` : "אין ממתינים" };
+    })(),
     potential: cycle.potential_computed_at
       ? { tone: "done", text: `חושב ${short(cycle.potential_computed_at)}` }
       : { tone: "todo", text: "לא חושב" },
-    slots: f.slots > 0 ? { tone: "done", text: `${f.slots} משבצות` } : { tone: "todo", text: "לא נקלט" },
+    slots: f.slots > 0 ? { tone: "done", text: `${f.slots} משימות` } : { tone: "todo", text: "לא נקלט" },
     schedule: published
       ? { tone: "done", text: cycle.published_at ? `פורסם ${short(cycle.published_at)}` : "פורסם" }
       : f.job && (f.job.status === "queued" || f.job.status === "running")
@@ -95,11 +98,11 @@ export function nextAction(cycle: Cycle, f: CycleFacts): { text: string; step: S
         ? { text: "לבדוק את המטריצה ולייצא לבסיס", step: "potential" }
         : { text: "לחשב את הפוטנציאל", step: "potential" };
     case "slots":
-      return f.slots ? { text: "המשבצות נקלטו – אפשר להריץ שיבוץ", step: "schedule" } : { text: "לקלוט את קובץ לוח הבסיס", step: "slots" };
+      return f.slots ? { text: "המשימות נקלטו – אפשר להריץ שיבוץ", step: "schedule" } : { text: "לקלוט את קובץ לוח הבסיס", step: "slots" };
     case "scheduling":
     case "review":
       return s.schedule.tone === "warn"
-        ? { text: `לאייש ידנית ${f.job?.unfilled} משבצות ולפרסם`, step: "schedule" }
+        ? { text: `לאייש ידנית ${f.job?.unfilled} משימות ולפרסם`, step: "schedule" }
         : s.schedule.tone === "busy"
           ? { text: "המנוע רץ – הטיוטה תופיע כשיסיים", step: "schedule" }
           : f.job?.status === "done"

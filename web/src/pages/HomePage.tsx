@@ -137,7 +137,7 @@ export function HomePage() {
         {[
           { to: "/soldiers", label: "חיילים", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי חיילים" },
           { to: "/board", label: "לוח מפורסם", hint: "מה שכל היחידה רואה" },
-          { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ושלבים" },
+          { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ומועד סגירת אילוצים" },
           { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים" },
         ]
           .filter((l) => staff || (l.to !== "/cycles" && l.to !== "/admin"))

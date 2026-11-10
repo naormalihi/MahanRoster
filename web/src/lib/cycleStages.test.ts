@@ -28,7 +28,7 @@ describe("automatic cycle stages", () => {
     expect(s.loading.tone).toBe("done");
     expect(s.collecting.note).toBe("נסגר 15/11");
     expect(s.approving).toMatchObject({ tone: "warn", note: "3 ממתינים" });
-    expect(s.slots.note).toBe("40 משבצות");
+    expect(s.slots.note).toBe("40 משימות");
     expect(s.scheduling.tone).toBe("todo");
   });
 });
