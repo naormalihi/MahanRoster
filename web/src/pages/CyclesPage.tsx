@@ -64,8 +64,8 @@ const STAGE_SCREEN: Record<CycleStatus, { staff: string; reader: string }> = {
   approving: { staff: "/cycle/constraints?tab=exemptions&status=pending", reader: "/cycle/constraints?tab=exemptions" },
   potential: { staff: "/cycle/potential", reader: "/cycle/potential" },
   slots: { staff: "/cycle/slots", reader: "/cycle/slots" },
-  scheduling: { staff: "/cycle/schedule?view=run", reader: "/cycle/schedule?view=run" },
-  review: { staff: "/cycle/schedule?view=draft", reader: "/cycle/schedule?view=draft" },
+  scheduling: { staff: "/cycle/schedule", reader: "/cycle/schedule" },
+  review: { staff: "/cycle/schedule", reader: "/cycle/schedule" },
   published: { staff: "/cycle/operate", reader: "/board" },
   closed: { staff: "/board", reader: "/board" },
 };

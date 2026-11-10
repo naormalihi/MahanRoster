@@ -64,8 +64,8 @@ function Gate() {
               <Route path="/constraints" element={<Navigate to="/cycle/constraints" replace />} />
               <Route path="/potential" element={<Navigate to="/cycle/potential" replace />} />
               <Route path="/slots" element={<Navigate to="/cycle/slots" replace />} />
-              <Route path="/schedule" element={<Navigate to="/cycle/schedule?view=run" replace />} />
-              <Route path="/draft" element={<Navigate to="/cycle/schedule?view=draft" replace />} />
+              <Route path="/schedule" element={<Navigate to="/cycle/schedule" replace />} />
+              <Route path="/draft" element={<Navigate to="/cycle/schedule" replace />} />
               <Route path="/roster" element={<Navigate to="/soldiers/import" replace />} />
             </>
           )}
