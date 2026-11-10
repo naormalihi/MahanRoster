@@ -29,7 +29,8 @@ def windows(problem: Problem) -> list[list]:
 
 
 def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solution:
-    """on_progress(done_windows, total_windows) is called after each month, if given."""
+    """on_progress(done_windows, total_windows, staffed_slots, total_slots) is called before the
+    first month and after each one, if given: how far the run is, in months and in duties staffed."""
     t0 = _time.time()
     groups = windows(problem)
     if len(groups) <= 1:
@@ -45,9 +46,11 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
     credit_days: dict[str, int] = defaultdict(int)
     credit_pts: dict[str, float] = defaultdict(float)
 
+    total_slots = sum(len(g) for g in groups)
+    staffed = 0
+    if on_progress:
+        on_progress(0, len(groups), 0, total_slots)
     for i, slots in enumerate(groups):
-        if on_progress:
-            on_progress(i, len(groups))
         ids = {k.id for k in slots}
         window_start = min(k.starts_at for k in slots)
         sub = replace(
@@ -62,6 +65,14 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
             settings=replace(problem.settings, time_limit_seconds=per_window_time),
         )
         sol = solve(sub, log=log)
+        # a duty counts as staffed once it has all its performers
+        got = defaultdict(int)
+        for a in sol.assignments:
+            if a.role == ROLE_PERFORMER:
+                got[a.slot_id] += 1
+        staffed += sum(1 for k in slots if got[k.id] >= k.performers_needed)
+        if on_progress:
+            on_progress(i + 1, len(groups), staffed, total_slots)
         statuses.append(sol.status)
         unfilled += sol.unfilled
         warnings += sol.warnings

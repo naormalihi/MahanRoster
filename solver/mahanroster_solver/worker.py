@@ -44,10 +44,16 @@ def claim(conn):
 def run_one(conn, job_id, payload) -> str:
     problem = models.load_problem(json.dumps(payload))
 
-    def progress(done: int, total: int) -> None:
-        # 5–95 % while solving month by month
-        conn.execute("update schedule_jobs set progress = %s where id = %s", (5 + int(90 * done / max(total, 1)), job_id))
+    def progress(done: int, total: int, staffed: int = 0, slots: int = 0) -> None:
+        # 5–95 % while solving month by month, and how many duties are staffed so far ("108/180")
+        conn.execute(
+            """update schedule_jobs set progress = %s,
+                 params = params || jsonb_build_object('staffed', %s::int, 'slots', %s::int, 'month', %s::int, 'months', %s::int)
+               where id = %s""",
+            (5 + int(90 * done / max(total, 1)), staffed, slots, done, total, job_id),
+        )
 
+    progress(0, 1, 0, len(problem.slots))
     solution = solve_rolling(problem, on_progress=progress)
     bad = violations(problem, solution)
     if bad:
