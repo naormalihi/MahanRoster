@@ -89,6 +89,7 @@ const EMPTY_TASK: TaskTypeInput = {
   requires_weapon: false,
   is_weekend_type: false,
   shachar_compatible: false,
+  shachar_only: false,
   qualifying_duty: false,
   allowed_rank_ids: null,
   gender: null,
@@ -318,6 +319,21 @@ export function TaskDialog(props: {
               <MenuItem value="male">גברים</MenuItem>
               <MenuItem value="female">נשים</MenuItem>
             </TextField>
+            <TextField
+              select
+              label='שח"ר'
+              value={t.shachar_only ? "only" : t.shachar_compatible ? "also" : "no"}
+              onChange={(e) => {
+                const v = e.target.value;
+                set("shachar_compatible", v !== "no");
+                set("shachar_only", v === "only");
+              }}
+              fullWidth
+            >
+              <MenuItem value="no">לא לשח"ר</MenuItem>
+              <MenuItem value="also">גם לשח"ר</MenuItem>
+              <MenuItem value="only">רק לשח"ר</MenuItem>
+            </TextField>
           </Stack>
           <FormGroup>
             <FormControlLabel
@@ -331,10 +347,6 @@ export function TaskDialog(props: {
             <FormControlLabel
               control={<Switch checked={t.qualifying_duty} onChange={(e) => set("qualifying_duty", e.target.checked)} />}
               label="תורנות מזכה (פתוחה גם למשרתי הורה ולבעלי פטור מזכה)"
-            />
-            <FormControlLabel
-              control={<Switch checked={t.shachar_compatible} onChange={(e) => set("shachar_compatible", e.target.checked)} />}
-              label='מתאימה לשח"ר'
             />
             <FormControlLabel
               control={<Switch checked={t.is_active} onChange={(e) => set("is_active", e.target.checked)} />}
@@ -465,7 +477,11 @@ function CatalogTab() {
                     {t.is_weekend_type && <Chip size="small" label="שבת" />}
                     {t.qualifying_duty && <Chip size="small" color="primary" variant="outlined" label="מזכה" />}
                     {t.requires_weapon && <Chip size="small" variant="outlined" label="נשק" />}
-                    {t.shachar_compatible && <Chip size="small" variant="outlined" label='שח"ר' />}
+                    {t.shachar_only ? (
+                      <Chip size="small" color="primary" label='רק שח"ר' />
+                    ) : (
+                      t.shachar_compatible && <Chip size="small" variant="outlined" label='שח"ר' />
+                    )}
                     {!t.is_active && <Chip size="small" label="לא פעילה" />}
                   </Stack>
                 </TableCell>

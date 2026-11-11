@@ -96,6 +96,20 @@ def test_shachar_mandatory_only_compatible_types():
     assert "shachar" in reasons(s, slot("k", "guard", *MON))
 
 
+def test_shachar_only_duty_is_closed_to_everyone_else():
+    kitchen = TaskType("kitchen", "מטבח", 1.0, shachar_compatible=True, shachar_only=True)
+    tasks = (kitchen, GUARD)
+    k = slot("k", "kitchen", *MON)
+    shachar = soldier("A", is_shachar=True)
+    assert reasons(shachar, k, tasks=tasks) == []
+    assert "shachar_only" in reasons(soldier("B"), k, tasks=tasks)
+    # שח"ר is mandatory service only: a career soldier flagged שח"ר is not one
+    assert "shachar_only" in reasons(soldier("C", is_shachar=True, service_type="career", populations=["career"]), k, tasks=tasks)
+    # the שח"ר soldier keeps the other duties marked for שח"ר
+    also = TaskType("office", "משרד", 1.0, shachar_compatible=True)
+    assert reasons(shachar, slot("o", "office", *MON), tasks=(kitchen, also)) == []
+
+
 def test_weapon_range_must_be_valid_through_last_day():
     s = soldier("A", range_valid_until=date(2027, 1, 4))
     assert "weapon_range" in reasons(s, slot("k", "guard", "2027-01-04T08:00", "2027-01-05T09:00"))

@@ -73,7 +73,7 @@ const POPULATIONS: Population[] = [
 ];
 const tt = (code: string, name: string, cat: number, weight: number, o: Partial<TaskTypeInput> = {}): TaskType => ({
   id: `t_${code}`, code, name, category_id: `c${cat}`, weight, min_rest_hours: 0, service_restriction: "any",
-  requires_weapon: false, is_weekend_type: false, shachar_compatible: false, qualifying_duty: false,
+  requires_weapon: false, is_weekend_type: false, shachar_compatible: false, shachar_only: false, qualifying_duty: false,
   allowed_rank_ids: null, gender: null,
   default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
 }) as TaskType;

@@ -24,6 +24,7 @@ REASON_LABELS = {
     "qualifying_only": "משרת הורה או פטור מזכה – רק ממלכ\"ת יום",
     "not_qualifying": "ממלכ\"ת יום – רק למשרתי הורה, בעלי פטור מזכה והאוכלוסיות שהוגדרו לה",
     "shachar": "שח\"ר – המשימה לא מסומנת מתאימה לשח\"ר",
+    "shachar_only": "המשימה רק לשח\"ר",
     "home_nightly": "ת\"ש 7 – לא לן בבסיס, והתורנות כוללת שעות לילה",
     "weapon_range": "מטווח לא בתוקף ביום התורנות",
     "not_enlisted": "לפני תאריך הגיוס",
@@ -140,6 +141,8 @@ class EligibilityIndex:
             reasons.append("gender")
         if soldier.is_shachar and soldier.service_type == SERVICE_MANDATORY and not task.shachar_compatible:
             reasons.append("shachar")
+        if task.shachar_only and not (soldier.is_shachar and soldier.service_type == SERVICE_MANDATORY):
+            reasons.append("shachar_only")
         if soldier.home_nightly and _window_overlap(settings.night_window, slot) > 0:
             reasons.append("home_nightly")
 
