@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.11.1",
+    date: "2026-11-11",
+    items: ["בוטלו ת\"ש 7 והרפרנס למחזור הקודם במסך החיילים של הטיוטה (יעברו למסך החיילים)"],
+  },
+  {
     version: "1.10.0",
     date: "2026-11-11",
     items: [
