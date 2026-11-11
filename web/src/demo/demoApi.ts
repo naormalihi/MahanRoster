@@ -64,7 +64,7 @@ function rng(seed: number) {
   };
 }
 
-const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד שער", "ממלכ\"ת", "שמירות חובה", "משימות חיליות", "רס\"ר", "מפקד תורן"].map((name, i) => ({ id: `c${i}`, name }));
+const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד שער", "ממלכת", "שמירות חובה", "משימות חיליות", "רס\"ר", "מפקד תורן"].map((name, i) => ({ id: `c${i}`, name }));
 const POPULATIONS: Population[] = [
   { code: "mandatory", name: "חובה" },
   { code: "career", name: "קבע" },
@@ -388,7 +388,14 @@ export class DemoApi implements Api {
   }
 
   async dutyCategories() {
-    return CATEGORIES;
+    return CATEGORIES.map((c) => ({ ...c }));
+  }
+
+  async saveDutyCategory(name: string, id?: string) {
+    await delay();
+    if (CATEGORIES.some((c) => c.name === name && c.id !== id)) throw new Error("duplicate key value violates unique constraint \"duty_categories_name_key\"");
+    if (id) CATEGORIES.find((c) => c.id === id)!.name = name;
+    else CATEGORIES.push({ id: this.nextId("c"), name });
   }
 
   async populations() {

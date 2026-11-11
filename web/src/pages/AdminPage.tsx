@@ -383,6 +383,7 @@ function CatalogTab() {
   const [categories, setCategories] = useState<NamedRef[]>([]);
   const [ranks, setRanks] = useState<NamedRef[]>([]);
   const [editing, setEditing] = useState<TaskType | "new" | null>(null);
+  const [editCats, setEditCats] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -420,6 +421,9 @@ function CatalogTab() {
       <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
           תורנות חדשה
+        </Button>
+        <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditCats(true)}>
+          קטגוריות
         </Button>
         {inactive > 0 && (
           <FormControlLabel
@@ -475,6 +479,14 @@ function CatalogTab() {
           </TableBody>
         </Table>
       </Paper>
+      {editCats && (
+        <CategoriesDialog
+          categories={categories}
+          tasks={tasks}
+          onClose={() => setEditCats(false)}
+          onChanged={() => void load()}
+        />
+      )}
       {editing && (
         <TaskDialog
           task={editing === "new" ? null : editing}
@@ -489,6 +501,88 @@ function CatalogTab() {
         />
       )}
     </Stack>
+  );
+}
+
+/**
+ * The duty categories: rename one in place, or add a new one. A category groups duty types for
+ * the potential and the fairness groups, so a rename shows everywhere at once; past cycles keep
+ * the group labels they were snapshotted with.
+ */
+function CategoriesDialog(props: { categories: NamedRef[]; tasks: TaskType[]; onClose: () => void; onChanged: () => void }) {
+  const { api } = useAuth();
+  const [names, setNames] = useState<Record<string, string>>(() => Object.fromEntries(props.categories.map((c) => [c.id, c.name])));
+  const [added, setAdded] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const used = (id: string) => props.tasks.filter((t) => t.category_id === id).length;
+  const clash = (name: string, id?: string) => props.categories.some((c) => c.id !== id && c.name.trim() === name.trim());
+  const sorted = [...props.categories].sort((a, b) => a.name.localeCompare(b.name, "he"));
+
+  async function save(name: string, id?: string) {
+    const v = name.trim();
+    if (!v) return setError("שם הקטגוריה לא יכול להיות ריק");
+    if (clash(v, id)) return setError(`כבר יש קטגוריה בשם "${v}"`);
+    setBusy(id ?? "new");
+    setError(null);
+    try {
+      await api!.saveDutyCategory(v, id);
+      if (!id) setAdded("");
+      props.onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Dialog open onClose={props.onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>קטגוריות תורנות</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={1.5}>
+          <Typography variant="body2" color="text.secondary">
+            הקטגוריה מקבצת סוגי תורנות לפוטנציאל ולקבוצות ההוגנות. שינוי שם מתעדכן בכל המקומות; מחזורים קודמים שומרים את שמות הקבוצות מהחישוב שלהם.
+          </Typography>
+          {error && <Alert severity="error">{error}</Alert>}
+          {sorted.map((c) => {
+            const v = names[c.id] ?? c.name;
+            const dirty = v.trim() !== c.name;
+            return (
+              <Stack key={c.id} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  value={v}
+                  onChange={(e) => setNames((n) => ({ ...n, [c.id]: e.target.value }))}
+                  onKeyDown={(e) => e.key === "Enter" && dirty && void save(v, c.id)}
+                  helperText={`${used(c.id)} סוגי תורנות`}
+                />
+                <Button size="small" variant="contained" disabled={!dirty || !!busy} onClick={() => void save(v, c.id)} sx={{ mb: 2.5 }}>
+                  {busy === c.id ? <CircularProgress size={16} color="inherit" /> : "שמירה"}
+                </Button>
+              </Stack>
+            );
+          })}
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", pt: 1, borderTop: 1, borderColor: "divider" }}>
+            <TextField
+              size="small"
+              fullWidth
+              label="קטגוריה חדשה"
+              value={added}
+              onChange={(e) => setAdded(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && added.trim() && void save(added)}
+            />
+            <Button size="small" variant="outlined" startIcon={<AddIcon />} disabled={!added.trim() || !!busy} onClick={() => void save(added)}>
+              הוספה
+            </Button>
+          </Stack>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={props.onClose}>סגירה</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

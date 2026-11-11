@@ -288,6 +288,11 @@ export class SupabaseApi implements Api {
     return check(await this.sb.from("duty_categories").select("id, name").order("name"));
   }
 
+  async saveDutyCategory(name: string, id?: string) {
+    if (id) maybe(await this.sb.from("duty_categories").update({ name }).eq("id", id));
+    else maybe(await this.sb.from("duty_categories").insert({ name }));
+  }
+
   async populations(): Promise<Population[]> {
     return check(await this.sb.from("populations").select("code, name").order("priority"));
   }
