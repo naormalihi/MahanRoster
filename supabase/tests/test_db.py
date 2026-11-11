@@ -1288,3 +1288,22 @@ def test_new_run_saves_when_a_manual_reserve_points_at_an_old_engine_performer(c
         new_p = conn.execute("select id from assignments where slot_id = %s and role = 'performer'", (k,)).fetchone()[0]
         assert res_pair == new_p
         raise psycopg.Rollback()
+
+
+def test_cycle_home_nightly_lists_tash7_soldiers(conn):
+    from datetime import timedelta
+
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
+        a, b, c = [r[0] for r in conn.execute(
+            "select soldier_id from cycle_soldier_snapshot sn join soldiers s on s.id = sn.soldier_id "
+            "where sn.cycle_id = %s and not s.home_nightly and s.home_nightly_override is null order by soldier_id limit 3", (cycle,)).fetchall()]
+        conn.execute("update soldiers set home_nightly = true where id = %s", (a,))
+        tid = conn.execute("select id from exemption_types where home_nightly limit 1").fetchone()[0]
+        conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+                        values (%s, %s, 'partial', %s, %s, 'approved', now())""", (b, tid, start + timedelta(days=5), start + timedelta(days=9)))
+        rows = dict(conn.execute("select soldier_id, partial from public.cycle_home_nightly(%s)", (cycle,)).fetchall())
+        assert rows[a] is False and rows[b] is True and c not in rows
+        raise psycopg.Rollback()
