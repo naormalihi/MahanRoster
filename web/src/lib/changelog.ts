@@ -11,6 +11,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.9.2",
+    date: "2026-11-11",
+    items: [
+      "בחירת סוג תורנות בקליטת לוח הבסיס: בלי כותרת קטגוריה כפולה כשיש בה סוג אחד בלבד",
+      "בזמן הרצת השיבוץ הוסר הקישור ל-GitHub",
+    ],
+  },
+  {
     version: "1.9.1",
     date: "2026-11-11",
     items: [

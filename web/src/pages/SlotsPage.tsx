@@ -96,19 +96,24 @@ function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) =
           אין סוגי תורנות פעילים בקטלוג
         </MenuItem>
       )}
-      {groups.flatMap((g) => [
-        <ListSubheader key={`h-${g.c.id}`}>{g.c.name}</ListSubheader>,
-        ...g.tasks.map((t) => (
+      {/* a category heads its types only when it has more than one – a lone type is its own title */}
+      {[...groups.filter((g) => g.tasks.length === 1).map((g) => g.tasks[0]), ...loose]
+        .sort((a, b) => a.name.localeCompare(b.name, "he"))
+        .map((t) => (
           <MenuItem key={t.id} value={t.id}>
             {t.name}
           </MenuItem>
-        )),
-      ])}
-      {loose.map((t) => (
-        <MenuItem key={t.id} value={t.id}>
-          {t.name}
-        </MenuItem>
-      ))}
+        ))}
+      {groups
+        .filter((g) => g.tasks.length > 1)
+        .flatMap((g) => [
+          <ListSubheader key={`h-${g.c.id}`}>{g.c.name}</ListSubheader>,
+          ...g.tasks.map((t) => (
+            <MenuItem key={t.id} value={t.id} sx={{ pl: 4 }}>
+              {t.name}
+            </MenuItem>
+          )),
+        ])}
     </TextField>
   );
 }
