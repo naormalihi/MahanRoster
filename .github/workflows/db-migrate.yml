@@ -41,7 +41,8 @@ jobs:
               if any(c in raw.group(1) for c in "#/?"):
                   print("::warning::password contains # / or ? – must be percent-encoded")
           PY
-      - run: sudo apt-get install -y -qq postgresql-client
+      # the runner image already has psql; install only when missing (with a fresh index)
+      - run: command -v psql || (sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client)
       - name: Apply migrations
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
