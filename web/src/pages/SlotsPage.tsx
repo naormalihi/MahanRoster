@@ -23,7 +23,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
@@ -62,19 +62,40 @@ interface Refs {
   holidays: Set<string>;
 }
 
+const TaskDialog = lazy(() => import("./AdminPage").then((m) => ({ default: m.TaskDialog })));
+/** A new catalog type, made from an unknown name in the file. */
+const NEW = "__new__";
+
 /** "לא לקלוט" in the duty mapping (an empty value means: not chosen yet). */
 const SKIP = "__skip__";
 
-function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) => void; label?: string }) {
+function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) => void; label?: string; onNew?: () => void }) {
   const groups = props.refs.categories
     .map((c) => ({ c, tasks: props.refs.tasks.filter((t) => t.is_active && t.category_id === c.id) }))
     .filter((g) => g.tasks.length);
   const loose = props.refs.tasks.filter((t) => t.is_active && !props.refs.categories.some((c) => c.id === t.category_id));
   return (
-    <TextField select size="small" label={props.label ?? "סוג תורנות"} value={props.value} onChange={(e) => props.onChange(e.target.value)} sx={{ minWidth: 220 }}>
+    <TextField
+      select
+      size="small"
+      label={props.label ?? "סוג תורנות"}
+      value={props.value}
+      onChange={(e) => (e.target.value === NEW ? props.onNew?.() : props.onChange(e.target.value))}
+      sx={{ minWidth: 220 }}
+    >
       <MenuItem value={SKIP}>
         <em>לא לקלוט</em>
       </MenuItem>
+      {props.onNew && (
+        <MenuItem value={NEW} sx={{ color: "primary.main", fontWeight: 600 }}>
+          + סוג תורנות חדש בשם הזה
+        </MenuItem>
+      )}
+      {!groups.length && !loose.length && (
+        <MenuItem disabled sx={{ whiteSpace: "normal" }}>
+          אין סוגי תורנות פעילים בקטלוג
+        </MenuItem>
+      )}
       {groups.flatMap((g) => [
         <ListSubheader key={`h-${g.c.id}`}>{g.c.name}</ListSubheader>,
         ...g.tasks.map((t) => (
@@ -96,7 +117,15 @@ function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) =
 // Import
 // ---------------------------------------------------------------------------
 
-function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDone: (msg: string) => void; onAliases: (a: Alias[]) => void }) {
+function ImportCard(props: {
+  cycle: Cycle;
+  refs: Refs;
+  existing: SlotRow[];
+  onDone: (msg: string) => void;
+  onAliases: (a: Alias[]) => void;
+  /** re-reads the catalog after a type was added here; returns the fresh list */
+  onTasksChanged: () => Promise<TaskType[]>;
+}) {
   const { api } = useAuth();
   const { refs, cycle } = props;
   const [file, setFile] = useState<string>("");
@@ -107,6 +136,7 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
   const [replace, setReplace] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [creating, setCreating] = useState<string | null>(null); // an unknown name opened as a new type
 
   const result: BuildResult | null = useMemo(
     () => (rows ? buildSlots(rows, { aliases: refs.aliases, tasks: refs.tasks, ranks: refs.ranks, weekendIsoDays: refs.weekend, cycle, holidays: refs.holidays }) : null),
@@ -180,6 +210,26 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+      {creating !== null && (
+        <Suspense fallback={null}>
+          <TaskDialog
+            task={null}
+            initialName={creating}
+            all={refs.tasks}
+            categories={refs.categories}
+            ranks={refs.ranks}
+            onClose={() => setCreating(null)}
+            onSaved={async () => {
+              const name = creating;
+              setCreating(null);
+              const tasks = await props.onTasksChanged();
+              // the new type matches the name by itself; keep it chosen if it was renamed
+              const made = tasks.find((t) => t.name.trim() === name.trim());
+              if (made) setMapping((m) => ({ ...m, [name]: made.id }));
+            }}
+          />
+        </Suspense>
+      )}
       <Stack spacing={2}>
         <Typography variant="h3">קליטת קובץ המשבצות מהבסיס</Typography>
         <Typography variant="body2" color="text.secondary">
@@ -215,6 +265,11 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
         {result && result.unmapped.length > 0 && (
           <Alert severity="warning" icon={false}>
             <Stack spacing={1.5}>
+              {!refs.tasks.some((t) => t.is_active) && (
+                <Alert severity="error">
+                  בקטלוג אין סוגי תורנות פעילים, ולכן אין למה להתאים. הוסף סוג מכל שם כאן (&quot;+ סוג תורנות חדש&quot; ברשימה) או בהגדרות ← קטלוג.
+                </Alert>
+              )}
               <Typography>
                 <b>{result.unmapped.length} שמות תורנות לא מוכרים.</b> בחר לכל שם את סוג התורנות בקטלוג. שם ותורנות שבת של אותו סוג מזוהים אוטומטית לפי היום.
               </Typography>
@@ -226,7 +281,12 @@ function ImportCard(props: { cycle: Cycle; refs: Refs; existing: SlotRow[]; onDo
                       {u.count} שורות{u.population ? ` · ${u.population}` : ""}
                     </Typography>
                   </Box>
-                  <TaskSelect refs={refs} value={mapping[u.duty] ?? ""} onChange={(id) => setMapping({ ...mapping, [u.duty]: id })} />
+                  <TaskSelect
+                    refs={refs}
+                    value={mapping[u.duty] ?? ""}
+                    onChange={(id) => setMapping({ ...mapping, [u.duty]: id })}
+                    onNew={() => setCreating(u.duty)}
+                  />
                 </Stack>
               ))}
               <FormControlLabel control={<Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} />} label="לזכור את ההתאמות לקבצים הבאים" />
@@ -511,6 +571,11 @@ export function SlotsPage() {
             refs={refs}
             existing={slots ?? []}
             onAliases={(a) => setRefs({ ...refs, aliases: [...refs.aliases.filter((x) => !a.some((y) => y.alias === x.alias)), ...a] })}
+            onTasksChanged={async () => {
+              const tasks = await api!.taskTypes();
+              setRefs((r) => (r ? { ...r, tasks } : r));
+              return tasks;
+            }}
             onDone={(m) => {
               setDone(m);
               void loadSlots();
