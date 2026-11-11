@@ -35,14 +35,16 @@ import { createContext, Fragment, useContext, useEffect, useMemo, useState } fro
 import { useSearchParams } from "react-router-dom";
 import { isStaff, type BoardRow } from "../lib/api";
 import { SlotActionsDialog } from "../components/SlotActions";
+import { PrintDialog } from "../components/BoardPrint";
+import { israeliHolidays } from "../lib/catalog";
+import { timeWords } from "../lib/printSheet";
 import { useAuth } from "../lib/auth";
-import { daySummaries, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix, type Person } from "../lib/board";
+import { daySummaries, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix } from "../lib/board";
 import { addDays, dayKey, dayLabel, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
 
 type Range = "week" | "next" | "weekend" | "month";
 
 const monthFmt = new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" });
-const weekdayFmt = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", weekday: "long" });
 const dateFmt = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric" });
 
 /** First day of a month, local midnight. */
@@ -56,55 +58,17 @@ function rangeOf(r: Range, month: Date): [Date, Date] {
   return [month, new Date(month.getFullYear(), month.getMonth() + 1, 1)];
 }
 
-function Name({ p, query, strong }: { p: Person; query: string; strong?: boolean }) {
-  const hit = !!query && p.name.includes(query);
-  return (
-    <Box component="span" sx={{ display: "inline-flex", alignItems: "baseline", gap: 0.75, flexWrap: "wrap" }}>
-      <Box
-        component="span"
-        sx={{ fontWeight: strong ? 700 : 500, ...(hit ? { bgcolor: "#ffe58a", color: "#000", borderRadius: 0.5, px: 0.4 } : null) }}
-      >
-        {p.name}
-      </Box>
-      {p.gaf && (
-        <Box component="span" sx={{ fontSize: 12, color: "text.secondary" }}>
-          {p.gaf}
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-function People({ list, query, strong, empty }: { list: Person[]; query: string; strong?: boolean; empty: React.ReactNode }) {
-  if (!list.length) return <>{empty}</>;
-  return (
-    <Stack spacing={0.25}>
-      {list.map((p, i) => (
-        <Name key={i} p={p} query={query} strong={strong} />
-      ))}
-    </Stack>
-  );
-}
-
 /** Staff open the actions of a duty by clicking it (null for everyone else). */
 const OpenSlot = createContext<((slotId: string) => void) | null>(null);
 
-function DutyRow({ r, query }: { r: BoardRow; query: string }) {
+/** One duty: performers (with gaf) and reserve on one line; staff open its actions by tapping it. */
+function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime: boolean }) {
   const [open, setOpen] = useState(false);
   const openSlot = useContext(OpenSlot);
-  const t = span(r.starts_at, r.ends_at);
   const performers = people(r.performers, r.performer_gafim ?? (r.gafim.length === 1 ? r.performers.map(() => r.gafim[0]) : undefined));
   const reserves = people(r.reserves, r.reserve_gafim);
   const details = !!(r.instructions || r.report_at || r.briefing_at);
-  const unstaffed = performers.length === 0;
-
-  const time = (
-    <Box sx={{ fontVariantNumeric: "tabular-nums", color: "text.secondary", fontSize: 13 }}>
-      {t.from} עד {t.until && t.until !== "למחרת" ? `${t.until}, ` : ""}
-      {t.to}
-      {t.until === "למחרת" ? " למחרת" : ""}
-    </Box>
-  );
+  const hit = (n: string) => (query && n.includes(query) ? { bgcolor: "#ffe58a", color: "#000", borderRadius: 0.5, px: 0.4 } : null);
 
   return (
     <Box
@@ -114,84 +78,83 @@ function DutyRow({ r, query }: { r: BoardRow; query: string }) {
       tabIndex={openSlot ? 0 : undefined}
       aria-label={openSlot ? `פעולות על ${r.task_name}` : undefined}
       sx={{
-        position: "relative",
-        pr: 1.75,
-        pl: 1,
-        py: 1.25,
-        bgcolor: unstaffed ? "rgba(211,47,47,0.04)" : undefined,
-        ...(openSlot && { cursor: "pointer", "&:hover": { bgcolor: "action.hover" }, "&:focus-visible": { outline: 2, outlineColor: "primary.main", outlineOffset: -2 } }),
+        py: 0.25,
+        borderRadius: 1,
+        ...(performers.length === 0 && { bgcolor: "rgba(211,47,47,0.06)", px: 0.5, mx: -0.5 }),
+        ...(openSlot && { cursor: "pointer", "&:hover": { bgcolor: "action.hover" }, "&:focus-visible": { outline: 2, outlineColor: "primary.main" } }),
       }}
     >
-      <Box sx={{ position: "absolute", insetInlineStart: 0, top: 8, bottom: 8, width: 4, borderRadius: 2, bgcolor: r.color ?? "grey.400" }} />
-      <Box
-        sx={{
-          display: "grid",
-          gap: { xs: 0.75, md: 2 },
-          alignItems: "start",
-          gridTemplateColumns: { xs: "1fr auto", md: "minmax(170px, 1.1fr) minmax(160px, 1.3fr) minmax(140px, 1fr) auto" },
-          gridTemplateAreas: { xs: `"duty info" "perf perf" "res res"`, md: `"duty perf res info"` },
-        }}
-      >
-        <Box sx={{ gridArea: "duty", minWidth: 0 }}>
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>{r.task_name}</Typography>
-            {r.changed_after_publish && (
-              <Chip size="small" color="warning" label={`עודכן ${dateFmt.format(new Date(r.updated_at))}`} title={`עודכן אחרי הפרסום, ${dateFmt.format(new Date(r.updated_at))} ${timeLabel(r.updated_at)}`} sx={{ height: 20 }} />
-            )}
-          </Stack>
-          {time}
-        </Box>
-        <Box sx={{ gridArea: "perf", minWidth: 0 }}>
-          <People
-            list={performers}
-            query={query}
-            strong
-            empty={
-              <Typography component="span" color="error" sx={{ fontWeight: 700 }}>
-                לא מאויש
-              </Typography>
-            }
-          />
-          {!!r.activated?.length && (
-            <Box sx={{ fontSize: 12, color: "warning.dark", mt: 0.25 }}>
-              עתודה הופעלה: {r.activated.join(", ")}
-              {!!r.replaced?.length && (
-                <>
-                  {" "}
-                  · במקום{" "}
-                  <Box component="span" sx={{ textDecoration: "line-through", color: "text.secondary" }}>
-                    {r.replaced.join(", ")}
-                  </Box>
-                </>
+      <Stack direction="row" sx={{ alignItems: "flex-start", gap: 0.5 }}>
+      <Stack direction="row" sx={{ alignItems: "baseline", columnGap: 1.25, rowGap: 0, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+        {performers.length ? (
+          performers.map((p, i) => (
+            <Box key={i} component="span" sx={{ display: "inline-flex", alignItems: "baseline", gap: 0.5 }}>
+              <Box component="span" sx={{ fontWeight: 700, fontSize: 15, ...hit(p.name) }}>
+                {p.name}
+              </Box>
+              {p.gaf && (
+                <Box component="span" sx={{ fontSize: 12, color: "text.secondary" }}>
+                  {p.gaf}
+                </Box>
               )}
             </Box>
-          )}
-        </Box>
-        <Box sx={{ gridArea: "res", minWidth: 0, display: "flex", gap: 0.75, alignItems: "baseline", fontSize: 14, color: "text.secondary" }}>
-          <Box component="span" sx={{ fontSize: 12, flexShrink: 0 }}>
-            עתודה
+          ))
+        ) : (
+          <Box component="span" sx={{ color: "error.main", fontWeight: 700, fontSize: 15 }}>
+            לא מאויש
           </Box>
-          <People list={reserves} query={query} empty={<span>—</span>} />
+        )}
+        <Box component="span" sx={{ fontSize: 13, color: "text.secondary" }}>
+          עתודה:{" "}
+          {reserves.length
+            ? reserves.map((p, i) => (
+                <Fragment key={i}>
+                  {i > 0 && ", "}
+                  <Box component="span" sx={hit(p.name)}>
+                    {p.name}
+                  </Box>
+                </Fragment>
+              ))
+            : "—"}
         </Box>
-        <Box sx={{ gridArea: "info", "@media print": { display: "none" } }}>
-          {details && (
-            <IconButton
-              size="small"
-              aria-label={open ? "הסתרת הנחיות" : "הנחיות"}
-              aria-expanded={open}
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(!open);
-              }}
-            >
-              {open ? <ExpandLessIcon fontSize="small" /> : <InfoIcon fontSize="small" />}
-            </IconButton>
+        {showTime && (
+          <Box component="span" sx={{ fontSize: 12, color: "text.secondary", fontVariantNumeric: "tabular-nums" }}>
+            {timeWords(r.starts_at, r.ends_at)}
+          </Box>
+        )}
+      </Stack>
+        {details && (
+          <IconButton
+            size="small"
+            aria-label={open ? "הסתרת הנחיות" : "הנחיות"}
+            aria-expanded={open}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(!open);
+            }}
+            sx={{ p: 0.25, "@media print": { display: "none" } }}
+          >
+            {open ? <ExpandLessIcon sx={{ fontSize: 18 }} /> : <InfoIcon sx={{ fontSize: 18 }} />}
+          </IconButton>
+        )}
+      </Stack>
+      {!!r.activated?.length && (
+        <Box sx={{ fontSize: 12, color: "warning.dark" }}>
+          עתודה הופעלה: {r.activated.join(", ")}
+          {!!r.replaced?.length && (
+            <>
+              {" "}
+              · במקום{" "}
+              <Box component="span" sx={{ textDecoration: "line-through", color: "text.secondary" }}>
+                {r.replaced.join(", ")}
+              </Box>
+            </>
           )}
         </Box>
-      </Box>
+      )}
       {details && (
-        <Collapse in={open} sx={{ "@media print": { display: "block !important", height: "auto !important", visibility: "visible !important" } }}>
-          <Box sx={{ mt: 1, p: 1.25, borderRadius: 1, bgcolor: "action.hover", fontSize: 13 }}>
+        <Collapse in={open} onClick={(e) => e.stopPropagation()}>
+          <Box sx={{ mt: 0.75, p: 1.25, borderRadius: 1, bgcolor: "action.hover", fontSize: 13 }}>
             {(r.report_at || r.briefing_at) && (
               <Stack direction="row" spacing={1} sx={{ mb: r.instructions ? 0.75 : 0, flexWrap: "wrap", gap: 0.5 }}>
                 {r.report_at && <Chip size="small" variant="outlined" label={`התייצבות ${timeLabel(r.report_at)}${r.report_place ? ` · ${r.report_place}` : ""}`} />}
@@ -212,32 +175,79 @@ function DutyRow({ r, query }: { r: BoardRow; query: string }) {
   );
 }
 
-function DayHeader({ day, count }: { day: string; count: number }) {
+/** One duty type on one day: its name and hours once, then each of its slots. */
+function TaskGroup({ rows, query }: { rows: BoardRow[]; query: string }) {
+  const first = rows[0];
+  const time = timeWords(first.starts_at, first.ends_at);
+  const sameTime = rows.every((r) => timeWords(r.starts_at, r.ends_at) === time);
+  const changed = rows.filter((r) => r.changed_after_publish).map((r) => r.updated_at).sort().pop();
+  return (
+    <Box sx={{ px: 1.25, py: 0.9, "& + &": { borderTop: 1, borderColor: "divider" } }}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 0.75 }}>
+        <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: first.color ?? "grey.400", flexShrink: 0 }} />
+        <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{first.task_name}</Typography>
+        {changed && (
+          <Chip size="small" color="warning" label={`עודכן ${dateFmt.format(new Date(changed))}`} title={`עודכן אחרי הפרסום, ${dateFmt.format(new Date(changed))} ${timeLabel(changed)}`} sx={{ height: 18, fontSize: 11 }} />
+        )}
+        <Box sx={{ flex: 1 }} />
+        {sameTime && (
+          <Typography sx={{ fontSize: 12, color: "text.secondary", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{time}</Typography>
+        )}
+      </Stack>
+      <Box sx={{ pr: 2.1 }}>
+        {rows.map((r) => (
+          <SlotLine key={r.slot_id} r={r} query={query} showTime={!sameTime} />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+/** A day: the date in a column of its own, the duties beside it, grouped by duty type. */
+function DayBlock({ day, items, query, holiday }: { day: string; items: BoardRow[]; query: string; holiday?: string | null }) {
   const today = day === dayKey(new Date());
   const d = new Date(day + "T12:00:00");
+  const weekend = isWeekend(day);
+  const groups: BoardRow[][] = [];
+  for (const r of items) {
+    const g = groups.find((x) => x[0].task_name === r.task_name);
+    if (g) g.push(r);
+    else groups.push([r]);
+  }
   return (
-    <Box
+    <Paper
+      component="section"
+      variant="outlined"
       sx={{
-        position: "sticky",
-        top: { xs: 56, sm: 64 },
-        zIndex: 2,
-        bgcolor: "background.default",
-        py: 0.75,
-        display: "flex",
-        alignItems: "baseline",
-        gap: 1,
-        "@media print": { position: "static" },
+        display: "grid",
+        gridTemplateColumns: "60px minmax(0, 1fr)",
+        overflow: "hidden",
+        borderRadius: 2,
+        breakInside: "avoid-page",
+        ...(today && { borderColor: "secondary.main", borderInlineStartWidth: 4 }),
       }}
     >
-      <Typography sx={{ fontWeight: 800, fontSize: 17, color: today ? "secondary.main" : "primary.main" }}>{weekdayFmt.format(d)}</Typography>
-      <Typography sx={{ fontWeight: 600, color: "text.secondary" }}>{dateFmt.format(d)}</Typography>
-      {today && <Chip size="small" color="secondary" label="היום" sx={{ height: 20 }} />}
-      {isWeekend(day) && !today && <Chip size="small" variant="outlined" label="סופ״ש" sx={{ height: 20 }} />}
-      <Box sx={{ flex: 1 }} />
-      <Typography variant="caption" color="text.secondary">
-        {count} תורנויות
-      </Typography>
-    </Box>
+      <Box
+        sx={{
+          textAlign: "center",
+          py: 1,
+          px: 0.5,
+          borderInlineEnd: 1,
+          borderColor: "divider",
+          bgcolor: holiday ? "rgba(232,112,15,0.14)" : weekend ? "rgba(232,112,15,0.07)" : "action.hover",
+        }}
+      >
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: today ? "secondary.main" : "text.secondary" }}>{today ? "היום" : weekdayShortFmt.format(d)}</Typography>
+        <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1, color: today ? "secondary.main" : "primary.main" }}>{d.getDate()}</Typography>
+        <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{dateFmt.format(d)}</Typography>
+        {holiday && <Typography sx={{ fontSize: 10.5, color: "warning.dark", fontWeight: 600, lineHeight: 1.2, mt: 0.25 }}>{holiday}</Typography>}
+      </Box>
+      <Box sx={{ bgcolor: weekend ? "rgba(232,112,15,0.025)" : "background.paper" }}>
+        {groups.map((g) => (
+          <TaskGroup key={g[0].task_name} rows={g} query={query} />
+        ))}
+      </Box>
+    </Paper>
   );
 }
 
@@ -342,16 +352,8 @@ function MonthView({ month, rows, query }: { month: Date; rows: BoardRow[]; quer
       </Paper>
       {selected && (
         <Box component="section">
-          <DayHeader day={selected} count={dayRows.length} />
           {dayRows.length ? (
-            <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 2 }}>
-              {dayRows.map((r, i) => (
-                <Fragment key={r.slot_id}>
-                  {i > 0 && <Box sx={{ borderTop: 1, borderColor: "divider", mx: 1.5 }} />}
-                  <DutyRow r={r} query={query} />
-                </Fragment>
-              ))}
-            </Paper>
+            <DayBlock day={selected} items={dayRows} query={query} />
           ) : (
             <Typography color="text.secondary">אין תורנויות ביום הזה.</Typography>
           )}
@@ -520,6 +522,7 @@ export function BoardPage() {
   const [gaf, setGaf] = useState("");
   const [category, setCategory] = useState("");
   const [filters, setFilters] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   const [from, to] = useMemo((): [Date, Date] => {
     if (view === "month") {
@@ -560,6 +563,12 @@ export function BoardPage() {
   const gafOf = (r: BoardRow) => people(r.performers, r.performer_gafim ?? r.gafim).map((p) => p.gaf).filter(Boolean);
   const gafim = useMemo(() => [...new Set((rows ?? []).flatMap(gafOf))].sort((a, b) => a.localeCompare(b, "he")), [rows]);
   const categories = useMemo(() => [...new Set((rows ?? []).map((r) => r.category_name ?? ""))].filter(Boolean).sort(), [rows]);
+
+  // holiday names beside the date (the board's own calendar, in the browser)
+  const holidays = useMemo(() => {
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return new Map(israeliHolidays(iso(from), iso(to)).map((h) => [h.day, h.note]));
+  }, [from, to]);
 
   const q = query.trim();
   const shown = (rows ?? []).filter((r) => (!gaf || gafOf(r).includes(gaf)) && (!category || r.category_name === category) && mentions(r, q));
@@ -604,13 +613,13 @@ export function BoardPage() {
             )}
           </Typography>
         </Box>
-        <IconButton aria-label="הדפסה" onClick={() => window.print()} sx={{ display: { sm: "none" }, "@media print": { display: "none" } }}>
+        <IconButton aria-label="הדפסה" onClick={() => setPrinting(true)} sx={{ display: { sm: "none" }, "@media print": { display: "none" } }}>
           <PrintIcon />
         </IconButton>
         <Button
           variant="outlined"
           startIcon={<PrintIcon />}
-          onClick={() => window.print()}
+          onClick={() => setPrinting(true)}
           sx={{ display: { xs: "none", sm: "inline-flex" }, "@media print": { display: "none" } }}
         >
           הדפסה
@@ -716,24 +725,16 @@ export function BoardPage() {
 
       {rows && view === "month" && (rows.length > 0 || !next) && <MonthView key={month.toISOString()} month={month} rows={shown} query={q} />}
       {rows && view === "week" && <WeekView sunday={sunday} rows={shown} query={q} />}
-      {view === "list" &&
-        days.map(([day, items]) => (
-          <Box key={day} component="section" sx={{ breakInside: "avoid-page" }}>
-            <DayHeader day={day} count={items.length} />
-            <Paper
-              variant="outlined"
-              sx={{ overflow: "hidden", bgcolor: isWeekend(day) ? "rgba(232,112,15,0.035)" : "background.paper", borderRadius: 2 }}
-            >
-              {items.map((r, i) => (
-                <Fragment key={r.slot_id}>
-                  {i > 0 && <Box sx={{ borderTop: 1, borderColor: "divider", mx: 1.5 }} />}
-                  <DutyRow r={r} query={q} />
-                </Fragment>
-              ))}
-            </Paper>
-          </Box>
-        ))}
+      {view === "list" && days.map(([day, items]) => <DayBlock key={day} day={day} items={items} query={q} holiday={holidays.get(day)} />)}
     </Stack>
+      {printing && (
+        <PrintDialog
+          api={api!}
+          month={view === "month" || (view === "list" && range === "month") ? month : monthStartOf(view === "week" ? sunday : from)}
+          onClose={() => setPrinting(false)}
+          onPrintScreen={() => setTimeout(() => window.print(), 300)}
+        />
+      )}
       {slotOpen && (
         <SlotActionsDialog
           slotId={slotOpen}
