@@ -235,12 +235,19 @@ def diagnose(problem: Problem) -> str:
     return "לא נמצא כלל אחד שחוסם; כנראה שילוב של כמה כללים או נתון חסר."
 
 
-def solve(problem: Problem, log: bool = False, relax: frozenset[str] = frozenset(), on_solution=None) -> Solution:
+def solve(
+    problem: Problem,
+    log: bool = False,
+    relax: frozenset[str] = frozenset(),
+    on_solution=None,
+    hint: Optional[set[tuple[str, str, str]]] = None,
+) -> Solution:
     """Solves the problem. Published (fixed) assignments are facts: they count toward load, take
     the soldier's time and fill the slot's needs, but never make the run infeasible on their own.
     On a failure all the same, the solution carries a diagnosis (unless this already is one).
     on_solution(staffed_slots, found) is called on each better solution while solving: how many of
-    this problem's slots have all their performers, and how many solutions were found so far."""
+    this problem's slots have all their performers, and how many solutions were found so far.
+    hint: a schedule to start from ((soldier, slot, role) triples) instead of the greedy one."""
     from ortools.sat.python import cp_model  # imported lazily so the rest works without OR-Tools
 
     t0 = _time.time()
@@ -506,7 +513,7 @@ def solve(problem: Problem, log: bool = False, relax: frozenset[str] = frozenset
     # Start from a full, valid greedy schedule.
     from .greedy import greedy
 
-    start = set(greedy(problem, prep))
+    start = set(hint) if hint is not None else set(greedy(problem, prep))
     for key, v in x.items():
         m.AddHint(v, int((key[0], key[1], ROLE_PERFORMER) in start))
     for key, v in r.items():
