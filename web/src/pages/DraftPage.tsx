@@ -3,15 +3,15 @@ import SearchIcon from "@mui/icons-material/Search";
 import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
 import WarningIcon from "@mui/icons-material/WarningAmber";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import InfoIcon from "@mui/icons-material/InfoOutlined";
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Collapse,
+  IconButton,
   Dialog,
   DialogActions,
   DialogContent,
@@ -44,7 +44,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { useCanEdit } from "../components/ReadOnly";
-import { UnpublishDialog, type UnpublishImpact } from "../components/UnpublishDialog";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
@@ -509,10 +508,13 @@ function LoadTab({
   onOpen: (soldierId: string) => void;
 }) {
   const { ls, groupName, rank, openNames, rows, verdict, tolerance } = fair;
-  const keys = [...verdict.keys()].sort((a, b) => verdict.get(b)!.soldiers - verdict.get(a)!.soldiers);
+  // groups that need a look first (most outliers first), then the big ones
+  const keys = [...verdict.keys()].sort(
+    (a, b) => verdict.get(b)!.outliers.length - verdict.get(a)!.outliers.length || verdict.get(b)!.soldiers - verdict.get(a)!.soldiers,
+  );
   const [picked, setPool] = useState("");
-  // "only outliers" from the health tile opens the first group that has some
-  const pool = keys.includes(picked) ? picked : (onlyOut ? keys.find((k) => verdict.get(k)!.outliers.length) : undefined) ?? keys[0] ?? "";
+  const [breakdown, setBreakdown] = useState(false);
+  const pool = keys.includes(picked) ? picked : keys[0] ?? "";
   const v = verdict.get(pool);
   const credited = ls.some((l) => l.creditDays > 0);
 
@@ -533,46 +535,10 @@ function LoadTab({
   // a signed number keeps its sign on the left inside Hebrew text
   const sign = (n: number) => `\u2066${n > 0 ? "+" : ""}${n.toFixed(1)}\u2069`;
 
-  const idleCount = fair.idle.reduce((n, g) => n + g.ids.length, 0);
-
   return (
-    <Stack spacing={2}>
-      {idleCount > 0 && (
-        <Accordion variant="outlined" disableGutters sx={{ borderColor: "warning.light" }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <WarningIcon color="warning" fontSize="small" />
-              <Typography variant="subtitle2">
-                {idleCount} חיילים בלי אף משימה אפשרית במחזור – לא בגלל האיזון
-              </Typography>
-            </Stack>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Stack spacing={1.5}>
-              <Typography variant="body2" color="text.secondary">
-                הם לא כשירים לאף קטגוריה, או כשירים רק לקטגוריות שאין להן משבצות במחזור. מה שקובע זה רשימת הדרגות של כל סוג תורנות בקטלוג
-                וסוגי המשבצות בלוח הבסיס.
-              </Typography>
-              {fair.idle.map((g) => (
-                <Box key={g.key}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {g.label} ({g.ids.length})
-                  </Typography>
-                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
-                    {g.ids
-                      .map((id) => ({ id, n: name(id) }))
-                      .sort((a, b) => a.n.localeCompare(b.n, "he"))
-                      .map(({ id, n }) => (
-                        <Chip key={id} size="small" variant="outlined" label={`${n} · ${rank.get(id) ?? ""}`} onClick={() => onOpen(id)} />
-                      ))}
-                  </Stack>
-                </Box>
-              ))}
-            </Stack>
-          </AccordionDetails>
-        </Accordion>
-      )}
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+    <Stack spacing={1.5}>
+      {/* one scrolling row of groups – the ones with outliers come first */}
+      <Box sx={{ display: "flex", gap: 1, overflowX: "auto", pb: 0.5 }}>
         {keys.map((p) => {
           const g = verdict.get(p)!;
           const bad = g.outliers.length > 0;
@@ -580,52 +546,110 @@ function LoadTab({
             <Tooltip key={p} title={poolName(groupName, p)}>
               <Chip
                 icon={bad ? <WarningIcon /> : <CheckIcon />}
-                label={`${shortGroupName(poolName(groupName, p))} (${g.soldiers})${bad ? ` · ${g.outliers.length} חורגים` : ""}`}
+                label={`${shortGroupName(poolName(groupName, p))} · ${g.soldiers}${bad ? ` · ${g.outliers.length} חורגים` : ""}`}
                 color={p === pool ? "primary" : bad ? "warning" : "default"}
                 variant={p === pool ? "filled" : "outlined"}
                 onClick={() => setPool(p)}
+                sx={{ flexShrink: 0 }}
               />
             </Tooltip>
           );
         })}
-      </Stack>
+      </Box>
 
-      {v &&
-        (v.outliers.length === 0 ? (
-          <Alert severity="success">
-            <b>הוגן:</b> כל {v.compared} החיילים שנבדקו בקבוצה בטווח של ±{tolerance}% מממוצע מי שזכאים לאותן תורנויות.
-          </Alert>
-        ) : (
-          <Alert severity="warning">
-            <b>{v.outliers.length} חורגים</b> מטווח ±{tolerance}%. הכי רחוק: {name(v.outliers[0].soldier_id)} {sign(v.outliers[0].diff)} נק׳ (ממוצע
-            עמיתיו {v.outliers[0].ref.toFixed(1)}).
-            <Button size="small" sx={{ mr: 1 }} onClick={() => setOnlyOut(true)}>
-              הצגת החורגים
-            </Button>
-          </Alert>
-        ))}
+      {v && (
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
+          {/* the group: its name and verdict in one header */}
+          <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", mb: 1 }}>
+            {v.outliers.length ? <WarningIcon color="warning" fontSize="small" sx={{ mt: 0.25 }} /> : <CheckIcon color="success" fontSize="small" sx={{ mt: 0.25 }} />}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 14 }}>{poolName(groupName, pool)}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {v.outliers.length === 0 ? (
+                  <>
+                    הוגן – כל {v.compared} שנבדקו בטווח ±{tolerance}% מממוצע מי שזכאים לאותן תורנויות.
+                  </>
+                ) : (
+                  <>
+                    <b>{v.outliers.length} חורגים</b> מטווח ±{tolerance}%. הכי רחוק: {name(v.outliers[0].soldier_id)} {sign(v.outliers[0].diff)} נק׳ (ממוצע
+                    עמיתיו {v.outliers[0].ref.toFixed(1)}).
+                  </>
+                )}
+              </Typography>
+              <Button size="small" sx={{ px: 0, minWidth: 0 }} onClick={() => setBreakdown((b) => !b)} endIcon={<ExpandMoreIcon sx={{ transform: breakdown ? "rotate(180deg)" : undefined }} />}>
+                פירוט לפי קטגוריות{notCompared ? ` · ${notCompared} לא נבדקו` : ""}
+              </Button>
+            </Box>
+            <Tooltip
+              enterTouchDelay={0}
+              leaveTouchDelay={6000}
+              title={
+                <>
+                  הפס = הניקוד הצפוי (קודם + זיכוי + המחזור). הקו = ממוצע מי שזכאים לאותן תורנויות, והרקע סביבו = הטווח המותר. לחיצה על חייל מציגה את
+                  הפירוט.
+                </>
+              }
+            >
+              <IconButton size="small" aria-label="מה רואים בגרף">
+                <InfoIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
 
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr auto" }, alignItems: "center", mb: 1.5 }}>
-          <TextField size="small" select label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)}>
-            <MenuItem value="">כל הגפים</MenuItem>
-            {gafim.map((g) => (
-              <MenuItem key={g} value={g}>
-                {g}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField size="small" select label="מיון" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <MenuItem value="score">לפי ניקוד</MenuItem>
-            <MenuItem value="diff">לפי פער מהממוצע</MenuItem>
-            <MenuItem value="name">לפי שם</MenuItem>
-          </TextField>
-          <FormControlLabel control={<Switch checked={onlyOut} onChange={(e) => setOnlyOut(e.target.checked)} />} label="רק חורגים" />
-        </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-          הפס = הניקוד הצפוי (קודם + זיכוי + המחזור). הקו = ממוצע מי שזכאים לאותן תורנויות, והרקע סביבו = הטווח המותר. לחיצה על חייל מציגה את
-          הפירוט.
-        </Typography>
+          <Collapse in={breakdown} unmountOnExit>
+            <Stack spacing={1.5} sx={{ mb: 1.5, p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                קבוצה = חיילים מאותה אוכלוסייה שיכולים להתחלק בעומס. בתוכה, כל חייל נמדד מול מי שזכאים לאותן קטגוריות תורנות. חייל שלא זכאי לאף
+                קטגוריה, או שהוא היחיד בצירוף שלו, לא נבדק.
+                {credited && " זיכוי = ימים מחוץ ליחידה שלא מבחירה, כפול העומס היומי הממוצע של הקבוצה."}
+              </Typography>
+              {profiles.length > 0 && (
+                <Box sx={{ overflowX: "auto" }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        {["קטגוריות פתוחות", "חיילים", "ממוצע", "מינימום", "מקסימום"].map((h) => (
+                          <TableCell key={h}>{h}</TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {profiles.map((p) => (
+                        <TableRow key={p.key}>
+                          <TableCell>{p.key}</TableCell>
+                          <TableCell>{p.soldiers}</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>{p.mean.toFixed(1)}</TableCell>
+                          <TableCell>{p.min.toFixed(1)}</TableCell>
+                          <TableCell>{p.max.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+              )}
+            </Stack>
+          </Collapse>
+
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr auto", alignItems: "center", mb: 1 }}>
+            <TextField size="small" select label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)}>
+              <MenuItem value="">כל הגפים</MenuItem>
+              {gafim.map((g) => (
+                <MenuItem key={g} value={g}>
+                  {g}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField size="small" select label="מיון" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+              <MenuItem value="score">לפי ניקוד</MenuItem>
+              <MenuItem value="diff">לפי פער מהממוצע</MenuItem>
+              <MenuItem value="name">לפי שם</MenuItem>
+            </TextField>
+            <FormControlLabel
+              sx={{ mx: 0, "& .MuiFormControlLabel-label": { fontSize: 13, whiteSpace: "nowrap" } }}
+              control={<Switch size="small" checked={onlyOut} onChange={(e) => setOnlyOut(e.target.checked)} />}
+              label="רק חורגים"
+            />
+          </Box>
         <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
           {shown.map((r) => {
             const s = ctx.soldiers.get(r.soldier_id);
@@ -706,46 +730,45 @@ function LoadTab({
             </Typography>
           )}
         </Stack>
-      </Paper>
-
-      <Accordion variant="outlined" disableGutters>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="subtitle2">פירוט לפי קטגוריות{notCompared ? ` · ${notCompared} לא נבדקו` : ""}</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Stack spacing={1.5}>
-            <Typography variant="body2" color="text.secondary">
-              קבוצה = חיילים מאותה אוכלוסייה שיכולים להתחלק בעומס. בתוכה, כל חייל נמדד מול מי שזכאים לאותן קטגוריות תורנות. חייל שלא זכאי לאף
-              קטגוריה, או שהוא היחיד בצירוף שלו, לא נבדק.
-              {credited && " זיכוי = ימים מחוץ ליחידה שלא מבחירה, כפול העומס היומי הממוצע של הקבוצה."}
-            </Typography>
-            {profiles.length > 0 && (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    {["קטגוריות פתוחות", "חיילים", "ממוצע", "מינימום", "מקסימום"].map((h) => (
-                      <TableCell key={h}>{h}</TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {profiles.map((p) => (
-                    <TableRow key={p.key}>
-                      <TableCell>{p.key}</TableCell>
-                      <TableCell>{p.soldiers}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{p.mean.toFixed(1)}</TableCell>
-                      <TableCell>{p.min.toFixed(1)}</TableCell>
-                      <TableCell>{p.max.toFixed(1)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Stack>
-        </AccordionDetails>
-      </Accordion>
-
+        </Paper>
+      )}
     </Stack>
+  );
+}
+
+/** Soldiers the cycle has nothing for – a catalog/board matter, not the balance. */
+function IdleDialog({ fair, ctx, onClose, onOpen }: { fair: Fairness; ctx: Ctx; onClose: () => void; onOpen: (id: string) => void }) {
+  const name = (id: string) => ctx.soldiers.get(id)?.full_name ?? "?";
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>חיילים בלי אף משימה אפשרית במחזור</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={1.5}>
+          <Typography variant="body2" color="text.secondary">
+            זה לא בגלל האיזון: הם לא כשירים לאף קטגוריה, או כשירים רק לקטגוריות שאין להן משבצות במחזור. מה שקובע זה רשימת הדרגות של כל סוג תורנות
+            בקטלוג וסוגי המשבצות בלוח הבסיס.
+          </Typography>
+          {fair.idle.map((g) => (
+            <Box key={g.key}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {g.label} ({g.ids.length})
+              </Typography>
+              <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+                {g.ids
+                  .map((id) => ({ id, n: name(id) }))
+                  .sort((a, b) => a.n.localeCompare(b.n, "he"))
+                  .map(({ id, n }) => (
+                    <Chip key={id} size="small" variant="outlined" label={`${n} · ${fair.rank.get(id) ?? ""}`} onClick={() => onOpen(id)} />
+                  ))}
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>סגירה</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -990,6 +1013,8 @@ function DraftBody(props: {
   const [who, setWho] = useState<string | null>(null);
   const [onlyOut, setOnlyOut] = useState(false);
   const [soldier, setSoldier] = useState<string | null>(null);
+  const [idleOpen, setIdleOpen] = useState(false);
+  const idleCount = fair.idle.reduce((n, g) => n + g.ids.length, 0);
   const manual = ctx.assignments.filter((a) => a.source === "manual").length;
   const gaps = props.missing + props.missingR;
   const row = soldier ? fair.rows.find((r) => r.soldier_id === soldier) : undefined;
@@ -1023,7 +1048,7 @@ function DraftBody(props: {
 
   return (
     <Stack spacing={2} sx={{ minWidth: 0 }}>
-      <Stack direction="row" sx={{ gap: 1, overflowX: "auto", pb: 0.5, alignItems: "stretch" }}>
+      <Stack direction="row" sx={{ gap: 1, flexWrap: "wrap", alignItems: "stretch" }}>
         <Tile
           tone={gaps ? "error" : "success"}
           title={gaps ? "חסרים" : "איוש"}
@@ -1052,6 +1077,7 @@ function DraftBody(props: {
             setOnlyOut(fair.outliers > 0);
           }}
         />
+        {idleCount > 0 && <Tile tone="warning" title="בלי משימה במחזור" value={`${idleCount} חיילים`} onClick={() => setIdleOpen(true)} />}
         <Tile
           tone={manual ? "secondary" : "default"}
           title="שינויים ידניים"
@@ -1096,6 +1122,17 @@ function DraftBody(props: {
         <LoadTab ctx={ctx} fair={fair} q={q} onlyOut={onlyOut} setOnlyOut={setOnlyOut} onOpen={setSoldier} />
       )}
 
+      {idleOpen && (
+        <IdleDialog
+          fair={fair}
+          ctx={ctx}
+          onClose={() => setIdleOpen(false)}
+          onOpen={(id) => {
+            setIdleOpen(false);
+            setSoldier(id);
+          }}
+        />
+      )}
       {soldier && row && (
         <SoldierLoadDialog
           ctx={ctx}
@@ -1119,7 +1156,7 @@ function DraftBody(props: {
 }
 
 export function DraftPage() {
-  const { api, me } = useAuth();
+  const { api } = useAuth();
   const canEdit = useCanEdit();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle } = useCycle();
@@ -1132,7 +1169,6 @@ export function DraftPage() {
   const [categories, setCategories] = useState<Map<string, string>>(new Map());
   const [tolerance, setTolerance] = useState(20);
   const [publishing, setPublishing] = useState(false);
-  const [unpublishing, setUnpublishing] = useState<UnpublishImpact | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -1211,46 +1247,7 @@ export function DraftPage() {
             published={locked}
             onPublish={() => setPublishing(true)}
           />
-          {cycle.status === "published" && me?.roles.includes("coordinator") && (() => {
-            const now = Date.now();
-            const started = cycle.start_date <= dayKey(new Date()) || slots.some((s) => Date.parse(s.starts_at) <= now);
-            const impact = {
-              assignments: assignments.filter((a) => a.status === "assigned" || a.status === "reserve_idle").length,
-              nextWeek: slots.filter((s) => Date.parse(s.starts_at) - now < 7 * 86_400_000).length,
-            };
-            return (
-              <Paper variant="outlined" sx={{ p: 2, borderColor: "error.light" }}>
-                <Typography variant="h3" color="error.main" sx={{ mb: 0.5 }}>
-                  פעולות רגישות
-                </Typography>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
-                  <Typography variant="body2" sx={{ flex: 1 }}>
-                    {started
-                      ? "המחזור כבר התחיל, ולכן אי אפשר לבטל את הפרסום. שינויים במחזור שרץ נעשים בתפעול השוטף."
-                      : "ביטול פרסום מחזיר את המחזור לטיוטה כדי לתקן ולפרסם שוב. אפשרי רק לפני שהמחזור מתחיל."}
-                  </Typography>
-                  <Button color="error" variant="outlined" disabled={started} onClick={() => setUnpublishing(impact)}>
-                    ביטול פרסום
-                  </Button>
-                </Stack>
-              </Paper>
-            );
-          })()}
         </>
-      )}
-      {unpublishing && cycle && (
-        <UnpublishDialog
-          cycle={cycle}
-          impact={unpublishing}
-          onClose={() => setUnpublishing(null)}
-          onDone={(n) => {
-            setUnpublishing(null);
-            setMsg({ ok: true, text: `הפרסום בוטל: ${n} שיבוצים חזרו לטיוטה, והמחזור הוסר מהלוח המפורסם.` });
-            void api!.cycles().then(setCycles);
-            void reloadCycle();
-            void load();
-          }}
-        />
       )}
       <Dialog open={publishing} onClose={() => setPublishing(false)} maxWidth="xs" fullWidth>
         <DialogTitle>פרסום הלוח</DialogTitle>
