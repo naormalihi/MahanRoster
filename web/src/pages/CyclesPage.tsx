@@ -36,6 +36,7 @@ import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import {
   STAGES,
+  STAGE_SCREEN,
   addDaysIso,
   planningCycle,
   cycleProblems,
@@ -46,7 +47,6 @@ import {
   suggestCycle,
   type Cycle,
   type CycleInput,
-  type CycleStatus,
   type StageState,
   type StageTone,
 } from "../lib/cycles";
@@ -56,19 +56,6 @@ import { DeadlineEditor } from "../components/DeadlineEditor";
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const today = () => dayKey(new Date());
 
-/** The screen each stage is worked on – every step of the stepper opens it. */
-const STAGE_SCREEN: Record<CycleStatus, { staff: string; reader: string }> = {
-  draft: { staff: "/cycles", reader: "/cycle" },
-  loading: { staff: "/soldiers/import", reader: "/soldiers" },
-  collecting: { staff: "/cycle/constraints", reader: "/cycle/constraints" },
-  approving: { staff: "/cycle/constraints?tab=exemptions&status=pending", reader: "/cycle/constraints?tab=exemptions" },
-  potential: { staff: "/cycle/potential", reader: "/cycle/potential" },
-  slots: { staff: "/cycle/slots", reader: "/cycle/slots" },
-  scheduling: { staff: "/cycle/schedule", reader: "/cycle/schedule" },
-  review: { staff: "/cycle/schedule", reader: "/cycle/schedule" },
-  published: { staff: "/cycle/operate", reader: "/board" },
-  closed: { staff: "/board", reader: "/board" },
-};
 
 const TONE_ICON: Record<StageTone, ReactNode> = {
   done: <CheckCircleIcon color="success" />,

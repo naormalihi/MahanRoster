@@ -2,12 +2,17 @@ import BackIcon from "@mui/icons-material/ArrowForward";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
 import KeyIcon from "@mui/icons-material/KeyOutlined";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
+import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOffOutlined";
+import NextIcon from "@mui/icons-material/ArrowBack";
 import {
   Alert,
   Box,
   Button,
   Checkbox,
   Chip,
+  IconButton,
+  InputAdornment,
   LinearProgress,
   MenuItem,
   Paper,
@@ -27,6 +32,8 @@ import {
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import { useCycle } from "../lib/cycleContext";
+import { STAGE_SCREEN, stageLabel, type CycleStatus } from "../lib/cycles";
 import * as XLSX from "xlsx";
 import type { ApplyResult } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -77,6 +84,8 @@ export function RosterImportPage() {
   const { api } = useAuth();
   const [step, setStep] = useState(0);
   const [unitKey, setUnitKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const { reload: reloadCycle } = useCycle();
   const [keyError, setKeyError] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
@@ -244,6 +253,8 @@ export function RosterImportPage() {
     setError(null);
     try {
       setDone(await api!.applyRoster(approvePlan(plan, approved)));
+      // the cycle moves on by itself once a file is loaded – let the next step show it
+      reloadCycle().catch(() => undefined);
       setStep(3);
     } catch (e) {
       setError((e as Error).message);
@@ -308,13 +319,29 @@ export function RosterImportPage() {
             )}
             <TextField
               label="מפתח היחידה"
-              type="password"
+              type={showKey ? "text" : "password"}
               value={unitKey}
               onChange={(e) => setUnitKey(e.target.value)}
               error={!!keyError}
               helperText={keyError ?? "לפחות 16 תווים. שמור עותק במקום בטוח מחוץ למערכת."}
               autoComplete="off"
-              slotProps={{ htmlInput: { dir: "ltr" } }}
+              slotProps={{
+                htmlInput: { dir: "ltr" },
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showKey ? "הסתרת המפתח" : "הצגת המפתח"}
+                        onClick={() => setShowKey((v) => !v)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        edge="end"
+                      >
+                        {showKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
             />
             <Box>
               <Button variant="contained" onClick={() => confirmKey()} disabled={!unitKey}>
@@ -592,6 +619,7 @@ export function RosterImportPage() {
               הטעינה הושלמה: {done.added} חדשים, {done.updated} עודכנו, {done.deactivated} סומנו לא פעילים
               {done.gafimCreated ? `, ${done.gafimCreated} גפים חדשים` : ""}.
             </Alert>
+            <NextStage />
             <Box>
               <Button onClick={reset}>טעינת קובץ נוסף</Button>
             </Box>
@@ -714,5 +742,40 @@ function RekeyPanel(props: {
         {props.busy && <LinearProgress />}
       </Stack>
     </Paper>
+  );
+}
+
+const EARLY: CycleStatus[] = ["draft", "loading", "collecting", "approving", "potential", "slots"];
+
+/** After a load: where the planning cycle goes next, as a plain button. */
+function NextStage() {
+  const { cycle } = useCycle();
+  if (!cycle || !EARLY.includes(cycle.status)) {
+    return (
+      <Box>
+        <Button variant="contained" component={RouterLink} to="/cycle">
+          חזרה למחזור
+        </Button>
+      </Box>
+    );
+  }
+  // the file is in: the next stage is at least the constraints collection
+  const next: CycleStatus = cycle.status === "draft" || cycle.status === "loading" ? "collecting" : cycle.status;
+  return (
+    <Alert severity="info" icon={false}>
+      <Stack spacing={1.5}>
+        <Typography>
+          השלב הבא במחזור <b>{cycle.name}</b>: <b>{stageLabel(next)}</b>
+        </Typography>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }} useFlexGap>
+          <Button variant="contained" endIcon={<NextIcon />} component={RouterLink} to={STAGE_SCREEN[next].staff}>
+            לשלב הבא: {stageLabel(next)}
+          </Button>
+          <Button component={RouterLink} to="/cycle">
+            לסקירת המחזור
+          </Button>
+        </Stack>
+      </Stack>
+    </Alert>
   );
 }

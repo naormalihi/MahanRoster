@@ -33,6 +33,20 @@ export const STAGES: { status: CycleStatus; label: string; hint: string }[] = [
 ];
 
 export const stageIndex = (s: CycleStatus) => STAGES.findIndex((x) => x.status === s);
+/** The screen each stage is worked on – every step of the stepper opens it. */
+export const STAGE_SCREEN: Record<CycleStatus, { staff: string; reader: string }> = {
+  draft: { staff: "/cycles", reader: "/cycle" },
+  loading: { staff: "/soldiers/import", reader: "/soldiers" },
+  collecting: { staff: "/cycle/constraints", reader: "/cycle/constraints" },
+  approving: { staff: "/cycle/constraints?tab=exemptions&status=pending", reader: "/cycle/constraints?tab=exemptions" },
+  potential: { staff: "/cycle/potential", reader: "/cycle/potential" },
+  slots: { staff: "/cycle/slots", reader: "/cycle/slots" },
+  scheduling: { staff: "/cycle/schedule", reader: "/cycle/schedule" },
+  review: { staff: "/cycle/schedule", reader: "/cycle/schedule" },
+  published: { staff: "/cycle/operate", reader: "/board" },
+  closed: { staff: "/board", reader: "/board" },
+};
+
 export const stageLabel = (s: CycleStatus) => STAGES[stageIndex(s)]?.label ?? s;
 
 export interface Cycle {
