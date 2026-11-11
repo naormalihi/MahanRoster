@@ -918,7 +918,8 @@ def test_reset_dynamic_data_keeps_system_settings(conn):
     sql = (ROOT / "supabase/reset_dynamic_data.sql").read_text(encoding="utf-8")
     body = sql.split("begin;", 1)[1].rsplit("commit;", 1)[0]
     kept = ("app_users", "settings", "populations", "ranks", "load_roles", "exemption_types", "absence_types",
-            "day_types", "calendar_days", "duty_categories")
+            "day_types", "calendar_days", "duty_categories", "task_types", "task_type_aliases", "exemption_type_duties",
+            "weight_history")
     count = lambda t: conn.execute(f"select count(*) from {t}").fetchone()[0]
     with conn.transaction():
         conn.execute("update app_users set soldier_id = (select id from soldiers limit 1) where id = %s", (COORD,))
@@ -929,12 +930,40 @@ def test_reset_dynamic_data_keeps_system_settings(conn):
         conn.execute(body)
         assert {t: count(t) for t in kept} == before
         for t in ("cycles", "slots", "assignments", "exemptions", "schedule_jobs", "cycle_soldier_snapshot",
-                  "soldiers", "task_types", "task_type_aliases", "exemption_type_duties"):
+                  "soldiers"):
             assert count(t) == 0, t
         assert count("org_units where kind = 'gaf'") == 0 and count("org_units where kind = 'unit'") == 1
         assert count("weight_history where task_type_id is null") == multipliers
         assert count("reset_backup.soldiers") == soldiers
         assert count("app_users where soldier_id is not null") == 0
+        raise psycopg.Rollback()
+
+
+def test_restore_catalog_after_an_old_reset(conn):
+    """The old reset deleted the catalog too; migration 48 puts it back from reset_backup."""
+    reset = (ROOT / "supabase/reset_dynamic_data.sql").read_text(encoding="utf-8")
+    restore = next((ROOT / "supabase/migrations").glob("*_restore_catalog.sql")).read_text(encoding="utf-8")
+    catalog = ("task_types", "task_type_aliases", "exemption_type_duties", "weight_history where task_type_id is not null")
+    count = lambda t: conn.execute(f"select count(*) from {t}").fetchone()[0]
+    with conn.transaction():
+        conn.execute(reset.split("begin;", 1)[1].rsplit("commit;", 1)[0])
+        conn.execute("insert into task_type_aliases (alias, task_type_id) select 'שם מהבסיס', id from task_types limit 1")
+        before = {t: count(t) for t in catalog}
+        names = conn.execute("select array_agg(name order by name) from task_types").fetchone()[0]
+        # what the old script did on top: copy, then delete the catalog
+        for t in ("task_types", "task_type_aliases", "exemption_type_duties", "weight_history"):
+            conn.execute(f"drop table if exists reset_backup.{t}")
+            conn.execute(f"create table reset_backup.{t} as table public.{t}")
+        conn.execute("delete from weight_history where task_type_id is not null")
+        conn.execute("delete from task_types")
+        assert count("task_types") == 0 and count("task_type_aliases") == 0
+        conn.execute(restore)
+        assert {t: count(t) for t in catalog} == before
+        assert conn.execute("select array_agg(name order by name) from task_types").fetchone()[0] == names
+        # a catalog that is there is left alone
+        conn.execute("update task_types set name = name || ' *' where id = (select id from task_types limit 1)")
+        conn.execute(restore)
+        assert count("task_types where name like '% *'") == 1
         raise psycopg.Rollback()
 
 

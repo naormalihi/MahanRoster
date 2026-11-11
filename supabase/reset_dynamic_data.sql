@@ -7,11 +7,12 @@
 --   overrides, gaf constraints, draft comments, briefings, swaps, penalties, appeals, notifications;
 --   soldiers and all that hangs off them – gaf history, load roles, exemptions, absences, date
 --   blocks, personal constraints, score adjustments; roster / base-schedule imports and their files;
---   duty types (task types) with their name aliases, exemption links and weight history;
 --   gafim (sub-units of the unit) with their name aliases.
 -- Kept (system settings): settings and multipliers, populations, day types, ranks, load roles,
---   duty categories, exemption and absence types, holidays (calendar), the unit itself,
---   users (their link to a soldier or gaf is cleared), audit log.
+--   the duty catalog – duty categories, duty types, the base's names for them (aliases), their
+--   exemption links and weight history –, exemption and absence types, holidays (calendar),
+--   the unit itself, users (their link to a soldier or gaf is cleared), audit log.
+-- The catalog is set up once and serves every cycle; a base file maps onto it, so it stays.
 
 begin;
 
@@ -26,11 +27,9 @@ declare
     -- soldiers
     'soldier_gaf_history', 'soldier_load_roles', 'exemptions', 'absences', 'date_blocks',
     'personal_constraints', 'score_adjustments', 'roster_imports', 'blobs',
-    -- duty types
-    'task_type_aliases', 'exemption_type_duties',
     -- gafim
     'gaf_aliases'];
-  partly text[] := array['soldiers', 'task_types', 'weight_history', 'org_units', 'app_users', 'user_roles'];
+  partly text[] := array['soldiers', 'org_units', 'app_users', 'user_roles'];
 begin
   if exists (select 1 from pg_namespace where nspname = 'reset_backup') then
     raise exception 'schema reset_backup already exists – drop it first (drop schema reset_backup cascade)';
@@ -50,8 +49,6 @@ begin
   execute 'truncate ' || (select string_agg(format('public.%I', x), ', ') from unnest(wipe) x) || ' restrict';
   -- tables that other kept tables point at: delete, not truncate
   delete from public.soldiers;
-  delete from public.weight_history where task_type_id is not null;  -- multiplier history stays
-  delete from public.task_types;
   delete from public.org_units where kind <> 'unit';
 end $$;
 
@@ -59,7 +56,7 @@ commit;
 
 select (select count(*) from cycles)     as cycles_left,
        (select count(*) from soldiers)   as soldiers_left,
-       (select count(*) from task_types) as duty_types_left,
+       (select count(*) from task_types) as duty_types_kept,
        (select count(*) from org_units where kind <> 'unit') as gafim_left,
        (select count(*) from app_users)  as users_kept,
        (select count(*) from settings)   as settings_kept;
