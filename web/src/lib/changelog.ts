@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.9.1",
+    date: "2026-11-11",
+    items: ["שחזור קטלוג סוגי התורנות שנמחק באיפוס הנתונים ב-10/11 (הסוגים, השמות של הבסיס וקישורי הפטורים)"],
+  },
+  {
     version: "1.9.0",
     date: "2026-11-11",
     items: [
