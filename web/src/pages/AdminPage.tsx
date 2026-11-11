@@ -150,8 +150,10 @@ function WeekdayHours(props: { value: Record<string, string> | null; onChange: (
   );
 }
 
-function TaskDialog(props: {
+export function TaskDialog(props: {
   task: TaskType | null;
+  /** a new type's name to start from (e.g. an unknown name in the base's file) */
+  initialName?: string;
   all: TaskType[];
   categories: NamedRef[];
   ranks: NamedRef[];
@@ -161,7 +163,7 @@ function TaskDialog(props: {
   const { api } = useAuth();
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
   const [t, setT] = useState<TaskTypeInput>(() => {
-    if (!props.task) return EMPTY_TASK;
+    if (!props.task) return { ...EMPTY_TASK, name: props.initialName ?? EMPTY_TASK.name };
     const { id: _id, ...rest } = props.task;
     return rest;
   });

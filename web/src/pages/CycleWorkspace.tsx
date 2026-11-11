@@ -3,12 +3,15 @@ import WarnIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
 import TodoIcon from "@mui/icons-material/RadioButtonUnchecked";
 import SyncIcon from "@mui/icons-material/Autorenew";
+import NextIcon from "@mui/icons-material/ArrowBack";
+import PrevIcon from "@mui/icons-material/ArrowForward";
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Paper,
   Stack,
   Tab,
   Tabs,
@@ -19,7 +22,7 @@ import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel, type Cycle } from "../lib/cycles";
-import { pendingSlots, nextAction, STEPS, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
+import { pendingSlots, nextAction, STEPS, stepNav, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
 import { StagePanel } from "./CyclesPage";
 import { announceBoardChange } from "../components/SlotActions";
 
@@ -115,8 +118,8 @@ function Overview({ cycle, facts }: { cycle: Cycle; facts: CycleFacts | null }) 
         <Alert
           severity="info"
           action={
-            next.step !== "overview" && (
-              <Button data-read color="inherit" size="small" onClick={() => navigate(STEPS.find((s) => s.key === next.step)!.path)}>
+            next.path !== "/cycle" && (
+              <Button data-read color="inherit" size="small" onClick={() => navigate(next.path)}>
                 מעבר
               </Button>
             )
@@ -127,6 +130,42 @@ function Overview({ cycle, facts }: { cycle: Cycle; facts: CycleFacts | null }) 
       )}
       <StagePanel cycle={cycle} inWorkspace />
     </Stack>
+  );
+}
+
+/**
+ * The way on from a step – the same at the end of every step: back, and on to the next one.
+ * Never locked: the work of a step (constraints, potential) has no "done" to declare, so
+ * whoever finished it moves on from here; what is still open is said beside the button.
+ */
+function StepFooter({ step, cycle, facts }: { step: StepKey; cycle: Cycle; facts: CycleFacts | null }) {
+  const nav = stepNav(step, cycle, facts);
+  if (step === "overview") return null; // the overview has its own "הצעד הבא"
+  if (!nav.next && !nav.prev && !nav.note) return null;
+  return (
+    <Paper variant="outlined" sx={{ p: 2, bgcolor: "action.hover" }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
+        <Box sx={{ flex: 1 }}>
+          {nav.note && (
+            <Typography variant="body2" color="text.secondary">
+              {nav.note}
+            </Typography>
+          )}
+        </Box>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }} useFlexGap>
+          {nav.prev && (
+            <Button data-read startIcon={<PrevIcon />} component={RouterLink} to={nav.prev.path}>
+              {nav.prev.label}
+            </Button>
+          )}
+          {nav.next && (
+            <Button data-read variant="contained" endIcon={<NextIcon />} component={RouterLink} to={nav.next.path}>
+              לשלב הבא: {nav.next.label}
+            </Button>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
   );
 }
 
@@ -167,6 +206,7 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
     );
 
   const states = facts ? stepStates(cycle, facts) : null;
+  const nextUp = stepNav(step, cycle, facts).next;
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
@@ -177,6 +217,11 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
           </Typography>
         </Box>
         <Chip label={`שלב: ${stageLabel(cycle.status)}`} color={locked ? "success" : "primary"} variant={locked ? "filled" : "outlined"} />
+        {step !== "overview" && nextUp && (
+          <Button data-read size="small" variant="outlined" endIcon={<NextIcon />} component={RouterLink} to={nextUp.path}>
+            הבא: {nextUp.label}
+          </Button>
+        )}
       </Stack>
       <StepTabs step={step} states={states} />
       {locked && step !== "overview" && step !== "operate" && (
@@ -212,6 +257,7 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
           {step === "schedule" && <ScheduleStep />}
           {step === "operate" && <OperatePage />}
         </Box>
+        <StepFooter step={step} cycle={cycle} facts={facts} />
       </Suspense>
     </Stack>
   );

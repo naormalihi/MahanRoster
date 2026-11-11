@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cycle } from "../cycles";
-import { nextAction, stepStates } from "../workspace";
+import { nextAction, stepNav, stepStates } from "../workspace";
 import { defaultCycle } from "../cycleContext";
 
 const cycle = (o: Partial<Cycle> = {}): Cycle => ({
@@ -21,7 +21,7 @@ describe("cycle workspace", () => {
     expect(stepStates(cycle({ status: "published", published_at: "2026-11-08T10:00:00Z" }), facts).schedule.text).toBe("פורסם 8.11");
   });
   it("says what to do next by stage", () => {
-    expect(nextAction(cycle({ status: "approving" }), { ...facts, pendingExemptions: 2 })).toEqual({ text: "לאשר או לדחות 2 פטורים ממתינים", step: "constraints" });
+    expect(nextAction(cycle({ status: "approving" }), { ...facts, pendingExemptions: 2 })).toEqual({ text: "לאשר או לדחות 2 פטורים ממתינים", step: "constraints", path: "/cycle/constraints" });
     expect(nextAction(cycle({ status: "slots" }), facts).step).toBe("slots");
     expect(nextAction(cycle({ status: "review" }), { ...facts, slots: 5, job: { status: "done", unfilled: 0 } }).text).toBe("לעבור על הטיוטה ולפרסם");
   });
@@ -44,5 +44,21 @@ describe("pending duties after publishing", () => {
       { slot_id: "added", role: "performer", status: "draft" },
     ];
     expect(pendingSlots(slots, as).map((s) => s.id)).toEqual(["activated", "added"]);
+  });
+
+  it("always offers the next step, saying what is still open", () => {
+    const c = cycle({ exemption_deadline: "2099-01-01T23:59:59+02:00" });
+    const n = stepNav("constraints", c, { ...facts, pendingExemptions: 2 });
+    expect(n.next).toEqual({ label: "פוטנציאל", path: "/cycle/potential" });
+    expect(n.note).toMatch(/^2 פטורים עוד ממתינים להחלטה · האיסוף פתוח עד/);
+    expect(stepNav("potential", c, facts)).toMatchObject({ next: { path: "/cycle/slots" }, note: "הפוטנציאל עוד לא חושב." });
+    expect(stepNav("slots", c, facts).next?.path).toBe("/cycle/schedule");
+    // before publishing the way on is the publish button, not a link
+    expect(stepNav("schedule", cycle({ status: "review" }), facts).next).toBeNull();
+    expect(stepNav("schedule", cycle({ status: "published" }), facts).next?.path).toBe("/cycle/operate");
+    expect(stepNav("operate", cycle({ status: "published" }), facts).next).toBeNull();
+    // before the personnel file is loaded the way on leaves the workspace
+    expect(nextAction(cycle({ status: "loading" }), facts).path).toBe("/soldiers/import");
+    expect(stepNav("overview", cycle({ status: "loading" }), facts).next).toEqual({ label: "טעינת כוח אדם", path: "/soldiers/import" });
   });
 });

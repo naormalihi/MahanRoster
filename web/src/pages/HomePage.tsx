@@ -72,7 +72,7 @@ export function HomePage() {
                     size="small"
                     endIcon={<ArrowBackIcon />}
                     component={RouterLink}
-                    to={STEPS.find((s) => s.key === next.step)!.path}
+                    to={next.path}
                   >
                     מעבר
                   </Button>

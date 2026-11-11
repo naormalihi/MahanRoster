@@ -81,8 +81,17 @@ export const STAGE_STEP: Record<CycleStatus, StepKey> = {
   closed: "schedule",
 };
 
-/** One line on what to do now, for the overview and the home page. */
-export function nextAction(cycle: Cycle, f: CycleFacts): { text: string; step: StepKey } {
+const stepPath = (k: StepKey) => STEPS.find((s) => s.key === k)!.path;
+
+/** One line on what to do now, for the overview and the home page, and the screen it is done on. */
+export function nextAction(cycle: Cycle, f: CycleFacts): { text: string; step: StepKey; path: string } {
+  const a = nextActionStep(cycle, f);
+  // loading the personnel file has its own screen, outside the cycle's steps
+  const path = cycle.status === "draft" || cycle.status === "loading" ? "/soldiers/import" : stepPath(a.step);
+  return { ...a, path };
+}
+
+function nextActionStep(cycle: Cycle, f: CycleFacts): { text: string; step: StepKey } {
   const s = stepStates(cycle, f);
   switch (cycle.status) {
     case "draft":
@@ -136,4 +145,45 @@ export function pendingSlots<S extends { id: string; ends_at: string; performers
     const mine = bySlot.get(k.id) ?? [];
     return mine.filter(performsA).length < k.performers_needed || mine.filter((a) => !performsA(a)).length < k.reserves_needed;
   });
+}
+
+/** The way on from a step of the workspace: always open, with a word on what is still left. */
+export interface StepNav {
+  prev: { label: string; path: string } | null;
+  next: { label: string; path: string } | null;
+  /** what is still open in this step – it does not hold the way on */
+  note: string | null;
+}
+
+export function stepNav(step: StepKey, cycle: Cycle, f: CycleFacts | null): StepNav {
+  const at = STEPS.findIndex((s) => s.key === step);
+  const prevStep = at > 0 ? STEPS[at - 1] : null;
+  const prev = prevStep && { label: prevStep.label, path: prevStep.path };
+  const to = (k: StepKey) => ({ label: STEPS.find((s) => s.key === k)!.label, path: stepPath(k) });
+  const published = stageIndex(cycle.status) >= stageIndex("published");
+  const deadline = cycle.exemption_deadline;
+  switch (step) {
+    case "overview": {
+      const a = f && nextAction(cycle, f);
+      return { prev: null, next: a && a.path !== "/cycle" ? { label: a.path === "/soldiers/import" ? "טעינת כוח אדם" : to(a.step).label, path: a.path } : null, note: null };
+    }
+    case "constraints": {
+      const open = !!deadline && Date.parse(deadline) > Date.now() && !published;
+      const parts = [
+        f && f.pendingExemptions > 0 ? `${f.pendingExemptions} פטורים עוד ממתינים להחלטה` : null,
+        open ? `האיסוף פתוח עד ${short(deadlineDay(deadline!))}` : null,
+      ].filter(Boolean);
+      return { prev, next: to("potential"), note: parts.length ? `${parts.join(" · ")}. אפשר להמשיך ולחזור לכאן בכל שלב.` : null };
+    }
+    case "potential":
+      return { prev, next: to("slots"), note: cycle.potential_computed_at ? null : "הפוטנציאל עוד לא חושב." };
+    case "slots":
+      return { prev, next: to("schedule"), note: f && f.slots === 0 ? "עוד לא נקלטו משימות – בלי משימות אין מה לשבץ." : null };
+    case "schedule":
+      return published
+        ? { prev, next: to("operate"), note: null }
+        : { prev, next: null, note: "הצעד הבא: לעבור על הטיוטה ולפרסם. אחרי הפרסום ממשיכים לתפעול." };
+    case "operate":
+      return { prev, next: null, note: null };
+  }
 }
