@@ -50,7 +50,8 @@ import {
   type SoldierLoadRole,
   type SoldierPatch,
 } from "../lib/soldiers";
-import type { Exemption, ExemptionType } from "../lib/cycles";
+import type { Cycle, Exemption, ExemptionType } from "../lib/cycles";
+import { cycleScores, lastPublishedCycle, summarize } from "../lib/lastCycle";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
 const RANGE_CHIP: Record<RangeState, { label: string; color: "default" | "error" | "warning" | "success" }> = {
@@ -326,6 +327,12 @@ export function SoldiersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SoldierDetail | null>(null);
   const [bulk, setBulk] = useState(false);
+  // the last published cycle, as a reference: points per soldier and who was in it
+  const [last, setLast] = useState<{
+    cycle: Cycle;
+    scores: Map<string, { points: number; duties: number }>;
+    members: { soldier_id: string; group: string }[];
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -351,6 +358,20 @@ export function SoldiersPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    (async () => {
+      const c = lastPublishedCycle(await api!.cycles());
+      if (!c) return;
+      const [as, sn] = await Promise.all([api!.draftAssignments(c.id), api!.snapshotSoldiers(c.id)]);
+      setLast({
+        cycle: c,
+        scores: cycleScores(as),
+        members: sn.map((x) => ({ soldier_id: x.soldier_id, group: x.service_type === "career" ? "קבע" : "חובה" })),
+      });
+    })().catch(() => setLast(null));
+  }, [api]);
+  const wasInLast = useMemo(() => new Set(last?.members.map((m) => m.soldier_id) ?? []), [last]);
+
   const gafim = useMemo(() => [...new Set((rows ?? []).map((s) => s.gaf_name))].sort(), [rows]);
   const rankName = useMemo(() => new Map(ranks.map((r) => [r.id, r.name])), [ranks]);
   // a rank appointment in force counts as the soldier's rank too (סרן במינוי רס"ן appears under both)
@@ -361,6 +382,10 @@ export function SoldiersPage() {
     for (const e of exemptions) m.set(e.soldier_id, [...(m.get(e.soldier_id) ?? []), e]);
     return m;
   }, [exemptions]);
+  const homeNightlyType = useMemo(() => new Set(exTypes.filter((t) => t.home_nightly).map((t) => t.id)), [exTypes]);
+  const tashBy = (s: SoldierDetail) =>
+    effectiveHomeNightly(s) ||
+    (exBySoldier.get(s.id) ?? []).some((e) => e.status === "approved" && homeNightlyType.has(e.exemption_type_id) && e.start_date <= today && e.end_date >= today);
   const exMatch = (id: string) => {
     const l = exBySoldier.get(id) ?? [];
     if (exFilter === "now") return l.some((e) => e.status === "approved" && e.start_date <= today);
@@ -530,10 +555,27 @@ export function SoldiersPage() {
       )}
       {rows && rows.length === 0 && <Alert severity="info">אין עדיין חיילים. טען קובץ כוח אדם במסך "כוח אדם".</Alert>}
 
+      {last && (
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
+          <Typography variant="subtitle2">רפרנס – המחזור האחרון שפורסם: {last.cycle.name}</Typography>
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 2, mt: 0.5 }}>
+            {summarize(last.members, last.scores).map((g) => (
+              <Typography key={g.key} variant="body2">
+                <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ · טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
+                {g.zero ? ` · ${g.zero} בלי תורנות` : ""}
+              </Typography>
+            ))}
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            ניקוד = סכום הנקודות של התורנויות שבוצעו או שנשארו בלוח (בלי עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של אותו מחזור.
+          </Typography>
+        </Paper>
+      )}
+
       {rows && rows.length > 0 && (
         <Paper sx={{ overflow: "hidden" }}>
           <Box sx={{ overflowX: "auto", maxHeight: "70vh" }}>
-            <Table size="small" stickyHeader sx={{ minWidth: 820 }}>
+            <Table size="small" stickyHeader sx={{ minWidth: 1080 }}>
               <TableHead>
                 <TableRow>
                   <TableCell padding="checkbox">
@@ -544,7 +586,21 @@ export function SoldiersPage() {
                       slotProps={{ input: { "aria-label": "בחירת כל המוצגים" } }}
                     />
                   </TableCell>
-                  {["שם", "דרגה", "גף", "שירות", "מטווח", "הורה / ת״ש", "הקלה", "פטורים", "תפקיד שני", ""].map((h, i) => (
+                  {[
+                    "שם",
+                    "דרגה",
+                    "גף",
+                    "שירות",
+                    "תום שירות",
+                    "ת״ש",
+                    last ? `ניקוד ${last.cycle.name}` : "ניקוד מחזור אחרון",
+                    "מטווח",
+                    "הורה",
+                    "הקלה",
+                    "פטורים",
+                    "תפקיד שני",
+                    "",
+                  ].map((h, i) => (
                     <TableCell key={i}>{h}</TableCell>
                   ))}
                 </TableRow>
@@ -569,11 +625,28 @@ export function SoldiersPage() {
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>{s.gaf_name}</TableCell>
                       <TableCell>{SERVICE[effectiveService(s)]}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap", color: s.release_date && s.release_date < today ? "text.disabled" : undefined }}>
+                        {fmt(s.release_date)}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : "—"}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {!last || !wasInLast.has(s.id) ? (
+                          "—"
+                        ) : (
+                          <>
+                            <b>{(last.scores.get(s.id)?.points ?? 0).toFixed(1)}</b>
+                            <Typography component="span" variant="caption" color="text.secondary">
+                              {" "}· {last.scores.get(s.id)?.duties ?? 0} תורנויות
+                            </Typography>
+                          </>
+                        )}
+                      </TableCell>
                       <TableCell><RangeChip until={s.range_valid_until} /></TableCell>
                       <TableCell>
                         {effectiveParent(s) ? "כן" : "—"}
                         {s.parent_override !== null && <Typography component="span" variant="caption" color="text.secondary"> (ידני)</Typography>}
-                        {effectiveHomeNightly(s) && <Chip size="small" variant="outlined" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {activeLoadRoles(s).length === 0
