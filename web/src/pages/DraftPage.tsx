@@ -63,6 +63,7 @@ import {
   type Role,
 } from "../lib/draft";
 import { effective, REASON_LABEL, reasonText, type PotentialCell, type SnapshotSoldier } from "../lib/potential";
+import { eligibilityOf, noWork, noWorkGroups, noWorkText, slotsByCategory, type EligRow } from "../lib/eligibility";
 import type { ExistingSoldier } from "../lib/roster";
 import { poolName, poolNames } from "../lib/schedule";
 
@@ -473,7 +474,22 @@ function useFairness(ctx: Ctx, snapshot: SnapshotSoldier[], cells: PotentialCell
   const rows = useMemo(() => fairRows(ls, profileOf, tolerance), [ls, profileOf, tolerance]);
   const verdict = useMemo(() => verdicts(rows), [rows]);
   const outliers = useMemo(() => rows.filter((r) => r.outlier).length, [rows]);
-  return { ls, groupName, rank, openNames, rows, verdict, outliers, tolerance, hasCells: !!cells };
+  // what each soldier can be given at all: open categories and the slots the cycle has for them
+  const perCategory = useMemo(() => slotsByCategory(ctx.slots, ctx.tasks), [ctx.slots, ctx.tasks]);
+  const cellsOf = useMemo(() => {
+    const m = new Map<string, PotentialCell[]>();
+    for (const c of cells ?? []) m.set(c.soldier_id, [...(m.get(c.soldier_id) ?? []), c]);
+    return m;
+  }, [cells]);
+  const elig = useCallback(
+    (id: string): EligRow[] => eligibilityOf(id, cellsOf.get(id) ?? [], categories, perCategory),
+    [cellsOf, categories, perCategory],
+  );
+  const idle = useMemo(
+    () => noWorkGroups(snapshot.map((s) => s.soldier_id), elig, (id) => rank.get(id) ?? ""),
+    [snapshot, elig, rank],
+  );
+  return { ls, groupName, rank, openNames, rows, verdict, outliers, tolerance, hasCells: !!cells, elig, idle };
 }
 type Fairness = ReturnType<typeof useFairness>;
 
@@ -517,8 +533,45 @@ function LoadTab({
   // a signed number keeps its sign on the left inside Hebrew text
   const sign = (n: number) => `\u2066${n > 0 ? "+" : ""}${n.toFixed(1)}\u2069`;
 
+  const idleCount = fair.idle.reduce((n, g) => n + g.ids.length, 0);
+
   return (
     <Stack spacing={2}>
+      {idleCount > 0 && (
+        <Accordion variant="outlined" disableGutters sx={{ borderColor: "warning.light" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <WarningIcon color="warning" fontSize="small" />
+              <Typography variant="subtitle2">
+                {idleCount} חיילים בלי אף משימה אפשרית במחזור – לא בגלל האיזון
+              </Typography>
+            </Stack>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack spacing={1.5}>
+              <Typography variant="body2" color="text.secondary">
+                הם לא כשירים לאף קטגוריה, או כשירים רק לקטגוריות שאין להן משבצות במחזור. מה שקובע זה רשימת הדרגות של כל סוג תורנות בקטלוג
+                וסוגי המשבצות בלוח הבסיס.
+              </Typography>
+              {fair.idle.map((g) => (
+                <Box key={g.key}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {g.label} ({g.ids.length})
+                  </Typography>
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+                    {g.ids
+                      .map((id) => ({ id, n: name(id) }))
+                      .sort((a, b) => a.n.localeCompare(b.n, "he"))
+                      .map(({ id, n }) => (
+                        <Chip key={id} size="small" variant="outlined" label={`${n} · ${rank.get(id) ?? ""}`} onClick={() => onOpen(id)} />
+                      ))}
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+      )}
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
         {keys.map((p) => {
           const g = verdict.get(p)!;
@@ -641,7 +694,7 @@ function LoadTab({
                     variant="caption"
                     sx={{ color: !r.compared ? "text.disabled" : r.outlier ? (r.diff > 0 ? "warning.dark" : "info.dark") : "text.secondary" }}
                   >
-                    {r.compared ? sign(r.diff) : "לא נבדק"}
+                    {r.compared ? sign(r.diff) : noWork(fair.elig(r.soldier_id)) ? "אין משימה" : "לא נבדק"}
                   </Typography>
                 </Box>
               </Box>
@@ -696,8 +749,77 @@ function LoadTab({
   );
 }
 
+/** What he can be given in the cycle: rank and service, then each duty category – open or why not. */
+function EligibilityCard({ elig, snap, rankName }: { elig: EligRow[]; snap: SnapshotSoldier | undefined; rankName: string }) {
+  const why = noWorkText(elig, rankName);
+  const tags = [
+    rankName && `דרגה: ${rankName}`,
+    snap && (snap.service_type === "career" ? "קבע" : "חובה"),
+    snap?.is_parent && "משרת הורה",
+    snap?.qualifies_day_only && !snap.is_parent && "פטור מזכה",
+  ].filter(Boolean) as string[];
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5 }}>
+      <Typography variant="subtitle2" gutterBottom>
+        כשירות במחזור
+      </Typography>
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mb: 1 }}>
+        {tags.map((t) => (
+          <Chip key={t} size="small" label={t} />
+        ))}
+      </Stack>
+      {why && (
+        <Alert severity="warning" sx={{ mb: 1 }}>
+          {why} לכן אין לו תורנויות – זה לא האיזון. משנים ברשימת הדרגות של סוג התורנות בקטלוג או בלוח הבסיס.
+        </Alert>
+      )}
+      {elig.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          הפוטנציאל לא חושב, אז אין פירוט כשירות.
+        </Typography>
+      ) : (
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>קטגוריה</TableCell>
+              <TableCell>כשיר</TableCell>
+              <TableCell>משבצות</TableCell>
+              <TableCell>למה לא</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {elig.map((e) => (
+              <TableRow key={e.category_id}>
+                <TableCell>{e.name}</TableCell>
+                <TableCell sx={{ color: e.open ? "success.main" : "text.disabled", whiteSpace: "nowrap" }}>
+                  {e.open ? (e.value < 1 ? `חלקית (${Math.round(e.value * 100)}%)` : "כן") : "לא"}
+                  {e.override ? " · ידני" : ""}
+                </TableCell>
+                <TableCell sx={{ color: e.slots === 0 ? "warning.main" : undefined }}>{e.slots}</TableCell>
+                <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
+                  {e.open ? (e.slots === 0 ? "אין משבצות במחזור" : "") : reasonText(e.reasons) || "—"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Paper>
+  );
+}
+
 /** One soldier's load: how the score is built, and his duties in the draft. */
-function SoldierLoadDialog(props: { ctx: Ctx; row: FairRow; rankName: string; tolerance: number; onClose: () => void; onShowSlots: () => void }) {
+function SoldierLoadDialog(props: {
+  ctx: Ctx;
+  row: FairRow;
+  rankName: string;
+  tolerance: number;
+  /** his eligibility per duty category (empty when no potential was computed) */
+  elig: EligRow[];
+  snap: SnapshotSoldier | undefined;
+  onClose: () => void;
+  onShowSlots: () => void;
+}) {
   const { ctx, row: r } = props;
   const { api } = useAuth();
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
@@ -762,6 +884,7 @@ function SoldierLoadDialog(props: { ctx: Ctx; row: FairRow; rankName: string; to
               זיכוי על {r.creditDays} ימים מחוץ ליחידה שלא מבחירה.
             </Typography>
           )}
+          <EligibilityCard elig={props.elig} snap={props.snap} rankName={props.rankName} />
           {r.compared ? (
             <Alert severity={r.outlier ? "warning" : "success"} icon={false}>
               ממוצע מי שזכאים לאותן תורנויות: {r.ref.toFixed(1)} · הפער: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`} (מותר ±
@@ -769,7 +892,13 @@ function SoldierLoadDialog(props: { ctx: Ctx; row: FairRow; rankName: string; to
             </Alert>
           ) : (
             <Alert severity="info" icon={false}>
-              לא נבדק: {r.profile ? "הוא היחיד בקבוצה עם הצירוף הזה של תורנויות" : "לא זכאי לאף קטגוריית תורנות"}.
+              לא נבדק:{" "}
+              {noWork(props.elig)
+                ? "אין לו אף משימה אפשרית במחזור (פירוט בכשירות למעלה)"
+                : r.profile
+                  ? "הוא היחיד בקבוצה עם הצירוף הזה של תורנויות"
+                  : "לא זכאי לאף קטגוריית תורנות"}
+              .
             </Alert>
           )}
           <Box>
@@ -973,6 +1102,8 @@ function DraftBody(props: {
           row={row}
           rankName={fair.rank.get(soldier) ?? ""}
           tolerance={props.tolerance}
+          elig={fair.elig(soldier)}
+          snap={props.snapshot.find((x) => x.soldier_id === soldier)}
           onClose={() => setSoldier(null)}
           onShowSlots={() => {
             setWho(soldier);
