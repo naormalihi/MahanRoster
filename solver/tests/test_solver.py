@@ -217,6 +217,32 @@ def test_rolling_reports_duties_staffed_month_by_month():
     slots = [slot("j", "guard", "2027-01-10T08:00", "2027-01-11T08:00", r=0), slot("f", "guard", "2027-02-10T08:00", "2027-02-11T08:00", r=0)]
     calls = []
     solve_rolling(problem([A, B], slots), on_progress=lambda *a: calls.append(a))
-    assert calls[0] == (0, 2, 0, 2, "searching") and calls[-1] == (2, 2, 2, 2, "searching")
+    assert calls[0] == (0, 2, 0, 2, "searching") and (2, 2, 2, 2, "searching") in calls
+    # then the polish pass over the whole cycle
+    assert calls[-1] == (2, 2, 2, 2, "polishing")
     # inside each month, better solutions report as they come
     assert any(c[4] == "improving" for c in calls)
+
+
+def test_polish_evens_a_small_pool_that_month_by_month_left_uneven():
+    """Six soldiers share 13 duties of different worth over six months (as מפקד תורן in 2027):
+    each month alone is balanced, the cycle is not – the polish pass deals them out again."""
+    from datetime import date
+
+    from mahanroster_solver.models import TaskType
+    from mahanroster_solver.rolling import solve_rolling
+    from mahanroster_solver.verify import violations
+
+    light, heavy, top = TaskType("l", "קל", 1.0, min_rest_hours=12), TaskType("h", "כבד", 2.0, min_rest_hours=12), TaskType("t", "חג", 2.5, min_rest_hours=12)
+    plan = [("01-04", "l"), ("01-19", "l"), ("02-04", "l"), ("02-15", "h"), ("03-01", "l"), ("03-18", "l"), ("03-29", "h"),
+            ("04-15", "l"), ("04-26", "h"), ("05-13", "t"), ("05-24", "h"), ("06-08", "l"), ("06-24", "l")]
+    # weekdays only (Mon–Thu), so weekend units play no part
+    slots = [slot(f"s{i}", t, f"2027-{d}T08:00", f"2027-{d}T20:00", r=0) for i, (d, t) in enumerate(plan)]
+    team = [soldier(c) for c in "ABCDEF"]
+    p = problem(team, slots, tasks=(light, heavy, top), settings=Settings(time_limit_seconds=30, workers=2))
+    p.cycle_end = date(2027, 6, 30)
+    sol = solve_rolling(p)
+    assert not sol.unfilled and violations(p, sol) == []
+    pts = {c: sum(a.normalized_points for a in sol.assignments if a.soldier_id == c) for c in "ABCDEF"}
+    # 18.5 points: the best is five at 3.0 and one at 3.5
+    assert max(pts.values()) - min(pts.values()) <= 1.0, pts

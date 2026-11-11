@@ -41,7 +41,7 @@ export interface ScheduleJob {
     month?: number;
     months?: number;
     /** searching for a first solution of the month, or improving the balance of one already found */
-    phase?: "searching" | "improving";
+    phase?: "searching" | "improving" | "polishing";
   };
   result_status: string | null;
   wall_time: number | null;

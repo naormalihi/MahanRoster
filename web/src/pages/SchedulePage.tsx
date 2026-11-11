@@ -115,7 +115,11 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
               {`\u2066${job.params.staffed ?? 0}/${job.params.slots}\u2069`} שובצו
               {job.params.months && job.params.months > 1 ? ` · חודש ${Math.min((job.params.month ?? 0) + 1, job.params.months)} מתוך ${job.params.months}` : ""}
               <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block", fontWeight: 400 }}>
-                {job.params.phase === "improving" ? "נמצא שיבוץ – המנוע משפר את האיזון בין החיילים" : "המנוע מחפש שיבוץ"}
+                {job.params.phase === "polishing"
+                  ? "ליטוש: המנוע מאזן את הקבוצות על פני כל המחזור"
+                  : job.params.phase === "improving"
+                    ? "נמצא שיבוץ – המנוע משפר את האיזון בין החיילים"
+                    : "המנוע מחפש שיבוץ"}
               </Typography>
             </Typography>
           ) : null}
