@@ -206,7 +206,6 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
     );
 
   const states = facts ? stepStates(cycle, facts) : null;
-  const nextUp = stepNav(step, cycle, facts).next;
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
@@ -217,14 +216,10 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
           </Typography>
         </Box>
         <Chip label={`שלב: ${stageLabel(cycle.status)}`} color={locked ? "success" : "primary"} variant={locked ? "filled" : "outlined"} />
-        {step !== "overview" && nextUp && (
-          <Button data-read size="small" variant="outlined" endIcon={<NextIcon />} component={RouterLink} to={nextUp.path}>
-            הבא: {nextUp.label}
-          </Button>
-        )}
       </Stack>
       <StepTabs step={step} states={states} />
-      {locked && step !== "overview" && step !== "operate" && (
+      {/* the schedule step says it on its own status card */}
+      {locked && step !== "overview" && step !== "operate" && step !== "schedule" && (
         <Alert
           severity="success"
           icon={<LockIcon />}

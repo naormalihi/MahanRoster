@@ -34,7 +34,8 @@ import { useCycle } from "../lib/cycleContext";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
-import { dayLabel, TZ } from "../lib/dates";
+import { dayKey, dayLabel, TZ } from "../lib/dates";
+import { UnpublishDialog, type UnpublishImpact } from "../components/UnpublishDialog";
 import { REASON_LABEL } from "../lib/potential";
 import {
   JOB_STATUS_LABEL,
@@ -51,6 +52,7 @@ import {
 } from "../lib/schedule";
 
 const tsFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+const fmtDate = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 const fmtTs = (iso: string | null) => (iso ? tsFmt.format(new Date(iso)) : "—");
 const dowFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "short", day: "2-digit", month: "2-digit" });
 
@@ -290,7 +292,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
  * button with what it does. onDone fires when a run finishes, so the draft below reloads.
  */
 export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
-  const { api } = useAuth();
+  const { api, me } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle } = useCycle();
   const [tasks, setTasks] = useState<Map<string, TaskType>>(new Map());
@@ -351,6 +353,23 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
   }, [active, jobs, onDone]);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const [details, setDetails] = useState(false);
+  const [unpublishing, setUnpublishing] = useState<UnpublishImpact | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  /** Unpublish lives in the card's menu: what it would undo is counted when it's asked for. */
+  async function askUnpublish() {
+    setMenu(null);
+    try {
+      const as = await api!.draftAssignments(cycleId);
+      const now = Date.now();
+      setUnpublishing({
+        assignments: as.filter((a) => a.status === "assigned" || a.status === "reserve_idle").length,
+        nextWeek: (slots ?? []).filter((s) => Date.parse(s.starts_at) - now < 7 * 86_400_000).length,
+      });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   async function run() {
     setConfirm(false);
@@ -373,6 +392,11 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
   return (
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
+      {notice && (
+        <Alert severity="success" onClose={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      )}
       {!cycle ? (
         <Alert severity="info">צריך קודם ליצור מחזור בניהול המחזורים.</Alert>
       ) : (
@@ -390,6 +414,11 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                   <Typography sx={{ fontWeight: 700 }}>
                     {cycle.status === "published" || cycle.status === "closed" ? "הלוח פורסם" : "טיוטה מוכנה"}
                   </Typography>
+                  {cycle.status === "published" && (
+                    <Typography variant="body2" color="text.secondary">
+                      {cycle.published_at ? `פורסם ב-${fmtDate(cycle.published_at)} · ` : ""}נעול – שינויים נעשים בתפעול. פטורים והיעדרויות אפשר עדיין להזין.
+                    </Typography>
+                  )}
                   <Typography variant="caption" color="text.secondary">
                     הרצה אחרונה {fmtTs(last.finished_at ?? last.created_at)}
                     {last.wall_time ? ` · ${Math.round(last.wall_time)} ש׳` : ""}
@@ -417,6 +446,19 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                   >
                     פרטי ההרצה וההיסטוריה
                   </MenuItem>
+                  {cycle.status === "published" && me?.roles.includes("coordinator") && (() => {
+                    const started = cycle.start_date <= dayKey(new Date()) || (slots ?? []).some((s) => Date.parse(s.starts_at) <= Date.now());
+                    return (
+                      <MenuItem disabled={started} onClick={() => void askUnpublish()} sx={{ color: "error.main", whiteSpace: "normal", maxWidth: 280 }}>
+                        <Box>
+                          ביטול פרסום
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                            {started ? "המחזור כבר התחיל – שינויים בתפעול השוטף" : "מחזיר לטיוטה כדי לתקן ולפרסם שוב"}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    );
+                  })()}
                 </Menu>
               </Stack>
             </Paper>
@@ -460,6 +502,20 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
             </Paper>
               {last?.status === "failed" && <Result job={last} slots={slotMap} tasks={tasks} pools={pools} names={names} />}
             </>
+          )}
+          {unpublishing && (
+            <UnpublishDialog
+              cycle={cycle}
+              impact={unpublishing}
+              onClose={() => setUnpublishing(null)}
+              onDone={(n) => {
+                setUnpublishing(null);
+                setNotice(`הפרסום בוטל: ${n} שיבוצים חזרו לטיוטה, והמחזור הוסר מהלוח המפורסם.`);
+                void api!.cycles().then(setCycles);
+                void reloadCycle();
+                onDone?.();
+              }}
+            />
           )}
           <Dialog open={details} onClose={() => setDetails(false)} maxWidth="md" fullWidth>
             <DialogTitle>פרטי ההרצה</DialogTitle>
