@@ -63,6 +63,7 @@ import {
   type Role,
 } from "../lib/draft";
 import { effective, REASON_LABEL, reasonText, type PotentialCell, type SnapshotSoldier } from "../lib/potential";
+import { prevCycle, prevMean, previousCycle, type PrevCycle } from "../lib/prevCycle";
 import { eligibilityOf, noWork, noWorkGroups, noWorkText, slotsByCategory, type EligRow } from "../lib/eligibility";
 import type { ExistingSoldier } from "../lib/roster";
 import { poolName, poolNames } from "../lib/schedule";
@@ -500,6 +501,8 @@ function LoadTab({
   onlyOut,
   setOnlyOut,
   onOpen,
+  tash,
+  prev,
 }: {
   ctx: Ctx;
   fair: Fairness;
@@ -507,6 +510,8 @@ function LoadTab({
   onlyOut: boolean;
   setOnlyOut: (v: boolean) => void;
   onOpen: (soldierId: string) => void;
+  tash: Map<string, boolean>;
+  prev: PrevCycle | null;
 }) {
   const { ls, groupName, rank, openNames, rows, verdict, tolerance } = fair;
   const keys = [...verdict.keys()].sort((a, b) => verdict.get(b)!.soldiers - verdict.get(a)!.soldiers);
@@ -605,6 +610,19 @@ function LoadTab({
           </Alert>
         ))}
 
+      {prev &&
+        (() => {
+          const m = prevMean(prev, inPool.map((r) => r.soldier_id));
+          const now = inPool.length ? inPool.reduce((n, r) => n + r.points, 0) / inPool.length : 0;
+          return (
+            <Typography variant="body2" color="text.secondary">
+              {m
+                ? `רפרנס – ${prev.name}: ממוצע ${m.mean.toFixed(1)} נק׳ לחייל בקבוצה הזו (${m.n} חיילים שהיו בו). במחזור הזה: ${now.toFixed(1)}.`
+                : `רפרנס – ${prev.name}: אף חייל בקבוצה הזו לא היה בו.`}
+            </Typography>
+          );
+        })()}
+
       <Paper variant="outlined" sx={{ p: 1.5 }}>
         <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr auto" }, alignItems: "center", mb: 1.5 }}>
           <TextField size="small" select label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)}>
@@ -655,8 +673,11 @@ function LoadTab({
                     {r.manual > 0 && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5, height: 18 }} />}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap component="div">
-                    {s?.gaf_name} · {rank.get(r.soldier_id)} · {r.duties} תורנויות{r.weekends ? ` · ${r.weekends} סופ״ש` : ""}
+                    {s?.gaf_name} · {rank.get(r.soldier_id)}
+                    {tash.has(r.soldier_id) ? (tash.get(r.soldier_id) ? " · ת״ש 7 (חלק מהמחזור)" : " · ת״ש 7") : ""} · {r.duties} תורנויות
+                    {r.weekends ? ` · ${r.weekends} סופ״ש` : ""}
                     {r.reserves ? ` · ${r.reserves} עתודות` : ""}
+                    {prev?.members.has(r.soldier_id) ? ` · קודם: ${(prev.load.get(r.soldier_id)?.points ?? 0).toFixed(1)}` : ""}
                   </Typography>
                 </Box>
                 <Box sx={{ position: "relative", height: 14, gridColumn: { xs: "1 / -1", sm: "auto" }, gridRow: { xs: 2, sm: "auto" } }}>
@@ -749,14 +770,34 @@ function LoadTab({
   );
 }
 
+/** His points in the previous cycle, next to the mean of his peers there. */
+function PrevLine({ prev, soldierId, peers }: { prev: PrevCycle; soldierId: string; peers: string[] }) {
+  if (!prev.members.has(soldierId)) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        במחזור הקודם ({prev.name}) הוא לא היה.
+      </Typography>
+    );
+  }
+  const mine = prev.load.get(soldierId) ?? { points: 0, duties: 0 };
+  const m = prevMean(prev, peers);
+  return (
+    <Typography variant="body2" color="text.secondary">
+      במחזור הקודם ({prev.name}): <b>{mine.points.toFixed(1)} נק׳</b> ב-{mine.duties} תורנויות
+      {m ? ` · ממוצע עמיתיו שם: ${m.mean.toFixed(1)}` : ""}.
+    </Typography>
+  );
+}
+
 /** What he can be given in the cycle: rank and service, then each duty category – open or why not. */
-function EligibilityCard({ elig, snap, rankName }: { elig: EligRow[]; snap: SnapshotSoldier | undefined; rankName: string }) {
+function EligibilityCard({ elig, snap, rankName, tash }: { elig: EligRow[]; snap: SnapshotSoldier | undefined; rankName: string; tash?: boolean }) {
   const why = noWorkText(elig, rankName);
   const tags = [
     rankName && `דרגה: ${rankName}`,
     snap && (snap.service_type === "career" ? "קבע" : "חובה"),
     snap?.is_parent && "משרת הורה",
     snap?.qualifies_day_only && !snap.is_parent && "פטור מזכה",
+    tash !== undefined && (tash ? "ת״ש 7 בחלק מהמחזור" : "ת״ש 7 – לן בבית"),
   ].filter(Boolean) as string[];
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -817,6 +858,11 @@ function SoldierLoadDialog(props: {
   /** his eligibility per duty category (empty when no potential was computed) */
   elig: EligRow[];
   snap: SnapshotSoldier | undefined;
+  /** ת"ש 7: undefined = no, false = all the cycle, true = part of it */
+  tash: boolean | undefined;
+  prev: PrevCycle | null;
+  /** the soldiers he is measured against (same group and open categories) */
+  peers: string[];
   onClose: () => void;
   onShowSlots: () => void;
 }) {
@@ -884,7 +930,8 @@ function SoldierLoadDialog(props: {
               זיכוי על {r.creditDays} ימים מחוץ ליחידה שלא מבחירה.
             </Typography>
           )}
-          <EligibilityCard elig={props.elig} snap={props.snap} rankName={props.rankName} />
+          {props.prev && <PrevLine prev={props.prev} soldierId={r.soldier_id} peers={props.peers} />}
+          <EligibilityCard elig={props.elig} snap={props.snap} rankName={props.rankName} tash={props.tash} />
           {r.compared ? (
             <Alert severity={r.outlier ? "warning" : "success"} icon={false}>
               ממוצע מי שזכאים לאותן תורנויות: {r.ref.toFixed(1)} · הפער: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`} (מותר ±
@@ -976,6 +1023,8 @@ function DraftBody(props: {
   cells: PotentialCell[] | null;
   categories: Map<string, string>;
   tolerance: number;
+  tash: Map<string, boolean>;
+  prev: PrevCycle | null;
   missing: number;
   missingR: number;
   published: boolean;
@@ -1093,7 +1142,7 @@ function DraftBody(props: {
       {view === "board" ? (
         <BoardView ctx={ctx} q={q} filter={filter} setFilter={setFilter} who={who} setWho={setWho} onOpenSoldier={setSoldier} />
       ) : (
-        <LoadTab ctx={ctx} fair={fair} q={q} onlyOut={onlyOut} setOnlyOut={setOnlyOut} onOpen={setSoldier} />
+        <LoadTab ctx={ctx} fair={fair} q={q} onlyOut={onlyOut} setOnlyOut={setOnlyOut} onOpen={setSoldier} tash={props.tash} prev={props.prev} />
       )}
 
       {soldier && row && (
@@ -1104,6 +1153,9 @@ function DraftBody(props: {
           tolerance={props.tolerance}
           elig={fair.elig(soldier)}
           snap={props.snapshot.find((x) => x.soldier_id === soldier)}
+          tash={props.tash.get(soldier)}
+          prev={props.prev}
+          peers={fair.rows.filter((x) => x.pool === row.pool && x.profile === row.profile).map((x) => x.soldier_id)}
           onClose={() => setSoldier(null)}
           onShowSlots={() => {
             setWho(soldier);
@@ -1129,6 +1181,8 @@ export function DraftPage() {
   const [assignments, setAssignments] = useState<DraftAssignment[] | null>(null);
   const [snapshot, setSnapshot] = useState<SnapshotSoldier[]>([]);
   const [cells, setCells] = useState<PotentialCell[] | null>(null);
+  const [tash, setTash] = useState<Map<string, boolean>>(new Map()); // ת"ש 7: soldier → only part of the cycle
+  const [prev, setPrev] = useState<PrevCycle | null>(null);
   const [categories, setCategories] = useState<Map<string, string>>(new Map());
   const [tolerance, setTolerance] = useState(20);
   const [publishing, setPublishing] = useState(false);
@@ -1155,6 +1209,10 @@ export function DraftPage() {
       setAssignments(as);
       setSnapshot(sn);
       api!.potentialMatrix(cycleId).then(setCells).catch(() => setCells(null));
+      api!
+        .cycleHomeNightly(cycleId)
+        .then((r) => setTash(new Map(r.map((x) => [x.soldier_id, x.partial]))))
+        .catch(() => setTash(new Map()));
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     }
@@ -1165,6 +1223,18 @@ export function DraftPage() {
     setCells(null);
     void load();
   }, [load]);
+
+  // the previous cycle, as a reference for the scores
+  const before = cycles && cycleId ? (() => { const cur = cycles.find((c) => c.id === cycleId); return cur ? previousCycle(cycles, cur) : undefined; })() : undefined;
+  const beforeId = before?.id;
+  const beforeName = before?.name;
+  useEffect(() => {
+    setPrev(null);
+    if (!beforeId || !beforeName) return;
+    Promise.all([api!.draftAssignments(beforeId), api!.snapshotSoldiers(beforeId)])
+      .then(([as, sn]) => setPrev(prevCycle(beforeName, as, sn.map((x) => x.soldier_id))))
+      .catch(() => setPrev(null));
+  }, [api, beforeId, beforeName]);
 
   if (!cycles) return msg ? <Alert severity="error">{msg.text}</Alert> : <Loading />;
   const cycle = cycles.find((c) => c.id === cycleId);
@@ -1206,6 +1276,8 @@ export function DraftPage() {
             cells={cells}
             categories={categories}
             tolerance={tolerance}
+            tash={tash}
+            prev={prev}
             missing={missing}
             missingR={missingR}
             published={locked}

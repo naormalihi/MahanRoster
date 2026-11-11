@@ -513,6 +513,10 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("potential_daily", { p_cycle: cycleId })) as DailyAvailability[];
   }
 
+  async cycleHomeNightly(cycleId: string): Promise<{ soldier_id: string; partial: boolean }[]> {
+    return check(await this.sb.rpc("cycle_home_nightly", { p_cycle: cycleId })) as { soldier_id: string; partial: boolean }[];
+  }
+
   async snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]> {
     const [rows, credits] = await Promise.all([
       this.sb

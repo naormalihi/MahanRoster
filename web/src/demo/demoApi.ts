@@ -648,6 +648,11 @@ export class DemoApi implements Api {
     return out;
   }
 
+  async cycleHomeNightly(cycleId: string) {
+    void cycleId;
+    return this.soldierList.filter((s) => s.is_active && s.home_nightly).map((s) => ({ soldier_id: s.id, partial: false }));
+  }
+
   async snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]> {
     void cycleId;
     return this.soldierList.filter((s) => s.is_active).map((s) => ({

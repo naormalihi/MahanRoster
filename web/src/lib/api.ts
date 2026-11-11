@@ -185,6 +185,8 @@ export interface Api {
   potentialMatrix(cycleId: string): Promise<PotentialCell[]>;
   potentialDaily(cycleId: string): Promise<DailyAvailability[]>;
   snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]>;
+  /** ת"ש 7 soldiers of the cycle (home every night), and whether only for part of it */
+  cycleHomeNightly(cycleId: string): Promise<{ soldier_id: string; partial: boolean }[]>;
   setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string): Promise<void>;
   clearPotentialOverride(cycleId: string, soldierId: string, categoryId: string): Promise<void>;
   // base schedule
