@@ -11,8 +11,11 @@ different worth: each month is balanced as it stands, but the months to come can
 seen, and a pool can end the cycle uneven (all level by April, May's two heavy duties go
 to two of them, June's two light ones to two others). So a polish pass follows: for each
 pool whose scores still spread, the duties its own members hold are dealt out again among
-them over the whole cycle, everything else kept as it is. A polished schedule is kept only
-if the pool is more even and no hard rule is broken.
+them over the whole cycle, everything else kept as it is. A large pool is too big a model
+for that in the time there is, so then single duties are moved instead, one at a time, from
+the highest of the pool to the lowest who may take them (rest, cap, gaf rule kept) – e.g.
+a regular duty from a soldier who also got a 6-point holiday duty to one left behind. A
+polished schedule is kept only if the pool is more even and no hard rule is broken.
 """
 
 from __future__ import annotations
@@ -139,7 +142,13 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
 
 # A pool is polished when its scores spread by more than this many points.
 POLISH_SPREAD = 1.0
+# Above this many slots a pool is not solved again as a model, only moved duty by duty.
+POLISH_MODEL_SLOTS = 120
 OK = ("OPTIMAL", "FEASIBLE")
+
+
+class _TooBig(Exception):
+    pass
 
 
 def _pool_state(problem: Problem, prep, chosen, credit_pts, members):
@@ -241,20 +250,129 @@ def polish(problem: Problem, chosen: list[tuple[str, str, str]], credit_pts: dic
             settings=replace(problem.settings, time_limit_seconds=min(left, max(5.0, budget / 4))),
         )
         hint = {c for c in chosen if c[1] in own}
+        candidates = []
         try:
+            if len(own) > POLISH_MODEL_SLOTS:
+                raise _TooBig  # a large pool: single moves only
             sol = solve(sub, log=log, hint=hint)
+            if sol.status in OK and not sol.unfilled:
+                candidates.append([c for c in chosen if c[1] not in own] + [(a.soldier_id, a.slot_id, a.role) for a in sol.assignments])
         except Exception:  # polishing must never cost the schedule itself
-            continue
-        if sol.status not in OK or sol.unfilled:
-            continue
-        candidate = [c for c in chosen if c[1] not in own] + [(a.soldier_id, a.slot_id, a.role) for a in sol.assignments]
-        new_score, new_wk = _pool_state(problem, prep, candidate, credit_pts, members)
-        if _unevenness(new_score) >= _unevenness(score) or max(new_wk.values()) > max(wk.values()):
+            pass
+        # then single moves, on top of the best so far
+        start_from = chosen
+        if candidates:
+            ns, nw = _pool_state(problem, prep, candidates[0], credit_pts, members)
+            if _unevenness(ns) < _unevenness(score) and max(nw.values()) <= max(wk.values()):
+                start_from = candidates[0]
+        moved = move_duties(problem, prep, start_from, credit_pts, members, deadline=min(t_end, _time.time() + max(3.0, budget / 4)))
+        candidates.append(moved)
+        best = None
+        for candidate in candidates:
+            new_score, new_wk = _pool_state(problem, prep, candidate, credit_pts, members)
+            if _unevenness(new_score) >= _unevenness(score) or max(new_wk.values()) > max(wk.values()):
+                continue
+            if best is None or _unevenness(new_score) < best[0]:
+                best = (_unevenness(new_score), candidate)
+        if best is None:
             continue
         if base_broken is None:
             base_broken = broken(chosen)
-        if broken(candidate) > base_broken:
+        if broken(best[1]) > base_broken:
             continue
-        chosen = candidate
+        chosen = best[1]
         improved += 1
     return chosen, improved
+
+
+def move_duties(problem: Problem, prep, chosen: list[tuple[str, str, str]], credit_pts: dict[str, float], members: list[str], deadline: float):
+    """Move single performer duties from the highest of a pool to the lowest who may take them.
+
+    A move is made only when it lowers the pool's unevenness; the receiver must be eligible,
+    free with rest on both sides, under the monthly cap, not above the pool's weekend maximum,
+    and a mandatory reserve on the slot must still share a performer's gaf. Published, manual
+    and penalty duties, and slots the base marked ת"ש 7, stay where they are.
+    """
+    soldiers = {s.id: s for s in problem.soldiers}
+    slots = {k.id: k for k in problem.slots}
+    rest = {t.id: timedelta(hours=t.min_rest_hours) for t in problem.task_types}
+    fixed = {(f.soldier_id, f.slot_id, f.role) for f in problem.fixed}
+    cap = problem.settings.duty_cap_per_month
+    chosen = list(chosen)
+
+    def window(kid):
+        k = slots[kid]
+        return k.briefing_at or k.starts_at, k.ends_at + rest[k.task_type_id]
+
+    held: dict[str, set[str]] = defaultdict(set)  # soldier → slots he holds (any role)
+    holders: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for sid, kid, role in chosen:
+        held[sid].add(kid)
+        holders[kid].append((sid, role))
+    score, wk = _pool_state(problem, prep, chosen, credit_pts, members)
+    wk_max = max(wk.values())
+
+    def free(sid, kid) -> bool:
+        a0, a1 = window(kid)
+        for j in held[sid]:
+            b0, b1 = window(j)
+            if a0 < b1 and b0 < a1:
+                return False
+        return True
+
+    def under_cap(sid, kid) -> bool:
+        if not cap or slots[kid].is_penalty:
+            return True
+        k = slots[kid]
+        n = sum(1 for j in held[sid] for s2, r2 in holders[j] if s2 == sid and r2 == ROLE_PERFORMER
+                and not slots[j].is_penalty and (slots[j].starts_at.year, slots[j].starts_at.month) == (k.starts_at.year, k.starts_at.month))
+        return n < cap
+
+    def gaf_ok(kid, giver, taker) -> bool:
+        perf = [sid for sid, r in holders[kid] if r == ROLE_PERFORMER and sid != giver] + [taker]
+        gafs = {soldiers[sid].gaf_id for sid in perf}
+        for sid, r in holders[kid]:
+            if r == ROLE_RESERVE and (sid, kid, r) not in fixed and soldiers[sid].service_type == "mandatory" and soldiers[sid].gaf_id not in gafs:
+                return False
+        return True
+
+    while _time.time() < deadline:
+        before = _unevenness(score)
+        best = None
+        high = sorted(members, key=lambda s: -score[s])[: max(3, len(members) // 4)]
+        low = sorted(members, key=lambda s: score[s])
+        for h in high:
+            for kid in held[h]:
+                if (h, kid, ROLE_PERFORMER) in fixed or (h, ROLE_PERFORMER) not in holders[kid]:
+                    continue
+                k = slots[kid]
+                if k.is_penalty or k.prefer_home_nightly:
+                    continue
+                for l in low:
+                    if l == h or score[l] >= score[h] or (l, kid) not in prep.pts or kid in held[l]:
+                        continue
+                    trial = dict(score)
+                    trial[h] -= prep.pts[h, kid] / SCALE
+                    trial[l] += prep.pts[l, kid] / SCALE
+                    after = _unevenness(trial)
+                    if after >= before or (best and after >= best[0]):
+                        continue
+                    if wk[l] + prep.wk_units[kid] > wk_max:
+                        continue
+                    if not (free(l, kid) and under_cap(l, kid) and gaf_ok(kid, h, l)):
+                        continue
+                    best = (after, h, l, kid)
+        if best is None:
+            break
+        _, h, l, kid = best
+        chosen.remove((h, kid, ROLE_PERFORMER))
+        chosen.append((l, kid, ROLE_PERFORMER))
+        holders[kid].remove((h, ROLE_PERFORMER))
+        holders[kid].append((l, ROLE_PERFORMER))
+        held[h].discard(kid)
+        held[l].add(kid)
+        score[h] -= prep.pts[h, kid] / SCALE
+        score[l] += prep.pts[l, kid] / SCALE
+        wk[h] -= prep.wk_units[kid]
+        wk[l] += prep.wk_units[kid]
+    return chosen
