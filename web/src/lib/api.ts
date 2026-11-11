@@ -141,6 +141,8 @@ export interface Api {
   /** Only a duty type nothing uses; otherwise the error says to make it inactive. */
   deleteTaskType(id: string): Promise<void>;
   dutyCategories(): Promise<NamedRef[]>;
+  /** Rename a duty category (id) or add a new one (no id). */
+  saveDutyCategory(name: string, id?: string): Promise<void>;
   populations(): Promise<Population[]>;
   scoringSettings(): Promise<ScoringSettings>;
   saveScoringSettings(s: ScoringSettings): Promise<void>;
