@@ -126,16 +126,8 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
         <LinearProgress variant={job.status === "running" ? "determinate" : "indeterminate"} value={job.progress} />
         <Typography variant="body2" color="text.secondary">
           {job.status === "queued"
-            ? "ההרצה מתחילה ב-GitHub בדרך כלל תוך דקה."
+            ? "ההרצה מתחילה בדרך כלל תוך דקה."
             : "המנוע משבץ חודש אחרי חודש. הרצה של חצי שנה לוקחת עד כ-7 דקות. אפשר לסגור את הדף ולחזור."}
-          {job.params.run_url && (
-            <>
-              {" "}
-              <Link href={job.params.run_url} target="_blank" rel="noreferrer">
-                צפייה בהרצה ב-GitHub
-              </Link>
-            </>
-          )}
         </Typography>
         {stuck && (
           <Alert severity="warning">
