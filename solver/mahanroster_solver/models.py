@@ -35,6 +35,8 @@ class TaskType:
     # A Shabbat variant has its own weight, so the weekend multiplier is not applied.
     is_weekend_type: bool = False
     shachar_compatible: bool = False
+    # Only mandatory-service שח"ר soldiers may do it (implies shachar_compatible).
+    shachar_only: bool = False
     # ממלכ"ת יום – the only duty open to parents and to holders of a qualifying exemption.
     qualifying_duty: bool = False
     # Empty list = open to every population.

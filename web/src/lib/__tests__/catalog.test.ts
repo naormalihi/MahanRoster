@@ -11,6 +11,7 @@ const base: TaskTypeInput = {
   requires_weapon: false,
   is_weekend_type: false,
   shachar_compatible: false,
+  shachar_only: false,
   qualifying_duty: false,
   allowed_rank_ids: null,
   gender: null,

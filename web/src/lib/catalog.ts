@@ -16,6 +16,8 @@ export interface TaskType {
   requires_weapon: boolean;
   is_weekend_type: boolean;
   shachar_compatible: boolean;
+  /** only mandatory-service שח"ר soldiers may do it (implies shachar_compatible) */
+  shachar_only: boolean;
   qualifying_duty: boolean;
   /** ranks that may do it (any of them); null = every rank */
   allowed_rank_ids: string[] | null;

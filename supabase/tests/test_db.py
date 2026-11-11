@@ -444,7 +444,7 @@ def test_holidays_are_preloaded(conn):
     assert conn.execute("select count(*) from calendar_days where extract(year from day) = 2035").fetchone()[0] >= 15
 
 
-STATIC_REASONS = {"service", "population", "rank", "gender", "qualifying_only", "not_qualifying", "shachar", "home_nightly"}
+STATIC_REASONS = {"service", "population", "rank", "gender", "qualifying_only", "not_qualifying", "shachar", "shachar_only", "home_nightly"}
 
 
 def _as_coord(conn, sql, *args):
@@ -987,6 +987,47 @@ def test_task_rank_list_limits_potential_and_engine_input(conn):
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
         task = next(t for t in doc["task_types"] if t["id"] == str(tid))
         assert task["allowed_ranks"] == [order]
+        raise psycopg.Rollback()
+
+
+def test_shachar_only_duty_in_potential_candidates_and_engine(conn):
+    from mahanroster_solver.eligibility import EligibilityIndex
+
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        tid = conn.execute("select id from task_types where is_active and qualifying_duty = false order by code limit 1").fetchone()[0]
+        cat = conn.execute("insert into duty_categories (name) values ('קטגוריה לבדיקת שחר') returning id").fetchone()[0]
+        conn.execute("update task_types set category_id = %s, shachar_compatible = true, shachar_only = true, service_restriction = 'any', "
+                     "eligible_populations = '{}', allowed_rank_ids = null, rank_min_id = null, rank_max_id = null, gender = null "
+                     "where id = %s", (cat, tid))
+        # only שח"ר may be marked shachar_only
+        with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
+            conn.execute("update task_types set shachar_compatible = false where id = %s", (tid,))
+        mand, career = [
+            conn.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s and service_type = %s limit 1",
+                         (cycle, st)).fetchone()[0] for st in ("mandatory", "career")]
+        conn.execute("update cycle_soldier_snapshot set is_shachar = (soldier_id in (%s, %s)) where cycle_id = %s", (mand, career, cycle))
+        blocked = {str(r[0]): r[1] for r in conn.execute(
+            "select soldier_id, 'shachar_only' = any(reasons) from app.potential_static(%s) where task_type_id = %s", (cycle, tid)).fetchall()}
+        assert blocked[str(mand)] is False                       # a mandatory שח"ר soldier may
+        assert blocked[str(career)] is True                      # שח"ר is mandatory service only
+        assert sum(not v for v in blocked.values()) == 1         # nobody else
+
+        slot_id = conn.execute("select id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        conn.execute("update slots set task_type_id = %s, allowed_rank_ids = null, rank_min_id = null, rank_max_id = null, gender = null "
+                     "where id = %s", (tid, slot_id))
+        cand = {str(r[0]): r[1] for r in _as_coord(conn, "select soldier_id, reasons from public.slot_candidates(%s)", slot_id)}
+        assert "shachar_only" not in cand[str(mand)] and "shachar_only" in cand[str(career)]
+
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        task = next(t for t in doc["task_types"] if t["id"] == str(tid))
+        assert task["shachar_only"] is True
+        problem = models.load_problem(json.dumps(doc))
+        idx = EligibilityIndex(problem)
+        k = next(x for x in problem.slots if x.id == str(slot_id))
+        for sv in problem.soldiers:
+            assert ("shachar_only" in idx.check(sv, k)) == blocked[sv.id], sv.id
         raise psycopg.Rollback()
 
 
