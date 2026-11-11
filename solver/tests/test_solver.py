@@ -8,7 +8,7 @@ from mahanroster_solver import synthetic  # noqa: E402
 from mahanroster_solver.models import FixedAssignment, Settings  # noqa: E402
 from statistics import pstdev  # noqa: E402
 
-from mahanroster_solver.solver import prepare, solve  # noqa: E402
+from mahanroster_solver.solver import prepare, solution_from, solve  # noqa: E402
 from mahanroster_solver.verify import violations  # noqa: E402
 
 from .conftest import USING_SHIM  # noqa: E402
@@ -246,3 +246,28 @@ def test_polish_evens_a_small_pool_that_month_by_month_left_uneven():
     pts = {c: sum(a.normalized_points for a in sol.assignments if a.soldier_id == c) for c in "ABCDEF"}
     # 18.5 points: the best is five at 3.0 and one at 3.5
     assert max(pts.values()) - min(pts.values()) <= 1.0, pts
+
+
+def test_moves_take_regular_duties_off_those_with_a_heavy_holiday_duty():
+    """Three got two regular duties and a 6-point holiday one (8), three only two regular (2):
+    the regular duties move from the first to the second."""
+    from mahanroster_solver.models import TaskType
+    from mahanroster_solver.rolling import _pool_state, move_duties
+    from mahanroster_solver.solver import prepare
+
+    light, heavy = TaskType("l", "רגיל", 1.0, min_rest_hours=12), TaskType("h", "חג", 6.0, min_rest_hours=12)
+    days = [f"2027-01-{d:02d}" for d in (4, 5, 6, 7, 11, 12, 13, 14, 18, 19, 20, 21)]  # weekdays
+    slots = [slot(f"l{i}", "l", f"{d}T08:00", f"{d}T20:00", r=0) for i, d in enumerate(days)]
+    slots += [slot(f"h{i}", "h", f"2027-01-{d}T08:00", f"2027-01-{d}T20:00", r=0) for i, d in enumerate((25, 26, 27))]
+    team = [soldier(c) for c in "ABCDEF"]
+    p = problem(team, slots, tasks=(light, heavy), settings=FAST)
+    chosen = [(c, f"l{i}", "performer") for i, c in enumerate("AABBCCDDEEFF")] + [(c, f"h{i}", "performer") for i, c in enumerate("ABC")]
+    prep = prepare(p)
+    before, _ = _pool_state(p, prep, chosen, {}, list("ABCDEF"))
+    assert max(before.values()) == 8 and min(before.values()) == 2
+    import time
+
+    moved = move_duties(p, prep, chosen, {}, list("ABCDEF"), deadline=time.time() + 10)
+    after, _ = _pool_state(p, prep, moved, {}, list("ABCDEF"))
+    assert max(after.values()) == 6 and min(after.values()) == 4, after
+    assert violations(p, solution_from(p, moved)) == []
