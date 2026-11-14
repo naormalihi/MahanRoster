@@ -317,7 +317,7 @@ export class SupabaseApi implements Api {
     const rows = check(
       await this.sb
         .from("score_multipliers")
-        .select("id, name, value, day_types, weekdays, time_window, date_from, date_to, skip_shabbat_types, is_active")
+        .select("id, name, value, day_types, holidays, holiday_kinds, weekdays, time_window, date_from, date_to, skip_shabbat_types, is_active")
         .order("sort_order")
         .order("name"),
     ) as ScoreMultiplier[];
@@ -350,7 +350,7 @@ export class SupabaseApi implements Api {
 
   async calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]> {
     return check(
-      await this.sb.from("calendar_days").select("day, day_type, source, note").gte("day", fromIso).lte("day", toIso).order("day"),
+      await this.sb.from("calendar_days").select("day, day_type, source, note, holiday, holiday_kind").gte("day", fromIso).lte("day", toIso).order("day"),
     ) as CalendarDay[];
   }
 

@@ -104,6 +104,8 @@ export interface ScoreMultiplierInput {
   name: string;
   value: number;
   day_types: string[]; // calendar day types (any of)
+  holidays: HolidayKey[]; // which holidays (any of); empty = any holiday when a kind is chosen
+  holiday_kinds: HolidayKind[]; // which day of the holiday (any of); empty = every day of it
   weekdays: number[]; // ISO (any of)
   time_window: string | null; // duty < 24h, most hours in the window
   date_from: string | null;
@@ -119,6 +121,8 @@ export const EMPTY_MULTIPLIER: ScoreMultiplierInput = {
   name: "",
   value: 1.5,
   day_types: [],
+  holidays: [],
+  holiday_kinds: [],
   weekdays: [],
   time_window: null,
   date_from: null,
@@ -135,8 +139,8 @@ export function multiplierProblems(m: ScoreMultiplierInput, all: ScoreMultiplier
   if (!(m.value >= 1) || m.value > 10) p.push("ערך המקדם – בין 1 ל-10");
   if (m.time_window !== null && !WINDOW_RE.test(m.time_window)) p.push("חלון שעות בתבנית 22:00-06:00");
   if (m.date_from && m.date_to && m.date_from > m.date_to) p.push("תאריך הסיום לפני תאריך ההתחלה");
-  if (!m.day_types.length && !m.weekdays.length && !m.time_window && !m.date_from && !m.date_to)
-    p.push("בחר לפחות תנאי אחד: סוג יום, ימים בשבוע, חלון שעות או תאריכים");
+  if (!m.day_types.length && !m.holidays.length && !m.holiday_kinds.length && !m.weekdays.length && !m.time_window && !m.date_from && !m.date_to)
+    p.push("בחר לפחות תנאי אחד: חגים, סוג יום, ימים בשבוע, חלון שעות או תאריכים");
   return p;
 }
 
@@ -145,6 +149,7 @@ const dmy = (iso: string) => iso.split("-").reverse().join("/");
 /** "חג, ערב חג · שישי, שבת · 22:00–06:00 · 01/01/2027–31/01/2027" */
 export function describeMultiplier(m: ScoreMultiplierInput, dayTypeName: (code: string) => string): string {
   const parts: string[] = [];
+  if (m.holidays.length || m.holiday_kinds.length) parts.push(holidayPhrase(m.holidays, m.holiday_kinds));
   if (m.day_types.length) parts.push(m.day_types.map(dayTypeName).join(", "));
   if (m.weekdays.length) parts.push(ISO_WEEK.filter((d) => m.weekdays.includes(d)).map((d) => ISO_DAY_LABEL[d]).join(", "));
   // ⁦…⁩ keeps times and dates left-to-right inside the Hebrew line
@@ -176,6 +181,7 @@ export const DAY_TYPE_LABEL: Record<string, string> = {
   holiday_eve: "ערב חג",
   major_holiday: "חג מרכזי",
   major_holiday_eve: "ערב חג מרכזי",
+  chol_hamoed: "חול המועד",
   memorial: "יום זיכרון",
   weekend: "סופ\"ש",
   weekday: "חול",
@@ -186,32 +192,83 @@ export interface CalendarDay {
   day_type: DayType;
   source: "hebcal" | "manual";
   note: string | null;
+  /** which holiday the day belongs to, and which day of it */
+  holiday?: HolidayKey | null;
+  holiday_kind?: HolidayKind | null;
 }
+
+// ---------------------------------------------------------------------------
+// Holidays by name
+// ---------------------------------------------------------------------------
+
+export type HolidayKey = "rosh_hashana" | "yom_kippur" | "sukkot" | "pesach" | "shavuot" | "independence";
+export type HolidayKind = "eve" | "day" | "chol_hamoed";
+
+/** The holidays a multiplier can name; סוכות includes שמיני עצרת, פסח includes שביעי של פסח. */
+export const HOLIDAYS: { key: HolidayKey; name: string; kinds: HolidayKind[] }[] = [
+  { key: "rosh_hashana", name: "ראש השנה", kinds: ["eve", "day"] },
+  { key: "yom_kippur", name: "יום כיפור", kinds: ["eve", "day"] },
+  { key: "sukkot", name: "סוכות", kinds: ["eve", "day", "chol_hamoed"] },
+  { key: "pesach", name: "פסח", kinds: ["eve", "day", "chol_hamoed"] },
+  { key: "shavuot", name: "שבועות", kinds: ["eve", "day"] },
+  { key: "independence", name: "יום העצמאות", kinds: ["day"] },
+];
+export const HOLIDAY_NAME = Object.fromEntries(HOLIDAYS.map((h) => [h.key, h.name])) as Record<HolidayKey, string>;
+export const HOLIDAY_KINDS: { key: HolidayKind; name: string }[] = [
+  { key: "eve", name: "ערב חג" },
+  { key: "day", name: "החג" },
+  { key: "chol_hamoed", name: "חול המועד" },
+];
+export const HOLIDAY_KIND_NAME = Object.fromEntries(HOLIDAY_KINDS.map((k) => [k.key, k.name])) as Record<HolidayKind, string>;
+
+/** "ערב חג · ראש השנה, סוכות" / "חול המועד · כל החגים" */
+export function holidayPhrase(holidays: HolidayKey[], kinds: HolidayKind[]): string {
+  const k = kinds.length ? HOLIDAY_KINDS.filter((x) => kinds.includes(x.key)).map((x) => x.name).join(", ") : "כל ימי החג";
+  const h = holidays.length ? HOLIDAYS.filter((x) => holidays.includes(x.key)).map((x) => x.name).join(", ") : "כל החגים";
+  return `${k} · ${h}`;
+}
+
+/** Does a multiplier's calendar part (day types, holidays, day of the holiday) hold on this day? */
+export function calendarMatch(m: Pick<ScoreMultiplierInput, "day_types" | "holidays" | "holiday_kinds">, d: CalendarDay | undefined): boolean {
+  if (m.day_types.length && !(d && m.day_types.includes(d.day_type))) return false;
+  if (m.holidays.length || m.holiday_kinds.length) {
+    if (!d?.holiday || !d.holiday_kind) return false;
+    if (m.holidays.length && !m.holidays.includes(d.holiday)) return false;
+    if (m.holiday_kinds.length && !m.holiday_kinds.includes(d.holiday_kind)) return false;
+  }
+  return true;
+}
+
+/** A multiplier that depends on the calendar only (no weekdays, hours or dates). */
+export const calendarOnly = (m: ScoreMultiplierInput) =>
+  (m.day_types.length > 0 || m.holidays.length > 0 || m.holiday_kinds.length > 0) && !m.weekdays.length && !m.time_window && !m.date_from && !m.date_to;
 
 /**
  * Days that count in Israel. Holidays and their eves get the holiday multiplier; ראש השנה,
  * יום כיפור and פסח (with their eves) are "major" holidays with a multiplier of their own;
- * memorial days are marked for information only. חול המועד is not marked.
+ * memorial days are marked for information only. חול המועד is marked, not as a holiday.
  */
-const HOLIDAY_RULES: { match: (desc: string) => boolean; type: DayType; note: string }[] = [
-  { match: (d) => d === "Erev Rosh Hashana", type: "major_holiday_eve", note: "ערב ראש השנה" },
-  { match: (d) => /^Rosh Hashana \d+$/.test(d), type: "major_holiday", note: "ראש השנה א׳" },
-  { match: (d) => d === "Rosh Hashana II", type: "major_holiday", note: "ראש השנה ב׳" },
-  { match: (d) => d === "Erev Yom Kippur", type: "major_holiday_eve", note: "ערב יום כיפור" },
-  { match: (d) => d === "Yom Kippur", type: "major_holiday", note: "יום כיפור" },
-  { match: (d) => d === "Erev Sukkot", type: "holiday_eve", note: "ערב סוכות" },
-  { match: (d) => d === "Sukkot I", type: "holiday", note: "סוכות" },
-  { match: (d) => d === "Sukkot VII (Hoshana Raba)", type: "holiday_eve", note: "הושענא רבה (ערב שמיני עצרת)" },
-  { match: (d) => d === "Shmini Atzeret", type: "holiday", note: "שמיני עצרת / שמחת תורה" },
-  { match: (d) => d === "Erev Pesach", type: "major_holiday_eve", note: "ערב פסח" },
-  { match: (d) => d === "Pesach I", type: "major_holiday", note: "פסח" },
-  { match: (d) => d === "Pesach VI (CH''M)", type: "major_holiday_eve", note: "ערב שביעי של פסח" },
-  { match: (d) => d === "Pesach VII", type: "major_holiday", note: "שביעי של פסח" },
-  { match: (d) => d === "Erev Shavuot", type: "holiday_eve", note: "ערב שבועות" },
-  { match: (d) => d === "Shavuot", type: "holiday", note: "שבועות" },
+const HOLIDAY_RULES: { match: (desc: string) => boolean; type: DayType; note: string; h?: [HolidayKey, HolidayKind] }[] = [
+  { match: (d) => d === "Erev Rosh Hashana", type: "major_holiday_eve", note: "ערב ראש השנה", h: ["rosh_hashana", "eve"] },
+  { match: (d) => /^Rosh Hashana \d+$/.test(d), type: "major_holiday", note: "ראש השנה א׳", h: ["rosh_hashana", "day"] },
+  { match: (d) => d === "Rosh Hashana II", type: "major_holiday", note: "ראש השנה ב׳", h: ["rosh_hashana", "day"] },
+  { match: (d) => d === "Erev Yom Kippur", type: "major_holiday_eve", note: "ערב יום כיפור", h: ["yom_kippur", "eve"] },
+  { match: (d) => d === "Yom Kippur", type: "major_holiday", note: "יום כיפור", h: ["yom_kippur", "day"] },
+  { match: (d) => d === "Erev Sukkot", type: "holiday_eve", note: "ערב סוכות", h: ["sukkot", "eve"] },
+  { match: (d) => d === "Sukkot I", type: "holiday", note: "סוכות", h: ["sukkot", "day"] },
+  { match: (d) => d === "Sukkot VII (Hoshana Raba)", type: "holiday_eve", note: "הושענא רבה (ערב שמיני עצרת)", h: ["sukkot", "eve"] },
+  { match: (d) => /^Sukkot (II|III|IV|V|VI) \(CH''M\)$/.test(d), type: "chol_hamoed", note: "חול המועד סוכות", h: ["sukkot", "chol_hamoed"] },
+  { match: (d) => d === "Shmini Atzeret", type: "holiday", note: "שמיני עצרת / שמחת תורה", h: ["sukkot", "day"] },
+  { match: (d) => d === "Erev Pesach", type: "major_holiday_eve", note: "ערב פסח", h: ["pesach", "eve"] },
+  { match: (d) => d === "Pesach I", type: "major_holiday", note: "פסח", h: ["pesach", "day"] },
+  { match: (d) => /^Pesach (II|III|IV|V) \(CH''M\)$/.test(d), type: "chol_hamoed", note: "חול המועד פסח", h: ["pesach", "chol_hamoed"] },
+  { match: (d) => d === "Pesach VI (CH''M)", type: "major_holiday_eve", note: "ערב שביעי של פסח", h: ["pesach", "eve"] },
+  { match: (d) => d === "Pesach VII", type: "major_holiday", note: "שביעי של פסח", h: ["pesach", "day"] },
+  { match: (d) => d === "Erev Shavuot", type: "holiday_eve", note: "ערב שבועות", h: ["shavuot", "eve"] },
+  { match: (d) => d === "Shavuot", type: "holiday", note: "שבועות", h: ["shavuot", "day"] },
   { match: (d) => d === "Yom HaShoah", type: "memorial", note: "יום השואה" },
   { match: (d) => d === "Yom HaZikaron", type: "memorial", note: "יום הזיכרון" },
-  { match: (d) => d === "Yom HaAtzma'ut", type: "holiday", note: "יום העצמאות" },
+  { match: (d) => d === "Yom HaAtzma'ut", type: "holiday", note: "יום העצמאות", h: ["independence", "day"] },
 ];
 
 const isoOf = (d: Date) =>
@@ -237,7 +294,7 @@ export function israeliHolidays(fromIso: string, toIso: string): CalendarDay[] {
     const prev = out.get(day);
     // a holiday wins over an eve on the same day
     if (prev && prev.day_type === "holiday") continue;
-    out.set(day, { day, day_type: rule.type, source: "hebcal", note: rule.note });
+    out.set(day, { day, day_type: rule.type, source: "hebcal", note: rule.note, holiday: rule.h?.[0] ?? null, holiday_kind: rule.h?.[1] ?? null });
   }
   return [...out.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
@@ -256,7 +313,7 @@ export function mergeHolidays(existing: CalendarDay[], generated: CalendarDay[])
       keptManual++;
       continue;
     }
-    if (cur && cur.day_type === g.day_type && cur.note === g.note) continue;
+    if (cur && cur.day_type === g.day_type && cur.note === g.note && (cur.holiday ?? null) === (g.holiday ?? null) && (cur.holiday_kind ?? null) === (g.holiday_kind ?? null)) continue;
     toWrite.push(g);
   }
   return { toWrite, keptManual };

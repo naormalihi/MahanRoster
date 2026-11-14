@@ -70,20 +70,44 @@ describe("Israeli holidays", () => {
     expect(at("2027-05-12")?.day_type).toBe("holiday");
     expect(at("2027-06-11")?.note).toBe("שבועות");
   });
-  it("skips chol hamoed and minor days", () => {
-    expect(at("2026-09-28")).toBeUndefined();
+  it("marks חול המועד (not as a holiday) and skips minor days", () => {
+    expect(at("2026-09-28")).toMatchObject({ day_type: "chol_hamoed", holiday: "sukkot", holiday_kind: "chol_hamoed" });
     expect(at("2026-12-05")).toBeUndefined();
     expect(at("2027-03-23")).toBeUndefined();
   });
   it("never overwrites manual entries", () => {
     const existing = [
       { day: "2026-09-12", day_type: "holiday" as const, source: "manual" as const, note: "שלי" },
-      { day: "2026-09-21", day_type: "major_holiday" as const, source: "hebcal" as const, note: "יום כיפור" },
+      { day: "2026-09-21", day_type: "major_holiday" as const, source: "hebcal" as const, note: "יום כיפור", holiday: "yom_kippur" as const, holiday_kind: "day" as const },
     ];
     const { toWrite, keptManual } = mergeHolidays(existing, days);
     expect(keptManual).toBe(1);
     expect(toWrite.find((d) => d.day === "2026-09-12")).toBeUndefined();
     expect(toWrite.find((d) => d.day === "2026-09-21")).toBeUndefined();
     expect(toWrite.length).toBe(days.length - 2);
+  });
+});
+
+import { calendarMatch, EMPTY_MULTIPLIER as EMPTY_M, israeliHolidays as hol } from "../catalog";
+
+describe("holidays by name", () => {
+  it("marks every day of סוכות and פסח, with חול המועד", () => {
+    const sukkot = hol("2027-10-14", "2027-10-24").map((d) => `${d.holiday}/${d.holiday_kind}`);
+    expect(sukkot).toEqual([
+      "sukkot/eve", "sukkot/day", ...Array(5).fill("sukkot/chol_hamoed"), "sukkot/eve", "sukkot/day",
+    ]);
+    expect(hol("2027-04-20", "2027-04-29").filter((d) => d.holiday_kind === "chol_hamoed")).toHaveLength(4);
+  });
+
+  it("matches a multiplier by holiday and by day of it", () => {
+    const days = hol("2027-09-30", "2027-10-24");
+    const at = (iso: string) => days.find((d) => d.day === iso);
+    const eves = { ...EMPTY_M, holidays: ["rosh_hashana", "yom_kippur", "sukkot", "pesach"] as const, holiday_kinds: ["eve"] as const };
+    const m = { ...eves, holidays: [...eves.holidays], holiday_kinds: [...eves.holiday_kinds] };
+    expect(calendarMatch(m, at("2027-10-15"))).toBe(true); // ערב סוכות
+    expect(calendarMatch(m, at("2027-10-16"))).toBe(false); // סוכות itself
+    const ch = { ...EMPTY_M, holiday_kinds: ["chol_hamoed" as const] };
+    expect(calendarMatch(ch, at("2027-10-18"))).toBe(true);
+    expect(calendarMatch(ch, undefined)).toBe(false);
   });
 });

@@ -1,3 +1,4 @@
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
@@ -9,6 +10,7 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -53,6 +55,13 @@ import {
   MARKABLE,
   describeMultiplier,
   multiplierProblems,
+  HOLIDAYS,
+  HOLIDAY_KINDS,
+  HOLIDAY_KIND_NAME,
+  calendarMatch,
+  calendarOnly,
+  type HolidayKey,
+  type HolidayKind,
   type CalendarDay,
   type DayTypeRef,
   type ScoreMultiplier,
@@ -688,9 +697,41 @@ function DayTypePicker(props: { types: DayTypeRef[]; value: string[]; onChange: 
   );
 }
 
+/** The holiday days (name and date) a multiplier's calendar conditions hit in the coming year. */
+function holidayHits(m: ScoreMultiplierInput, calendar: CalendarDay[]) {
+  const iso = (d: number) => ((d + 6) % 7) + 1; // JS Sunday=0 → ISO 7
+  return calendar.filter(
+    (d) =>
+      calendarMatch(m, d) &&
+      (!m.weekdays.length || m.weekdays.includes(iso(new Date(d.day + "T12:00:00Z").getUTCDay()))) &&
+      (!m.date_from || d.day >= m.date_from) &&
+      (!m.date_to || d.day <= m.date_to),
+  );
+}
+
+function ChipToggles<T extends string>(props: { options: { key: T; name: string }[]; value: T[]; onChange: (v: T[]) => void }) {
+  return (
+    <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
+      {props.options.map((o) => {
+        const on = props.value.includes(o.key);
+        return (
+          <Chip
+            key={o.key}
+            label={o.name}
+            color={on ? "primary" : "default"}
+            variant={on ? "filled" : "outlined"}
+            onClick={() => props.onChange(on ? props.value.filter((x) => x !== o.key) : [...props.value, o.key])}
+          />
+        );
+      })}
+    </Stack>
+  );
+}
+
 function MultiplierDialog(props: {
   m: ScoreMultiplier | null;
   all: ScoreMultiplier[];
+  calendar: CalendarDay[];
   types: DayTypeRef[];
   onTypesChanged: () => Promise<void>;
   onClose: () => void;
@@ -709,6 +750,9 @@ function MultiplierDialog(props: {
   const set = <K extends keyof ScoreMultiplierInput>(k: K, v: ScoreMultiplierInput[K]) => setM((x) => ({ ...x, [k]: v }));
   const problems = multiplierProblems(m, props.all, props.m?.id);
   const [wFrom, wTo] = (m.time_window ?? "22:00-06:00").split("-");
+  const [moreTypes, setMoreTypes] = useState(() => m.day_types.length > 0);
+  const byCalendar = m.holidays.length > 0 || m.holiday_kinds.length > 0 || m.day_types.length > 0;
+  const hits = byCalendar ? holidayHits(m, props.calendar) : [];
 
   async function run(f: () => Promise<void>) {
     setBusy(true);
@@ -744,9 +788,47 @@ function MultiplierDialog(props: {
           </Alert>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
-              סוג יום בלוח השנה
+              חגים
             </Typography>
-            <DayTypePicker types={props.types} value={m.day_types} onChange={(v) => set("day_types", v)} onAdded={props.onTypesChanged} />
+            <ChipToggles<HolidayKey> options={HOLIDAYS} value={m.holidays} onChange={(v) => set("holidays", v)} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              סוכות כולל שמיני עצרת (הושענא רבה הוא ערב החג), פסח כולל שביעי של פסח. בלי בחירה – כל החגים.
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              איזה יום בחג
+            </Typography>
+            <ChipToggles<HolidayKind> options={HOLIDAY_KINDS} value={m.holiday_kinds} onChange={(v) => set("holiday_kinds", v)} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              בלי בחירה – כל ימי החגים שבחרת. למשל סוכות + ערב חג = רק ערב סוכות והושענא רבה.
+            </Typography>
+          </Box>
+          {byCalendar && (
+            <Alert severity={hits.length ? "success" : "warning"} icon={false} sx={{ py: 0.5 }}>
+              {hits.length ? (
+                <>
+                  <b>חל ב-12 החודשים הקרובים על:</b>{" "}
+                  {hits
+                    .slice(0, 12)
+                    .map((d) => `${d.note ?? HOLIDAY_KIND_NAME[d.holiday_kind as HolidayKind] ?? ""} (${fmt(d.day).slice(0, 5)})`)
+                    .join(" · ")}
+                  {hits.length > 12 && ` ועוד ${hits.length - 12}`}
+                </>
+              ) : (
+                "לא חל על אף יום ב-12 החודשים הקרובים."
+              )}
+            </Alert>
+          )}
+          <Box>
+            <Button size="small" onClick={() => setMoreTypes(!moreTypes)} endIcon={<ExpandMoreIcon sx={{ transform: moreTypes ? "rotate(180deg)" : undefined }} />} sx={{ px: 0 }}>
+              סוגי ימים בלוח (יום זיכרון, סוגים שהוספת){m.day_types.length ? ` · ${m.day_types.length} נבחרו` : ""}
+            </Button>
+            <Collapse in={moreTypes}>
+              <Box sx={{ pt: 1 }}>
+                <DayTypePicker types={props.types} value={m.day_types} onChange={(v) => set("day_types", v)} onAdded={props.onTypesChanged} />
+              </Box>
+            </Collapse>
           </Box>
           <Box>
             <Typography variant="subtitle2">ימים בשבוע</Typography>
@@ -820,6 +902,86 @@ function MultiplierDialog(props: {
         )}
       </DialogActions>
     </Dialog>
+  );
+}
+
+/**
+ * Which multiplier each day of each holiday gets – so a rule like "ערבי ר"ה, יו"כ, סוכות ופסח"
+ * next to "חול המועד" and "חג" can be checked at a glance. Calendar-only multipliers; the
+ * weekend or night multiplier may still be higher on a given duty (the highest always wins).
+ */
+function HolidayMatrix({ list, calendar }: { list: ScoreMultiplier[]; calendar: CalendarDay[] }) {
+  const active = list.filter((m) => m.is_active && calendarOnly(m));
+  // the stored calendar first; a holiday not in it yet is looked up in the generated dates
+  const generated = useMemo(() => {
+    const from = new Date().toISOString().slice(0, 10);
+    const to = new Date(Date.now() + 400 * 86_400_000).toISOString().slice(0, 10);
+    return israeliHolidays(from, to);
+  }, []);
+  const cell = (h: HolidayKey, k: HolidayKind) => {
+    const d =
+      calendar.find((x) => x.holiday === h && x.holiday_kind === k) ?? generated.find((x) => x.holiday === h && x.holiday_kind === k);
+    if (!d) return null;
+    const hit = active.filter((m) => calendarMatch(m, d)).sort((a, b) => b.value - a.value);
+    return hit.length ? { value: hit[0].value, name: hit[0].name } : { value: 1, name: "" };
+  };
+  return (
+    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+      <Stack spacing={1.5}>
+        <Typography variant="h3">מקדם לכל יום חג</Typography>
+        <Typography variant="body2" color="text.secondary">
+          המקדם שיחול על כל יום, לפי המקדמים שלמעלה. כשהחג נופל בסוף שבוע, או בתורנות לילה, ייתכן מקדם גבוה יותר – תמיד נלקח הגבוה.
+        </Typography>
+        <Box sx={{ overflowX: "auto" }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>חג</TableCell>
+                {HOLIDAY_KINDS.map((k) => (
+                  <TableCell key={k.key}>{k.name}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {HOLIDAYS.map((h) => (
+                <TableRow key={h.key}>
+                  <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>{h.name}</TableCell>
+                  {HOLIDAY_KINDS.map((k) => {
+                    if (!h.kinds.includes(k.key))
+                      return (
+                        <TableCell key={k.key} sx={{ color: "text.disabled" }}>
+                          —
+                        </TableCell>
+                      );
+                    const c = cell(h.key, k.key);
+                    return (
+                      <TableCell key={k.key}>
+                        {c ? (
+                          <>
+                            <Box component="span" sx={{ fontWeight: 700, color: c.value > 1 ? "primary.main" : "text.secondary" }}>
+                              ×{c.value}
+                            </Box>
+                            {c.name && (
+                              <Typography component="div" variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+                                {c.name}
+                              </Typography>
+                            )}
+                          </>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            —
+                          </Typography>
+                        )}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+      </Stack>
+    </Paper>
   );
 }
 
@@ -947,6 +1109,7 @@ function ScoringTab() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [surprise, setSurprise] = useState<string | null>(null);
+  const [calendar, setCalendar] = useState<CalendarDay[]>([]);
 
   async function saveSurprise() {
     const v = Number(surprise);
@@ -965,8 +1128,11 @@ function ScoringTab() {
   const loadTypes = useCallback(async () => setTypes(await api!.dayTypes()), [api]);
   const load = useCallback(async () => {
     try {
-      const [l, v] = await Promise.all([api!.scoreMultipliers(), api!.scoringSettings(), loadTypes()]);
+      const from = new Date().toISOString().slice(0, 10);
+      const to = new Date(Date.now() + 366 * 86_400_000).toISOString().slice(0, 10);
+      const [l, v, cal] = await Promise.all([api!.scoreMultipliers(), api!.scoringSettings(), api!.calendarDays(from, to), loadTypes()]);
       setList(l);
+      setCalendar(cal);
       setS(v);
       setSaved(v);
     } catch (e) {
@@ -1051,6 +1217,8 @@ function ScoringTab() {
           </Box>
         </Stack>
       </Paper>
+
+      <HolidayMatrix list={list} calendar={calendar} />
 
       <LoadRolesCard />
 
@@ -1152,6 +1320,7 @@ function ScoringTab() {
         <MultiplierDialog
           m={editing === "new" ? null : editing}
           all={list}
+          calendar={calendar}
           types={types}
           onTypesChanged={loadTypes}
           onClose={() => setEditing(null)}
@@ -1185,6 +1354,7 @@ function DayDialog(props: { day: CalendarDay | null; types: DayTypeRef[]; onClos
   const [error, setError] = useState<string | null>(null);
   async function save() {
     if (!d.day) return setError("בחר תאריך");
+    if (!d.holiday !== !d.holiday_kind) return setError("לחג צריך לבחור גם איזה יום בחג (או לנקות את שניהם)");
     try {
       await api!.saveCalendarDays([{ ...d, source: "manual", note: d.note?.trim() || null }]);
       props.onSaved();
@@ -1213,6 +1383,30 @@ function DayDialog(props: { day: CalendarDay | null; types: DayTypeRef[]; onClos
             ))}
           </TextField>
           <TextField label="תיאור" value={d.note ?? ""} onChange={(e) => setD({ ...d, note: e.target.value })} />
+          <Stack direction="row" spacing={1.5}>
+            <TextField select label="חג" value={d.holiday ?? ""} onChange={(e) => setD({ ...d, holiday: (e.target.value || null) as HolidayKey | null })} fullWidth>
+              <MenuItem value="">—</MenuItem>
+              {HOLIDAYS.map((h) => (
+                <MenuItem key={h.key} value={h.key}>
+                  {h.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="איזה יום בחג"
+              value={d.holiday_kind ?? ""}
+              onChange={(e) => setD({ ...d, holiday_kind: (e.target.value || null) as HolidayKind | null })}
+              fullWidth
+            >
+              <MenuItem value="">—</MenuItem>
+              {HOLIDAY_KINDS.map((k) => (
+                <MenuItem key={k.key} value={k.key}>
+                  {k.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
           <Typography variant="caption" color="text.secondary">
             יום שנערך ידנית לא יידרס בטעינה אוטומטית של החגים.
           </Typography>
