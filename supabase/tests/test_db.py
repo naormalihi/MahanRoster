@@ -1242,6 +1242,13 @@ def test_recent_holiday_duties(conn):
         conn.execute("select public.snapshot_cycle(%s)", (cycle,))
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
         assert all(isinstance(x["recent_holiday"], bool) for x in doc["soldiers"])
+        # a day retyped to a custom type still counts by its name
+        conn.execute("insert into day_types (code, name) values ('custom_sk', 'סוכות שלי') on conflict do nothing")
+        conn.execute("update calendar_days set day_type = 'custom_sk', holiday = 'sukkot', holiday_kind = 'eve' where day = %s", (day,))
+        assert (str(sid), day) in set(conn.execute(dutiesq, (since, day)).fetchall())
+        # an observance does not
+        conn.execute("update calendar_days set day_type = 'observance', holiday = 'hanukkah', holiday_kind = 'day' where day = %s", (day,))
+        assert (str(sid), day) not in set(conn.execute(dutiesq, (since, day)).fetchall())
         models.load_problem(json.dumps(doc))
         raise psycopg.Rollback()
 
