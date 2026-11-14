@@ -39,6 +39,7 @@ import {
   useTheme,
   Menu,
 } from "@mui/material";
+import { SoldierFactors } from "../components/SoldierFactors";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -902,11 +903,14 @@ function SoldierLoadDialog(props: {
               </Paper>
             ))}
           </Box>
-          {r.creditDays > 0 && (
-            <Typography variant="caption" color="text.secondary">
-              זיכוי על {r.creditDays} ימים מחוץ ליחידה שלא מבחירה.
-            </Typography>
-          )}
+          <SoldierFactors
+            api={api!}
+            cycle={{ id: ctx.cycle.id, start: ctx.cycle.start_date, end: ctx.cycle.end_date }}
+            soldierId={r.soldier_id}
+            creditDays={r.creditDays}
+            credit={r.credit}
+            taskName={(id) => ctx.tasks.get(id)?.name ?? "תורנות"}
+          />
           <EligibilityCard elig={props.elig} snap={props.snap} rankName={props.rankName} />
           {r.compared ? (
             <Alert severity={r.outlier ? "warning" : "success"} icon={false}>
