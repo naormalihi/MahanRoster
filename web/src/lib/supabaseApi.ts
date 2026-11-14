@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
+import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
 import { SCORING_KEYS, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import {
@@ -516,6 +516,10 @@ export class SupabaseApi implements Api {
 
   async potentialDaily(cycleId: string): Promise<DailyAvailability[]> {
     return check(await this.sb.rpc("potential_daily", { p_cycle: cycleId })) as DailyAvailability[];
+  }
+
+  async recentHolidayDuties(sinceIso: string): Promise<HolidayDuty[]> {
+    return check(await this.sb.rpc("recent_holiday_duties", { p_since: sinceIso })) as HolidayDuty[];
   }
 
   async snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]> {

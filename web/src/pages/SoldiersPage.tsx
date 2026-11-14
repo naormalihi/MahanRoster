@@ -1,4 +1,5 @@
 import AddIcon from "@mui/icons-material/Add";
+import CheckIcon from "@mui/icons-material/Check";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
@@ -27,6 +28,8 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TableSortLabel,
+  Tooltip,
   TextField,
   Typography,
   useMediaQuery,
@@ -54,23 +57,39 @@ import type { Cycle, Exemption, ExemptionType } from "../lib/cycles";
 import { cycleScores, lastPublishedCycle, summarize } from "../lib/lastCycle";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
-const RANGE_CHIP: Record<RangeState, { label: string; color: "default" | "error" | "warning" | "success" }> = {
+const RANGE_CHIP: Record<
+  RangeState,
+  { label: string; color: "default" | "error" | "warning" | "success" }
+> = {
   missing: { label: "לא הוזן", color: "default" },
   expired: { label: "פג", color: "error" },
   expiring: { label: "פג בקרוב", color: "warning" },
   valid: { label: "בתוקף", color: "success" },
 };
 
-const fmt = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "—");
+const fmt = (iso: string | null) =>
+  iso ? iso.split("-").reverse().join("/") : "—";
 const ddmm = (iso: string) => iso.slice(5, 10).split("-").reverse().join("/");
 
 function RangeChip({ until }: { until: string | null }) {
   const st = rangeState(until);
   const c = RANGE_CHIP[st];
-  return <Chip size="small" color={c.color} variant={st === "valid" ? "outlined" : "filled"} label={st === "missing" ? c.label : `${c.label} · ${fmt(until)}`} />;
+  return (
+    <Chip
+      size="small"
+      color={c.color}
+      variant={st === "valid" ? "outlined" : "filled"}
+      label={st === "missing" ? c.label : `${c.label} · ${fmt(until)}`}
+    />
+  );
 }
 
-function DateField(props: { label: string; value: string | null; onChange: (v: string | null) => void; helperText?: string }) {
+function DateField(props: {
+  label: string;
+  value: string | null;
+  onChange: (v: string | null) => void;
+  helperText?: string;
+}) {
   return (
     <TextField
       type="date"
@@ -114,16 +133,25 @@ function EditDialog(props: {
     tash_level: s.tash_level,
     is_active: s.is_active,
   });
-  const [roles, setRoles] = useState<Omit<SoldierLoadRole, "name" | "factor">[]>(
-    s.load_roles.map(({ load_role_id, valid_from, valid_to }) => ({ load_role_id, valid_from, valid_to })),
+  const [roles, setRoles] = useState<
+    Omit<SoldierLoadRole, "name" | "factor">[]
+  >(
+    s.load_roles.map(({ load_role_id, valid_from, valid_to }) => ({
+      load_role_id,
+      valid_from,
+      valid_to,
+    })),
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const set = <K extends keyof SoldierPatch>(k: K, v: SoldierPatch[K]) => setP((x) => ({ ...x, [k]: v }));
+  const set = <K extends keyof SoldierPatch>(k: K, v: SoldierPatch[K]) =>
+    setP((x) => ({ ...x, [k]: v }));
 
   const problems: string[] = [];
-  if (p.parent_override !== null && !p.parent_override_reason?.trim()) problems.push("שינוי ידני של משרת הורה מחייב סיבה");
-  if (roles.some((r) => !r.load_role_id || !r.valid_from)) problems.push("לכל תפקיד הקלה צריך סוג ותאריך התחלה");
+  if (p.parent_override !== null && !p.parent_override_reason?.trim())
+    problems.push("שינוי ידני של משרת הורה מחייב סיבה");
+  if (roles.some((r) => !r.load_role_id || !r.valid_from))
+    problems.push("לכל תפקיד הקלה צריך סוג ותאריך התחלה");
 
   async function save() {
     if (problems.length) return setError(problems[0]);
@@ -132,8 +160,12 @@ function EditDialog(props: {
     try {
       const patch = {
         ...p,
-        parent_override_reason: p.parent_override === null ? null : p.parent_override_reason,
-        home_nightly_override_reason: p.home_nightly_override === null ? null : p.home_nightly_override_reason,
+        parent_override_reason:
+          p.parent_override === null ? null : p.parent_override_reason,
+        home_nightly_override_reason:
+          p.home_nightly_override === null
+            ? null
+            : p.home_nightly_override_reason,
       };
       await api!.updateSoldiers([s.id], patch);
       await api!.setSoldierLoadRoles(s.id, roles);
@@ -145,10 +177,17 @@ function EditDialog(props: {
     }
   }
 
-  const parentChoice = p.parent_override === null ? "file" : p.parent_override ? "yes" : "no";
+  const parentChoice =
+    p.parent_override === null ? "file" : p.parent_override ? "yes" : "no";
 
   return (
-    <Dialog open onClose={props.onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
+    <Dialog
+      open
+      onClose={props.onClose}
+      fullScreen={fullScreen}
+      maxWidth="sm"
+      fullWidth
+    >
       <DialogTitle>
         {s.full_name}
         <Typography variant="body2" color="text.secondary">
@@ -158,7 +197,9 @@ function EditDialog(props: {
       <DialogContent dividers>
         <Stack spacing={2.5}>
           <Box>
-            <Typography variant="h3" gutterBottom>מטווח</Typography>
+            <Typography variant="h3" gutterBottom>
+              מטווח
+            </Typography>
             <DateField
               label="תוקף מטווח עד"
               value={p.range_valid_until}
@@ -168,32 +209,56 @@ function EditDialog(props: {
           </Box>
           <Divider />
           <Box>
-            <Typography variant="h3" gutterBottom>דרגת מינוי</Typography>
+            <Typography variant="h3" gutterBottom>
+              דרגת מינוי
+            </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               במקום הדרגה המחושבת ({s.rank_name || "—"}), למשל סרן במינוי רס"ן.
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField select label="דרגת מינוי" value={p.appointment_rank_id ?? ""} onChange={(e) => set("appointment_rank_id", e.target.value || null)} fullWidth>
+              <TextField
+                select
+                label="דרגת מינוי"
+                value={p.appointment_rank_id ?? ""}
+                onChange={(e) =>
+                  set("appointment_rank_id", e.target.value || null)
+                }
+                fullWidth
+              >
                 <MenuItem value="">— ללא —</MenuItem>
                 {props.ranks.map((r) => (
-                  <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
+                  <MenuItem key={r.id} value={r.id}>
+                    {r.name}
+                  </MenuItem>
                 ))}
               </TextField>
-              <DateField label="בתוקף עד" value={p.appointment_rank_until} onChange={(v) => set("appointment_rank_until", v)} />
+              <DateField
+                label="בתוקף עד"
+                value={p.appointment_rank_until}
+                onChange={(v) => set("appointment_rank_until", v)}
+              />
             </Stack>
           </Box>
           <Divider />
           <Box>
-            <Typography variant="h3" gutterBottom>משרת הורה</Typography>
+            <Typography variant="h3" gutterBottom>
+              משרת הורה
+            </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              לפי הקובץ: {s.parent_status ? "כן" : "לא"}. שינוי ידני גובר על הקובץ עד התאריך שנקבע.
+              לפי הקובץ: {s.parent_status ? "כן" : "לא"}. שינוי ידני גובר על
+              הקובץ עד התאריך שנקבע.
             </Typography>
             <Stack spacing={1.5}>
               <TextField
                 select
                 label="מקור"
                 value={parentChoice}
-                onChange={(e) => set("parent_override", e.target.value === "file" ? null : e.target.value === "yes")}
+                onChange={(e) =>
+                  set(
+                    "parent_override",
+                    e.target.value === "file" ? null : e.target.value === "yes",
+                  )
+                }
               >
                 <MenuItem value="file">לפי הקובץ</MenuItem>
                 <MenuItem value="yes">משרת הורה – ידני</MenuItem>
@@ -201,29 +266,59 @@ function EditDialog(props: {
               </TextField>
               {p.parent_override !== null && (
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                  <TextField label="סיבה" value={p.parent_override_reason ?? ""} onChange={(e) => set("parent_override_reason", e.target.value)} fullWidth />
-                  <DateField label="עד תאריך" value={p.parent_override_until} onChange={(v) => set("parent_override_until", v)} />
+                  <TextField
+                    label="סיבה"
+                    value={p.parent_override_reason ?? ""}
+                    onChange={(e) =>
+                      set("parent_override_reason", e.target.value)
+                    }
+                    fullWidth
+                  />
+                  <DateField
+                    label="עד תאריך"
+                    value={p.parent_override_until}
+                    onChange={(v) => set("parent_override_until", v)}
+                  />
                 </Stack>
               )}
             </Stack>
           </Box>
           <Divider />
           <Box>
-            <Typography variant="h3" gutterBottom>תפקיד שני</Typography>
+            <Typography variant="h3" gutterBottom>
+              תפקיד שני
+            </Typography>
             <Stack spacing={1.5}>
               <DateField
                 label="תאריך חתימה על המשך שירות קבע (תפקיד שני)"
                 value={p.second_role_signed_at}
                 onChange={(v) => set("second_role_signed_at", v)}
               />
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
-                <FormControlLabel control={<Switch checked={p.is_shachar} onChange={(e) => set("is_shachar", e.target.checked)} />} label="שח״ר" />
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                sx={{ alignItems: { sm: "center" } }}
+              >
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={p.is_shachar}
+                      onChange={(e) => set("is_shachar", e.target.checked)}
+                    />
+                  }
+                  label="שח״ר"
+                />
                 <TextField
                   select
                   size="small"
                   label='זכאות הת"ש'
                   value={p.tash_level ?? ""}
-                  onChange={(e) => set("tash_level", e.target.value === "" ? null : Number(e.target.value))}
+                  onChange={(e) =>
+                    set(
+                      "tash_level",
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
                   helperText={
                     p.tash_level
                       ? p.tash_level === 7
@@ -246,32 +341,73 @@ function EditDialog(props: {
           <Divider />
           <Box>
             <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
-              <Typography variant="h3" sx={{ flex: 1 }}>תפקידי הקלה</Typography>
+              <Typography variant="h3" sx={{ flex: 1 }}>
+                תפקידי הקלה
+              </Typography>
               <Button
                 size="small"
                 startIcon={<AddIcon />}
-                onClick={() => setRoles([...roles, { load_role_id: props.loadRoles[0]?.id ?? "", valid_from: new Date().toISOString().slice(0, 10), valid_to: null }])}
+                onClick={() =>
+                  setRoles([
+                    ...roles,
+                    {
+                      load_role_id: props.loadRoles[0]?.id ?? "",
+                      valid_from: new Date().toISOString().slice(0, 10),
+                      valid_to: null,
+                    },
+                  ])
+                }
               >
                 הוספה
               </Button>
             </Stack>
-            {roles.length === 0 && <Typography variant="body2" color="text.secondary">אין. מקדם 1.0</Typography>}
+            {roles.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                אין. מקדם 1.0
+              </Typography>
+            )}
             <Stack spacing={1.5}>
               {roles.map((r, i) => (
-                <Stack key={i} direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { sm: "center" } }}>
+                <Stack
+                  key={i}
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  sx={{ alignItems: { sm: "center" } }}
+                >
                   <TextField
                     select
                     label="תפקיד"
                     value={r.load_role_id}
-                    onChange={(e) => setRoles(roles.map((x, j) => (j === i ? { ...x, load_role_id: e.target.value } : x)))}
+                    onChange={(e) =>
+                      setRoles(
+                        roles.map((x, j) =>
+                          j === i ? { ...x, load_role_id: e.target.value } : x,
+                        ),
+                      )
+                    }
                     sx={{ minWidth: 160 }}
                   >
                     {props.loadRoles.map((lr) => (
-                      <MenuItem key={lr.id} value={lr.id}>{lr.name}</MenuItem>
+                      <MenuItem key={lr.id} value={lr.id}>
+                        {lr.name}
+                      </MenuItem>
                     ))}
                   </TextField>
-                  <DateField label="מתאריך" value={r.valid_from} onChange={(v) => setRoles(roles.map((x, j) => (j === i ? { ...x, valid_from: v ?? "" } : x)))} />
-                  <IconButton aria-label="מחיקה" onClick={() => setRoles(roles.filter((_, j) => j !== i))}>
+                  <DateField
+                    label="מתאריך"
+                    value={r.valid_from}
+                    onChange={(v) =>
+                      setRoles(
+                        roles.map((x, j) =>
+                          j === i ? { ...x, valid_from: v ?? "" } : x,
+                        ),
+                      )
+                    }
+                  />
+                  <IconButton
+                    aria-label="מחיקה"
+                    onClick={() => setRoles(roles.filter((_, j) => j !== i))}
+                  >
                     <DeleteIcon />
                   </IconButton>
                 </Stack>
@@ -280,7 +416,12 @@ function EditDialog(props: {
           </Box>
           <Divider />
           <FormControlLabel
-            control={<Switch checked={p.is_active} onChange={(e) => set("is_active", e.target.checked)} />}
+            control={
+              <Switch
+                checked={p.is_active}
+                onChange={(e) => set("is_active", e.target.checked)}
+              />
+            }
             label="פעיל ביחידה"
           />
           {error && <Alert severity="error">{error}</Alert>}
@@ -288,7 +429,9 @@ function EditDialog(props: {
       </DialogContent>
       <DialogActions>
         <Button onClick={props.onClose}>ביטול</Button>
-        <Button variant="contained" onClick={save} disabled={busy}>שמירה</Button>
+        <Button variant="contained" onClick={save} disabled={busy}>
+          שמירה
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -298,7 +441,11 @@ function EditDialog(props: {
 // Bulk range dialog
 // ---------------------------------------------------------------------------
 
-function BulkRangeDialog(props: { count: number; onClose: () => void; onApply: (date: string | null) => Promise<void> }) {
+function BulkRangeDialog(props: {
+  count: number;
+  onClose: () => void;
+  onApply: (date: string | null) => Promise<void>;
+}) {
   const [date, setDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -306,7 +453,12 @@ function BulkRangeDialog(props: { count: number; onClose: () => void; onApply: (
       <DialogTitle>עדכון תוקף מטווח ל-{props.count} חיילים</DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 1 }}>
-          <DateField label="תוקף מטווח עד" value={date} onChange={setDate} helperText="ריק = מחיקת התאריך" />
+          <DateField
+            label="תוקף מטווח עד"
+            value={date}
+            onChange={setDate}
+            helperText="ריק = מחיקת התאריך"
+          />
         </Box>
       </DialogContent>
       <DialogActions>
@@ -359,7 +511,9 @@ export function SoldiersPage() {
 
   const load = useCallback(async () => {
     try {
-      const horizon = new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10);
+      const horizon = new Date(Date.now() + 365 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
       const [s, r, lr, ex, et] = await Promise.all([
         api!.soldierDetails(),
         api!.ranks(),
@@ -370,7 +524,9 @@ export function SoldiersPage() {
       setRows(s);
       setRanks(r);
       setLoadRoles(lr);
-      setExemptions(ex.filter((e) => e.status === "approved" || e.status === "pending"));
+      setExemptions(
+        ex.filter((e) => e.status === "approved" || e.status === "pending"),
+      );
       setExTypes(et);
     } catch (e) {
       setError((e as Error).message);
@@ -385,43 +541,95 @@ export function SoldiersPage() {
     (async () => {
       const c = lastPublishedCycle(await api!.cycles());
       if (!c) return;
-      const [as, sn] = await Promise.all([api!.draftAssignments(c.id), api!.snapshotSoldiers(c.id)]);
+      const [as, sn] = await Promise.all([
+        api!.draftAssignments(c.id),
+        api!.snapshotSoldiers(c.id),
+      ]);
       setLast({
         cycle: c,
         scores: cycleScores(as),
-        members: sn.map((x) => ({ soldier_id: x.soldier_id, group: x.service_type === "career" ? "קבע" : "חובה" })),
+        members: sn.map((x) => ({
+          soldier_id: x.soldier_id,
+          group: x.service_type === "career" ? "קבע" : "חובה",
+        })),
       });
     })().catch(() => setLast(null));
   }, [api]);
-  const wasInLast = useMemo(() => new Set(last?.members.map((m) => m.soldier_id) ?? []), [last]);
+  const wasInLast = useMemo(
+    () => new Set(last?.members.map((m) => m.soldier_id) ?? []),
+    [last],
+  );
+  // a duty on a holiday or its eve in the past year (published cycles)
+  const [holidayDuty, setHolidayDuty] = useState<
+    Map<string, { day: string; task_name: string }>
+  >(new Map());
+  useEffect(() => {
+    const since = new Date(Date.now() - 365 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    api!
+      .recentHolidayDuties(since)
+      .then((l) => setHolidayDuty(new Map(l.map((h) => [h.soldier_id, h]))))
+      .catch(() => setHolidayDuty(new Map()));
+  }, [api]);
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(
+    null,
+  );
 
-  const gafim = useMemo(() => [...new Set((rows ?? []).map((s) => s.gaf_name))].sort(), [rows]);
-  const rankName = useMemo(() => new Map(ranks.map((r) => [r.id, r.name])), [ranks]);
+  const gafim = useMemo(
+    () => [...new Set((rows ?? []).map((s) => s.gaf_name))].sort(),
+    [rows],
+  );
+  const rankName = useMemo(
+    () => new Map(ranks.map((r) => [r.id, r.name])),
+    [ranks],
+  );
   // a rank appointment in force counts as the soldier's rank too (סרן במינוי רס"ן appears under both)
   const today = todayIso();
-  const exTypeName = useMemo(() => new Map(exTypes.map((t) => [t.id, t.name])), [exTypes]);
+  const exTypeName = useMemo(
+    () => new Map(exTypes.map((t) => [t.id, t.name])),
+    [exTypes],
+  );
   const exBySoldier = useMemo(() => {
     const m = new Map<string, Exemption[]>();
-    for (const e of exemptions) m.set(e.soldier_id, [...(m.get(e.soldier_id) ?? []), e]);
+    for (const e of exemptions)
+      m.set(e.soldier_id, [...(m.get(e.soldier_id) ?? []), e]);
     return m;
   }, [exemptions]);
-  const homeNightlyType = useMemo(() => new Set(exTypes.filter((t) => t.home_nightly).map((t) => t.id)), [exTypes]);
+  const homeNightlyType = useMemo(
+    () => new Set(exTypes.filter((t) => t.home_nightly).map((t) => t.id)),
+    [exTypes],
+  );
   const tashBy = (s: SoldierDetail) =>
     s.tash_level === 7 ||
     effectiveHomeNightly(s) ||
-    (exBySoldier.get(s.id) ?? []).some((e) => e.status === "approved" && homeNightlyType.has(e.exemption_type_id) && e.start_date <= today && e.end_date >= today);
+    (exBySoldier.get(s.id) ?? []).some(
+      (e) =>
+        e.status === "approved" &&
+        homeNightlyType.has(e.exemption_type_id) &&
+        e.start_date <= today &&
+        e.end_date >= today,
+    );
   const exMatch = (id: string) => {
     const l = exBySoldier.get(id) ?? [];
-    if (exFilter === "now") return l.some((e) => e.status === "approved" && e.start_date <= today);
+    if (exFilter === "now")
+      return l.some((e) => e.status === "approved" && e.start_date <= today);
     if (exFilter === "any") return l.length > 0;
     if (exFilter === "pending") return l.some((e) => e.status === "pending");
     if (exFilter === "none") return l.length === 0;
     return true;
   };
-  const appointedNow = (s: SoldierDetail) => !!s.appointment_rank_id && (!s.appointment_rank_until || s.appointment_rank_until >= todayIso());
+  const appointedNow = (s: SoldierDetail) =>
+    !!s.appointment_rank_id &&
+    (!s.appointment_rank_until || s.appointment_rank_until >= todayIso());
   // ranks present among the soldiers, in the catalog's order
   const rankOptions = useMemo(() => {
-    const present = new Set((rows ?? []).flatMap((s) => [s.rank_name, appointedNow(s) ? rankName.get(s.appointment_rank_id!) : undefined]));
+    const present = new Set(
+      (rows ?? []).flatMap((s) => [
+        s.rank_name,
+        appointedNow(s) ? rankName.get(s.appointment_rank_id!) : undefined,
+      ]),
+    );
     return ranks.map((r) => r.name).filter((n) => present.has(n));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, ranks, rankName]);
@@ -432,7 +640,9 @@ export function SoldiersPage() {
       (!q || s.full_name.includes(q.trim())) &&
       (!gaf || s.gaf_name === gaf) &&
       (!service || effectiveService(s) === service) &&
-      (!rank || s.rank_name === rank || (appointedNow(s) && rankName.get(s.appointment_rank_id!) === rank)) &&
+      (!rank ||
+        s.rank_name === rank ||
+        (appointedNow(s) && rankName.get(s.appointment_rank_id!) === rank)) &&
       exMatch(s.id) &&
       (!relief ||
         (relief === "any"
@@ -441,16 +651,94 @@ export function SoldiersPage() {
             ? activeLoadRoles(s).length === 0
             : activeLoadRoles(s).some((r) => r.load_role_id === relief))) &&
       (!range ||
-        (range === "issues" ? ["expired", "expiring"].includes(rangeState(s.range_valid_until)) : rangeState(s.range_valid_until) === range)),
+        (range === "issues"
+          ? ["expired", "expiring"].includes(rangeState(s.range_valid_until))
+          : rangeState(s.range_valid_until) === range)),
   );
-  const allSelected = shown.length > 0 && shown.every((s) => selected.has(s.id));
+  // sortable columns: what each sorts by, and which way the first click goes
+  const rankOrder = new Map(ranks.map((r, i) => [r.name, i]));
+  const columns: {
+    label: string;
+    key?: string;
+    by?: (s: SoldierDetail) => string | number;
+    first?: "asc" | "desc";
+  }[] = [
+    { label: "שם", key: "name", by: (s) => s.full_name },
+    {
+      label: "דרגה",
+      key: "rank",
+      by: (s) => rankOrder.get(s.rank_name) ?? -1,
+      first: "desc",
+    },
+    { label: "גף", key: "gaf", by: (s) => s.gaf_name },
+    { label: "שירות", key: "service", by: (s) => effectiveService(s) },
+    { label: "תום שירות", key: "release", by: (s) => s.release_date ?? "9999" },
+    {
+      label: "ת״ש",
+      key: "tash",
+      by: (s) => (tashBy(s) ? 7 : (s.tash_level ?? 0)),
+      first: "desc",
+    },
+    {
+      label: last ? `ניקוד ${last.cycle.name}` : "ניקוד מחזור אחרון",
+      key: "score",
+      by: (s) =>
+        last && wasInLast.has(s.id) ? (last.scores.get(s.id)?.points ?? 0) : -1,
+      first: "desc",
+    },
+    {
+      label: "חג בשנה האחרונה",
+      key: "holiday",
+      by: (s) => holidayDuty.get(s.id)?.day ?? "",
+      first: "desc",
+    },
+    { label: "מטווח", key: "range", by: (s) => s.range_valid_until ?? "" },
+    {
+      label: "הורה",
+      key: "parent",
+      by: (s) => (effectiveParent(s) ? 1 : 0),
+      first: "desc",
+    },
+    { label: "הקלה", key: "relief", by: (s) => activeLoadRole(s)?.factor ?? 2 },
+    {
+      label: "פטורים",
+      key: "exemptions",
+      by: (s) => (exBySoldier.get(s.id) ?? []).length,
+      first: "desc",
+    },
+    {
+      label: "תפקיד שני",
+      key: "second",
+      by: (s) => s.second_role_signed_at ?? "",
+    },
+    { label: "" },
+  ];
+  const sortCol = sort && columns.find((c) => c.key === sort.key);
+  if (sortCol?.by) {
+    const by = sortCol.by;
+    const sign = sort!.dir === "asc" ? 1 : -1;
+    shown.sort((a, b) => {
+      const x = by(a),
+        y = by(b);
+      const c =
+        typeof x === "number" && typeof y === "number"
+          ? x - y
+          : String(x).localeCompare(String(y), "he");
+      return sign * c || a.full_name.localeCompare(b.full_name, "he");
+    });
+  }
+  const allSelected =
+    shown.length > 0 && shown.every((s) => selected.has(s.id));
   const counts = useMemo(() => {
     const active = (rows ?? []).filter((s) => s.is_active);
     return {
       active: active.length,
-      mandatory: active.filter((s) => effectiveService(s) === "mandatory").length,
+      mandatory: active.filter((s) => effectiveService(s) === "mandatory")
+        .length,
       career: active.filter((s) => effectiveService(s) === "career").length,
-      rangeIssues: active.filter((s) => ["expired", "expiring"].includes(rangeState(s.range_valid_until))).length,
+      rangeIssues: active.filter((s) =>
+        ["expired", "expiring"].includes(rangeState(s.range_valid_until)),
+      ).length,
     };
   }, [rows]);
 
@@ -463,11 +751,19 @@ export function SoldiersPage() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+      <Stack
+        direction="row"
+        sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}
+      >
         <Typography variant="h1" sx={{ flex: 1 }}>
           חיילים
         </Typography>
-        <Button variant="contained" startIcon={<UploadIcon />} component={RouterLink} to="/soldiers/import">
+        <Button
+          variant="contained"
+          startIcon={<UploadIcon />}
+          component={RouterLink}
+          to="/soldiers/import"
+        >
           טעינת כוח אדם
         </Button>
       </Stack>
@@ -486,7 +782,9 @@ export function SoldiersPage() {
           <Chip
             label={`חובה: ${counts.mandatory}`}
             color={service === "mandatory" ? "primary" : "default"}
-            onClick={() => setService(service === "mandatory" ? "" : "mandatory")}
+            onClick={() =>
+              setService(service === "mandatory" ? "" : "mandatory")
+            }
           />
           <Chip
             label={`קבע: ${counts.career}`}
@@ -505,21 +803,51 @@ export function SoldiersPage() {
       )}
 
       <Paper sx={{ p: 2 }}>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", md: "2fr repeat(6, 1fr)" } }}>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 1.5,
+            gridTemplateColumns: {
+              xs: "1fr 1fr",
+              sm: "repeat(3, 1fr)",
+              md: "2fr repeat(6, 1fr)",
+            },
+          }}
+        >
           <TextField
             sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}
             placeholder="חיפוש לפי שם"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
-          <TextField select label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)}>
+          <TextField
+            select
+            label="גף"
+            value={gaf}
+            onChange={(e) => setGaf(e.target.value)}
+          >
             <MenuItem value="">כל הגפים</MenuItem>
             {gafim.map((g) => (
-              <MenuItem key={g} value={g}>{g}</MenuItem>
+              <MenuItem key={g} value={g}>
+                {g}
+              </MenuItem>
             ))}
           </TextField>
-          <TextField select label="דרגה" value={rank} onChange={(e) => setRank(e.target.value)}>
+          <TextField
+            select
+            label="דרגה"
+            value={rank}
+            onChange={(e) => setRank(e.target.value)}
+          >
             <MenuItem value="">כל הדרגות</MenuItem>
             {rankOptions.map((r) => (
               <MenuItem key={r} value={r}>
@@ -527,7 +855,12 @@ export function SoldiersPage() {
               </MenuItem>
             ))}
           </TextField>
-          <TextField select label="הקלה" value={relief} onChange={(e) => setRelief(e.target.value)}>
+          <TextField
+            select
+            label="הקלה"
+            value={relief}
+            onChange={(e) => setRelief(e.target.value)}
+          >
             <MenuItem value="">הכול</MenuItem>
             <MenuItem value="any">עם הקלה</MenuItem>
             <MenuItem value="none">בלי הקלה</MenuItem>
@@ -537,19 +870,34 @@ export function SoldiersPage() {
               </MenuItem>
             ))}
           </TextField>
-          <TextField select label="פטור" value={exFilter} onChange={(e) => setExFilter(e.target.value)}>
+          <TextField
+            select
+            label="פטור"
+            value={exFilter}
+            onChange={(e) => setExFilter(e.target.value)}
+          >
             <MenuItem value="">הכול</MenuItem>
             <MenuItem value="now">בפטור היום</MenuItem>
             <MenuItem value="any">עם פטור</MenuItem>
             <MenuItem value="pending">ממתין לאישור</MenuItem>
             <MenuItem value="none">בלי פטור</MenuItem>
           </TextField>
-          <TextField select label="שירות" value={service} onChange={(e) => setService(e.target.value)}>
+          <TextField
+            select
+            label="שירות"
+            value={service}
+            onChange={(e) => setService(e.target.value)}
+          >
             <MenuItem value="">הכול</MenuItem>
             <MenuItem value="mandatory">חובה</MenuItem>
             <MenuItem value="career">קבע</MenuItem>
           </TextField>
-          <TextField select label="מטווח" value={range} onChange={(e) => setRange(e.target.value)}>
+          <TextField
+            select
+            label="מטווח"
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+          >
             <MenuItem value="">הכול</MenuItem>
             <MenuItem value="missing">לא הוזן</MenuItem>
             <MenuItem value="expired">פג</MenuItem>
@@ -558,14 +906,30 @@ export function SoldiersPage() {
             <MenuItem value="valid">בתוקף</MenuItem>
           </TextField>
         </Box>
-        <Stack direction="row" spacing={1.5} sx={{ mt: 1.5, alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
-          <FormControlLabel control={<Switch checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />} label="הצגת לא פעילים" />
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ mt: 1.5, alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+              />
+            }
+            label="הצגת לא פעילים"
+          />
           <Box sx={{ flex: 1 }} />
           {selected.size > 0 && (
             <>
               <Typography variant="body2">נבחרו {selected.size}</Typography>
-              <Button variant="contained" onClick={() => setBulk(true)}>עדכון מטווח לנבחרים</Button>
-              <Button onClick={() => setSelected(new Set())}>ניקוי בחירה</Button>
+              <Button variant="contained" onClick={() => setBulk(true)}>
+                עדכון מטווח לנבחרים
+              </Button>
+              <Button onClick={() => setSelected(new Set())}>
+                ניקוי בחירה
+              </Button>
             </>
           )}
         </Stack>
@@ -577,21 +941,29 @@ export function SoldiersPage() {
           <CircularProgress />
         </Box>
       )}
-      {rows && rows.length === 0 && <Alert severity="info">אין עדיין חיילים. טען קובץ כוח אדם במסך "כוח אדם".</Alert>}
+      {rows && rows.length === 0 && (
+        <Alert severity="info">
+          אין עדיין חיילים. טען קובץ כוח אדם במסך "כוח אדם".
+        </Alert>
+      )}
 
       {last && (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
-          <Typography variant="subtitle2">רפרנס – המחזור האחרון שפורסם: {last.cycle.name}</Typography>
+          <Typography variant="subtitle2">
+            רפרנס – המחזור האחרון שפורסם: {last.cycle.name}
+          </Typography>
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 2, mt: 0.5 }}>
             {summarize(last.members, last.scores).map((g) => (
               <Typography key={g.key} variant="body2">
-                <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ · טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
+                <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ ·
+                טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
                 {g.zero ? ` · ${g.zero} בלי תורנות` : ""}
               </Typography>
             ))}
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            ניקוד = סכום הנקודות של התורנויות שבוצעו או שנשארו בלוח (בלי עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של אותו מחזור.
+            ניקוד = סכום הנקודות של התורנויות שבוצעו או שנשארו בלוח (בלי
+            עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של אותו מחזור.
           </Typography>
         </Paper>
       )}
@@ -605,58 +977,121 @@ export function SoldiersPage() {
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={allSelected}
-                      indeterminate={!allSelected && shown.some((s) => selected.has(s.id))}
-                      onChange={() => setSelected(allSelected ? new Set() : new Set(shown.map((s) => s.id)))}
-                      slotProps={{ input: { "aria-label": "בחירת כל המוצגים" } }}
+                      indeterminate={
+                        !allSelected && shown.some((s) => selected.has(s.id))
+                      }
+                      onChange={() =>
+                        setSelected(
+                          allSelected
+                            ? new Set()
+                            : new Set(shown.map((s) => s.id)),
+                        )
+                      }
+                      slotProps={{
+                        input: { "aria-label": "בחירת כל המוצגים" },
+                      }}
                     />
                   </TableCell>
-                  {[
-                    "שם",
-                    "דרגה",
-                    "גף",
-                    "שירות",
-                    "תום שירות",
-                    "ת״ש",
-                    last ? `ניקוד ${last.cycle.name}` : "ניקוד מחזור אחרון",
-                    "מטווח",
-                    "הורה",
-                    "הקלה",
-                    "פטורים",
-                    "תפקיד שני",
-                    "",
-                  ].map((h, i) => (
-                    <TableCell key={i}>{h}</TableCell>
-                  ))}
+                  {columns.map((c, i) => {
+                    const on = !!c.key && sort?.key === c.key;
+                    return (
+                      <TableCell
+                        key={i}
+                        sortDirection={on ? sort!.dir : false}
+                        sx={{ whiteSpace: "nowrap" }}
+                      >
+                        {c.key ? (
+                          <TableSortLabel
+                            active={on}
+                            direction={on ? sort!.dir : (c.first ?? "asc")}
+                            onClick={() =>
+                              setSort(
+                                sort && sort.key === c.key
+                                  ? sort.dir === (c.first ?? "asc")
+                                    ? {
+                                        key: c.key!,
+                                        dir:
+                                          sort.dir === "asc" ? "desc" : "asc",
+                                      }
+                                    : null // third click: back to the default order
+                                  : { key: c.key!, dir: c.first ?? "asc" },
+                              )
+                            }
+                          >
+                            {c.label}
+                          </TableSortLabel>
+                        ) : (
+                          c.label
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {shown.map((s) => {
                   const lr = activeLoadRole(s);
-                  const appointed = s.appointment_rank_id && (!s.appointment_rank_until || s.appointment_rank_until >= new Date().toISOString().slice(0, 10));
+                  const appointed =
+                    s.appointment_rank_id &&
+                    (!s.appointment_rank_until ||
+                      s.appointment_rank_until >=
+                        new Date().toISOString().slice(0, 10));
                   return (
-                    <TableRow key={s.id} hover selected={selected.has(s.id)} sx={{ opacity: s.is_active ? 1 : 0.5 }}>
+                    <TableRow
+                      key={s.id}
+                      hover
+                      selected={selected.has(s.id)}
+                      sx={{ opacity: s.is_active ? 1 : 0.5 }}
+                    >
                       <TableCell padding="checkbox">
-                        <Checkbox checked={selected.has(s.id)} onChange={() => toggle(s.id)} slotProps={{ input: { "aria-label": `בחירת ${s.full_name}` } }} />
+                        <Checkbox
+                          checked={selected.has(s.id)}
+                          onChange={() => toggle(s.id)}
+                          slotProps={{
+                            input: { "aria-label": `בחירת ${s.full_name}` },
+                          }}
+                        />
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>{s.full_name}</TableCell>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                        {s.full_name}
+                      </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {s.rank_name}
                         {appointed && (
-                          <Typography component="span" variant="caption" color="secondary.main">
-                            {" "}(מינוי {rankName.get(s.appointment_rank_id!)})
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            color="secondary.main"
+                          >
+                            {" "}
+                            (מינוי {rankName.get(s.appointment_rank_id!)})
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell sx={{ whiteSpace: "nowrap" }}>{s.gaf_name}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {s.gaf_name}
+                      </TableCell>
                       <TableCell>{SERVICE[effectiveService(s)]}</TableCell>
-                      <TableCell sx={{ whiteSpace: "nowrap", color: s.release_date && s.release_date < today ? "text.disabled" : undefined }}>
+                      <TableCell
+                        sx={{
+                          whiteSpace: "nowrap",
+                          color:
+                            s.release_date && s.release_date < today
+                              ? "text.disabled"
+                              : undefined,
+                        }}
+                      >
                         {fmt(s.release_date)}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {tashBy(s) ? (
                           <Chip size="small" variant="outlined" label="ת״ש 7" />
                         ) : s.tash_level ? (
-                          <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} />
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={`הת״ש ${s.tash_level}`}
+                          />
                         ) : (
                           "—"
                         )}
@@ -666,17 +1101,48 @@ export function SoldiersPage() {
                           "—"
                         ) : (
                           <>
-                            <b>{(last.scores.get(s.id)?.points ?? 0).toFixed(1)}</b>
-                            <Typography component="span" variant="caption" color="text.secondary">
-                              {" "}· {last.scores.get(s.id)?.duties ?? 0} תורנויות
+                            <b>
+                              {(last.scores.get(s.id)?.points ?? 0).toFixed(1)}
+                            </b>
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {" "}
+                              · {last.scores.get(s.id)?.duties ?? 0} תורנויות
                             </Typography>
                           </>
                         )}
                       </TableCell>
-                      <TableCell><RangeChip until={s.range_valid_until} /></TableCell>
+                      <TableCell align="center">
+                        {holidayDuty.has(s.id) ? (
+                          <Tooltip
+                            title={`${holidayDuty.get(s.id)!.task_name} · ${fmt(holidayDuty.get(s.id)!.day)}`}
+                          >
+                            <CheckIcon
+                              color="success"
+                              fontSize="small"
+                              aria-label="ביצע תורנות חג בשנה האחרונה"
+                            />
+                          </Tooltip>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <RangeChip until={s.range_valid_until} />
+                      </TableCell>
                       <TableCell>
                         {effectiveParent(s) ? "כן" : "—"}
-                        {s.parent_override !== null && <Typography component="span" variant="caption" color="text.secondary"> (ידני)</Typography>}
+                        {s.parent_override !== null && (
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            color="text.secondary"
+                          >
+                            {" "}
+                            (ידני)
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {activeLoadRoles(s).length === 0
@@ -686,9 +1152,21 @@ export function SoldiersPage() {
                                 key={r.load_role_id + r.valid_from}
                                 size="small"
                                 label={`${r.name} ×${r.factor}`}
-                                color={r.load_role_id === lr?.load_role_id ? "primary" : "default"}
-                                variant={r.load_role_id === lr?.load_role_id ? "filled" : "outlined"}
-                                title={r.load_role_id === lr?.load_role_id ? "ההקלה שחלה (הגדולה מביניהן)" : "לא חלה – יש הקלה גדולה יותר"}
+                                color={
+                                  r.load_role_id === lr?.load_role_id
+                                    ? "primary"
+                                    : "default"
+                                }
+                                variant={
+                                  r.load_role_id === lr?.load_role_id
+                                    ? "filled"
+                                    : "outlined"
+                                }
+                                title={
+                                  r.load_role_id === lr?.load_role_id
+                                    ? "ההקלה שחלה (הגדולה מביניהן)"
+                                    : "לא חלה – יש הקלה גדולה יותר"
+                                }
                                 sx={{ ml: 0.5 }}
                               />
                             ))}
@@ -699,14 +1177,23 @@ export function SoldiersPage() {
                           : (exBySoldier.get(s.id) ?? []).map((e) => {
                               const now = e.start_date <= today;
                               const pending = e.status === "pending";
-                              const type = exTypeName.get(e.exemption_type_id) ?? "פטור";
+                              const type =
+                                exTypeName.get(e.exemption_type_id) ?? "פטור";
                               return (
                                 <Chip
                                   key={e.id}
                                   size="small"
                                   label={`${type}${e.kind === "partial" ? " (חלקי)" : ""} · ${now ? `עד ${ddmm(e.end_date)}` : `מ-${ddmm(e.start_date)}`}${pending ? " · ממתין" : ""}`}
-                                  color={pending ? "warning" : now ? "info" : "default"}
-                                  variant={now && !pending ? "filled" : "outlined"}
+                                  color={
+                                    pending
+                                      ? "warning"
+                                      : now
+                                        ? "info"
+                                        : "default"
+                                  }
+                                  variant={
+                                    now && !pending ? "filled" : "outlined"
+                                  }
                                   title={`${type}: ${fmt(e.start_date)} – ${fmt(e.end_date)}${pending ? " · ממתין לאישור" : ""}`}
                                   sx={{ ml: 0.5 }}
                                 />
@@ -715,7 +1202,10 @@ export function SoldiersPage() {
                       </TableCell>
                       <TableCell>{fmt(s.second_role_signed_at)}</TableCell>
                       <TableCell padding="checkbox">
-                        <IconButton aria-label={`עריכת ${s.full_name}`} onClick={() => setEditing(s)}>
+                        <IconButton
+                          aria-label={`עריכת ${s.full_name}`}
+                          onClick={() => setEditing(s)}
+                        >
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </TableCell>
@@ -725,8 +1215,13 @@ export function SoldiersPage() {
               </TableBody>
             </Table>
           </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", p: 1 }}>
-            מוצגים {shown.length} מתוך {rows.length}. סוג השירות מוצג לפי היום; במחזור הוא נקבע לפי תאריך תחילת המחזור.
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", p: 1 }}
+          >
+            מוצגים {shown.length} מתוך {rows.length}. סוג השירות מוצג לפי היום;
+            במחזור הוא נקבע לפי תאריך תחילת המחזור.
           </Typography>
         </Paper>
       )}
@@ -748,7 +1243,9 @@ export function SoldiersPage() {
           count={selected.size}
           onClose={() => setBulk(false)}
           onApply={async (date) => {
-            await api!.updateSoldiers([...selected], { range_valid_until: date });
+            await api!.updateSoldiers([...selected], {
+              range_valid_until: date,
+            });
             setBulk(false);
             setSelected(new Set());
             await load();

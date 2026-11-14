@@ -100,6 +100,12 @@ export interface ApplyResult {
   gafimCreated: number;
 }
 
+export interface HolidayDuty {
+  soldier_id: string;
+  day: string;
+  task_name: string;
+}
+
 export interface Api {
   readonly demo: boolean;
   signIn(username: string, password: string): Promise<void>;
@@ -187,6 +193,8 @@ export interface Api {
   potentialMatrix(cycleId: string): Promise<PotentialCell[]>;
   potentialDaily(cycleId: string): Promise<DailyAvailability[]>;
   snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]>;
+  /** The last duty on a holiday (or its eve) per soldier since a date, in published cycles. */
+  recentHolidayDuties(sinceIso: string): Promise<HolidayDuty[]>;
   setPotentialOverride(cycleId: string, soldierId: string, categoryId: string, value: number, reason: string): Promise<void>;
   clearPotentialOverride(cycleId: string, soldierId: string, categoryId: string): Promise<void>;
   // base schedule

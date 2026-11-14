@@ -38,7 +38,7 @@ from datetime import date, datetime, timedelta
 from statistics import mean, pstdev
 from typing import Optional
 
-from .eligibility import EligibilityIndex, base_nights, max_base_nights, nights_by_week
+from .eligibility import EligibilityIndex, base_nights, is_holiday_slot, max_base_nights, nights_by_week
 from .models import (
     ROLE_PERFORMER,
     ROLE_RESERVE,
@@ -525,6 +525,19 @@ def solve(
                 objective.append(coef(w.home_nightly_preference * SCALE) * x[sid, k.id])
                 if (sid, k.id) in r:
                     objective.append(coef(w.home_nightly_preference * SCALE) * r[sid, k.id])
+
+    # Holiday duties: first to those who did none in the past year. Each holiday duty beyond the
+    # first in "the past year + this cycle" costs a penalty.
+    holidays_set = set(problem.holidays)
+    holiday_slots = [k for k in problem.slots if not k.is_penalty and is_holiday_slot(k, holidays_set)]
+    if holiday_slots and w.holiday_repeat:
+        for s in problem.soldiers:
+            vs = [x[s.id, k.id] for k in holiday_slots if (s.id, k.id) in x]
+            if not vs:
+                continue
+            extra = m.NewIntVar(0, len(vs), f"hol_{s.id}")
+            m.Add(extra >= sum(vs) + int(s.recent_holiday) - 1)
+            objective.append(coef(w.holiday_repeat * SCALE) * extra)
 
     m.Minimize(sum(objective))
 
