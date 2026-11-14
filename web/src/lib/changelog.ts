@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.22.2",
+    date: "2026-11-14",
+    items: ["ערב סוכות מוגדר עכשיו \"ערב חג מרכזי\", כמו ערב ראש השנה, ערב יום כיפור וערב פסח – כל מקדם על ערב חג מרכזי חל גם עליו"],
+  },
+  {
     version: "1.22.1",
     date: "2026-11-14",
     items: [
