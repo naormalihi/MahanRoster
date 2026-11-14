@@ -12,6 +12,7 @@ const base: TaskTypeInput = {
   is_weekend_type: false,
   shachar_compatible: false,
   shachar_only: false,
+  tash_rule: "auto",
   qualifying_duty: false,
   allowed_rank_ids: null,
   gender: null,

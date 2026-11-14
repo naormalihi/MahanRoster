@@ -12,6 +12,7 @@ import bisect
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from .eligibility import base_nights, max_base_nights, nights_by_week
 from .models import ROLE_PERFORMER, ROLE_RESERVE, SERVICE_MANDATORY, Problem
 
 LOOKBACK = timedelta(days=14)  # longer than any duty plus its rest
@@ -26,6 +27,7 @@ def greedy(problem: Problem, prep) -> list[tuple[str, str, str]]:
     weekends = {s.id: s.baseline_weekends for s in problem.soldiers}
     month_count = defaultdict(int)
     cap = problem.settings.duty_cap_per_month
+    nights = defaultdict(int)  # (soldier, week) -> nights on base so far, for הת"ש limits
     chosen: list[tuple[str, str, str]] = []
     fixed = defaultdict(list)
     for f in problem.fixed:
@@ -46,6 +48,17 @@ def greedy(problem: Problem, prep) -> list[tuple[str, str, str]]:
     def take(sid: str, kid: str, role: str, a: datetime, b: datetime):
         bisect.insort(busy[sid], (a, b))
         chosen.append((sid, kid, role))
+        if role == ROLE_PERFORMER and max_base_nights(soldiers[sid]):
+            for wk, n in week_nights[kid].items():
+                nights[sid, wk] += n
+
+    def nights_ok(sid: str, kid: str) -> bool:
+        limit = max_base_nights(soldiers[sid])
+        return not limit or all(nights[sid, wk] + n <= limit for wk, n in week_nights[kid].items())
+
+    week_nights = {
+        k.id: nights_by_week(base_nights(k, tasks[k.task_type_id], problem.settings)) for k in problem.slots
+    }
 
     for k in sorted(problem.slots, key=lambda k: k.starts_at):
         a = k.starts_at
@@ -68,9 +81,11 @@ def greedy(problem: Problem, prep) -> list[tuple[str, str, str]]:
             if sid not in performers and sid not in res_list and free(sid, a, b)
             and not (cap and not k.is_penalty and month_count[sid, month] >= cap)
         ]
-        cand.sort(key=lambda sid: (score[sid] + prep.pts[sid, k.id], weekends[sid], sid))
-        while len(performers) < k.performers_needed and cand:
-            sid = cand.pop(0)
+        perf_cand = [sid for sid in cand if nights_ok(sid, k.id)]
+        perf_cand.sort(key=lambda sid: (score[sid] + prep.pts[sid, k.id], weekends[sid], sid))
+        while len(performers) < k.performers_needed and perf_cand:
+            sid = perf_cand.pop(0)
+            cand.remove(sid)
             performers.append(sid)
             take(sid, k.id, ROLE_PERFORMER, a, b)
             score[sid] += prep.pts[sid, k.id]

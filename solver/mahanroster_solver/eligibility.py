@@ -13,8 +13,10 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from .models import SERVICE_MANDATORY, Problem, Slot, Soldier, TaskType
-from .scoring import parse_window, window_overlap_minutes
+from typing import Optional
+
+from .models import SERVICE_MANDATORY, Problem, Settings, Slot, Soldier, TaskType
+from .scoring import overlap_minutes, parse_window, window_intervals, window_overlap_minutes
 
 REASON_LABELS = {
     "service": "המשימה מוגבלת לחובה או לקבע",
@@ -26,6 +28,8 @@ REASON_LABELS = {
     "shachar": "שח\"ר – המשימה לא מסומנת מתאימה לשח\"ר",
     "shachar_only": "המשימה רק לשח\"ר",
     "home_nightly": "ת\"ש 7 – לא לן בבסיס, והתורנות כוללת שעות לילה",
+    "tash_closed": "התורנות לא מתאימה לבעלי הת\"ש",
+    "tash_nights": "הת\"ש – יותר לילות בבסיס בשבוע ממה שמותר לו",
     "weapon_range": "מטווח לא בתוקף ביום התורנות",
     "not_enlisted": "לפני תאריך הגיוס",
     "released": "אחרי תאריך השחרור",
@@ -62,6 +66,41 @@ def _worked(slot: Slot) -> list[tuple[datetime, datetime]]:
         if a < b:
             out.append((a, b))
     return out
+
+
+TASH_HOME, TASH_CLOSED = "home", "closed"
+
+
+def week_of(d: date) -> date:
+    """The Sunday that opens the week of a day."""
+    return d - timedelta(days=(d.weekday() + 1) % 7)
+
+
+def base_nights(slot: Slot, task: TaskType, settings: Settings) -> list[date]:
+    """Nights (by their evening's date) the slot keeps its performer on base: the night window
+    overlaps the hours worked. A duty marked fit for הת"ש keeps no one on base."""
+    if task.tash_rule == TASH_HOME:
+        return []
+    worked = _worked(slot)
+    return [
+        a.date()
+        for a, b in window_intervals(settings.night_window, slot.starts_at, slot.ends_at)
+        if any(overlap_minutes(a, b, x, y) > 0 for x, y in worked)
+    ]
+
+
+def nights_by_week(nights: list[date]) -> dict[date, int]:
+    out: dict[date, int] = defaultdict(int)
+    for n in nights:
+        out[week_of(n)] += 1
+    return dict(out)
+
+
+def max_base_nights(soldier: Soldier) -> Optional[int]:
+    """Nights on base allowed a week: 0 for ת"ש 7, 7 − level for הת"ש 3–6, None = no limit."""
+    if soldier.home_nightly or soldier.tash_level == 7:
+        return 0
+    return 7 - soldier.tash_level if soldier.tash_level else None
 
 
 def _window_overlap(window: str, slot: Slot) -> float:
@@ -143,8 +182,14 @@ class EligibilityIndex:
             reasons.append("shachar")
         if task.shachar_only and not (soldier.is_shachar and soldier.service_type == SERVICE_MANDATORY):
             reasons.append("shachar_only")
-        if soldier.home_nightly and _window_overlap(settings.night_window, slot) > 0:
+        has_tash = soldier.home_nightly or soldier.tash_level is not None
+        if task.tash_rule == TASH_CLOSED and has_tash:
+            reasons.append("tash_closed")
+        limit = max_base_nights(soldier)
+        if limit == 0 and task.tash_rule != TASH_HOME and _window_overlap(settings.night_window, slot) > 0:
             reasons.append("home_nightly")
+        elif limit and any(n > limit for n in nights_by_week(base_nights(slot, task, settings)).values()):
+            reasons.append("tash_nights")
 
         # --- dates of service ----------------------------------------------------
         if task.requires_weapon and (soldier.range_valid_until is None or soldier.range_valid_until < last_day):

@@ -37,6 +37,9 @@ class TaskType:
     shachar_compatible: bool = False
     # Only mandatory-service שח"ר soldiers may do it (implies shachar_compatible).
     shachar_only: bool = False
+    # "auto": a night on base when it covers night hours; "home": fit for הת"ש, never a night
+    # on base; "closed": closed to anyone with הת"ש (any level) or ת"ש 7.
+    tash_rule: str = "auto"
     # ממלכ"ת יום – the only duty open to parents and to holders of a qualifying exemption.
     qualifying_duty: bool = False
     # Empty list = open to every population.
@@ -80,6 +83,8 @@ class Soldier:
     is_shachar: bool = False
     # ת"ש 7: must be home every night, so no duty that covers night hours.
     home_nightly: bool = False
+    # הת"ש 3–7: nights a week he must sleep at home – at most 7 − level nights on base a week.
+    tash_level: Optional[int] = None
     # Parent, or holder of an exemption marked "qualifies for day duty only".
     qualifies_day_only: bool = False
     # Fairness pool: soldiers are compared only inside their pool.

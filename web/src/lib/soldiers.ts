@@ -33,6 +33,8 @@ export interface SoldierDetail {
   home_nightly_override: boolean | null;
   home_nightly_override_reason: string | null;
   home_nightly_override_until: string | null;
+  /** הת"ש 3–7: nights a week he must sleep at home */
+  tash_level: number | null;
   is_active: boolean;
   load_roles: SoldierLoadRole[];
 }
@@ -53,6 +55,7 @@ export type SoldierPatch = Partial<
     | "home_nightly_override"
     | "home_nightly_override_reason"
     | "home_nightly_override_until"
+    | "tash_level"
     | "is_active"
   >
 >;

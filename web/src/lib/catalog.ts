@@ -18,6 +18,8 @@ export interface TaskType {
   shachar_compatible: boolean;
   /** only mandatory-service שח"ר soldiers may do it (implies shachar_compatible) */
   shachar_only: boolean;
+  /** auto = by night hours; home = fit for הת"ש (never a night on base); closed = not for הת"ש */
+  tash_rule: "auto" | "home" | "closed";
   qualifying_duty: boolean;
   /** ranks that may do it (any of them); null = every rank */
   allowed_rank_ids: string[] | null;

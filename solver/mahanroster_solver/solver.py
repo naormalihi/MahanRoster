@@ -38,7 +38,7 @@ from datetime import date, datetime, timedelta
 from statistics import mean, pstdev
 from typing import Optional
 
-from .eligibility import EligibilityIndex
+from .eligibility import EligibilityIndex, base_nights, max_base_nights, nights_by_week
 from .models import (
     ROLE_PERFORMER,
     ROLE_RESERVE,
@@ -215,7 +215,7 @@ def _weekend_key(d: date) -> date:
 
 
 # Rule families a diagnosis run may switch off, one at a time, to tell which one blocks.
-RELAXABLE = ("fixed", "overlap", "cap", "gaf", "penalty")
+RELAXABLE = ("fixed", "overlap", "cap", "gaf", "penalty", "tash")
 
 DIAGNOSIS = {
     "fixed": "השיבוצים הקבועים (המפורסמים) לא מתיישבים זה עם זה או עם הגדרות התורנות.",
@@ -223,6 +223,7 @@ DIAGNOSIS = {
     "cap": "התקרה החודשית חוסמת: שיבוצים קבועים כבר מעבר לתקרה.",
     "gaf": "כלל העתודה מאותו הגף (בחובה) חוסם.",
     "penalty": "תורנות עונש קבועה מתנגשת בשיבוץ אחר.",
+    "tash": "מגבלת הלילות של בעלי הת\"ש חוסמת: שיבוצים קבועים כבר מעבר לה.",
 }
 
 
@@ -402,6 +403,23 @@ def solve(
             # published duties already over the cap are facts: no new duty that month, but no failure
             if "cap" not in relax:
                 m.Add(sum(vars_) <= max(settings.duty_cap_per_month, fixed_month[key]))
+
+    # הת"ש 3–6: at most 7 − level nights on base a week (ת"ש 7 is already out of every night).
+    if "tash" not in relax:
+        tash_terms = defaultdict(list)
+        tash_fixed = defaultdict(int)
+        for (sid, kid), v in x.items():
+            limit = max_base_nights(soldiers[sid])
+            if not limit:
+                continue
+            k = slots[kid]
+            for wk, n in nights_by_week(base_nights(k, tasks[k.task_type_id], settings)).items():
+                tash_terms[sid, wk].append(n * v)
+                if fixed.get((sid, kid)) == ROLE_PERFORMER:
+                    tash_fixed[sid, wk] += n
+        for (sid, wk), terms in tash_terms.items():
+            # published duties already over the limit are facts: nothing new that week
+            m.Add(sum(terms) <= max(max_base_nights(soldiers[sid]), tash_fixed[sid, wk]))
 
     # ---- fairness, per pool ---------------------------------------------------
     pools = defaultdict(list)

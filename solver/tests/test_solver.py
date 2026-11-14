@@ -38,6 +38,16 @@ def test_tash7_slot_prefers_home_nightly_soldiers():
     assert len(solve(p).assignments) == 1
 
 
+def test_tash_level_limits_nights_on_base_a_week():
+    # five evening duties in one week; A (הת"ש 5) may sleep on base only 2 nights of it
+    evenings = [slot(f"e{i}", "towers", f"2027-01-{3 + i:02d}T20:00", f"2027-01-{3 + i:02d}T23:00", r=0) for i in range(5)]
+    soldiers = [soldier("A", baseline_score=-50, tash_level=5), soldier("B", baseline_score=0), soldier("C", baseline_score=0)]
+    p = problem(soldiers, evenings, settings=FAST)
+    sol = solve(p)
+    assert not sol.unfilled and violations(p, sol) == []
+    assert sum(a.soldier_id == "A" for a in sol.assignments) == 2  # he is far behind, so he takes all he may
+
+
 def test_rest_and_roles_respected():
     slots = [
         slot(f"d{i}", "guard", f"2027-01-{4 + i:02d}T08:00", f"2027-01-{5 + i:02d}T08:00") for i in range(4)

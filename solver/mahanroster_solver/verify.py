@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import timedelta
 
-from .eligibility import EligibilityIndex
+from .eligibility import EligibilityIndex, base_nights, max_base_nights, nights_by_week
 from .models import ROLE_PERFORMER, ROLE_RESERVE, SERVICE_MANDATORY, Problem, Solution
 
 
@@ -75,4 +75,18 @@ def violations(problem: Problem, solution: Solution) -> list[str]:
             for (y, mth), n in months.items():
                 if n > cap and new_in[y, mth]:  # published duties alone over the cap are facts
                     out.append(f"{sid}: {n} תורנויות בחודש {mth}/{y}, מעל התקרה {cap}")
+        limit = max_base_nights(soldiers[sid])
+        if limit:
+            weeks = defaultdict(int)
+            new_wk = defaultdict(int)
+            for k, role in items:
+                if role != ROLE_PERFORMER:
+                    continue
+                for wk, n in nights_by_week(base_nights(k, tasks[k.task_type_id], problem.settings)).items():
+                    weeks[wk] += n
+                    if (sid, k.id, role) not in fixed:
+                        new_wk[wk] += n
+            for wk, n in weeks.items():
+                if n > limit and new_wk[wk]:
+                    out.append(f"{sid}: {n} לילות בבסיס בשבוע של {wk:%d/%m}, מעל {limit} שמותרים לפי הת\"ש")
     return out

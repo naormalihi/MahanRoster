@@ -73,7 +73,7 @@ const POPULATIONS: Population[] = [
 ];
 const tt = (code: string, name: string, cat: number, weight: number, o: Partial<TaskTypeInput> = {}): TaskType => ({
   id: `t_${code}`, code, name, category_id: `c${cat}`, weight, min_rest_hours: 0, service_restriction: "any",
-  requires_weapon: false, is_weekend_type: false, shachar_compatible: false, shachar_only: false, qualifying_duty: false,
+  requires_weapon: false, is_weekend_type: false, shachar_compatible: false, shachar_only: false, tash_rule: "auto", qualifying_duty: false,
   allowed_rank_ids: null, gender: null,
   default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
 }) as TaskType;
@@ -151,7 +151,7 @@ export class DemoApi implements Api {
   private extraOf(id: string): Extra {
     if (!this.extra.has(id))
       this.extra.set(id, {
-        appointment_rank_id: null, appointment_rank_until: null, is_shachar: false, shachar_start_date: null,
+        appointment_rank_id: null, appointment_rank_until: null, is_shachar: false, shachar_start_date: null, tash_level: null,
         parent_override: null, parent_override_reason: null, parent_override_until: null, second_role_signed_at: null,
         home_nightly_override: null, home_nightly_override_reason: null, home_nightly_override_until: null,
         load_roles: [],
