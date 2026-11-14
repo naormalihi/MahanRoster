@@ -34,6 +34,10 @@ const cells = [
   cell("B", "gate", 0, ["rank"]),
   cell("B", "guard", 0, ["rank", "service"]),
   cell("B", "oto", 0, ["rank"]),
+  // her rank fits one category, but she is away all cycle
+  cell("D", "gate", 0, ["unavailable"]),
+  cell("D", "guard", 0, ["rank"]),
+  cell("D", "oto", 0, ["rank"]),
   // has work
   cell("C", "guard", 1),
   cell("C", "oto", 0, ["rank"]),
@@ -54,15 +58,19 @@ describe("eligibility", () => {
     expect(noWorkText(rows("A"), 'רס"ל')).toBe("כשיר רק למפקד שער, ובמחזור אין משבצות כאלה.");
     expect(noWork(rows("B"))).toBe("none_open");
     expect(noWorkText(rows("B"), 'סא"ל')).toBe('לא כשיר לאף קטגוריית תורנות: הדרגה סא"ל לא ברשימת הדרגות של אף סוג תורנות.');
+    expect(noWorkText(rows("D"), 'קמ"א')).toBe(
+      'לא כשיר לאף קטגוריית תורנות: הדרגה קמ"א מתאימה רק למפקד שער, ושם – לא זמין בכל המחזור (היעדרות, פטור, גיוס/שחרור או חודש חסד).',
+    );
     expect(noWork(rows("C"))).toBeNull();
     expect(noWork([])).toBeNull();
   });
 
   it("gathers the soldiers with no possible duty by what to fix", () => {
-    const g = noWorkGroups(["A", "B", "C"], rows, (id) => (id === "B" ? 'סא"ל' : 'רס"ל'));
+    const g = noWorkGroups(["A", "B", "C", "D"], rows, (id) => (id === "B" ? 'סא"ל' : 'רס"ל'));
     expect(g.map((x) => [x.label, x.ids])).toEqual([
       ["כשירים רק למפקד שער – אין משבצות במחזור", ["A"]],
       ['דרגת סא"ל – לא ברשימת הדרגות של אף סוג', ["B"]],
+      ["לא כשירים לאף קטגוריה: לא זמין בכל המחזור (היעדרות, פטור, גיוס/שחרור או חודש חסד)", ["D"]],
     ]);
   });
 });
