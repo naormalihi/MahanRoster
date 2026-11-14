@@ -444,7 +444,7 @@ def test_holidays_are_preloaded(conn):
     assert conn.execute("select count(*) from calendar_days where extract(year from day) = 2035").fetchone()[0] >= 15
 
 
-STATIC_REASONS = {"service", "population", "rank", "gender", "qualifying_only", "not_qualifying", "shachar", "shachar_only", "home_nightly"}
+STATIC_REASONS = {"service", "population", "rank", "gender", "qualifying_only", "not_qualifying", "shachar", "shachar_only", "home_nightly", "tash_closed"}
 
 
 def _as_coord(conn, sql, *args):
@@ -1017,7 +1017,8 @@ def test_shachar_only_duty_in_potential_candidates_and_engine(conn):
         slot_id = conn.execute("select id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
         conn.execute("update slots set task_type_id = %s, allowed_rank_ids = null, rank_min_id = null, rank_max_id = null, gender = null "
                      "where id = %s", (tid, slot_id))
-        cand = {str(r[0]): r[1] for r in _as_coord(conn, "select soldier_id, reasons from public.slot_candidates(%s)", slot_id)}
+        with session_as(conn, COORD) as c:
+            cand = {str(r[0]): r[1] for r in c.execute("select soldier_id, reasons from public.slot_candidates(%s)", (slot_id,)).fetchall()}
         assert "shachar_only" not in cand[str(mand)] and "shachar_only" in cand[str(career)]
 
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
@@ -1028,6 +1029,52 @@ def test_shachar_only_duty_in_potential_candidates_and_engine(conn):
         k = next(x for x in problem.slots if x.id == str(slot_id))
         for sv in problem.soldiers:
             assert ("shachar_only" in idx.check(sv, k)) == blocked[sv.id], sv.id
+        raise psycopg.Rollback()
+
+
+def test_tash_level_and_duty_rule(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        slot_id, tid = conn.execute("select id, task_type_id from slots where cycle_id = %s order by starts_at limit 1", (cycle,)).fetchone()
+        conn.execute("update task_types set service_restriction = 'any', eligible_populations = '{}', allowed_rank_ids = null, "
+                     "rank_min_id = null, rank_max_id = null, gender = null, qualifying_duty = false, shachar_compatible = true, "
+                     "shachar_only = false where id = %s", (tid,))
+        # a week-long duty that covers every night, Sunday to Sunday
+        conn.execute("update slots set starts_at = '2027-01-03 08:00+02', ends_at = '2027-01-10 08:00+02', daily_hours = null, "
+                     "allowed_rank_ids = null, rank_min_id = null, rank_max_id = null, gender = null where id = %s", (slot_id,))
+        sid = conn.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s and service_type = 'mandatory' "
+                           "and not is_shachar limit 1", (cycle,)).fetchone()[0]
+        nights = conn.execute("select array_length(app.slot_nights(s), 1) from slots s where id = %s", (slot_id,)).fetchone()[0]
+        assert nights == 7
+
+        def why():
+            with session_as(conn, COORD) as c:
+                rows = c.execute("select soldier_id, reasons from public.slot_candidates(%s)", (slot_id,)).fetchall()
+            return dict((str(r[0]), r[1]) for r in rows)[str(sid)]
+
+        conn.execute("update soldiers set tash_level = 3 where id = %s", (sid,))
+        assert "tash_nights" in why()                    # 3 nights home = at most 4 on base
+        conn.execute("update task_types set tash_rule = 'home' where id = %s", (tid,))
+        assert "tash_nights" not in why()                # fit for הת"ש: no nights on base
+        conn.execute("update task_types set tash_rule = 'closed' where id = %s", (tid,))
+        assert "tash_closed" in why()
+        conn.execute("update task_types set tash_rule = 'auto' where id = %s", (tid,))
+        conn.execute("update soldiers set tash_level = 7 where id = %s", (sid,))
+        assert "home_nightly" in why()                   # level 7 = ת"ש 7
+        with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
+            conn.execute("update soldiers set tash_level = 2 where id = %s", (sid,))
+
+        conn.execute("update soldiers set tash_level = 4 where id = %s", (sid,))
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        assert next(s for s in doc["soldiers"] if s["id"] == str(sid))["tash_level"] == 4
+        assert next(t for t in doc["task_types"] if t["id"] == str(tid))["tash_rule"] == "auto"
+        problem = models.load_problem(json.dumps(doc))
+        from mahanroster_solver.eligibility import EligibilityIndex
+        idx = EligibilityIndex(problem)
+        sv = next(x for x in problem.soldiers if x.id == str(sid))
+        k = next(x for x in problem.slots if x.id == str(slot_id))
+        assert "tash_nights" in idx.check(sv, k) and "tash_nights" in why()   # the engine agrees
         raise psycopg.Rollback()
 
 

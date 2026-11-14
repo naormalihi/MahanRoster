@@ -111,6 +111,7 @@ function EditDialog(props: {
     home_nightly_override: s.home_nightly_override,
     home_nightly_override_reason: s.home_nightly_override_reason,
     home_nightly_override_until: s.home_nightly_override_until,
+    tash_level: s.tash_level,
     is_active: s.is_active,
   });
   const [roles, setRoles] = useState<Omit<SoldierLoadRole, "name" | "factor">[]>(
@@ -217,6 +218,28 @@ function EditDialog(props: {
               />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
                 <FormControlLabel control={<Switch checked={p.is_shachar} onChange={(e) => set("is_shachar", e.target.checked)} />} label="שח״ר" />
+                <TextField
+                  select
+                  size="small"
+                  label='זכאות הת"ש'
+                  value={p.tash_level ?? ""}
+                  onChange={(e) => set("tash_level", e.target.value === "" ? null : Number(e.target.value))}
+                  helperText={
+                    p.tash_level
+                      ? p.tash_level === 7
+                        ? "בבית כל לילה – בלי תורנויות לילה"
+                        : `${p.tash_level} לילות בבית בשבוע – עד ${7 - p.tash_level} לילות בבסיס`
+                      : "כמה לילות בשבוע חייב לישון בבית"
+                  }
+                  sx={{ minWidth: 220 }}
+                >
+                  <MenuItem value="">אין</MenuItem>
+                  {[3, 4, 5, 6, 7].map((n) => (
+                    <MenuItem key={n} value={n}>
+                      {n}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Stack>
             </Stack>
           </Box>
@@ -384,6 +407,7 @@ export function SoldiersPage() {
   }, [exemptions]);
   const homeNightlyType = useMemo(() => new Set(exTypes.filter((t) => t.home_nightly).map((t) => t.id)), [exTypes]);
   const tashBy = (s: SoldierDetail) =>
+    s.tash_level === 7 ||
     effectiveHomeNightly(s) ||
     (exBySoldier.get(s.id) ?? []).some((e) => e.status === "approved" && homeNightlyType.has(e.exemption_type_id) && e.start_date <= today && e.end_date >= today);
   const exMatch = (id: string) => {
@@ -629,7 +653,13 @@ export function SoldiersPage() {
                         {fmt(s.release_date)}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
-                        {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : "—"}
+                        {tashBy(s) ? (
+                          <Chip size="small" variant="outlined" label="ת״ש 7" />
+                        ) : s.tash_level ? (
+                          <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} />
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {!last || !wasInLast.has(s.id) ? (

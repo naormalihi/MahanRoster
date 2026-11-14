@@ -90,6 +90,7 @@ const EMPTY_TASK: TaskTypeInput = {
   is_weekend_type: false,
   shachar_compatible: false,
   shachar_only: false,
+  tash_rule: "auto",
   qualifying_duty: false,
   allowed_rank_ids: null,
   gender: null,
@@ -334,6 +335,17 @@ export function TaskDialog(props: {
               <MenuItem value="also">גם לשח"ר</MenuItem>
               <MenuItem value="only">רק לשח"ר</MenuItem>
             </TextField>
+            <TextField
+              select
+              label='ת"ש'
+              value={t.tash_rule}
+              onChange={(e) => set("tash_rule", e.target.value as TaskType["tash_rule"])}
+              fullWidth
+            >
+              <MenuItem value="auto">לפי שעות לילה</MenuItem>
+              <MenuItem value="home">מתאימה לת"ש</MenuItem>
+              <MenuItem value="closed">לא מתאימה לת"ש</MenuItem>
+            </TextField>
           </Stack>
           <FormGroup>
             <FormControlLabel
@@ -482,6 +494,8 @@ function CatalogTab() {
                     ) : (
                       t.shachar_compatible && <Chip size="small" variant="outlined" label='שח"ר' />
                     )}
+                    {t.tash_rule === "home" && <Chip size="small" color="success" variant="outlined" label='מתאימה לת"ש' />}
+                    {t.tash_rule === "closed" && <Chip size="small" variant="outlined" label='לא לת"ש' />}
                     {!t.is_active && <Chip size="small" label="לא פעילה" />}
                   </Stack>
                 </TableCell>

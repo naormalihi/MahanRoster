@@ -110,6 +110,26 @@ def test_shachar_only_duty_is_closed_to_everyone_else():
     assert reasons(shachar, slot("o", "office", *MON), tasks=(kitchen, also)) == []
 
 
+def test_tash_rules_by_duty_and_level():
+    eased = TaskType("eased", "רס\"ר הקלת ת\"ש", 1.0, tash_rule="home")
+    closed = TaskType("closed", "סגורה", 1.0, tash_rule="closed")
+    tasks = (GUARD, eased, closed)
+    night = slot("n", "guard", *MON)
+    week = slot("w", "guard", "2027-01-03T08:00", "2027-01-10T08:00")  # Sunday to Sunday: 7 nights
+    t7 = soldier("A", home_nightly=True)
+    assert "home_nightly" in reasons(t7, night, tasks=tasks)
+    assert reasons(soldier("A7", tash_level=7), night, tasks=tasks) == ["home_nightly"]
+    # a duty fit for הת"ש keeps no one on base
+    assert reasons(t7, slot("e", "eased", *MON), tasks=tasks) == []
+    # closed to any level
+    assert "tash_closed" in reasons(soldier("B", tash_level=3), slot("c", "closed", *MON), tasks=tasks)
+    assert reasons(soldier("C"), slot("c", "closed", *MON), tasks=tasks) == []
+    # level 3 = at most 4 nights on base a week: one night is fine, a whole week is not
+    assert reasons(soldier("D", tash_level=3), night, tasks=tasks) == []
+    assert "tash_nights" in reasons(soldier("D", tash_level=3), week, tasks=tasks)
+    assert reasons(soldier("E"), week, tasks=tasks) == []
+
+
 def test_weapon_range_must_be_valid_through_last_day():
     s = soldier("A", range_valid_until=date(2027, 1, 4))
     assert "weapon_range" in reasons(s, slot("k", "guard", "2027-01-04T08:00", "2027-01-05T09:00"))

@@ -218,7 +218,7 @@ export class SupabaseApi implements Api {
           `id, full_name, service_type, gender, gaf_id, appointment_rank_id, appointment_rank_until, enlistment_date, release_date,
            career_start_date, range_valid_until, is_shachar, shachar_start_date, parent_status, parent_override,
            parent_override_reason, parent_override_until, second_role_signed_at, is_active,
-           home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until,
+           home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until, tash_level,
            gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name),
            soldier_load_roles(load_role_id, valid_from, valid_to, load_roles(name, factor))`,
         )
