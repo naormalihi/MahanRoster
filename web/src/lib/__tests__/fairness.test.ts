@@ -36,7 +36,15 @@ describe("why few duties", () => {
       soldier_id: "a", reasons, conflicts: Array.from({ length: conflicts }, () => ({ slot_id: "k", task: "x", role: "performer" as const, starts_at: "", ends_at: "" })), cycle_points: 0, cycle_duties: 0, in_slot,
     });
     const out = summarizeReasons([c(["weapon_range"]), c(["weapon_range", "exemption"]), c([], 1), c([]), c([], 0, "performer"), undefined]);
-    expect(out[0]).toEqual({ reason: "weapon_range", slots: 2 });
+    expect(out[0]).toMatchObject({ reason: "weapon_range", slots: 2 });
     expect(Object.fromEntries(out.map((x) => [x.reason, x.slots]))).toMatchObject({ exemption: 1, busy: 1, free: 1, assigned: 1 });
+  });
+  it("keeps which slots each reason blocked, and the duty a busy one overlaps", async () => {
+    const { summarizeReasons } = await import("../draft");
+    const busy = { slot_id: "other", task: "רס\"ר", role: "performer" as const, starts_at: "s", ends_at: "e" };
+    const c = (reasons: string[], conflicts: (typeof busy)[] = []) => ({ soldier_id: "a", reasons, conflicts, cycle_points: 0, cycle_duties: 0, in_slot: null });
+    const out = summarizeReasons([c(["rank"]), undefined, c(["rank"]), c([], [busy])], ["k1", "k2", "k3", "k4"]);
+    expect(out.find((x) => x.reason === "rank")!.items.map((i) => i.slot_id)).toEqual(["k1", "k3"]);
+    expect(out.find((x) => x.reason === "busy")!.items).toEqual([{ slot_id: "k4", conflict: busy }]);
   });
 });

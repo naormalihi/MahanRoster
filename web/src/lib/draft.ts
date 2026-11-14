@@ -182,15 +182,23 @@ export function byProfile(ls: SoldierLoad[], openOf: (soldierId: string) => stri
  * reason with its number of slots, "busy" (another duty then), "assigned" (he is in it), and
  * "free" (eligible and free: the engine chose others for balance).
  */
-export function summarizeReasons(perSlot: (Candidate | undefined)[]): { reason: string; slots: number }[] {
-  const n = new Map<string, number>();
-  const add = (r: string) => n.set(r, (n.get(r) ?? 0) + 1);
-  for (const c of perSlot) {
-    if (!c) continue;
-    if (c.in_slot) add("assigned");
-    else if (c.reasons.length) c.reasons.forEach(add);
-    else if (c.conflicts.length) add("busy");
-    else add("free");
-  }
-  return [...n].map(([reason, slots]) => ({ reason, slots })).sort((a, b) => b.slots - a.slots);
+export interface WhyItem {
+  slot_id: string;
+  /** for "busy": the duty he is already on at that time (or resting after) */
+  conflict?: Conflict;
+}
+
+/** Per reason: how many slots it blocked, and which (slot ids parallel to perSlot when given). */
+export function summarizeReasons(perSlot: (Candidate | undefined)[], ids: string[] = []): { reason: string; slots: number; items: WhyItem[] }[] {
+  const n = new Map<string, WhyItem[]>();
+  const add = (r: string, item: WhyItem) => n.set(r, [...(n.get(r) ?? []), item]);
+  perSlot.forEach((c, i) => {
+    if (!c) return;
+    const slot_id = ids[i] ?? "";
+    if (c.in_slot) add("assigned", { slot_id });
+    else if (c.reasons.length) c.reasons.forEach((r) => add(r, { slot_id }));
+    else if (c.conflicts.length) add("busy", { slot_id, conflict: c.conflicts[0] });
+    else add("free", { slot_id });
+  });
+  return [...n].map(([reason, items]) => ({ reason, slots: items.length, items })).sort((a, b) => b.slots - a.slots);
 }

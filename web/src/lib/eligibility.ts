@@ -73,7 +73,7 @@ export function noWorkText(rows: EligRow[], rankName: string): string | null {
   const w = noWork(rows);
   if (w === "no_slots") {
     const open = rows.filter((r) => r.open).map((r) => r.name);
-    return `כשיר רק ל${open.join(", ")}, ובמחזור אין משבצות כאלה.`;
+    return `כשיר רק ל${open.join(", ")}, ובמחזור אין תורנויות כאלה.`;
   }
   if (w === "none_open") {
     // the rank is the cause only when it closes every category; otherwise say what closes the
