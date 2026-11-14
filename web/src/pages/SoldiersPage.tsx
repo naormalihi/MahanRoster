@@ -559,7 +559,7 @@ export function SoldiersPage() {
     () => new Set(last?.members.map((m) => m.soldier_id) ?? []),
     [last],
   );
-  // a duty on a holiday or its eve in the past year (published cycles)
+  // a duty on a holiday or its eve, from a year back to a year ahead (published cycles)
   const [holidayDuty, setHolidayDuty] = useState<
     Map<string, { day: string; task_name: string }>
   >(new Map());
@@ -687,7 +687,7 @@ export function SoldiersPage() {
       first: "desc",
     },
     {
-      label: "חג בשנה האחרונה",
+      label: "תורנות חג",
       key: "holiday",
       by: (s) => holidayDuty.get(s.id)?.day ?? "",
       first: "desc",
@@ -1116,17 +1116,20 @@ export function SoldiersPage() {
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        {holidayDuty.has(s.id) ? (
-                          <Tooltip
-                            title={`${holidayDuty.get(s.id)!.task_name} · ${fmt(holidayDuty.get(s.id)!.day)}`}
-                          >
-                            <CheckIcon
-                              color="success"
-                              fontSize="small"
-                              aria-label="ביצע תורנות חג בשנה האחרונה"
-                            />
-                          </Tooltip>
-                        ) : null}
+                        {holidayDuty.has(s.id) &&
+                          (() => {
+                            const h = holidayDuty.get(s.id)!;
+                            const done = h.day <= today;
+                            return (
+                              <Tooltip title={`${done ? "ביצע" : "משובץ"}: ${h.task_name} · ${fmt(h.day)}`}>
+                                <CheckIcon
+                                  color={done ? "success" : "primary"}
+                                  fontSize="small"
+                                  aria-label={done ? "ביצע תורנות חג" : "משובץ לתורנות חג"}
+                                />
+                              </Tooltip>
+                            );
+                          })()}
                       </TableCell>
                       <TableCell>
                         <RangeChip until={s.range_valid_until} />
