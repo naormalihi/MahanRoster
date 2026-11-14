@@ -108,6 +108,7 @@ describe("holidays by name", () => {
     const eves = { ...EMPTY_M, holidays: ["rosh_hashana", "yom_kippur", "sukkot", "pesach"] as const, holiday_kinds: ["eve"] as const };
     const m = { ...eves, holidays: [...eves.holidays], holiday_kinds: [...eves.holiday_kinds] };
     expect(calendarMatch(m, at("2027-10-15"))).toBe(true); // ערב סוכות
+    expect(at("2027-10-15")?.day_type).toBe("major_holiday_eve"); // ערב סוכות is a major holiday eve
     expect(calendarMatch(m, at("2027-10-16"))).toBe(false); // סוכות itself
     const ch = { ...EMPTY_M, holiday_kinds: ["chol_hamoed" as const] };
     expect(calendarMatch(ch, at("2027-10-18"))).toBe(true);

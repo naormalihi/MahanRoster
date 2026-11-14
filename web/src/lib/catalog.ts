@@ -263,7 +263,7 @@ export const calendarOnly = (m: ScoreMultiplierInput) =>
 
 /**
  * Days that count in Israel. Holidays and their eves get the holiday multiplier; ראש השנה,
- * יום כיפור and פסח (with their eves) are "major" holidays with a multiplier of their own;
+ * יום כיפור and פסח (with their eves), and ערב סוכות, are "major" with a multiplier of their own;
  * memorial days are marked for information only. חול המועד is marked, not as a holiday.
  */
 const HOLIDAY_RULES: { match: (desc: string) => boolean; type: DayType; note: string; h?: [HolidayKey, HolidayKind] }[] = [
@@ -272,7 +272,7 @@ const HOLIDAY_RULES: { match: (desc: string) => boolean; type: DayType; note: st
   { match: (d) => d === "Rosh Hashana II", type: "major_holiday", note: "ראש השנה ב׳", h: ["rosh_hashana", "day"] },
   { match: (d) => d === "Erev Yom Kippur", type: "major_holiday_eve", note: "ערב יום כיפור", h: ["yom_kippur", "eve"] },
   { match: (d) => d === "Yom Kippur", type: "major_holiday", note: "יום כיפור", h: ["yom_kippur", "day"] },
-  { match: (d) => d === "Erev Sukkot", type: "holiday_eve", note: "ערב סוכות", h: ["sukkot", "eve"] },
+  { match: (d) => d === "Erev Sukkot", type: "major_holiday_eve", note: "ערב סוכות", h: ["sukkot", "eve"] },
   { match: (d) => d === "Sukkot I", type: "holiday", note: "סוכות", h: ["sukkot", "day"] },
   { match: (d) => d === "Sukkot VII (Hoshana Raba)", type: "holiday_eve", note: "הושענא רבה (ערב שמיני עצרת)", h: ["sukkot", "eve"] },
   { match: (d) => /^Sukkot (II|III|IV|V|VI) \(CH''M\)$/.test(d), type: "chol_hamoed", note: "חול המועד סוכות", h: ["sukkot", "chol_hamoed"] },
