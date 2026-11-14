@@ -1,4 +1,3 @@
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
@@ -10,7 +9,6 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
-  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -59,6 +57,7 @@ import {
   HOLIDAY_KINDS,
   HOLIDAY_KIND_NAME,
   HOLIDAY_NAME,
+  holidayPhrase,
   calendarMatch,
   calendarOnly,
   type HolidayKey,
@@ -710,25 +709,6 @@ function holidayHits(m: ScoreMultiplierInput, calendar: CalendarDay[]) {
   );
 }
 
-function ChipToggles<T extends string>(props: { options: { key: T; name: string }[]; value: T[]; onChange: (v: T[]) => void }) {
-  return (
-    <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
-      {props.options.map((o) => {
-        const on = props.value.includes(o.key);
-        return (
-          <Chip
-            key={o.key}
-            label={o.name}
-            color={on ? "primary" : "default"}
-            variant={on ? "filled" : "outlined"}
-            onClick={() => props.onChange(on ? props.value.filter((x) => x !== o.key) : [...props.value, o.key])}
-          />
-        );
-      })}
-    </Stack>
-  );
-}
-
 function MultiplierDialog(props: {
   m: ScoreMultiplier | null;
   all: ScoreMultiplier[];
@@ -751,7 +731,6 @@ function MultiplierDialog(props: {
   const set = <K extends keyof ScoreMultiplierInput>(k: K, v: ScoreMultiplierInput[K]) => setM((x) => ({ ...x, [k]: v }));
   const problems = multiplierProblems(m, props.all, props.m?.id);
   const [wFrom, wTo] = (m.time_window ?? "22:00-06:00").split("-");
-  const [moreTypes, setMoreTypes] = useState(() => m.day_types.length > 0);
   const byCalendar = m.holidays.length > 0 || m.holiday_kinds.length > 0 || m.day_types.length > 0;
   const hits = byCalendar ? holidayHits(m, props.calendar) : [];
 
@@ -787,24 +766,28 @@ function MultiplierDialog(props: {
           <Alert severity="info" icon={false}>
             המקדם חל על יום של תורנות כשכל התנאים שבחרת מתקיימים. בתוך תנאי מספיק אחת האפשרויות. כשכמה מקדמים חלים, נלקח הגבוה מביניהם.
           </Alert>
+          <Typography variant="body2" color="text.secondary">
+            מקדם לחג מסוים (ערב חג, החג, חול המועד) נקבע בטבלה "מקדם לכל יום חג" בהמשך העמוד.
+          </Typography>
+          {(m.holidays.length > 0 || m.holiday_kinds.length > 0) && (
+            // a multiplier made before the table keeps its holiday condition until it is cleared
+            <Alert
+              severity="info"
+              icon={false}
+              action={
+                <Button size="small" onClick={() => setM((x) => ({ ...x, holidays: [], holiday_kinds: [] }))}>
+                  ניקוי
+                </Button>
+              }
+            >
+              תנאי חג: {holidayPhrase(m.holidays, m.holiday_kinds)}
+            </Alert>
+          )}
           <Box>
             <Typography variant="subtitle2" gutterBottom>
-              חגים
+              סוג יום בלוח השנה
             </Typography>
-            <ChipToggles<HolidayKey> options={HOLIDAYS} value={m.holidays} onChange={(v) => set("holidays", v)} />
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-              סוכות כולל שמיני עצרת (הושענא רבה הוא ערב החג), פסח כולל שביעי של פסח. חנוכה, פורים, צומות ומועדים נוספים אינם שבתון. בלי
-              בחירה – כל החגים שהם שבתון, בלי המועדים.
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              איזה יום בחג
-            </Typography>
-            <ChipToggles<HolidayKind> options={HOLIDAY_KINDS} value={m.holiday_kinds} onChange={(v) => set("holiday_kinds", v)} />
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-              בלי בחירה – כל ימי החגים שבחרת. למשל סוכות + ערב חג = רק ערב סוכות והושענא רבה.
-            </Typography>
+            <DayTypePicker types={props.types} value={m.day_types} onChange={(v) => set("day_types", v)} onAdded={props.onTypesChanged} />
           </Box>
           {byCalendar && (
             <Alert severity={hits.length ? "success" : "warning"} icon={false} sx={{ py: 0.5 }}>
@@ -822,16 +805,6 @@ function MultiplierDialog(props: {
               )}
             </Alert>
           )}
-          <Box>
-            <Button size="small" onClick={() => setMoreTypes(!moreTypes)} endIcon={<ExpandMoreIcon sx={{ transform: moreTypes ? "rotate(180deg)" : undefined }} />} sx={{ px: 0 }}>
-              סוגי ימים בלוח (יום זיכרון, סוגים שהוספת){m.day_types.length ? ` · ${m.day_types.length} נבחרו` : ""}
-            </Button>
-            <Collapse in={moreTypes}>
-              <Box sx={{ pt: 1 }}>
-                <DayTypePicker types={props.types} value={m.day_types} onChange={(v) => set("day_types", v)} onAdded={props.onTypesChanged} />
-              </Box>
-            </Collapse>
-          </Box>
           <Box>
             <Typography variant="subtitle2">ימים בשבוע</Typography>
             <FormGroup row>
