@@ -92,6 +92,9 @@ def unit_day_multiplier(day: date, task: TaskType, settings: Settings, holidays:
     return m
 
 
+REST_HOLIDAYS = ("rosh_hashana", "yom_kippur", "sukkot", "pesach", "shavuot", "independence")
+
+
 def multiplier_applies(
     m: Multiplier, day: date, task: TaskType, starts_at: datetime, ends_at: datetime, settings: Settings
 ) -> bool:
@@ -101,7 +104,8 @@ def multiplier_applies(
         return False
     if m.holidays or m.holiday_kinds:
         hk = settings.day_holidays.get(day.isoformat())
-        if not hk or (m.holidays and hk[0] not in m.holidays) or (m.holiday_kinds and hk[1] not in m.holiday_kinds):
+        # no holiday chosen = the rest-day holidays, not the observances (חנוכה, צומות…)
+        if not hk or hk[0] not in (m.holidays or REST_HOLIDAYS) or (m.holiday_kinds and hk[1] not in m.holiday_kinds):
             return False
     if m.weekdays and day.weekday() not in m.weekdays:
         return False

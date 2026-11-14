@@ -36,7 +36,7 @@ import { useSearchParams } from "react-router-dom";
 import { isStaff, type BoardRow } from "../lib/api";
 import { SlotActionsDialog } from "../components/SlotActions";
 import { PrintDialog } from "../components/BoardPrint";
-import { israeliHolidays } from "../lib/catalog";
+import { HOLIDAY_TYPES, israeliHolidays } from "../lib/catalog";
 import { timeWords } from "../lib/printSheet";
 import { useAuth } from "../lib/auth";
 import { daySummaries, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix } from "../lib/board";
@@ -204,7 +204,7 @@ function TaskGroup({ rows, query }: { rows: BoardRow[]; query: string }) {
 }
 
 /** A day: the date in a column of its own, the duties beside it, grouped by duty type. */
-function DayBlock({ day, items, query, holiday }: { day: string; items: BoardRow[]; query: string; holiday?: string | null }) {
+function DayBlock({ day, items, query, holiday }: { day: string; items: BoardRow[]; query: string; holiday?: { name: string | null; rest: boolean } }) {
   const today = day === dayKey(new Date());
   const d = new Date(day + "T12:00:00");
   const weekend = isWeekend(day);
@@ -234,13 +234,18 @@ function DayBlock({ day, items, query, holiday }: { day: string; items: BoardRow
           px: 0.5,
           borderInlineEnd: 1,
           borderColor: "divider",
-          bgcolor: holiday ? "rgba(232,112,15,0.14)" : weekend ? "rgba(232,112,15,0.07)" : "action.hover",
+          // a rest-day holiday is tinted; an observance (חנוכה, a fast…) only shows its name
+          bgcolor: holiday?.rest ? "rgba(232,112,15,0.14)" : weekend ? "rgba(232,112,15,0.07)" : "action.hover",
         }}
       >
         <Typography sx={{ fontSize: 12, fontWeight: 600, color: today ? "secondary.main" : "text.secondary" }}>{today ? "היום" : weekdayShortFmt.format(d)}</Typography>
         <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1, color: today ? "secondary.main" : "primary.main" }}>{d.getDate()}</Typography>
         <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{dateFmt.format(d)}</Typography>
-        {holiday && <Typography sx={{ fontSize: 10.5, color: "warning.dark", fontWeight: 600, lineHeight: 1.2, mt: 0.25 }}>{holiday}</Typography>}
+        {holiday?.name && (
+          <Typography sx={{ fontSize: 10.5, color: holiday.rest ? "warning.dark" : "text.secondary", fontWeight: 600, lineHeight: 1.2, mt: 0.25 }}>
+            {holiday.name}
+          </Typography>
+        )}
       </Box>
       <Box sx={{ bgcolor: weekend ? "rgba(232,112,15,0.025)" : "background.paper" }}>
         {groups.map((g) => (
@@ -567,7 +572,7 @@ export function BoardPage() {
   // holiday names beside the date (the board's own calendar, in the browser)
   const holidays = useMemo(() => {
     const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return new Map(israeliHolidays(iso(from), iso(to)).map((h) => [h.day, h.note]));
+    return new Map(israeliHolidays(iso(from), iso(to)).map((h) => [h.day, { name: h.note, rest: HOLIDAY_TYPES.has(h.day_type) }]));
   }, [from, to]);
 
   const q = query.trim();

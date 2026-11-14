@@ -87,7 +87,7 @@ def seed(c):
     q("insert into populations (code, name) values ('mandatory','חובה'),('career','קבע'),('officer','קצינים'),('major','רס\"ן ומעלה')")
     q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג'),('memorial','יום זיכרון')")
     q("update day_types set counts_as_holiday = true where code in ('holiday', 'holiday_eve')")
-    q("insert into day_types (code, name, counts_as_holiday) values ('major_holiday','חג מרכזי',true),('major_holiday_eve','ערב חג מרכזי',true),('chol_hamoed','חול המועד',false)")
+    q("insert into day_types (code, name, counts_as_holiday) values ('major_holiday','חג מרכזי',true),('major_holiday_eve','ערב חג מרכזי',true),('chol_hamoed','חול המועד',false),('observance','מועד (לא שבתון)',false)")
     rank_id = {}
     for name, order in synthetic.RANKS.items():
         rank_id[order] = q(
@@ -1196,6 +1196,12 @@ def test_multipliers_by_holiday_name_and_day(conn):
         assert um("2027-10-16") == 1       # סוכות itself: no rule here
         assert um("2027-10-18") == 1.5     # חול המועד סוכות
         assert um("2027-06-10") == 2       # ערב שבועות: "שאר החגים"
+        conn.execute("insert into calendar_days (day, day_type, source, note, holiday, holiday_kind) values "
+                     "('2027-12-27', 'observance', 'hebcal', 'חנוכה', 'hanukkah', 'day') on conflict (day) do nothing")
+        conn.execute("insert into score_multipliers (name, value, holiday_kinds) values ('כל יום חג', 3, '{day}')")
+        assert um("2027-12-27") == 1       # חנוכה is not a rest day: "any holiday" leaves it out
+        conn.execute("insert into score_multipliers (name, value, holidays) values ('חנוכה', 1.2, '{hanukkah}')")
+        assert um("2027-12-27") == 1.2     # by name it counts
         with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
             conn.execute("insert into score_multipliers (name, value, holiday_kinds) values ('x', 2, '{tomorrow}')")
         cycle = conn.cycle_id

@@ -3,7 +3,7 @@ import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Api } from "../lib/api";
-import { israeliHolidays } from "../lib/catalog";
+import { HOLIDAY_TYPES, israeliHolidays } from "../lib/catalog";
 import { buildSheet, type SheetPage } from "../lib/printSheet";
 
 const monthFmt = new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" });
@@ -20,8 +20,10 @@ async function loadPages(api: Api, first: Date, count: number): Promise<SheetPag
     const to = new Date(from.getFullYear(), from.getMonth() + 1, 1);
     const rows = await api.board(from.toISOString(), to.toISOString());
     if (!rows.length) continue;
-    const holidays = new Map(israeliHolidays(iso(from), iso(to)).map((h) => [h.day, h.note ?? ""]));
-    pages.push(...buildSheet(rows, from.getFullYear(), from.getMonth() + 1, holidays, monthFmt.format(from)));
+    const days = israeliHolidays(iso(from), iso(to));
+    const holidays = new Map(days.map((h) => [h.day, h.note ?? ""]));
+    const rest = new Set(days.filter((h) => HOLIDAY_TYPES.has(h.day_type)).map((h) => h.day));
+    pages.push(...buildSheet(rows, from.getFullYear(), from.getMonth() + 1, holidays, monthFmt.format(from), rest));
   }
   return pages;
 }
@@ -85,7 +87,7 @@ function Sheet({ page, printed }: { page: SheetPage; printed: string }) {
         </thead>
         <tbody>
           {page.days.map((d) => (
-            <tr key={d.day} className={[d.holiday ? "hl" : d.weekend ? "we" : "", d.weekStart ? "wk" : ""].join(" ")}>
+            <tr key={d.day} className={[d.rest ? "hl" : d.weekend ? "we" : "", d.weekStart ? "wk" : ""].join(" ")}>
               <th className="d">
                 <span className="dd">{d.date}</span>
                 <span className="w">{WD[d.weekday]}</span>

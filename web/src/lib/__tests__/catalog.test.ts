@@ -70,10 +70,13 @@ describe("Israeli holidays", () => {
     expect(at("2027-05-12")?.day_type).toBe("holiday");
     expect(at("2027-06-11")?.note).toBe("שבועות");
   });
-  it("marks חול המועד (not as a holiday) and skips minor days", () => {
+  it("marks חול המועד and the observances that are not rest days", () => {
     expect(at("2026-09-28")).toMatchObject({ day_type: "chol_hamoed", holiday: "sukkot", holiday_kind: "chol_hamoed" });
-    expect(at("2026-12-05")).toBeUndefined();
-    expect(at("2027-03-23")).toBeUndefined();
+    expect(at("2026-12-05")).toMatchObject({ day_type: "observance", holiday: "hanukkah", holiday_kind: "day" });
+    expect(at("2027-03-23")).toMatchObject({ day_type: "observance", holiday: "purim", note: "פורים" });
+    expect(at("2026-09-14")).toMatchObject({ day_type: "observance", holiday: "fast", note: "צום גדליה" });
+    // a fast and ערב פורים on the same day: one row, the fast
+    expect(at("2027-03-22")).toMatchObject({ holiday: "fast", note: "תענית אסתר" });
   });
   it("never overwrites manual entries", () => {
     const existing = [
@@ -109,5 +112,10 @@ describe("holidays by name", () => {
     const ch = { ...EMPTY_M, holiday_kinds: ["chol_hamoed" as const] };
     expect(calendarMatch(ch, at("2027-10-18"))).toBe(true);
     expect(calendarMatch(ch, undefined)).toBe(false);
+    // a multiplier that names no holiday covers the rest days only, not חנוכה
+    const anyDay = { ...EMPTY_M, holiday_kinds: ["day" as const] };
+    const hanukkah = hol("2026-12-05", "2026-12-05")[0];
+    expect(calendarMatch(anyDay, hanukkah)).toBe(false);
+    expect(calendarMatch({ ...anyDay, holidays: ["hanukkah"] }, hanukkah)).toBe(true);
   });
 });
