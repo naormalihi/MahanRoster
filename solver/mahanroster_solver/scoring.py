@@ -99,6 +99,10 @@ def multiplier_applies(
         return False
     if m.day_types and settings.day_types.get(day.isoformat()) not in m.day_types:
         return False
+    if m.holidays or m.holiday_kinds:
+        hk = settings.day_holidays.get(day.isoformat())
+        if not hk or (m.holidays and hk[0] not in m.holidays) or (m.holiday_kinds and hk[1] not in m.holiday_kinds):
+            return False
     if m.weekdays and day.weekday() not in m.weekdays:
         return False
     if m.date_from and day < m.date_from or m.date_to and day > m.date_to:

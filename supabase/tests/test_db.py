@@ -86,7 +86,7 @@ def seed(c):
     q("insert into populations (code, name) values ('mandatory','חובה'),('career','קבע'),('officer','קצינים'),('major','רס\"ן ומעלה')")
     q("insert into day_types (code, name) values ('weekday','חול'),('weekend','סופ\"ש'),('holiday','חג'),('holiday_eve','ערב חג'),('memorial','יום זיכרון')")
     q("update day_types set counts_as_holiday = true where code in ('holiday', 'holiday_eve')")
-    q("insert into day_types (code, name, counts_as_holiday) values ('major_holiday','חג מרכזי',true),('major_holiday_eve','ערב חג מרכזי',true)")
+    q("insert into day_types (code, name, counts_as_holiday) values ('major_holiday','חג מרכזי',true),('major_holiday_eve','ערב חג מרכזי',true),('chol_hamoed','חול המועד',false)")
     rank_id = {}
     for name, order in synthetic.RANKS.items():
         rank_id[order] = q(
@@ -1043,8 +1043,10 @@ def test_tash_level_and_duty_rule(conn):
         # a week-long duty that covers every night, Sunday to Sunday
         conn.execute("update slots set starts_at = '2027-01-03 08:00+02', ends_at = '2027-01-10 08:00+02', daily_hours = null, "
                      "allowed_rank_ids = null, rank_min_id = null, rank_max_id = null, gender = null where id = %s", (slot_id,))
-        sid = conn.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s and service_type = 'mandatory' "
-                           "and not is_shachar limit 1", (cycle,)).fetchone()[0]
+        sid = conn.execute("select sn.soldier_id from cycle_soldier_snapshot sn join soldiers so on so.id = sn.soldier_id "
+                           "where sn.cycle_id = %s and sn.service_type = 'mandatory' and not sn.is_shachar "
+                           "and not app.home_nightly_on(so, current_date) and not app.home_nightly_on(so, '2027-01-01') "
+                           "order by sn.soldier_id limit 1", (cycle,)).fetchone()[0]
         nights = conn.execute("select array_length(app.slot_nights(s), 1) from slots s where id = %s", (slot_id,)).fetchone()[0]
         assert nights == 7
 
@@ -1068,6 +1070,7 @@ def test_tash_level_and_duty_rule(conn):
         conn.execute("update soldiers set tash_level = 4 where id = %s", (sid,))
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
         assert next(s for s in doc["soldiers"] if s["id"] == str(sid))["tash_level"] == 4
+        assert all(isinstance(x["home_nightly"], bool) for x in doc["soldiers"])   # never null
         assert next(t for t in doc["task_types"] if t["id"] == str(tid))["tash_rule"] == "auto"
         problem = models.load_problem(json.dumps(doc))
         from mahanroster_solver.eligibility import EligibilityIndex
@@ -1161,6 +1164,46 @@ def test_major_holidays_have_their_own_multiplier(conn):
         # counts as a holiday for weekend balancing (2031-09-18 is a Thursday)
         assert conn.execute("select app.weekend_units('2031-09-18 08:00+03', '2031-09-19 08:00+03')").fetchone()[0] == 1
         conn.execute("update score_multipliers set value = 8 where name = 'ראש השנה, יום כיפור ופסח'")  # up to 10
+        raise psycopg.Rollback()
+
+
+def test_multipliers_by_holiday_name_and_day(conn):
+    um = lambda day: float(conn.execute(
+        "select app.unit_multiplier(%s::date, false, (%s::date + time '08:00'), (%s::date + time '08:00' + interval '1 day'))",
+        (day, day, day)).fetchone()[0])
+    with conn.transaction():
+        conn.execute("""insert into calendar_days (day, day_type, source, note) values
+            ('2027-04-21', 'major_holiday_eve', 'hebcal', 'ערב פסח'), ('2027-04-22', 'major_holiday', 'hebcal', 'פסח'),
+            ('2027-04-27', 'major_holiday_eve', 'hebcal', 'ערב שביעי של פסח'), ('2027-04-28', 'major_holiday', 'hebcal', 'שביעי של פסח'),
+            ('2027-06-10', 'holiday_eve', 'hebcal', 'ערב שבועות'), ('2027-06-11', 'holiday', 'hebcal', 'שבועות'),
+            ('2027-10-15', 'holiday_eve', 'hebcal', 'ערב סוכות'), ('2027-10-16', 'holiday', 'hebcal', 'סוכות'),
+            ('2027-10-22', 'holiday_eve', 'hebcal', 'הושענא רבה (ערב שמיני עצרת)'),
+            ('2027-10-23', 'holiday', 'hebcal', 'שמיני עצרת / שמחת תורה')
+            on conflict (day) do nothing""")
+        conn.execute("select app.label_holidays()")
+        rows = conn.execute("select note, holiday || '/' || holiday_kind from calendar_days where day between '2027-10-14' and '2027-10-24'").fetchall()
+        got = [r[1] for r in rows]
+        assert dict(rows)["ערב סוכות"] == "sukkot/eve" and dict(rows)["סוכות"] == "sukkot/day"
+        assert dict(rows)["הושענא רבה (ערב שמיני עצרת)"] == "sukkot/eve" and dict(rows)["שמיני עצרת / שמחת תורה"] == "sukkot/day"
+        assert got.count("sukkot/chol_hamoed") == 5
+        assert not conn.execute("select app.is_holiday('2027-10-18')").fetchone()[0]   # חול המועד is not a holiday day
+        conn.execute("update score_multipliers set is_active = false")
+        conn.execute("insert into score_multipliers (name, value, holidays, holiday_kinds) values "
+                     "('ערבי חגים מרכזיים', 7, '{rosh_hashana,yom_kippur,sukkot,pesach}', '{eve}'), "
+                     "('חול המועד', 1.5, '{}', '{chol_hamoed}'), ('שאר החגים', 2, '{shavuot,independence}', '{}')")
+        assert um("2027-10-15") == 7       # ערב סוכות
+        assert um("2027-10-16") == 1       # סוכות itself: no rule here
+        assert um("2027-10-18") == 1.5     # חול המועד סוכות
+        assert um("2027-06-10") == 2       # ערב שבועות: "שאר החגים"
+        with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
+            conn.execute("insert into score_multipliers (name, value, holiday_kinds) values ('x', 2, '{tomorrow}')")
+        cycle = conn.cycle_id
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        m = next(x for x in doc["settings"]["multipliers"] if x["name"] == "ערבי חגים מרכזיים")
+        assert m["holiday_kinds"] == ["eve"] and "sukkot" in m["holidays"]
+        assert isinstance(doc["settings"]["day_holidays"], dict)
+        models.load_problem(json.dumps(doc))
         raise psycopg.Rollback()
 
 

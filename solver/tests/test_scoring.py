@@ -113,3 +113,23 @@ def test_custom_skip_for_shabbat_types():
 
 def test_custom_window_ignored_for_24h_duties():
     assert cpts(GUARD, "2027-01-11T22:00", "2027-01-12T22:00") == pytest.approx(1.0)
+
+
+def test_multipliers_by_holiday_and_day_of_it():
+    s = Settings(
+        multipliers=[
+            Multiplier("ערבי חגים מרכזיים", 6.0, holidays=["rosh_hashana", "yom_kippur", "sukkot", "pesach"], holiday_kinds=["eve"]),
+            Multiplier("חול המועד", 1.5, holiday_kinds=["chol_hamoed"]),
+            Multiplier("חג", 2.0, holiday_kinds=["eve", "day"]),
+        ],
+        day_holidays={
+            "2027-10-15": ["sukkot", "eve"], "2027-10-16": ["sukkot", "day"], "2027-10-18": ["sukkot", "chol_hamoed"],
+            "2027-06-10": ["shavuot", "eve"],
+        },
+    )
+    one_day = lambda d: raw_points(GUARD, dt(f"{d}T08:00"), dt(f"{d}T20:00"), s, set())  # noqa: E731
+    assert one_day("2027-10-15") == 6.0    # ערב סוכות: the highest that applies
+    assert one_day("2027-10-16") == 2.0    # סוכות itself: only "חג"
+    assert one_day("2027-10-18") == 1.5    # חול המועד סוכות
+    assert one_day("2027-06-10") == 2.0    # ערב שבועות is not in the first list
+    assert one_day("2027-10-20") == 1.0    # an ordinary day

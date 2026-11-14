@@ -220,6 +220,9 @@ class Multiplier:
     date_from: Optional[date] = None
     date_to: Optional[date] = None
     skip_shabbat_types: bool = False
+    # Holidays by name (rosh_hashana, sukkot, …) and the day of them (eve / day / chol_hamoed).
+    holidays: list[str] = field(default_factory=list)
+    holiday_kinds: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -228,6 +231,7 @@ class Settings:
     # Otherwise the three fixed multipliers below apply (night on top of the day multiplier).
     multipliers: Optional[list[Multiplier]] = None
     day_types: dict[str, str] = field(default_factory=dict)  # ISO date -> calendar day type
+    day_holidays: dict[str, list[str]] = field(default_factory=dict)  # ISO date -> [holiday, kind]
     surprise_multiplier: float = 1.0
     weekend_multiplier: float = 1.5
     holiday_multiplier: float = 2.0
