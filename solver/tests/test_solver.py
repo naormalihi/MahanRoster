@@ -1,5 +1,7 @@
 """End-to-end solver tests. Skipped when OR-Tools is not installed."""
 
+from datetime import date
+
 import pytest
 
 pytest.importorskip("ortools")  # real CP-SAT, or the HiGHS shim from conftest
@@ -46,6 +48,23 @@ def test_tash_level_limits_nights_on_base_a_week():
     sol = solve(p)
     assert not sol.unfilled and violations(p, sol) == []
     assert sum(a.soldier_id == "A" for a in sol.assignments) == 2  # he is far behind, so he takes all he may
+
+
+def test_holiday_duty_first_to_those_without_one_this_year():
+    # 2027-04-22 is פסח: A is lowest but did a holiday duty in the past year
+    soldiers = [soldier("A", baseline_score=0, recent_holiday=True), soldier("B", baseline_score=4), soldier("C", baseline_score=6)]
+    hol = slot("p", "guard", "2027-04-22T08:00", "2027-04-23T08:00", r=0)
+    p = problem(soldiers, [hol], settings=FAST, holidays=[date(2027, 4, 22)])
+    assert [a.soldier_id for a in solve(p).assignments] == ["B"]
+    # an ordinary day: the lowest score as usual
+    p = problem(soldiers, [slot("d", "guard", "2027-04-25T08:00", "2027-04-26T08:00", r=0)], settings=FAST, holidays=[date(2027, 4, 22)])
+    assert [a.soldier_id for a in solve(p).assignments] == ["A"]
+    # two holidays in the cycle, nobody had one: two different soldiers
+    two = [slot("p1", "guard", "2027-04-22T08:00", "2027-04-23T08:00", r=0), slot("p7", "guard", "2027-04-28T08:00", "2027-04-29T08:00", r=0)]
+    p = problem([soldier("A"), soldier("B", baseline_score=20), soldier("C", baseline_score=20)], two, settings=FAST,
+                holidays=[date(2027, 4, 22), date(2027, 4, 28)])
+    got = [a.soldier_id for a in solve(p).assignments]
+    assert len(got) == 2 and len(set(got)) == 2
 
 
 def test_rest_and_roles_respected():

@@ -99,6 +99,8 @@ class Soldier:
     baseline_score: float = 0.0
     baseline_weekends: int = 0
     baseline_reserves: int = 0
+    # Performed a duty on a holiday (or its eve) in the year before the cycle.
+    recent_holiday: bool = False
     load_roles: list[LoadRolePeriod] = field(default_factory=list)
 
     @property
@@ -206,6 +208,9 @@ class Weights:
     same_week: float = 1.0  # more than one duty in the same week
     cross_gaf_reserve: float = 5.0  # career reserve from another gaf
     home_nightly_preference: float = 100.0  # a "ת"ש 7" slot given to someone else (≈ 10 points of fairness)
+    # A holiday duty for someone who already did one in the past year (or earlier in this cycle):
+    # those who did not come first (≈ 10 points of fairness).
+    holiday_repeat: float = 100.0
 
 
 @dataclass

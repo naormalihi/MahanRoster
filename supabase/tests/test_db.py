@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import timedelta
 import os
 import sys
 import uuid
@@ -1203,6 +1204,38 @@ def test_multipliers_by_holiday_name_and_day(conn):
         m = next(x for x in doc["settings"]["multipliers"] if x["name"] == "ערבי חגים מרכזיים")
         assert m["holiday_kinds"] == ["eve"] and "sukkot" in m["holidays"]
         assert isinstance(doc["settings"]["day_holidays"], dict)
+        models.load_problem(json.dumps(doc))
+        raise psycopg.Rollback()
+
+
+def test_recent_holiday_duties(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        slot_id, day = conn.execute("select id, (starts_at at time zone 'Asia/Jerusalem')::date from slots "
+                                    "where cycle_id = %s and not is_penalty_slot order by starts_at limit 1", (cycle,)).fetchone()
+        sid, other = [r[0] for r in conn.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s order by soldier_id limit 2", (cycle,))]
+        conn.execute("delete from assignments where slot_id = %s", (slot_id,))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) "
+                     "select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (slot_id, sid))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) "
+                     "select %s, id, gaf_id, 'reserve', 'reserve_idle' from soldiers where id = %s", (slot_id, other))
+        conn.execute("insert into calendar_days (day, day_type, note) values (%s, 'holiday', 'חג בדיקה') "
+                     "on conflict (day) do update set day_type = 'holiday'", (day,))
+        since = day - timedelta(days=30)
+        dutiesq = "select soldier_id::text, day from app.holiday_duties(%s, %s)"
+        conn.execute("update cycles set status = 'review' where id = %s", (cycle,))
+        before = set(conn.execute(dutiesq, (since, day)).fetchall())
+        assert (str(sid), day) not in before                              # not published yet: does not count
+        conn.execute("update cycles set status = 'published' where id = %s", (cycle,))
+        after = set(conn.execute(dutiesq, (since, day)).fetchall())
+        assert (str(sid), day) in after and (str(other), day) not in after - before   # the performer, not an idle reserve
+        with session_as(conn, COORD) as c:
+            rows = c.execute("select soldier_id from public.recent_holiday_duties(%s, %s)", (since, day)).fetchall()
+        assert str(sid) in {str(r[0]) for r in rows}
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        assert all(isinstance(x["recent_holiday"], bool) for x in doc["soldiers"])
         models.load_problem(json.dumps(doc))
         raise psycopg.Rollback()
 

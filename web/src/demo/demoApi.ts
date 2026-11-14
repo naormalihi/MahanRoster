@@ -655,6 +655,14 @@ export class DemoApi implements Api {
     return out;
   }
 
+  async recentHolidayDuties(sinceIso: string) {
+    void sinceIso;
+    // a few soldiers did a holiday duty in the demo's past year
+    return this.soldierList
+      .filter((_, i) => i % 4 === 0)
+      .map((s, i) => ({ soldier_id: s.id, day: i % 2 ? "2026-04-02" : "2026-09-21", task_name: i % 2 ? "קצין תורן" : "מפקד שער" }));
+  }
+
   async snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]> {
     void cycleId;
     return this.soldierList.filter((s) => s.is_active).map((s) => ({

@@ -89,6 +89,11 @@ def base_nights(slot: Slot, task: TaskType, settings: Settings) -> list[date]:
     ]
 
 
+def is_holiday_slot(slot: Slot, holidays: set[date]) -> bool:
+    """A duty on a holiday or its eve (any of the days it touches)."""
+    return any(d in holidays for d in _days(slot.starts_at, slot.ends_at))
+
+
 def nights_by_week(nights: list[date]) -> dict[date, int]:
     out: dict[date, int] = defaultdict(int)
     for n in nights:
