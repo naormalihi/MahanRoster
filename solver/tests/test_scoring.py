@@ -124,7 +124,7 @@ def test_multipliers_by_holiday_and_day_of_it():
         ],
         day_holidays={
             "2027-10-15": ["sukkot", "eve"], "2027-10-16": ["sukkot", "day"], "2027-10-18": ["sukkot", "chol_hamoed"],
-            "2027-06-10": ["shavuot", "eve"],
+            "2027-06-10": ["shavuot", "eve"], "2026-12-06": ["hanukkah", "day"],
         },
     )
     one_day = lambda d: raw_points(GUARD, dt(f"{d}T08:00"), dt(f"{d}T20:00"), s, set())  # noqa: E731
@@ -133,3 +133,6 @@ def test_multipliers_by_holiday_and_day_of_it():
     assert one_day("2027-10-18") == 1.5    # חול המועד סוכות
     assert one_day("2027-06-10") == 2.0    # ערב שבועות is not in the first list
     assert one_day("2027-10-20") == 1.0    # an ordinary day
+    assert one_day("2026-12-06") == 1.0    # חנוכה: "חג" names no holiday, so the rest days only
+    s.multipliers.append(Multiplier("חנוכה", 1.2, holidays=["hanukkah"]))
+    assert one_day("2026-12-06") == 1.2    # by name it counts

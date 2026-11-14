@@ -30,6 +30,8 @@ export interface SheetDay {
   /** a Sunday that is not the first row: draw the week line above it */
   weekStart: boolean;
   holiday: string | null;
+  /** a rest-day holiday (shaded); an observance only shows its name */
+  rest: boolean;
   cells: SheetItem[][]; // by column
   /** the tallest cell, in lines */
   lines: number;
@@ -119,6 +121,7 @@ export function buildSheet(
   month: number,
   holidays: Map<string, string>,
   monthTitle: string,
+  restDays: Set<string> = new Set(holidays.keys()),
 ): SheetPage[] {
   const days = monthDays(year, month);
   const mine = rows.filter((r) => dayKey(r.starts_at).startsWith(days[0].slice(0, 7)));
@@ -134,7 +137,7 @@ export function buildSheet(
     const holiday = holidays.get(day) ?? null;
     // a holiday's name goes under the date: the row is at least two lines
     const lines = Math.max(holiday ? 2 : 1, ...cells.map((items) => items.reduce((n, it) => n + itemLines(it), 0)));
-    return { day, date: i + 1, weekday: wd, weekend: wd === 5 || wd === 6, weekStart: wd === 0 && i > 0, holiday, cells, lines };
+    return { day, date: i + 1, weekday: wd, weekend: wd === 5 || wd === 6, weekStart: wd === 0 && i > 0, holiday, rest: restDays.has(day), cells, lines };
   });
   const changed = mine.filter((r) => r.changed_after_publish).map((r) => r.updated_at).sort();
   const updated = changed.length ? changed[changed.length - 1] : null;

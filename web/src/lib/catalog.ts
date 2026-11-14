@@ -182,6 +182,7 @@ export const DAY_TYPE_LABEL: Record<string, string> = {
   major_holiday: "חג מרכזי",
   major_holiday_eve: "ערב חג מרכזי",
   chol_hamoed: "חול המועד",
+  observance: "מועד (לא שבתון)",
   memorial: "יום זיכרון",
   weekend: "סופ\"ש",
   weekday: "חול",
@@ -201,18 +202,35 @@ export interface CalendarDay {
 // Holidays by name
 // ---------------------------------------------------------------------------
 
-export type HolidayKey = "rosh_hashana" | "yom_kippur" | "sukkot" | "pesach" | "shavuot" | "independence";
+export type HolidayKey =
+  | "rosh_hashana"
+  | "yom_kippur"
+  | "sukkot"
+  | "pesach"
+  | "shavuot"
+  | "independence"
+  // observances that are not rest days (מועדים שאינם שבתון)
+  | "hanukkah"
+  | "purim"
+  | "fast"
+  | "minor";
 export type HolidayKind = "eve" | "day" | "chol_hamoed";
 
 /** The holidays a multiplier can name; סוכות includes שמיני עצרת, פסח includes שביעי של פסח. */
-export const HOLIDAYS: { key: HolidayKey; name: string; kinds: HolidayKind[] }[] = [
+export const HOLIDAYS: { key: HolidayKey; name: string; kinds: HolidayKind[]; observance?: boolean }[] = [
   { key: "rosh_hashana", name: "ראש השנה", kinds: ["eve", "day"] },
   { key: "yom_kippur", name: "יום כיפור", kinds: ["eve", "day"] },
   { key: "sukkot", name: "סוכות", kinds: ["eve", "day", "chol_hamoed"] },
   { key: "pesach", name: "פסח", kinds: ["eve", "day", "chol_hamoed"] },
   { key: "shavuot", name: "שבועות", kinds: ["eve", "day"] },
   { key: "independence", name: "יום העצמאות", kinds: ["day"] },
+  { key: "hanukkah", name: "חנוכה", kinds: ["eve", "day"], observance: true },
+  { key: "purim", name: "פורים", kinds: ["eve", "day"], observance: true },
+  { key: "fast", name: "צומות", kinds: ["eve", "day"], observance: true },
+  { key: "minor", name: "מועדים נוספים", kinds: ["day"], observance: true },
 ];
+/** With no holiday chosen, a multiplier means the rest-day holidays – not the observances. */
+export const REST_HOLIDAYS = HOLIDAYS.filter((h) => !h.observance).map((h) => h.key);
 export const HOLIDAY_NAME = Object.fromEntries(HOLIDAYS.map((h) => [h.key, h.name])) as Record<HolidayKey, string>;
 export const HOLIDAY_KINDS: { key: HolidayKind; name: string }[] = [
   { key: "eve", name: "ערב חג" },
@@ -224,7 +242,7 @@ export const HOLIDAY_KIND_NAME = Object.fromEntries(HOLIDAY_KINDS.map((k) => [k.
 /** "ערב חג · ראש השנה, סוכות" / "חול המועד · כל החגים" */
 export function holidayPhrase(holidays: HolidayKey[], kinds: HolidayKind[]): string {
   const k = kinds.length ? HOLIDAY_KINDS.filter((x) => kinds.includes(x.key)).map((x) => x.name).join(", ") : "כל ימי החג";
-  const h = holidays.length ? HOLIDAYS.filter((x) => holidays.includes(x.key)).map((x) => x.name).join(", ") : "כל החגים";
+  const h = holidays.length ? HOLIDAYS.filter((x) => holidays.includes(x.key)).map((x) => x.name).join(", ") : "כל החגים (שבתון)";
   return `${k} · ${h}`;
 }
 
@@ -233,7 +251,7 @@ export function calendarMatch(m: Pick<ScoreMultiplierInput, "day_types" | "holid
   if (m.day_types.length && !(d && m.day_types.includes(d.day_type))) return false;
   if (m.holidays.length || m.holiday_kinds.length) {
     if (!d?.holiday || !d.holiday_kind) return false;
-    if (m.holidays.length && !m.holidays.includes(d.holiday)) return false;
+    if (!(m.holidays.length ? m.holidays : REST_HOLIDAYS).includes(d.holiday)) return false;
     if (m.holiday_kinds.length && !m.holiday_kinds.includes(d.holiday_kind)) return false;
   }
   return true;
@@ -268,8 +286,27 @@ const HOLIDAY_RULES: { match: (desc: string) => boolean; type: DayType; note: st
   { match: (d) => d === "Shavuot", type: "holiday", note: "שבועות", h: ["shavuot", "day"] },
   { match: (d) => d === "Yom HaShoah", type: "memorial", note: "יום השואה" },
   { match: (d) => d === "Yom HaZikaron", type: "memorial", note: "יום הזיכרון" },
+  // observances that are not rest days
+  { match: (d) => d === "Tzom Gedaliah", type: "observance", note: "צום גדליה", h: ["fast", "day"] },
+  { match: (d) => d === "Asara B'Tevet", type: "observance", note: "עשרה בטבת", h: ["fast", "day"] },
+  { match: (d) => d === "Ta'anit Esther", type: "observance", note: "תענית אסתר", h: ["fast", "day"] },
+  { match: (d) => d === "Tzom Tammuz", type: "observance", note: "צום י״ז בתמוז", h: ["fast", "day"] },
+  { match: (d) => d === "Erev Tish'a B'Av", type: "observance", note: "ערב תשעה באב", h: ["fast", "eve"] },
+  { match: (d) => d === "Tish'a B'Av", type: "observance", note: "תשעה באב", h: ["fast", "day"] },
+  { match: (d) => d === "Chanukah: 1 Candle", type: "observance", note: "ערב חנוכה (נר ראשון)", h: ["hanukkah", "eve"] },
+  { match: (d) => /^Chanukah: (\d Candles|8th Day)$/.test(d), type: "observance", note: "חנוכה", h: ["hanukkah", "day"] },
+  { match: (d) => d === "Erev Purim", type: "observance", note: "ערב פורים", h: ["purim", "eve"] },
+  { match: (d) => d === "Purim", type: "observance", note: "פורים", h: ["purim", "day"] },
+  { match: (d) => d === "Shushan Purim", type: "observance", note: "שושן פורים", h: ["purim", "day"] },
+  { match: (d) => d === "Tu BiShvat", type: "observance", note: "ט״ו בשבט", h: ["minor", "day"] },
+  { match: (d) => d === "Lag BaOmer", type: "observance", note: "ל״ג בעומר", h: ["minor", "day"] },
+  { match: (d) => d === "Yom Yerushalayim", type: "observance", note: "יום ירושלים", h: ["minor", "day"] },
+  { match: (d) => d === "Tu B'Av", type: "observance", note: "ט״ו באב", h: ["minor", "day"] },
   { match: (d) => d === "Yom HaAtzma'ut", type: "holiday", note: "יום העצמאות", h: ["independence", "day"] },
 ];
+
+const DAY_RANK = (t: DayType) =>
+  ({ major_holiday: 0, holiday: 0, major_holiday_eve: 1, holiday_eve: 1, chol_hamoed: 2, memorial: 3, observance: 4 })[t] ?? 5;
 
 const isoOf = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -282,7 +319,7 @@ export function israeliHolidays(fromIso: string, toIso: string): CalendarDay[] {
     start: new Date(fy, fm - 1, fd),
     end: new Date(ty, tm - 1, td),
     il: true,
-    noMinorFast: true,
+    noMinorFast: false,
     noRoshChodesh: true,
     noSpecialShabbat: true,
   });
@@ -292,8 +329,9 @@ export function israeliHolidays(fromIso: string, toIso: string): CalendarDay[] {
     if (!rule) continue;
     const day = isoOf(e.getDate().greg());
     const prev = out.get(day);
-    // a holiday wins over an eve on the same day
-    if (prev && prev.day_type === "holiday") continue;
+    // one row a day: a rest day wins over an eve, an eve over חול המועד, a memorial day or an
+    // observance; between observances the first (a fast before ערב פורים on the same day)
+    if (prev && DAY_RANK(prev.day_type) <= DAY_RANK(rule.type)) continue;
     out.set(day, { day, day_type: rule.type, source: "hebcal", note: rule.note, holiday: rule.h?.[0] ?? null, holiday_kind: rule.h?.[1] ?? null });
   }
   return [...out.values()].sort((a, b) => a.day.localeCompare(b.day));

@@ -792,7 +792,8 @@ function MultiplierDialog(props: {
             </Typography>
             <ChipToggles<HolidayKey> options={HOLIDAYS} value={m.holidays} onChange={(v) => set("holidays", v)} />
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-              סוכות כולל שמיני עצרת (הושענא רבה הוא ערב החג), פסח כולל שביעי של פסח. בלי בחירה – כל החגים.
+              סוכות כולל שמיני עצרת (הושענא רבה הוא ערב החג), פסח כולל שביעי של פסח. חנוכה, פורים, צומות ומועדים נוספים אינם שבתון. בלי
+              בחירה – כל החגים שהם שבתון, בלי המועדים.
             </Typography>
           </Box>
           <Box>
