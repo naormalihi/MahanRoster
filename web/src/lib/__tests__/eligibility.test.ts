@@ -55,7 +55,7 @@ describe("eligibility", () => {
 
   it("tells why a soldier cannot get any duty", () => {
     expect(noWork(rows("A"))).toBe("no_slots");
-    expect(noWorkText(rows("A"), 'רס"ל')).toBe("כשיר רק למפקד שער, ובמחזור אין משבצות כאלה.");
+    expect(noWorkText(rows("A"), 'רס"ל')).toBe("כשיר רק למפקד שער, ובמחזור אין תורנויות כאלה.");
     expect(noWork(rows("B"))).toBe("none_open");
     expect(noWorkText(rows("B"), 'סא"ל')).toBe('לא כשיר לאף קטגוריית תורנות: הדרגה סא"ל לא ברשימת הדרגות של אף סוג תורנות.');
     expect(noWorkText(rows("D"), 'קמ"א')).toBe(

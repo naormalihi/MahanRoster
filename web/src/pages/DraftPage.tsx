@@ -58,6 +58,7 @@ import {
   rankCandidates,
   summarizeReasons,
   type SlotView,
+  type WhyItem,
   type Candidate,
   type DraftAssignment,
   type Role,
@@ -797,7 +798,7 @@ function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string
             <TableRow>
               <TableCell>קטגוריה</TableCell>
               <TableCell>כשיר</TableCell>
-              <TableCell>משבצות</TableCell>
+              <TableCell>תורנויות במחזור</TableCell>
               <TableCell>למה לא</TableCell>
             </TableRow>
           </TableHead>
@@ -811,7 +812,7 @@ function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string
                 </TableCell>
                 <TableCell sx={{ color: e.slots === 0 ? "warning.main" : undefined }}>{e.slots}</TableCell>
                 <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
-                  {e.open ? (e.slots === 0 ? "אין משבצות במחזור" : "") : reasonText(e.reasons) || "—"}
+                  {e.open ? (e.slots === 0 ? "אין תורנויות במחזור" : "") : reasonText(e.reasons) || "—"}
                 </TableCell>
               </TableRow>
             ))}
@@ -819,6 +820,84 @@ function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string
         </Table>
       )}
     </Paper>
+  );
+}
+
+const shortDay = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "narrow" });
+const shortDate = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric", month: "numeric" });
+/** "ב׳ 4.1" */
+const dmShort = (iso: string) => shortDate.format(new Date(iso)).replace("/", ".");
+const dayDm = (iso: string) => `${shortDay.format(new Date(iso))} ${dmShort(iso)}`;
+const WHY_LIST_MAX = 10;
+
+/** One "why not" reason: the count, and on click the duties themselves – by date, or grouped by duty when many. */
+function WhyReasonRow(props: {
+  count: number;
+  label: string;
+  free: boolean;
+  busy: boolean;
+  items: WhyItem[];
+  open: boolean;
+  onToggle: () => void;
+  slotOf: Map<string, SlotRow>;
+  taskName: (taskTypeId: string) => string;
+}) {
+  const [all, setAll] = useState(false);
+  const rows = props.items
+    .map((it) => ({ it, k: props.slotOf.get(it.slot_id) }))
+    .filter((x): x is { it: WhyItem; k: SlotRow } => !!x.k)
+    .sort((a, b) => a.k.starts_at.localeCompare(b.k.starts_at));
+  const busyText = (it: WhyItem, k: SlotRow) => {
+    const c = it.conflict;
+    if (!c) return "";
+    const overlaps = c.starts_at < k.ends_at && k.starts_at < c.ends_at;
+    return ` (${overlaps ? "חופף ל" : "מנוחה אחרי"}: ${c.task} ${dmShort(c.starts_at)})`;
+  };
+  const groups = new Map<string, SlotRow[]>();
+  for (const { k } of rows) groups.set(k.task_type_id, [...(groups.get(k.task_type_id) ?? []), k]);
+  const grouped = rows.length > WHY_LIST_MAX && !all;
+  return (
+    <>
+      <TableRow hover onClick={props.onToggle} sx={{ cursor: "pointer", "& td": props.open ? { borderBottom: "none" } : undefined }}>
+        <TableCell sx={{ width: 64, fontWeight: 600 }}>{props.count}</TableCell>
+        <TableCell sx={{ color: props.free ? "success.main" : undefined }}>
+          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+            <span>{props.label}</span>
+            <ExpandMoreIcon fontSize="small" sx={{ color: "text.secondary", transform: props.open ? "rotate(180deg)" : undefined }} />
+          </Stack>
+        </TableCell>
+      </TableRow>
+      {props.open && (
+        <TableRow>
+          <TableCell colSpan={2} sx={{ pt: 0 }}>
+            <Box sx={{ bgcolor: "action.hover", borderRadius: 1, px: 1.5, py: 1 }}>
+              {grouped
+                ? [...groups].map(([tt, ks]) => (
+                    <Typography key={tt} variant="body2">
+                      {props.taskName(tt)} · {ks.length} תורנויות · {dmShort(ks[0].starts_at)}
+                      {ks.length > 1 ? `–${dmShort(ks[ks.length - 1].starts_at)}` : ""}
+                    </Typography>
+                  ))
+                : rows.map(({ it, k }) => (
+                    <Typography key={it.slot_id} variant="body2">
+                      {dayDm(k.starts_at)} · {props.taskName(k.task_type_id)}
+                      {props.busy && (
+                        <Typography component="span" variant="body2" color="text.secondary">
+                          {busyText(it, k)}
+                        </Typography>
+                      )}
+                    </Typography>
+                  ))}
+              {rows.length > WHY_LIST_MAX && (
+                <Button size="small" sx={{ mt: 0.5, px: 0 }} onClick={() => setAll(!all)}>
+                  {all ? "קיבוץ לפי תורנות" : `הצג את כל ה-${rows.length}`}
+                </Button>
+              )}
+            </Box>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
 
@@ -840,7 +919,8 @@ function SoldierLoadDialog(props: {
   const s = ctx.soldiers.get(r.soldier_id);
   const slotOf = new Map(ctx.slots.map((k) => [k.id, k]));
   // "why few duties": the candidate check of every slot, a few at a time, summed for him
-  const [why, setWhy] = useState<{ reason: string; slots: number }[] | null>(null);
+  const [why, setWhy] = useState<{ reason: string; slots: number; items: WhyItem[] }[] | null>(null);
+  const [openWhy, setOpenWhy] = useState<string | null>(null);
   const [whyProgress, setWhyProgress] = useState<number | null>(null);
   async function checkWhy() {
     const ids = ctx.slots.map((k) => k.id);
@@ -851,7 +931,7 @@ function SoldierLoadDialog(props: {
       for (const cs of batch) found.push(cs.find((c) => c.soldier_id === r.soldier_id));
       setWhyProgress(Math.min(ids.length, i + 8) / ids.length);
     }
-    setWhy(summarizeReasons(found));
+    setWhy(summarizeReasons(found, ids));
     setWhyProgress(null);
   }
   const WHY_LABEL: Record<string, string> = {
@@ -921,25 +1001,33 @@ function SoldierLoadDialog(props: {
           <Box>
             {why === null ? (
               <Button size="small" variant="outlined" onClick={checkWhy} disabled={whyProgress !== null}>
-                {whyProgress === null ? "למה מעט תורנויות? בדיקת כל המשבצות" : `בודק… ${Math.round(whyProgress * 100)}%`}
+                {whyProgress === null ? "למה מעט תורנויות? בדיקת כל התורנויות" : `בודק… ${Math.round(whyProgress * 100)}%`}
               </Button>
             ) : (
               <>
                 <Typography variant="subtitle2" gutterBottom>
-                  מה מנע תורנויות ({ctx.slots.length} משבצות במחזור)
+                  מה מנע תורנויות ({ctx.slots.length} תורנויות במחזור)
                 </Typography>
                 <Table size="small">
                   <TableBody>
                     {why.map((w) => (
-                      <TableRow key={w.reason}>
-                        <TableCell sx={{ width: 64, fontWeight: 600 }}>{w.slots}</TableCell>
-                        <TableCell sx={{ color: w.reason === "free" ? "success.main" : undefined }}>{WHY_LABEL[w.reason] ?? w.reason}</TableCell>
-                      </TableRow>
+                      <WhyReasonRow
+                        key={w.reason}
+                        count={w.slots}
+                        label={WHY_LABEL[w.reason] ?? w.reason}
+                        free={w.reason === "free"}
+                        busy={w.reason === "busy"}
+                        items={w.items}
+                        open={openWhy === w.reason}
+                        onToggle={() => setOpenWhy(openWhy === w.reason ? null : w.reason)}
+                        slotOf={slotOf}
+                        taskName={(id) => ctx.tasks.get(id)?.name ?? "תורנות"}
+                      />
                     ))}
                   </TableBody>
                 </Table>
                 <Typography variant="caption" color="text.secondary">
-                  משבצת אחת יכולה להיספר בכמה סיבות.
+                  תורנות אחת יכולה להיספר בכמה סיבות. לחיצה על שורה פותחת את התאריכים.
                 </Typography>
               </>
             )}
