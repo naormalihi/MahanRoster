@@ -773,25 +773,15 @@ function IdleDialog({ fair, ctx, onClose, onOpen }: { fair: Fairness; ctx: Ctx; 
   );
 }
 
-/** What he can be given in the cycle: rank and service, then each duty category – open or why not. */
-function EligibilityCard({ elig, snap, rankName }: { elig: EligRow[]; snap: SnapshotSoldier | undefined; rankName: string }) {
+/** What he can be given in the cycle: each duty category – open or why not. */
+function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string }) {
+  // rank and service are in the dialog's title, parent and exemptions in "what steers his schedule"
   const why = noWorkText(elig, rankName);
-  const tags = [
-    rankName && `דרגה: ${rankName}`,
-    snap && (snap.service_type === "career" ? "קבע" : "חובה"),
-    snap?.is_parent && "משרת הורה",
-    snap?.qualifies_day_only && !snap.is_parent && "פטור מזכה",
-  ].filter(Boolean) as string[];
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }}>
       <Typography variant="subtitle2" gutterBottom>
         כשירות במחזור
       </Typography>
-      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mb: 1 }}>
-        {tags.map((t) => (
-          <Chip key={t} size="small" label={t} />
-        ))}
-      </Stack>
       {why && (
         <Alert severity="warning" sx={{ mb: 1 }}>
           {why} לכן אין לו תורנויות – זה לא האיזון. משנים ברשימת הדרגות של סוג התורנות בקטלוג או בלוח הבסיס.
@@ -881,7 +871,7 @@ function SoldierLoadDialog(props: {
         {s?.full_name}
         <Typography variant="body2" color="text.secondary">
           {s?.gaf_name} · {props.rankName}
-          {r.profile && r.profile !== "הכול" ? ` · זכאי ל: ${r.profile}` : ""}
+          {props.snap ? ` · ${props.snap.service_type === "career" ? "קבע" : "חובה"}` : ""}
         </Typography>
       </DialogTitle>
       <DialogContent dividers>
@@ -911,7 +901,7 @@ function SoldierLoadDialog(props: {
             credit={r.credit}
             taskName={(id) => ctx.tasks.get(id)?.name ?? "תורנות"}
           />
-          <EligibilityCard elig={props.elig} snap={props.snap} rankName={props.rankName} />
+          <EligibilityCard elig={props.elig} rankName={props.rankName} />
           {r.compared ? (
             <Alert severity={r.outlier ? "warning" : "success"} icon={false}>
               ממוצע מי שזכאים לאותן תורנויות: {r.ref.toFixed(1)} · הפער: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`} (מותר ±
