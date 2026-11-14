@@ -317,7 +317,7 @@ export class SupabaseApi implements Api {
     const rows = check(
       await this.sb
         .from("score_multipliers")
-        .select("id, name, value, day_types, holidays, holiday_kinds, weekdays, time_window, date_from, date_to, skip_shabbat_types, is_active")
+        .select("id, name, value, day_types, holidays, holiday_kinds, weekdays, time_window, date_from, date_to, skip_shabbat_types, is_active, holiday_cell")
         .order("sort_order")
         .order("name"),
     ) as ScoreMultiplier[];

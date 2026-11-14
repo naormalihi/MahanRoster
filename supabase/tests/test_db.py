@@ -1253,6 +1253,27 @@ def test_recent_holiday_duties(conn):
         raise psycopg.Rollback()
 
 
+def test_holiday_table_cells(conn):
+    um = lambda day: float(conn.execute(
+        "select app.unit_multiplier(%s::date, false, (%s::date + time '08:00'), (%s::date + time '08:00' + interval '1 day'))",
+        (day, day, day)).fetchone()[0])
+    with conn.transaction():
+        conn.execute("update score_multipliers set is_active = false")
+        conn.execute("insert into calendar_days (day, day_type, source, note, holiday, holiday_kind) values "
+                     "('2033-10-07', 'major_holiday_eve', 'hebcal', 'ערב סוכות', 'sukkot', 'eve') "
+                     "on conflict (day) do update set holiday = 'sukkot', holiday_kind = 'eve'")
+        conn.execute("insert into score_multipliers (name, value, holidays, holiday_kinds, holiday_cell) "
+                     "values ('סוכות · ערב חג', 5, '{sukkot}', '{eve}', true)")
+        assert um("2033-10-07") == 5
+        with pytest.raises(psycopg.errors.UniqueViolation), conn.transaction():   # one row per cell
+            conn.execute("insert into score_multipliers (name, value, holidays, holiday_kinds, holiday_cell) "
+                         "values ('עוד אחד', 4, '{sukkot}', '{eve}', true)")
+        with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():    # a cell is one holiday, one day
+            conn.execute("insert into score_multipliers (name, value, holidays, holiday_kinds, holiday_cell) "
+                         "values ('שניים', 4, '{sukkot,pesach}', '{eve}', true)")
+        raise psycopg.Rollback()
+
+
 def test_load_roles_settings(conn):
     with conn.transaction():
         conn.execute("insert into load_roles (name, factor) values ('כונן מבצעי בדיקה', 0.7)")
