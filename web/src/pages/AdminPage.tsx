@@ -58,6 +58,7 @@ import {
   HOLIDAYS,
   HOLIDAY_KINDS,
   HOLIDAY_KIND_NAME,
+  HOLIDAY_NAME,
   calendarMatch,
   calendarOnly,
   type HolidayKey,
@@ -906,32 +907,102 @@ function MultiplierDialog(props: {
   );
 }
 
+/** One cell of the holiday table: its own multiplier, edited in place. */
+function HolidayCell(props: { h: HolidayKey; k: HolidayKind; row: ScoreMultiplier | undefined; other: { value: number; name: string } | null; onChanged: () => void }) {
+  const { api } = useAuth();
+  const own = props.row?.is_active ? props.row.value : null;
+  const [text, setText] = useState(own === null ? "" : String(own));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setText(own === null ? "" : String(own)), [own]);
+
+  async function commit() {
+    const t = text.trim();
+    const v = t === "" ? null : Number(t);
+    if (v !== null && (!(v >= 1) || v > 10)) return setError("בין 1 ל-10");
+    if (v === own || (v === 1 && own === null)) return setError(null);
+    setBusy(true);
+    setError(null);
+    try {
+      if (v === null || v === 1) {
+        if (props.row) await api!.deleteScoreMultiplier(props.row.id);
+      } else {
+        await api!.saveScoreMultiplier(props.row?.id ?? null, {
+          ...EMPTY_MULTIPLIER,
+          name: `${HOLIDAY_NAME[props.h]} · ${HOLIDAY_KIND_NAME[props.k]}`,
+          value: v,
+          holidays: [props.h],
+          holiday_kinds: [props.k],
+          holiday_cell: true,
+        });
+      }
+      props.onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const effective = Math.max(own ?? 1, props.other?.value ?? 1);
+  return (
+    <Box>
+      <TextField
+        size="small"
+        type="number"
+        value={text}
+        placeholder="1"
+        disabled={busy}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        error={!!error}
+        slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10, "aria-label": `${HOLIDAY_NAME[props.h]} – ${HOLIDAY_KIND_NAME[props.k]}`, style: { padding: "6px 8px" } } }}
+        sx={{ width: 84 }}
+      />
+      {error ? (
+        <Typography variant="caption" color="error" sx={{ display: "block" }}>
+          {error}
+        </Typography>
+      ) : (
+        props.other &&
+        props.other.value > (own ?? 1) && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.2, mt: 0.25 }}>
+            חל ×{effective} · {props.other.name}
+          </Typography>
+        )
+      )}
+    </Box>
+  );
+}
+
 /**
- * Which multiplier each day of each holiday gets – so a rule like "ערבי ר"ה, יו"כ, סוכות ופסח"
- * next to "חול המועד" and "חג" can be checked at a glance. Calendar-only multipliers; the
- * weekend or night multiplier may still be higher on a given duty (the highest always wins).
+ * The multiplier of each day of each holiday, edited here directly: a value in a cell is that
+ * day's own multiplier (empty = none). A general multiplier from the list above that is higher
+ * still wins, and the cell says so.
  */
-function HolidayMatrix({ list, calendar }: { list: ScoreMultiplier[]; calendar: CalendarDay[] }) {
-  const active = list.filter((m) => m.is_active && calendarOnly(m));
+function HolidayMatrix({ list, calendar, onChanged }: { list: ScoreMultiplier[]; calendar: CalendarDay[]; onChanged: () => void }) {
+  const general = list.filter((m) => m.is_active && !m.holiday_cell && calendarOnly(m));
   // the stored calendar first; a holiday not in it yet is looked up in the generated dates
   const generated = useMemo(() => {
     const from = new Date().toISOString().slice(0, 10);
     const to = new Date(Date.now() + 400 * 86_400_000).toISOString().slice(0, 10);
     return israeliHolidays(from, to);
   }, []);
-  const cell = (h: HolidayKey, k: HolidayKind) => {
-    const d =
-      calendar.find((x) => x.holiday === h && x.holiday_kind === k) ?? generated.find((x) => x.holiday === h && x.holiday_kind === k);
+  const otherFor = (h: HolidayKey, k: HolidayKind) => {
+    const d = calendar.find((x) => x.holiday === h && x.holiday_kind === k) ?? generated.find((x) => x.holiday === h && x.holiday_kind === k);
     if (!d) return null;
-    const hit = active.filter((m) => calendarMatch(m, d)).sort((a, b) => b.value - a.value);
-    return hit.length ? { value: hit[0].value, name: hit[0].name } : { value: 1, name: "" };
+    const hit = general.filter((m) => calendarMatch(m, d)).sort((a, b) => b.value - a.value);
+    return hit.length ? { value: hit[0].value, name: hit[0].name } : null;
   };
+  const cellRow = (h: HolidayKey, k: HolidayKind) => list.find((m) => m.holiday_cell && m.holidays[0] === h && m.holiday_kinds[0] === k);
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
       <Stack spacing={1.5}>
         <Typography variant="h3">מקדם לכל יום חג</Typography>
         <Typography variant="body2" color="text.secondary">
-          המקדם שיחול על כל יום, לפי המקדמים שלמעלה. כשהחג נופל בסוף שבוע, או בתורנות לילה, ייתכן מקדם גבוה יותר – תמיד נלקח הגבוה.
+          כתוב מקדם בתא כדי לקבוע אותו לאותו יום (ריק = בלי מקדם משלו). אם מקדם כללי מהרשימה למעלה גבוה יותר, הוא חל – והתא מראה אותו. גם בסוף שבוע
+          או בתורנות לילה נלקח תמיד המקדם הגבוה.
         </Typography>
         <Box sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -947,35 +1018,17 @@ function HolidayMatrix({ list, calendar }: { list: ScoreMultiplier[]; calendar: 
               {HOLIDAYS.map((h) => (
                 <TableRow key={h.key}>
                   <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>{h.name}</TableCell>
-                  {HOLIDAY_KINDS.map((k) => {
-                    if (!h.kinds.includes(k.key))
-                      return (
-                        <TableCell key={k.key} sx={{ color: "text.disabled" }}>
-                          —
-                        </TableCell>
-                      );
-                    const c = cell(h.key, k.key);
-                    return (
-                      <TableCell key={k.key}>
-                        {c ? (
-                          <>
-                            <Box component="span" sx={{ fontWeight: 700, color: c.value > 1 ? "primary.main" : "text.secondary" }}>
-                              ×{c.value}
-                            </Box>
-                            {c.name && (
-                              <Typography component="div" variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
-                                {c.name}
-                              </Typography>
-                            )}
-                          </>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            —
-                          </Typography>
-                        )}
+                  {HOLIDAY_KINDS.map((k) =>
+                    h.kinds.includes(k.key) ? (
+                      <TableCell key={k.key} sx={{ py: 0.75 }}>
+                        <HolidayCell h={h.key} k={k.key} row={cellRow(h.key, k.key)} other={otherFor(h.key, k.key)} onChanged={onChanged} />
                       </TableCell>
-                    );
-                  })}
+                    ) : (
+                      <TableCell key={k.key} sx={{ color: "text.disabled" }}>
+                        —
+                      </TableCell>
+                    ),
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -1025,9 +1078,6 @@ function LoadRolesCard() {
           <Typography variant="h3" sx={{ flex: 1 }}>
             מקדמי הקלה (תפקידים)
           </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({ id: null, name: "", factor: "0.7" })}>
-            הקלה חדשה
-          </Button>
         </Stack>
         <Typography variant="body2" color="text.secondary">
           חייל עם תפקיד מקבל חלק מהעומס: הניקוד שלו מחולק במקדם (0.5 = חצי מהעומס של חייל רגיל). לחייל עם כמה תפקידים חלה ההקלה הגדולה ביותר – המקדם
@@ -1189,7 +1239,7 @@ function ScoringTab() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {list.map((m) => (
+                {list.filter((m) => !m.holiday_cell).map((m) => (
                   <TableRow key={m.id} hover onClick={() => setEditing(m)} sx={{ cursor: "pointer", opacity: m.is_active ? 1 : 0.5 }}>
                     <TableCell sx={{ fontWeight: 600 }}>
                       {m.name} {!m.is_active && <Chip size="small" label="לא פעיל" />}
@@ -1219,7 +1269,7 @@ function ScoringTab() {
         </Stack>
       </Paper>
 
-      <HolidayMatrix list={list} calendar={calendar} />
+      <HolidayMatrix list={list} calendar={calendar} onChanged={() => void load()} />
 
       <LoadRolesCard />
 

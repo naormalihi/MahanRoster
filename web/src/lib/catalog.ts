@@ -112,6 +112,8 @@ export interface ScoreMultiplierInput {
   date_to: string | null;
   skip_shabbat_types: boolean;
   is_active: boolean;
+  /** a cell of the "multiplier per holiday day" table (one holiday, one day of it) */
+  holiday_cell?: boolean;
 }
 export interface ScoreMultiplier extends ScoreMultiplierInput {
   id: string;
