@@ -76,9 +76,12 @@ export function noWorkText(rows: EligRow[], rankName: string): string | null {
     return `כשיר רק ל${open.join(", ")}, ובמחזור אין משבצות כאלה.`;
   }
   if (w === "none_open") {
-    const main = mainReasons(rows);
-    const why = main.includes("rank") ? `הדרגה ${rankName} לא ברשימת הדרגות של אף סוג תורנות` : reasonText(main.slice(0, 2));
-    return `לא כשיר לאף קטגוריית תורנות: ${why}.`;
+    // the rank is the cause only when it closes every category; otherwise say what closes the
+    // ones his rank fits (e.g. not available all cycle)
+    const rankFits = rows.filter((r) => !r.reasons.includes("rank"));
+    if (!rankFits.length) return `לא כשיר לאף קטגוריית תורנות: הדרגה ${rankName} לא ברשימת הדרגות של אף סוג תורנות.`;
+    const why = reasonText(mainReasons(rankFits).slice(0, 2));
+    return `לא כשיר לאף קטגוריית תורנות: הדרגה ${rankName} מתאימה רק ל${rankFits.map((r) => r.name).join(", ")}, ושם – ${why}.`;
   }
   return null;
 }
@@ -103,8 +106,9 @@ export function noWorkGroups(
       key = `slots:${open.join("+")}`;
       label = `כשירים רק ל${open.join(", ")} – אין משבצות במחזור`;
     } else {
-      const main = mainReasons(rows);
-      if (main.includes("rank")) {
+      const rankFits = rows.filter((r) => !r.reasons.includes("rank"));
+      const main = mainReasons(rankFits);
+      if (!rankFits.length) {
         key = `rank:${rankOf(id)}`;
         label = `דרגת ${rankOf(id)} – לא ברשימת הדרגות של אף סוג`;
       } else {
