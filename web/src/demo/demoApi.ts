@@ -808,6 +808,14 @@ export class DemoApi implements Api {
     return id;
   }
 
+  async updateSpecialSlot(slotId: string, name: string, points: number) {
+    await delay();
+    for (const rows of this.slotsByCycle.values()) {
+      const k = rows.find((x) => x.id === slotId);
+      if (k) Object.assign(k, { special_name: name, fixed_points: points });
+    }
+  }
+
   async addSlot(cycleId: string, k: NewSlot) {
     await delay();
     const row: SlotRow = {

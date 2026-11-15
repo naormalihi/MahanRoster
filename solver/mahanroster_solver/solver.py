@@ -84,7 +84,12 @@ def prepare(problem: Problem) -> Prepared:
     for slot in problem.slots:
         task = tasks[slot.task_type_id]
         surprise = settings.surprise_multiplier if slot.is_surprise else 1.0
-        raw[slot.id] = 0.0 if slot.is_penalty else surprise * raw_points(task, slot.starts_at, slot.ends_at, settings, holidays)
+        if slot.is_penalty:
+            raw[slot.id] = 0.0
+        elif slot.fixed_points is not None:
+            raw[slot.id] = float(slot.fixed_points)  # a special call-up: its own points, nothing multiplies them
+        else:
+            raw[slot.id] = surprise * raw_points(task, slot.starts_at, slot.ends_at, settings, holidays)
         wk[slot.id] = 0 if slot.is_penalty else weekend_units(slot.starts_at, slot.ends_at, settings, holidays)
         ok, why = [], defaultdict(int)
         for s in problem.soldiers:

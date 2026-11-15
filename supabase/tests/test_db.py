@@ -1561,3 +1561,44 @@ def test_update_run_starts_from_the_draft(conn):
         assert {"slot_id": str(k), "soldier_id": str(sol[0]), "role": "performer"} in doc["start"]
         assert conn.execute("select public.build_solver_input(%s, 'full')", (cycle,)).fetchone()[0]["start"] == []
         raise psycopg.Rollback()
+
+
+def test_special_callup_points_and_name(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        tt = conn.execute("insert into task_types (code, name, weight, service_restriction, is_special) values ('special_any', 'הקפצה מיוחדת', 1, 'any', true) on conflict (code) do update set is_special = true returning id").fetchone()[0]
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        day = start + timedelta(days=4)
+        k = conn.execute(
+            """insert into slots (cycle_id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, special_name, fixed_points)
+               values (%s, %s, (%s::timestamp at time zone 'Asia/Jerusalem') + interval '10 hours',
+                       (%s::timestamp at time zone 'Asia/Jerusalem') + interval '2 days 18 hours', 1, 0, 'ליווי משלחת', 4) returning id""",
+            (cycle, tt, day, day)).fetchone()[0]
+        sol = conn.execute("select id, gaf_id from soldiers where is_active order by full_name limit 1").fetchone()
+        # 4 points for the whole duty, though it spans three days
+        assert conn.execute("select raw from app.slot_points(%s, %s)", (k, sol[0])).fetchone()[0] == 4
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        assert next(s for s in doc["slots"] if s["id"] == str(k))["fixed_points"] == 4
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) values (%s, %s, %s, 'performer', 'draft', 'manual', 'בדיקה', 4, 4)",
+                     (k, sol[0], sol[1]))
+        assert conn.execute("select points from assignments where slot_id = %s", (k,)).fetchone()[0] == 4
+        raise psycopg.Rollback()
+
+
+def test_update_special_slot_rescores(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        tt = conn.execute("insert into task_types (code, name, weight, service_restriction, is_special) values ('special_any', 'הקפצה מיוחדת', 1, 'any', true) on conflict (code) do update set is_special = true returning id").fetchone()[0]
+        k = conn.execute(
+            """insert into slots (cycle_id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, special_name, fixed_points)
+               values (%s, %s, now() + interval '2 days', now() + interval '2 days 8 hours', 1, 0, 'משימה', 4) returning id""",
+            (cycle, tt)).fetchone()[0]
+        sol = conn.execute("select id, gaf_id from soldiers where is_active order by full_name limit 1").fetchone()
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) values (%s, %s, %s, 'performer', 'draft', 'manual', 'בדיקה', 4, 4)",
+                     (k, sol[0], sol[1]))
+        with session_as(conn, COORD):
+            conn.execute("select public.update_special_slot(%s, 'משימה חדשה', 6)", (k,))
+            assert conn.execute("select special_name, fixed_points from slots where id = %s", (k,)).fetchone() == ("משימה חדשה", 6)
+            assert conn.execute("select points from assignments where slot_id = %s", (k,)).fetchone()[0] == 6
+        raise psycopg.Rollback()

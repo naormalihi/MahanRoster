@@ -367,6 +367,9 @@ export interface SlotRow {
   briefing_at: string | null;
   /** added after publishing and caught its performer by surprise (הקפצה) */
   is_surprise?: boolean;
+  /** a special call-up (הקפצה מיוחדת): its own name and its points for the whole duty */
+  special_name?: string | null;
+  fixed_points?: number | null;
   assigned: number; // assignments that are not drafts
 }
 
@@ -378,6 +381,9 @@ export interface NewSlot {
   performers_needed: number;
   reserves_needed: number;
   is_surprise: boolean;
+  special_name?: string;
+  fixed_points?: number;
+  allowed_rank_ids?: string[] | null;
 }
 
 /** Template for a base file, for manual preparation or testing. */
@@ -389,3 +395,8 @@ export const dayOf = (isoTs: string) => {
 };
 
 export { isoDate };
+
+/** A duty's name as people see it: a special call-up's own name, else its type's. */
+export function slotName(k: { special_name?: string | null; task_type_id: string }, taskName: (id: string) => string | undefined): string {
+  return k.special_name || taskName(k.task_type_id) || "תורנות";
+}

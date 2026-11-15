@@ -123,6 +123,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
+  const [editSpecial, setEditSpecial] = useState<{ name: string; points: string } | null>(null);
 
   useEffect(() => {
     api!.slotPeople(slotId).then(setData, (e) => setError((e as Error).message));
@@ -176,6 +177,57 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
               <Typography variant="body2" color="text.secondary">
                 {when}
               </Typography>
+              {data.slot.fixed_points != null && (
+                <Box>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <Chip size="small" color="warning" variant="outlined" icon={<BoltIcon />} label={`הקפצה מיוחדת · ${data.slot.fixed_points} נק׳`} />
+                    {!started && !editSpecial && (
+                      <Button size="small" onClick={() => setEditSpecial({ name: data.slot.special_name ?? data.slot.task_name, points: String(data.slot.fixed_points) })}>
+                        עריכת שם וניקוד
+                      </Button>
+                    )}
+                  </Stack>
+                  {editSpecial && (
+                    <Stack spacing={1} sx={{ mt: 1 }}>
+                      <TextField size="small" label="שם המשימה" value={editSpecial.name} onChange={(e) => setEditSpecial({ ...editSpecial, name: e.target.value })} />
+                      <TextField
+                        size="small"
+                        type="number"
+                        label="ניקוד למבצע"
+                        value={editSpecial.points}
+                        onChange={(e) => setEditSpecial({ ...editSpecial, points: e.target.value })}
+                        slotProps={{ htmlInput: { min: 0.5, max: 100, step: 0.5 } }}
+                        helperText="מי שכבר שובץ מקבל את הניקוד החדש"
+                      />
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                              await api!.updateSpecialSlot(data.slot.id, editSpecial.name, Number(editSpecial.points));
+                              setEditSpecial(null);
+                              changed();
+                            } catch (e) {
+                              setError((e as Error).message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          שמירה
+                        </Button>
+                        <Button size="small" onClick={() => setEditSpecial(null)}>
+                          ביטול
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  )}
+                </Box>
+              )}
               <Box>
                 <Typography variant="subtitle2" gutterBottom>
                   מבצעים

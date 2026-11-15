@@ -157,3 +157,13 @@ def test_task_whose_weight_includes_holidays_gets_no_holiday_multiplier():
     assert one_day(GUARD, "2027-12-26") == 3.0 and one_day(week, "2027-12-26") == 1.0
     assert one_day(GUARD, "2027-10-11") == 2.0 and one_day(week, "2027-10-11") == 1.0
     assert one_day(week, "2027-10-15") == 3.0  # a Friday: the weekend multiplier still applies
+
+
+def test_special_callup_scores_its_own_points():
+    from mahanroster_solver.solver import prepare
+
+    from .helpers import problem, slot, soldier
+
+    k = slot("sp", "guard", "2027-01-08T10:00", "2027-01-09T18:00", r=0, fixed_points=4.0)  # a Friday: no weekend multiplier
+    prep = prepare(problem([soldier("A")], [k]))
+    assert prep.raw["sp"] == 4.0

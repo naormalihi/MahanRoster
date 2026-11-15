@@ -583,7 +583,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("slots")
         .select(
-          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, briefing_at, is_surprise, assignments(status)",
+          "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, briefing_at, is_surprise, special_name, fixed_points, assignments(status)",
         )
         .eq("cycle_id", cycleId)
         .is("cancelled_at", null)
@@ -659,10 +659,14 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("slots").insert({ ...k, cycle_id: cycleId }));
   }
 
+  async updateSpecialSlot(slotId: string, name: string, points: number) {
+    check(await this.sb.rpc("update_special_slot", { p_slot: slotId, p_name: name, p_points: points }));
+  }
+
   async slotPeople(slotId: string): Promise<SlotPeople | null> {
     const { data: sl, error } = await this.sb
       .from("slots")
-      .select("id, cycle_id, starts_at, ends_at, task_types(name), cycles(status)")
+      .select("id, cycle_id, starts_at, ends_at, special_name, fixed_points, task_types(name), cycles(status)")
       .eq("id", slotId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -670,14 +674,16 @@ export class SupabaseApi implements Api {
     const rows = check(
       await this.sb.from("assignments").select("id, role, status, replaced_assignment_id, soldiers(full_name)").eq("slot_id", slotId).neq("status", "draft"),
     ) as unknown as { id: string; role: "performer" | "reserve"; status: string; replaced_assignment_id: string | null; soldiers: { full_name: string } | null }[];
-    const s = sl as unknown as { id: string; cycle_id: string; starts_at: string; ends_at: string; task_types: { name: string } | null; cycles: { status: string } | null };
+    const s = sl as unknown as { id: string; cycle_id: string; starts_at: string; ends_at: string; special_name: string | null; fixed_points: number | null; task_types: { name: string } | null; cycles: { status: string } | null };
     return {
       slot: {
         id: s.id,
         cycle_id: s.cycle_id,
         starts_at: s.starts_at,
         ends_at: s.ends_at,
-        task_name: s.task_types?.name ?? "",
+        task_name: s.special_name ?? s.task_types?.name ?? "",
+        special_name: s.special_name,
+        fixed_points: s.fixed_points === null ? null : Number(s.fixed_points),
         published: s.cycles?.status === "published",
       },
       people: rows.map((r) => ({ id: r.id, name: r.soldiers?.full_name ?? "?", role: r.role, status: r.status, replaced_id: r.replaced_assignment_id })),

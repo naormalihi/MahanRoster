@@ -533,7 +533,7 @@ export function SlotsPage() {
       .then(([c, tasks, categories, ranks, aliases, sc, cal]) => {
         setCycles(c);
         const holidays = new Set(cal.filter((d) => HOLIDAY_TYPES.has(d.day_type)).map((d) => d.day));
-        setRefs({ tasks, categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
+        setRefs({ tasks: tasks.filter((x) => !x.is_special), categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
       })
       .catch((e) => setError((e as Error).message));
   }, [api]);
@@ -577,7 +577,7 @@ export function SlotsPage() {
             existing={slots ?? []}
             onAliases={(a) => setRefs({ ...refs, aliases: [...refs.aliases.filter((x) => !a.some((y) => y.alias === x.alias)), ...a] })}
             onTasksChanged={async () => {
-              const tasks = await api!.taskTypes();
+              const tasks = (await api!.taskTypes()).filter((x) => !x.is_special);
               setRefs((r) => (r ? { ...r, tasks } : r));
               return tasks;
             }}
