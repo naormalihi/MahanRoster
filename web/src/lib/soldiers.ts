@@ -35,6 +35,10 @@ export interface SoldierDetail {
   home_nightly_override_until: string | null;
   /** הת"ש 3–7: nights a week he must sleep at home */
   tash_level: number | null;
+  /** set when a new soldier first enters a cycle; his training period runs from it */
+  unit_join_date?: string | null;
+  /** a new soldier's opening score (his group's mean) */
+  opening_score?: number | null;
   is_active: boolean;
   load_roles: SoldierLoadRole[];
 }

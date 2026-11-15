@@ -120,7 +120,7 @@ export class DemoApi implements Api {
   private boardPeople = new Map<string, SlotPerson[]>();
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
-  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, exemption_deadline_days: 40, fairness_tolerance_pct: 20 };
+  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90 };
   private multipliers: ScoreMultiplier[] = [
     { id: "m1", name: "סוף שבוע", value: 1.5, day_types: [], holidays: [], holiday_kinds: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
     { id: "m4", name: "ראש השנה, יום כיפור ופסח", value: 6, day_types: ["major_holiday", "major_holiday_eve"], holidays: [], holiday_kinds: [], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },

@@ -5,6 +5,7 @@ import ParentIcon from "@mui/icons-material/FamilyRestroomOutlined";
 import RangeIcon from "@mui/icons-material/GpsFixedOutlined";
 import ReliefIcon from "@mui/icons-material/BalanceOutlined";
 import ServiceIcon from "@mui/icons-material/BadgeOutlined";
+import NewcomerIcon from "@mui/icons-material/PersonAddAltOutlined";
 import ShacharIcon from "@mui/icons-material/SchoolOutlined";
 import { Box, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
@@ -22,6 +23,7 @@ const ICON: Record<FactorIcon, typeof AwayIcon> = {
   range: RangeIcon,
   holiday: HolidayIcon,
   service: ServiceIcon,
+  newcomer: NewcomerIcon,
 };
 
 interface Shared {
@@ -31,6 +33,7 @@ interface Shared {
   absences: Absence[];
   absenceTypes: AbsenceType[];
   holidays: Map<string, { day: string; task_name: string }>;
+  graceDays: number;
 }
 // one load per cycle, shared by every soldier dialog opened on it
 const cache = new Map<string, Promise<Shared>>();
@@ -44,13 +47,15 @@ function loadShared(api: Api, cycle: { id: string; start: string; end: string })
       api.absences(cycle.start, cycle.end),
       api.absenceTypes(),
       api.recentHolidayDuties(since).catch(() => []),
-    ]).then(([d, ex, et, ab, at, hol]) => ({
+      api.scoringSettings().then((x) => x.grace_days).catch(() => 90),
+    ]).then(([d, ex, et, ab, at, hol, graceDays]) => ({
       details: new Map(d.map((s) => [s.id, s])),
       exemptions: ex,
       exemptionTypes: et,
       absences: ab,
       absenceTypes: at,
       holidays: new Map(hol.map((h) => [h.soldier_id, h])),
+      graceDays,
     }));
     p.catch(() => cache.delete(cycle.id));
     cache.set(cycle.id, p);
@@ -89,6 +94,7 @@ export function SoldierFactors(props: {
             absenceTypes: sh.absenceTypes,
             taskName,
             holiday: sh.holidays.get(soldierId) ?? null,
+            graceDays: sh.graceDays,
             today: new Date().toISOString().slice(0, 10),
           }),
         );
