@@ -52,3 +52,30 @@ export function summarize(members: { soldier_id: string; group: string }[], scor
     }))
     .sort((a, b) => b.n - a.n);
 }
+
+/** The cycle today falls in, if any. */
+export function currentCycle(cycles: Cycle[], today: string): Cycle | undefined {
+  return cycles.find((c) => c.start_date <= today && today <= c.end_date);
+}
+
+/** The first cycle that starts after today. */
+export function nextCycle(cycles: Cycle[], today: string): Cycle | undefined {
+  return cycles.filter((c) => c.start_date > today).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+}
+
+/** A board people see: published or closed. Anything else is still a draft. */
+export const isPublished = (c: Cycle) => c.status === "published" || c.status === "closed";
+
+/**
+ * The "current" score on the soldiers screen: a new soldier's opening score plus his points in
+ * the cycle today falls in. null = nothing to show (no current cycle and no opening score).
+ */
+export function currentScore(
+  opening: number | null | undefined,
+  inCycle: { points: number; duties: number } | undefined,
+  hasCycle: boolean,
+): { points: number; duties: number; opening: number } | null {
+  const o = opening ? Number(opening) : 0;
+  if (!hasCycle && !o) return null;
+  return { points: o + (inCycle?.points ?? 0), duties: inCycle?.duties ?? 0, opening: o };
+}

@@ -32,3 +32,25 @@ describe("last cycle reference", () => {
     ]);
   });
 });
+
+describe("current and next cycle by today's date", () => {
+  const c = (id: string, start: string, end: string, status = "published") => ({ id, start_date: start, end_date: end, status }) as unknown as Cycle;
+  const cycles = [c("h1", "2027-01-01", "2027-06-30"), c("h2", "2027-07-01", "2027-12-31", "review")];
+  it("between cycles: no current one, the next is the coming half-year", async () => {
+    const { currentCycle, nextCycle } = await import("../lastCycle");
+    expect(currentCycle(cycles, "2026-11-15")).toBeUndefined();
+    expect(nextCycle(cycles, "2026-11-15")?.id).toBe("h1");
+  });
+  it("once a cycle starts it is current and the one after it is next", async () => {
+    const { currentCycle, nextCycle } = await import("../lastCycle");
+    expect(currentCycle(cycles, "2027-01-01")?.id).toBe("h1");
+    expect(nextCycle(cycles, "2027-01-01")?.id).toBe("h2");
+  });
+  it("current score: opening score alone, or opening plus the cycle's points", async () => {
+    const { currentScore } = await import("../lastCycle");
+    expect(currentScore(null, undefined, false)).toBeNull();
+    expect(currentScore(10.9, undefined, false)).toEqual({ points: 10.9, duties: 0, opening: 10.9 });
+    expect(currentScore(10.9, { points: 3, duties: 2 }, true)).toEqual({ points: 13.9, duties: 2, opening: 10.9 });
+    expect(currentScore(null, undefined, true)).toEqual({ points: 0, duties: 0, opening: 0 });
+  });
+});
