@@ -133,6 +133,8 @@ export interface Api {
   undoReserveActivation(reserveId: string): Promise<void>;
   /** Deletes a duty that waits for staffing and has nothing published on it. */
   deletePendingSlot(slotId: string): Promise<void>;
+  /** Deletes a duty before it starts, also with published people (they come off, with their points); a reason is required then. */
+  deleteSlot(slotId: string, reason?: string): Promise<void>;
   applyRoster(plan: RosterPlan): Promise<ApplyResult>;
   soldierDetails(): Promise<SoldierDetail[]>;
   updateSoldiers(ids: string[], patch: SoldierPatch): Promise<void>;

@@ -870,6 +870,12 @@ export class DemoApi implements Api {
     };
   }
 
+  async deleteSlot(slotId: string) {
+    await delay(200);
+    this.draft = this.draft.filter((a) => a.slot_id !== slotId);
+    for (const [c, l] of this.slotsByCycle) this.slotsByCycle.set(c, l.filter((s) => s.id !== slotId));
+  }
+
   async deletePendingSlot(slotId: string) {
     await delay(200);
     if (this.draft.some((a) => a.slot_id === slotId && a.status !== "draft")) throw new Error("בתורנות יש שיבוץ מפורסם – אי אפשר למחוק אותה");

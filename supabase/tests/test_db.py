@@ -1617,3 +1617,41 @@ def test_a_duty_added_by_hand_starts_inside_its_cycle(conn):
             conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values (%s, %s, (%s::date + 1)::timestamp at time zone 'Asia/Jerusalem', (%s::date + 2)::timestamp at time zone 'Asia/Jerusalem')",
                          (cycle, task, start, start))
         raise psycopg.Rollback()
+
+
+def test_delete_slot_with_published_people_before_it_starts(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a = conn.execute("select id from soldiers where is_active limit 1").fetchone()[0]
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '1 day', now() + interval '2 days') returning id", (cycle, tid)).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (k, a))
+        with session_as(conn, COORD):
+            with pytest.raises(psycopg.Error, match="סיבה"):
+                with conn.transaction():
+                    conn.execute("select public.delete_slot(%s, null)", (k,))
+        raise psycopg.Rollback()
+
+
+def test_delete_slot_logs_and_removes(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a = conn.execute("select id from soldiers where is_active limit 1").fetchone()[0]
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '1 day', now() + interval '2 days') returning id", (cycle, tid)).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (k, a))
+        with session_as(conn, COORD):
+            assert conn.execute("select public.delete_slot(%s, 'בוטלה')", (k,)).fetchone()[0] == 1
+            assert conn.execute("select count(*) from slots where id = %s", (k,)).fetchone()[0] == 0
+            conn.execute("reset role")
+            log = conn.execute("select after->>'reason', jsonb_array_length(before->'people') from audit_log where action = 'slot.delete' and entity_id = %s", (str(k),)).fetchone()
+            assert log == ("בוטלה", 1)
+        old = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                           "(%s, %s, now() - interval '1 hour', now() + interval '2 hours') returning id", (cycle, tid)).fetchone()[0]
+        with session_as(conn, COORD):
+            with pytest.raises(psycopg.Error, match="כבר התחילה"):
+                with conn.transaction():
+                    conn.execute("select public.delete_slot(%s, 'x')", (old,))
+        raise psycopg.Rollback()

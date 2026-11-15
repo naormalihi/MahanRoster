@@ -690,6 +690,10 @@ export class SupabaseApi implements Api {
     };
   }
 
+  async deleteSlot(slotId: string, reason?: string) {
+    check(await this.sb.rpc("delete_slot", { p_slot: slotId, p_reason: reason ?? null }));
+  }
+
   async deletePendingSlot(slotId: string) {
     maybe(await this.sb.rpc("delete_pending_slot", { p_slot: slotId }));
   }
