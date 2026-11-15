@@ -29,7 +29,7 @@ import {
 } from "@mui/material";
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { canRead, isSoldier, isStaff } from "../lib/api";
+import { canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
@@ -42,11 +42,13 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: "צפייה",
   gaf_commander: "מפקד גף",
   soldier: "חייל",
+  unit_commander: "מפקד יחידה",
 };
 
 /** Four areas instead of a link per screen; the cycle steps live inside "מחזור". */
 const STAFF_LINKS = [
   { to: "/", label: "בית", match: (p: string) => p === "/" },
+  { to: "/dashboard", label: "מחוונים", match: (p: string) => p === "/dashboard" },
   { to: "/cycle", label: "מחזור", match: (p: string) => p.startsWith("/cycle") },
   { to: "/soldiers", label: "חיילים", match: (p: string) => p.startsWith("/soldiers") },
   { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
@@ -201,7 +203,13 @@ export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
-  const links = staff ? STAFF_LINKS : reader ? STAFF_LINKS.filter((l) => l.to !== "/admin") : isSoldier(me) ? SOLDIER_LINKS : [];
+  const links = staff
+    ? STAFF_LINKS
+    : reader
+      ? STAFF_LINKS.filter((l) => l.to !== "/admin" && !(isUnitCommander(me) && l.to === "/dashboard"))
+      : isSoldier(me)
+        ? SOLDIER_LINKS
+        : [];
   const current = links.find((l) => l.match(pathname));
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", "@media print": { bgcolor: "white" } }}>

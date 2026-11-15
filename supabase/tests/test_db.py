@@ -1833,3 +1833,25 @@ def test_soldier_is_notified_of_his_board_changes_and_decisions(conn):
         conn.execute("select public.save_push_subscription('https://push.example/abc', 'p256', 'authkey', 'test')")
         assert conn.execute("select count(*) from push_subscriptions").fetchone()[0] == 1
         raise psycopg.Rollback()
+
+
+def test_unit_commander_reads_the_unit_and_its_dashboard(conn):
+    uid = _as_coord(conn, "select public.create_user('mefaked.yechida', 'temp-pass-123', 'unit_commander', null)")[0][0]
+    # a rule change by נע"ת shows on the dashboard
+    with conn.transaction():
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        conn.execute("update settings set value = value where key = (select key from settings order by key limit 1)")
+        conn.execute("reset role")
+        conn.execute("set local role authenticated")
+        _claims(conn, uid)
+        assert conn.execute("select count(*) from soldiers").fetchone()[0] > 0
+        assert conn.execute("update soldiers set full_name = full_name").rowcount == 0  # reads only
+        d = conn.execute("select public.unit_dashboard()").fetchone()[0]
+        assert {"cycle", "by_gaf", "by_population", "requests", "accounts", "settings_changes"} <= set(d)
+        assert any(x["entity"] == "settings" and x["action"] == "update" for x in d["settings_changes"])
+        assert d["accounts"]["soldiers"] > 0
+        raise psycopg.Rollback()
+    with session_as(conn, uid, aal="aal1") as c:
+        with pytest.raises(psycopg.Error):
+            c.execute("select public.unit_dashboard()")

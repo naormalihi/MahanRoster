@@ -13,6 +13,7 @@ import {
   Chip,
   CircularProgress,
   Dialog,
+  MenuItem,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -78,6 +79,7 @@ function Handover({ username, password }: { username: string; password: string }
 function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onClose: () => void; onDone: () => void }) {
   const { api } = useAuth();
   const [soldier, setSoldier] = useState<string | null>(null);
+  const [role, setRole] = useState<"gaf_commander" | "unit_commander">("gaf_commander");
   const [username, setUsername] = useState("");
   const [password] = useState(() => tempPassword());
   const [busy, setBusy] = useState(false);
@@ -89,7 +91,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
     setBusy(true);
     setError(null);
     try {
-      await api!.createUser(username.trim().toLowerCase(), password, soldier);
+      await api!.createUser(username.trim().toLowerCase(), password, soldier, role);
       setDone(true);
       props.onDone();
     } catch (e) {
@@ -100,14 +102,20 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
 
   return (
     <Dialog open onClose={props.onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>משתמש חדש – מפקד גף</DialogTitle>
+      <DialogTitle>משתמש חדש – {role === "unit_commander" ? "מפקד יחידה" : "מפקד גף"}</DialogTitle>
       <DialogContent dividers>
         {done ? (
           <Handover username={username.trim().toLowerCase()} password={password} />
         ) : (
           <Stack spacing={2}>
+            <TextField select label="תפקיד" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+              <MenuItem value="gaf_commander">מפקד גף</MenuItem>
+              <MenuItem value="unit_commander">מפקד יחידה</MenuItem>
+            </TextField>
             <Typography variant="body2" color="text.secondary">
-              מפקד גף רואה את כל נתוני היחידה (מחזור, אילוצים, פוטנציאל, טיוטה, חיילים ולוח) לקריאה בלבד, ולא יכול לשנות דבר.
+              {role === "unit_commander"
+                ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא לוח המחוונים – כולל כל שינוי הגדרות שנע\"ת עשה בחודש האחרון."
+                : "מפקד גף רואה את כל נתוני היחידה (מחזור, אילוצים, פוטנציאל, טיוטה, חיילים ולוח) לקריאה בלבד, ולא יכול לשנות דבר."}
             </Typography>
             <SoldierPicker soldiers={props.soldiers} value={soldier} onChange={setSoldier} autoFocus />
             <TextField
@@ -167,14 +175,29 @@ export function UsersTab() {
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 260 }}>
-          חשבונות אישיים. כל משתמש משויך לרשומת החייל שלו מכוח האדם (בלי מספר אישי). בגרסה הזו נוצרים כאן חשבונות של מפקדי גפים לצפייה; נע"ת
-          וממלא מקום מוגדרים בהקמה.
+          חשבונות אישיים. כל משתמש משויך לרשומת החייל שלו מכוח האדם (בלי מספר אישי). כאן נוצרים חשבונות של מפקדי גפים ומפקד היחידה (צפייה);
+          חיילים מצטרפים בקוד הצטרפות ממסך החיילים; נע"ת וממלא מקום מוגדרים בהקמה.
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
           משתמש חדש
         </Button>
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
+      {(users ?? [])
+        .filter((u) => !u.is_locked && u.roles.some((r) => r.role === "viewer"))
+        .map((u) => (
+          <Alert
+            key={u.user_id}
+            severity="warning"
+            action={
+              <Button color="inherit" size="small" onClick={() => act(() => api!.setUserLocked(u.user_id, true))}>
+                נעילה
+              </Button>
+            }
+          >
+            חשבון הצפייה המשותף <b>{u.username}</b> עדיין פעיל. בגרסה 2.0 לכל חייל חשבון אישי, ולכן מבטלים אותו: אחרי שהחיילים הצטרפו – לנעול.
+          </Alert>
+        ))}
       {!users ? (
         <CircularProgress />
       ) : (
