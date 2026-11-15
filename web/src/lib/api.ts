@@ -44,7 +44,7 @@ export const isCommander = (me: Me | null) => !!me && me.roles.includes("gaf_com
 export const canRead = (me: Me | null) => isStaff(me) || isCommander(me);
 /** A soldier with his own account (version 2.1): his duties and the published board. */
 export const isSoldier = (me: Me | null) => !!me && me.roles.includes("soldier");
-/** A gaf representative or commander: the gaf's own screen (version 2.0, stage 2.3). */
+/** A gaf representative (acts for the gaf) or commander (only looks): the gaf's own screen. */
 export const isGafRole = (me: Me | null) => !!me && (me.roles.includes("gaf_rep") || me.roles.includes("gaf_commander"));
 
 export interface MfaState {
@@ -265,7 +265,6 @@ export interface Api {
   gafRequestExemption(soldierId: string, typeId: string, from: string, to: string): Promise<void>;
   gafCancelEntry(kind: "block" | "absence", id: string): Promise<void>;
   gafSubmit(cycleId: string): Promise<void>;
-  gafApprove(cycleId: string): Promise<void>;
   gafComment(cycleId: string, slotId: string | null, text: string): Promise<void>;
   /** נע"ת: the gafs' submissions and draft comments of a cycle */
   gafReports(cycleId: string): Promise<GafReports>;

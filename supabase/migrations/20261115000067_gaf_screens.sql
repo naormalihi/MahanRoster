@@ -1,13 +1,13 @@
 -- =============================================================================
--- Version 2.0, stage 2.3 – the gaf's own screen: gaf representative and gaf commander.
+-- Version 2.0, stage 2.3 – the gaf's own screen.
 --
 --   * the gaf representative (נציג גף, new account type) gathers the gaf's constraints:
 --     sees the gaf's soldiers and what each entered, enters blocks and absences for those
---     who are away and an exemption request on their behalf, and submits the gaf's
---     constraints to the commander;
---   * the gaf commander may do all of that, and approves the gaf's constraints;
---   * both comment on the draft (a duty of their soldiers, or the gaf in general) – the
---     comments reach נע"ת on the scheduling screen, who marks them handled.
+--     who are away and an exemption request on their behalf, submits the gaf's constraints
+--     to נע"ת, and comments on the draft (a duty of a gaf soldier, or the gaf in general) –
+--     the comments reach נע"ת on the scheduling screen, who marks them handled;
+--   * the gaf commander only looks: he sees the same screen (and, as in 1.0, the whole unit),
+--     and takes no part in requests, approvals, swaps or appeals.
 --
 -- Both are role holders: two-step verification, as for every role. A gaf is the gaf of the
 -- soldier the account is tied to. Everything entered is marked on_behalf_of = the user.
@@ -51,7 +51,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
     and ur.role in ('gaf_commander', 'gaf_rep')
     and (ur.valid_from is null or ur.valid_from <= now()) and (ur.valid_to is null or ur.valid_to > now())
     and app.mfa_passed()
-  order by (ur.role = 'gaf_commander') desc
+  order by (ur.role = 'gaf_rep') desc
   limit 1
 $$;
 
@@ -63,9 +63,21 @@ begin
   return g;
 end $$;
 
-create or replace function app.require_gaf_soldier(p_soldier uuid) returns uuid
+-- Acting for the gaf is the representative's alone.
+create or replace function app.require_gaf_rep() returns uuid
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare g uuid := app.require_my_gaf();
+begin
+  if not exists (select 1 from user_roles where user_id = auth.uid() and role = 'gaf_rep' and gaf_id = g
+                  and (valid_from is null or valid_from <= now()) and (valid_to is null or valid_to > now())) then
+    raise exception 'רק נציג הגף מזין ומגיש בשם הגף' using errcode = '42501';
+  end if;
+  return g;
+end $$;
+
+create or replace function app.require_gaf_soldier(p_soldier uuid) returns uuid
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare g uuid := app.require_gaf_rep();
 begin
   if not exists (select 1 from soldiers where id = p_soldier and gaf_id = g and is_active) then
     raise exception 'החייל לא בגף שלך' using errcode = '42501';
@@ -103,7 +115,7 @@ begin
   if not found then return null; end if;
   return jsonb_build_object(
     'gaf', jsonb_build_object('id', g, 'name', (select name from org_units where id = g)),
-    'is_commander', app.has_role('gaf_commander') and exists (select 1 from user_roles where user_id = auth.uid() and role = 'gaf_commander' and gaf_id = g),
+    'can_act', exists (select 1 from user_roles where user_id = auth.uid() and role = 'gaf_rep' and gaf_id = g),
     'cycle', jsonb_build_object('id', c.id, 'name', c.name, 'start_date', c.start_date, 'end_date', c.end_date, 'status', c.status,
                                 'deadline', c.exemption_deadline,
                                 'open', c.status not in ('published', 'closed') and (c.exemption_deadline is null or c.exemption_deadline > now())),
@@ -216,37 +228,23 @@ begin
   end if;
 end $$;
 
--- The representative submits the gaf's constraints; the commander approves them.
+-- The representative submits the gaf's constraints to נע"ת (after the deadline: "late").
 create or replace function public.gaf_submit_constraints(p_cycle uuid) returns void
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare g uuid := app.require_my_gaf();
+declare g uuid := app.require_gaf_rep(); late boolean;
 begin
-  insert into gaf_constraint_submissions (cycle_id, gaf_id, representative_user_id, status, submitted_at, received_via, received_at)
-  values (p_cycle, g, auth.uid(), 'submitted', now(), 'system', now())
-  on conflict (cycle_id, gaf_id) do update
-    set representative_user_id = excluded.representative_user_id, status = 'submitted', submitted_at = now(),
-        approved_by = null, approved_at = null;
-end $$;
-
-create or replace function public.gaf_approve_constraints(p_cycle uuid) returns void
-language plpgsql security definer set search_path = public, pg_temp as $$
-declare g uuid := app.require_my_gaf(); late boolean;
-begin
-  if not exists (select 1 from user_roles where user_id = auth.uid() and role = 'gaf_commander' and gaf_id = g) then
-    raise exception 'רק מפקד הגף מאשר את אילוצי הגף' using errcode = '42501';
-  end if;
   late := exists (select 1 from cycles where id = p_cycle and exemption_deadline is not null and exemption_deadline < now());
-  insert into gaf_constraint_submissions (cycle_id, gaf_id, status, submitted_at, approved_by, approved_at, received_via, received_at)
-  values (p_cycle, g, case when late then 'late' else 'approved' end, now(), auth.uid(), now(), 'system', now())
+  insert into gaf_constraint_submissions (cycle_id, gaf_id, representative_user_id, status, submitted_at, received_via, received_at)
+  values (p_cycle, g, auth.uid(), case when late then 'late' else 'submitted' end, now(), 'system', now())
   on conflict (cycle_id, gaf_id) do update
-    set status = case when late then 'late' else 'approved' end, approved_by = auth.uid(), approved_at = now(),
-        submitted_at = coalesce(gaf_constraint_submissions.submitted_at, now());
+    set representative_user_id = excluded.representative_user_id, status = excluded.status, submitted_at = now(),
+        approved_by = null, approved_at = null;
 end $$;
 
 -- A comment on the draft: on a duty of a gaf soldier, or on the gaf in general (no slot).
 create or replace function public.gaf_comment(p_cycle uuid, p_slot uuid, p_text text) returns void
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare g uuid := app.require_my_gaf();
+declare g uuid := app.require_gaf_rep();
 begin
   if length(trim(coalesce(p_text, ''))) < 2 then raise exception 'כתוב את ההערה'; end if;
   if not exists (select 1 from cycles where id = p_cycle and status not in ('published', 'closed')) then
@@ -289,10 +287,10 @@ end $$;
 
 revoke execute on function public.gaf_overview(uuid), public.gaf_add_block(uuid, date), public.gaf_add_absence(uuid, uuid, date, date),
   public.gaf_request_exemption(uuid, uuid, date, date), public.gaf_cancel_entry(text, uuid), public.gaf_submit_constraints(uuid),
-  public.gaf_approve_constraints(uuid), public.gaf_comment(uuid, uuid, text), public.gaf_reports(uuid), public.handle_draft_comment(uuid, boolean)
+  public.gaf_comment(uuid, uuid, text), public.gaf_reports(uuid), public.handle_draft_comment(uuid, boolean)
   from anon, public;
 grant execute on function public.gaf_overview(uuid), public.gaf_add_block(uuid, date), public.gaf_add_absence(uuid, uuid, date, date),
   public.gaf_request_exemption(uuid, uuid, date, date), public.gaf_cancel_entry(text, uuid), public.gaf_submit_constraints(uuid),
-  public.gaf_approve_constraints(uuid), public.gaf_comment(uuid, uuid, text), public.gaf_reports(uuid), public.handle_draft_comment(uuid, boolean)
+  public.gaf_comment(uuid, uuid, text), public.gaf_reports(uuid), public.handle_draft_comment(uuid, boolean)
   to authenticated;
-revoke execute on function app.my_gaf(), app.require_my_gaf(), app.require_gaf_soldier(uuid) from anon, public;
+revoke execute on function app.my_gaf(), app.require_my_gaf(), app.require_gaf_rep(), app.require_gaf_soldier(uuid) from anon, public;

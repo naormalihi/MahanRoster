@@ -36,8 +36,8 @@ type Entry = { soldier: string; kind: "block" | "absence" | "exemption"; type: s
 
 /**
  * The gaf's own screen (version 2.0, stage 2.3). The representative gathers the gaf's
- * constraints – sees what each soldier entered, enters for those who are away – and submits
- * them; the commander can do the same and approves. On the draft, both comment for נע"ת.
+ * constraints – sees what each soldier entered, enters for those who are away – submits them
+ * to נע"ת, and comments on the draft. The gaf commander sees the same, and takes no part.
  */
 export function GafPage() {
   const { api } = useAuth();
@@ -118,7 +118,7 @@ export function GafPage() {
       <Box>
         <Typography variant="h1">הגף שלי · {o.gaf.name}</Typography>
         <Typography variant="body2" color="text.secondary">
-          {o.is_commander ? "מפקד הגף" : "נציג הגף"} · {o.soldiers.length} חיילים
+          {o.can_act ? "נציג הגף" : "מפקד הגף · צפייה"} · {o.soldiers.length} חיילים
         </Typography>
       </Box>
 
@@ -136,29 +136,22 @@ export function GafPage() {
         <Typography variant="h3">אילוצי הגף · {o.cycle.name}</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           {o.cycle.open
-            ? `האיסוף פתוח${o.cycle.deadline ? ` עד ${dayLabel(o.cycle.deadline)}` : ""}. החיילים מזינים בעצמם; לחיילים שנעדרים – מזינים מכאן.`
+            ? `האיסוף פתוח${o.cycle.deadline ? ` עד ${dayLabel(o.cycle.deadline)}` : ""}. החיילים מזינים בעצמם; ${o.can_act ? "לחיילים שנעדרים – מזינים מכאן." : "נציג הגף מזין לחיילים שנעדרים ומגיש לנע\"ת."}`
             : 'האיסוף נסגר – שינויים דרך נע"ת. בקשת פטור אפשר עדיין להגיש (תסומן דחופה).'}
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5, alignItems: { sm: "center" } }}>
           <Chip
             label={sub ? SUBMISSION_LABEL[sub.status] : "לא הוגש"}
-            color={sub?.status === "approved" ? "success" : sub?.status === "late" ? "warning" : sub?.status === "submitted" ? "info" : "default"}
+            color={sub?.status === "late" ? "warning" : sub && sub.status !== "open" ? "success" : "default"}
           />
           <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-            {sub?.approved_at
-              ? `אושר ${fmt(sub.approved_at)}${sub.approved_by ? ` ע"י ${sub.approved_by}` : ""}`
-              : sub?.submitted_at
+            {sub?.submitted_at
                 ? `הוגש ${fmt(sub.submitted_at)}${sub.submitted_by ? ` ע"י ${sub.submitted_by}` : ""}`
                 : ""}
           </Typography>
-          {!published && (!sub || sub.status === "open") && (
-            <Button variant="outlined" onClick={() => act(() => api!.gafSubmit(o.cycle.id))}>
-              הגשה למפקד הגף
-            </Button>
-          )}
-          {!published && o.is_commander && sub?.status !== "approved" && sub?.status !== "late" && (
-            <Button variant="contained" onClick={() => act(() => api!.gafApprove(o.cycle.id))}>
-              אישור אילוצי הגף
+          {!published && o.can_act && (
+            <Button variant="contained" onClick={() => act(() => api!.gafSubmit(o.cycle.id))}>
+              {sub && sub.status !== "open" ? "הגשה מחדש לנע\"ת" : "הגשה לנע\"ת"}
             </Button>
           )}
         </Stack>
@@ -182,7 +175,7 @@ export function GafPage() {
                     </Typography>
                   </Typography>
                 </Box>
-                {(o.cycle.open || !published) && (
+                {o.can_act && (o.cycle.open || !published) && (
                   <IconButton
                     size="small"
                     aria-label={`אילוץ ל${s.name}`}
@@ -213,7 +206,7 @@ export function GafPage() {
                         size="small"
                         variant="outlined"
                         label={`חסימה ${ddmm(b.day)}`}
-                        onDelete={o.cycle.open ? () => act(() => api!.gafCancelEntry("block", b.id)) : undefined}
+                        onDelete={o.can_act && o.cycle.open ? () => act(() => api!.gafCancelEntry("block", b.id)) : undefined}
                       />
                     ))}
                   {o.absences
@@ -224,7 +217,7 @@ export function GafPage() {
                         size="small"
                         variant="outlined"
                         label={`${a.type} ${ddmm(dayKey(a.starts_at))}–${ddmm(dayKey(new Date(Date.parse(a.ends_at) - 1)))}`}
-                        onDelete={o.cycle.open ? () => act(() => api!.gafCancelEntry("absence", a.id)) : undefined}
+                        onDelete={o.can_act && o.cycle.open ? () => act(() => api!.gafCancelEntry("absence", a.id)) : undefined}
                       />
                     ))}
                 </Stack>
@@ -243,7 +236,7 @@ export function GafPage() {
             </Typography>
           </AccordionSummary>
           <AccordionDetails>
-            {!published && (
+            {!published && o.can_act && (
               <Box sx={{ mb: 1 }}>
                 <Button size="small" startIcon={<CommentIcon />} onClick={() => setComment({ slot: null, label: "הערה כללית על הטיוטה", text: "" })}>
                   הערה כללית לנע"ת
@@ -262,7 +255,7 @@ export function GafPage() {
                       {dayLabel(d.starts_at)} · {spanLabel(d.starts_at, d.ends_at)}
                     </Typography>
                   </Box>
-                  {!published && (
+                  {!published && o.can_act && (
                     <IconButton
                       size="small"
                       aria-label="הערה על התורנות"

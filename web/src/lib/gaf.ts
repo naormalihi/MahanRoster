@@ -1,8 +1,9 @@
-/** Version 2.0, stage 2.3: the gaf's own screen – representative and commander. */
+/** Version 2.0, stage 2.3: the gaf's own screen – the representative acts, the commander only looks. */
 
 export interface GafOverview {
   gaf: { id: string; name: string };
-  is_commander: boolean;
+  /** the representative: enters, submits and comments; the commander only looks */
+  can_act: boolean;
   cycle: { id: string; name: string; start_date: string; end_date: string; status: string; deadline: string | null; open: boolean };
   soldiers: { id: string; name: string; rank: string | null; has_account: boolean }[];
   exemptions: { id: string; soldier_id: string; type: string; start_date: string; end_date: string; status: string; is_urgent: boolean; by_soldier: boolean }[];
@@ -20,9 +21,9 @@ export interface GafReports {
 
 export const SUBMISSION_LABEL: Record<string, string> = {
   open: "בעבודה",
-  submitted: "הוגש למפקד הגף",
-  approved: "אושר ע\"י מפקד הגף",
-  late: "אושר אחרי מועד הסגירה",
+  submitted: "הוגש לנע\"ת",
+  approved: "הוגש לנע\"ת",
+  late: "הוגש אחרי מועד הסגירה",
 };
 
 /** Per soldier: how many constraints he has in the cycle, for the gaf's table. */

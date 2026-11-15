@@ -1670,7 +1670,7 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
             c.execute("select public.add_my_date_block(%s)", (far,))
 
 
-def test_gaf_rep_and_commander_gather_and_approve_the_gafs_constraints(conn):
+def test_gaf_rep_gathers_the_gafs_constraints_and_the_commander_only_looks(conn):
     from datetime import date, timedelta
 
     gaf, other_gaf = [r[0] for r in conn.execute("select id from org_units where kind = 'gaf' order by name limit 2").fetchall()]
@@ -1687,7 +1687,7 @@ def test_gaf_rep_and_commander_gather_and_approve_the_gafs_constraints(conn):
     etype = conn.execute("select id from exemption_types where auto_rule is null order by name limit 1").fetchone()[0]
     with session_as(conn, rep) as c:
         ov = c.execute("select public.gaf_overview(%s)", (cycle,)).fetchone()[0]
-        assert ov["gaf"]["id"] == str(gaf) and not ov["is_commander"]
+        assert ov["gaf"]["id"] == str(gaf) and ov["can_act"]
         assert {s["id"] for s in ov["soldiers"]} >= {str(member), str(rep_s)} and str(outsider) not in {s["id"] for s in ov["soldiers"]}
         assert c.execute("select public.my_input_options()").fetchone()[0] is not None
         c.execute("select public.gaf_add_block(%s, %s)", (member, far))
@@ -1697,21 +1697,20 @@ def test_gaf_rep_and_commander_gather_and_approve_the_gafs_constraints(conn):
             with c.transaction():
                 c.execute("select public.gaf_add_block(%s, %s)", (outsider, far))
         c.execute("select public.gaf_submit_constraints(%s)", (cycle,))
-        with pytest.raises(psycopg.Error, match="רק מפקד הגף"):
-            with c.transaction():
-                c.execute("select public.gaf_approve_constraints(%s)", (cycle,))
-        # a comment on the draft, while there is no board yet
         c.execute("select public.gaf_comment(%s, null, 'נא לשים לב לחופשה של החייל')", (cycle,))
         # nothing of the unit beyond the gaf screen: the tables stay closed to a representative
         assert c.execute("select count(*) from soldiers").fetchone()[0] == 0
         ov = c.execute("select public.gaf_overview(%s)", (cycle,)).fetchone()[0]
-        assert ov["submission"]["status"] == "submitted" and len(ov["comments"]) == 1
+        assert ov["submission"]["status"] in ("submitted", "late") and len(ov["comments"]) == 1
+    # the commander sees the gaf's screen, and acts in nothing
     with session_as(conn, cmd) as c:
-        c.execute("select public.gaf_submit_constraints(%s)", (cycle,))
-        c.execute("select public.gaf_approve_constraints(%s)", (cycle,))
-        st = c.execute("select public.gaf_overview(%s)->'submission'->>'status'", (cycle,)).fetchone()[0]
-        assert st in ("approved", "late")
-        assert c.execute("select public.gaf_overview(%s)->>'is_commander'", (cycle,)).fetchone()[0] == "true"
+        ov = c.execute("select public.gaf_overview(%s)", (cycle,)).fetchone()[0]
+        assert ov["gaf"]["id"] == str(gaf) and not ov["can_act"]
+        for sql, args in (("select public.gaf_add_block(%s, %s)", (member, far)), ("select public.gaf_submit_constraints(%s)", (cycle,)),
+                          ("select public.gaf_comment(%s, null, 'הערה')", (cycle,))):
+            with pytest.raises(psycopg.Error, match="רק נציג הגף"):
+                with c.transaction():
+                    c.execute(sql, args)
     # without the second factor: no gaf screen
     with session_as(conn, rep, aal="aal1") as c:
         with pytest.raises(psycopg.Error, match="רק מפקד גף או נציג גף"):

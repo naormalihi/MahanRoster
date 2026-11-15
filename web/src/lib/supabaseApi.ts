@@ -867,10 +867,6 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("gaf_submit_constraints", { p_cycle: cycleId }));
   }
 
-  async gafApprove(cycleId: string) {
-    maybe(await this.sb.rpc("gaf_approve_constraints", { p_cycle: cycleId }));
-  }
-
   async gafComment(cycleId: string, slotId: string | null, text: string) {
     maybe(await this.sb.rpc("gaf_comment", { p_cycle: cycleId, p_slot: slotId, p_text: text }));
   }

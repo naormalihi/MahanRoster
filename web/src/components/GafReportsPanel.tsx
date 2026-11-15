@@ -8,9 +8,9 @@ import { SUBMISSION_LABEL, type GafReports } from "../lib/gaf";
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 
 /**
- * What the gafs sent from their own screen (version 2.0, stage 2.3): on the constraints step,
- * which gafs submitted and approved their constraints; on the scheduling step, the gafs'
- * comments on the draft, which נע"ת marks handled.
+ * What the gafs' representatives sent (version 2.0, stage 2.3): on the constraints step, which
+ * gafs submitted their constraints; on the scheduling step, the gafs' comments on the draft,
+ * which נע"ת marks handled.
  */
 export function GafReportsPanel({ cycleId, show }: { cycleId: string; show: "submissions" | "comments" }) {
   const { api, me } = useAuth();
@@ -22,12 +22,12 @@ export function GafReportsPanel({ cycleId, show }: { cycleId: string; show: "sub
   if (!r) return null;
 
   if (show === "submissions") {
-    const done = r.submissions.filter((s) => s.status === "approved" || s.status === "late").length;
+    const done = r.submissions.filter((s) => s.status && s.status !== "open").length;
     return (
       <Accordion variant="outlined" disableGutters>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="subtitle2">
-            אישורי הגפים · {done} מתוך {r.submissions.length} אישרו
+            הגשות הגפים · {done} מתוך {r.submissions.length} הגישו
           </Typography>
         </AccordionSummary>
         <AccordionDetails>
@@ -38,12 +38,12 @@ export function GafReportsPanel({ cycleId, show }: { cycleId: string; show: "sub
                   {s.gaf}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {s.approved_at ? `${fmt(s.approved_at)}${s.approved_by ? ` · ${s.approved_by}` : ""}` : s.submitted_at ? fmt(s.submitted_at) : ""}
+                  {s.submitted_at ? fmt(s.submitted_at) : ""}
                 </Typography>
                 <Chip
                   size="small"
                   label={s.status ? SUBMISSION_LABEL[s.status] : "לא הוגש"}
-                  color={s.status === "approved" ? "success" : s.status === "late" ? "warning" : s.status === "submitted" ? "info" : "default"}
+                  color={s.status === "late" ? "warning" : s.status && s.status !== "open" ? "success" : "default"}
                 />
               </Stack>
             ))}

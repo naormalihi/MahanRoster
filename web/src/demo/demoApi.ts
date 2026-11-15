@@ -1244,7 +1244,7 @@ export class DemoApi implements Api {
     const open = c.status !== "published" && c.status !== "closed" && (!c.exemption_deadline || Date.parse(c.exemption_deadline) > Date.now());
     return {
       gaf: { id: gaf, name: gaf },
-      is_commander: this.user?.roles.includes("gaf_commander") ?? false,
+      can_act: this.user?.roles.includes("gaf_rep") ?? false,
       cycle: { id: c.id, name: c.name, start_date: c.start_date, end_date: c.end_date, status: c.status, deadline: c.exemption_deadline, open },
       soldiers: mine.map((s) => ({ id: s.id, name: s.full_name, rank: s.rank_name, has_account: false })),
       exemptions: this.exemptionList
@@ -1297,17 +1297,12 @@ export class DemoApi implements Api {
   }
 
   async gafSubmit(cycleId: string) {
+    if (!this.user?.roles.includes("gaf_rep")) throw new Error("רק נציג הגף מזין ומגיש בשם הגף");
     this.submissions.set(cycleId, { status: "submitted", submitted_at: new Date().toISOString(), submitted_by: this.user?.name ?? null, approved_at: null, approved_by: null });
   }
 
-  async gafApprove(cycleId: string) {
-    if (!this.user?.roles.includes("gaf_commander")) throw new Error("רק מפקד הגף מאשר את אילוצי הגף");
-    const s = this.submissions.get(cycleId);
-    this.submissions.set(cycleId, { status: "approved", submitted_at: s?.submitted_at ?? new Date().toISOString(), submitted_by: s?.submitted_by ?? null,
-      approved_at: new Date().toISOString(), approved_by: this.user.name });
-  }
-
   async gafComment(cycleId: string, slotId: string | null, text: string) {
+    if (!this.user?.roles.includes("gaf_rep")) throw new Error("רק נציג הגף מזין ומגיש בשם הגף");
     if (text.trim().length < 2) throw new Error("כתוב את ההערה");
     this.comments.unshift({ id: `dc${Date.now()}`, cycle_id: cycleId, gaf: this.demoGaf(), slot_id: slotId, text: text.trim(), status: "open",
       author: this.user?.name ?? null, created_at: new Date().toISOString() });
