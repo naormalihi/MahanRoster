@@ -2,7 +2,7 @@ import { Alert, Box, CircularProgress } from "@mui/material";
 import { lazy, Suspense, type ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { canRead, isSoldier, isStaff } from "./lib/api";
+import { canRead, isGafRole, isSoldier, isStaff } from "./lib/api";
 import { ReadOnlyScope } from "./components/ReadOnly";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ChangePasswordPage, LoginPage, MfaPage } from "./pages/AuthPages";
@@ -12,6 +12,7 @@ import { CycleWorkspace } from "./pages/CycleWorkspace";
 import { HomePage } from "./pages/HomePage";
 import { MyPage } from "./pages/MyPage";
 import { RequestsPage } from "./pages/RequestsPage";
+import { GafPage } from "./pages/GafPage";
 import { CycleProvider } from "./lib/cycleContext";
 import { SoldiersPage } from "./pages/SoldiersPage";
 
@@ -44,7 +45,8 @@ function Gate() {
     <CycleProvider>
       <Layout>
         <Routes>
-          <Route path="/" element={reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
+          <Route path="/" element={reader ? <HomePage /> : isGafRole(me) ? <GafPage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
+          {isGafRole(me) && <Route path="/gaf" element={<GafPage />} />}
           <Route path="/board" element={<BoardPage />} />
           {isSoldier(me) && <Route path="/requests" element={<RequestsPage />} />}
           {reader && (

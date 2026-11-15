@@ -30,6 +30,7 @@ import {
 import { dayKey } from "../lib/dates";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
 import type { AppUser } from "../lib/users";
+import type { GafOverview, GafReports } from "../lib/gaf";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
 import type { ScheduleJob } from "../lib/schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
@@ -114,6 +115,9 @@ export class DemoApi implements Api {
   // version 2.1: soldier accounts (username → soldier) and open invite codes (code → soldier, expiry)
   private accounts = new Map<string, string>();
   private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean }>();
+  // stage 2.3: the gaf's submissions and draft comments (cycle → …)
+  private submissions = new Map<string, NonNullable<GafOverview["submission"]>>();
+  private comments: (GafReports["comments"][number] & { cycle_id: string })[] = [];
   private soldierList: ExistingSoldier[] = [];
   private gafList: NamedRef[] = GAFIM.map((name, i) => ({ id: `g${i}`, name }));
   private rankList: NamedRef[] = RANKS.map((name, i) => ({ id: `r${i}`, name }));
@@ -232,6 +236,7 @@ export class DemoApi implements Api {
     else if (u === "board") this.user = { name: u, roles: ["viewer"], mustChange: false, aal2: true };
     else if (u === "new.user") this.user = { name: u, roles: ["viewer"], mustChange: true, aal2: true };
     else if (u === "cmd") this.user = { name: u, roles: ["gaf_commander"], mustChange: false, aal2: false };
+    else if (u === "rep") this.user = { name: u, roles: ["gaf_rep"], mustChange: false, aal2: true };
     else if (u === "chayal" || this.accounts.has(u)) this.user = { name: u, roles: ["soldier"], mustChange: false, aal2: true };
     else throw new Error("שם משתמש או סיסמה שגויים");
   }
@@ -1027,13 +1032,13 @@ export class DemoApi implements Api {
     return this.users.map((u) => ({ ...u, roles: [...u.roles] }));
   }
 
-  async createUser(username: string, password: string, soldierId: string | null) {
+  async createUser(username: string, password: string, soldierId: string | null, role: "gaf_commander" | "gaf_rep" = "gaf_commander") {
     await delay(300);
     if (this.users.some((u) => u.username === username)) throw new Error("שם המשתמש כבר קיים");
     if (password.length < 10) throw new Error("סיסמה זמנית: לפחות 10 תווים");
     const s = this.soldierList.find((x) => x.id === soldierId);
     const id = crypto.randomUUID();
-    this.users.push({ user_id: id, username, soldier_id: soldierId, soldier_name: s?.full_name ?? null, is_locked: false, must_change_password: true, last_login_at: null, roles: [{ id: crypto.randomUUID(), role: "gaf_commander", gaf_id: null, valid_from: null, valid_to: null }] });
+    this.users.push({ user_id: id, username, soldier_id: soldierId, soldier_name: s?.full_name ?? null, is_locked: false, must_change_password: true, last_login_at: null, roles: [{ id: crypto.randomUUID(), role, gaf_id: null, valid_from: null, valid_to: null }] });
     return id;
   }
 
@@ -1219,6 +1224,110 @@ export class DemoApi implements Api {
   async cancelMyAbsence(id: string) {
     const a = this.absenceList.find((x) => x.id === id);
     if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי החייל" });
+  }
+
+  /** The demo gaf: the first soldier's. */
+  private demoGaf() {
+    return this.soldierList[0]?.gaf_name ?? "";
+  }
+
+  async gafOverview(cycleId: string): Promise<GafOverview> {
+    await delay();
+    this.seedConstraints();
+    const c = this.cycleList.find((x) => x.id === cycleId)!;
+    const gaf = this.demoGaf();
+    const mine = this.soldierList.filter((s) => s.is_active && s.gaf_name === gaf);
+    const ids = new Set(mine.map((s) => s.id));
+    const exName = new Map(EXEMPTION_TYPES.map((t) => [t.id, t.name]));
+    const abName = new Map(ABSENCE_TYPES.map((t) => [t.id, t.name]));
+    const slots = new Map((this.slotsByCycle.get(c.id) ?? []).map((k) => [k.id, k]));
+    const open = c.status !== "published" && c.status !== "closed" && (!c.exemption_deadline || Date.parse(c.exemption_deadline) > Date.now());
+    return {
+      gaf: { id: gaf, name: gaf },
+      is_commander: this.user?.roles.includes("gaf_commander") ?? false,
+      cycle: { id: c.id, name: c.name, start_date: c.start_date, end_date: c.end_date, status: c.status, deadline: c.exemption_deadline, open },
+      soldiers: mine.map((s) => ({ id: s.id, name: s.full_name, rank: s.rank_name, has_account: false })),
+      exemptions: this.exemptionList
+        .filter((e) => ids.has(e.soldier_id) && ["pending", "approved"].includes(e.status) && e.source !== "computed" && e.start_date <= c.end_date && e.end_date >= c.start_date)
+        .map((e) => ({ id: e.id, soldier_id: e.soldier_id, type: exName.get(e.exemption_type_id) ?? "", start_date: e.start_date, end_date: e.end_date,
+          status: e.status, is_urgent: e.is_urgent, by_soldier: e.source === "soldier" })),
+      blocks: this.blockList
+        .filter((b) => ids.has(b.soldier_id) && b.status === "active" && b.day >= c.start_date && b.day <= c.end_date)
+        .map((b) => ({ id: b.id, soldier_id: b.soldier_id, day: b.day, by_soldier: false })),
+      absences: this.absenceList
+        .filter((a) => ids.has(a.soldier_id) && a.status === "active" && a.starts_at.slice(0, 10) <= c.end_date && a.ends_at.slice(0, 10) >= c.start_date)
+        .map((a) => ({ id: a.id, soldier_id: a.soldier_id, type: abName.get(a.absence_type_id) ?? "", starts_at: a.starts_at, ends_at: a.ends_at, by_soldier: false })),
+      submission: this.submissions.get(c.id) ?? null,
+      comments: this.comments.filter((x) => x.cycle_id === c.id && x.gaf === gaf).map(({ cycle_id: _c, gaf: _g, ...x }) => x),
+      duties: this.draft
+        .filter((a) => a.cycle_id === c.id && ids.has(a.soldier_id) && slots.has(a.slot_id))
+        .map((a) => {
+          const k = slots.get(a.slot_id)!;
+          return { assignment_id: a.id, slot_id: k.id, soldier_id: a.soldier_id, task: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "",
+            starts_at: k.starts_at, ends_at: k.ends_at, role: a.role, status: a.status };
+        })
+        .sort((x, y) => x.starts_at.localeCompare(y.starts_at)),
+    };
+  }
+
+  async gafAddBlock(soldierId: string, day: string) {
+    await delay();
+    this.blockList.push({ id: `b${Date.now()}`, soldier_id: soldierId, cycle_id: null, day, status: "active", received_via: "system" });
+  }
+
+  async gafAddAbsence(soldierId: string, typeId: string, from: string, to: string) {
+    await delay();
+    const end = new Date(Date.parse(to) + 86_400_000).toISOString().slice(0, 10);
+    this.absenceList.push({ id: `ab${Date.now()}`, soldier_id: soldierId, absence_type_id: typeId, starts_at: `${from}T00:00:00+02:00`,
+      ends_at: `${end}T00:00:00+02:00`, status: "active", cancel_reason: null, received_via: "system" });
+  }
+
+  async gafRequestExemption(soldierId: string, typeId: string, from: string, to: string) {
+    await delay();
+    this.exemptionList.push({
+      id: `ex${Date.now()}`, soldier_id: soldierId, exemption_type_id: typeId, kind: "full", start_date: from, end_date: to,
+      excluded_task_type_ids: null, restricted_hours: null, is_urgent: false, status: "pending", source: "soldier",
+      proof_checked_at: null, decided_at: null, decision_reason: null, received_via: "system", received_at: new Date().toISOString(),
+    } as Exemption);
+  }
+
+  async gafCancelEntry(kind: "block" | "absence", id: string) {
+    if (kind === "block") await this.cancelMyDateBlock(id);
+    else await this.cancelMyAbsence(id);
+  }
+
+  async gafSubmit(cycleId: string) {
+    this.submissions.set(cycleId, { status: "submitted", submitted_at: new Date().toISOString(), submitted_by: this.user?.name ?? null, approved_at: null, approved_by: null });
+  }
+
+  async gafApprove(cycleId: string) {
+    if (!this.user?.roles.includes("gaf_commander")) throw new Error("רק מפקד הגף מאשר את אילוצי הגף");
+    const s = this.submissions.get(cycleId);
+    this.submissions.set(cycleId, { status: "approved", submitted_at: s?.submitted_at ?? new Date().toISOString(), submitted_by: s?.submitted_by ?? null,
+      approved_at: new Date().toISOString(), approved_by: this.user.name });
+  }
+
+  async gafComment(cycleId: string, slotId: string | null, text: string) {
+    if (text.trim().length < 2) throw new Error("כתוב את ההערה");
+    this.comments.unshift({ id: `dc${Date.now()}`, cycle_id: cycleId, gaf: this.demoGaf(), slot_id: slotId, text: text.trim(), status: "open",
+      author: this.user?.name ?? null, created_at: new Date().toISOString() });
+  }
+
+  async gafReports(cycleId: string): Promise<GafReports> {
+    await delay();
+    const gafs = [...new Set(this.soldierList.map((s) => s.gaf_name))].sort();
+    return {
+      submissions: gafs.map((g) => {
+        const s = g === this.demoGaf() ? this.submissions.get(cycleId) : undefined;
+        return { gaf: g, status: s?.status ?? null, submitted_at: s?.submitted_at ?? null, approved_at: s?.approved_at ?? null, approved_by: s?.approved_by ?? null };
+      }),
+      comments: this.comments.filter((x) => x.cycle_id === cycleId).map(({ cycle_id: _c, ...x }) => x),
+    };
+  }
+
+  async handleDraftComment(id: string, handled: boolean) {
+    const c = this.comments.find((x) => x.id === id);
+    if (c) c.status = handled ? "handled" : "open";
   }
 
   async myScores() {

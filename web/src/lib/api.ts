@@ -19,6 +19,7 @@ import type {
   StageState,
 } from "./cycles";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
+import type { GafOverview, GafReports } from "./gaf";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
@@ -43,6 +44,8 @@ export const isCommander = (me: Me | null) => !!me && me.roles.includes("gaf_com
 export const canRead = (me: Me | null) => isStaff(me) || isCommander(me);
 /** A soldier with his own account (version 2.1): his duties and the published board. */
 export const isSoldier = (me: Me | null) => !!me && me.roles.includes("soldier");
+/** A gaf representative or commander: the gaf's own screen (version 2.0, stage 2.3). */
+export const isGafRole = (me: Me | null) => !!me && (me.roles.includes("gaf_rep") || me.roles.includes("gaf_commander"));
 
 export interface MfaState {
   /** signed in with password only, and a TOTP factor exists */
@@ -255,10 +258,22 @@ export interface Api {
   cancelMyDateBlock(id: string): Promise<void>;
   addMyAbsence(typeId: string, from: string, to: string): Promise<void>;
   cancelMyAbsence(id: string): Promise<void>;
+  // stage 2.3 – the gaf's screen
+  gafOverview(cycleId: string): Promise<GafOverview>;
+  gafAddBlock(soldierId: string, day: string): Promise<void>;
+  gafAddAbsence(soldierId: string, typeId: string, from: string, to: string): Promise<void>;
+  gafRequestExemption(soldierId: string, typeId: string, from: string, to: string): Promise<void>;
+  gafCancelEntry(kind: "block" | "absence", id: string): Promise<void>;
+  gafSubmit(cycleId: string): Promise<void>;
+  gafApprove(cycleId: string): Promise<void>;
+  gafComment(cycleId: string, slotId: string | null, text: string): Promise<void>;
+  /** נע"ת: the gafs' submissions and draft comments of a cycle */
+  gafReports(cycleId: string): Promise<GafReports>;
+  handleDraftComment(id: string, handled: boolean): Promise<void>;
 
   listUsers(): Promise<AppUser[]>;
   /** A gaf-commander account with a temporary password, linked to a soldier record. */
-  createUser(username: string, password: string, soldierId: string | null): Promise<string>;
+  createUser(username: string, password: string, soldierId: string | null, role?: "gaf_commander" | "gaf_rep"): Promise<string>;
   resetUserPassword(userId: string, password: string): Promise<void>;
   setUserLocked(userId: string, locked: boolean): Promise<void>;
   setUserSoldier(userId: string, soldierId: string | null): Promise<void>;

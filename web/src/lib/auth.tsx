@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { canRead, getApi, type Api, type Me, type MfaState } from "./api";
+import { canRead, isGafRole, getApi, type Api, type Me, type MfaState } from "./api";
 import { forgetUnitKey } from "./hmac";
 
 /**
@@ -41,10 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const who = await a.me();
     setMe(who);
     if (!who) return setStage("signedOut");
-    // Staff and commanders must pass a second factor; everyone else may if they set one up.
+    // Staff, commanders and gaf representatives must pass a second factor; soldiers may if they set one up.
     const m = await a.mfaState();
     setMfa(m);
-    if (m.needsVerify || (canRead(who) && m.needsEnroll)) return setStage("mfa");
+    if (m.needsVerify || ((canRead(who) || isGafRole(who)) && m.needsEnroll)) return setStage("mfa");
     if (who.mustChangePassword) return setStage("changePassword");
     setStage("ready");
   }, [api]);

@@ -25,6 +25,7 @@ import { stageLabel, type Cycle } from "../lib/cycles";
 import { pendingSlots, nextAction, STEPS, stepNav, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
 import { StagePanel } from "./CyclesPage";
 import { announceBoardChange } from "../components/SlotActions";
+import { GafReportsPanel } from "../components/GafReportsPanel";
 
 const ConstraintsPage = lazy(() => import("./ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
 const PotentialPage = lazy(() => import("./PotentialPage").then((m) => ({ default: m.PotentialPage })));
@@ -246,10 +247,20 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
           {step === "overview" && (
             <Overview cycle={cycle} facts={facts} />
           )}
-          {step === "constraints" && <ConstraintsPage />}
+          {step === "constraints" && (
+            <Stack spacing={2}>
+              <GafReportsPanel cycleId={cycle.id} show="submissions" />
+              <ConstraintsPage />
+            </Stack>
+          )}
           {step === "potential" && <PotentialPage />}
           {step === "slots" && <SlotsPage />}
-          {step === "schedule" && <ScheduleStep />}
+          {step === "schedule" && (
+            <Stack spacing={2}>
+              <GafReportsPanel cycleId={cycle.id} show="comments" />
+              <ScheduleStep />
+            </Stack>
+          )}
           {step === "operate" && <OperatePage />}
         </Box>
         <StepFooter step={step} cycle={cycle} facts={facts} />

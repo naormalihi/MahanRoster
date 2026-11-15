@@ -1668,3 +1668,62 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
     with session_as(conn, COORD) as c:
         with pytest.raises(psycopg.Error, match="רק חייל"):
             c.execute("select public.add_my_date_block(%s)", (far,))
+
+
+def test_gaf_rep_and_commander_gather_and_approve_the_gafs_constraints(conn):
+    from datetime import date, timedelta
+
+    gaf, other_gaf = [r[0] for r in conn.execute("select id from org_units where kind = 'gaf' order by name limit 2").fetchall()]
+    sol = lambda g, n: [r[0] for r in conn.execute(
+        "select id from soldiers s where gaf_id = %s and is_active and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit %s",
+        (g, n)).fetchall()]
+    rep_s, cmd_s, member = sol(gaf, 3)
+    outsider = sol(other_gaf, 1)[0]
+    rep = _as_coord(conn, "select public.create_user('rep.one', 'temp-pass-123', 'gaf_rep', %s)", rep_s)[0][0]
+    cmd = _as_coord(conn, "select public.create_user('cmd.one', 'temp-pass-123', 'gaf_commander', %s)", cmd_s)[0][0]
+    cycle = conn.cycle_id
+    far = date.today() + timedelta(days=800)
+    atype = conn.execute("select id from absence_types where not requires_approval order by name limit 1").fetchone()[0]
+    etype = conn.execute("select id from exemption_types where auto_rule is null order by name limit 1").fetchone()[0]
+    with session_as(conn, rep) as c:
+        ov = c.execute("select public.gaf_overview(%s)", (cycle,)).fetchone()[0]
+        assert ov["gaf"]["id"] == str(gaf) and not ov["is_commander"]
+        assert {s["id"] for s in ov["soldiers"]} >= {str(member), str(rep_s)} and str(outsider) not in {s["id"] for s in ov["soldiers"]}
+        assert c.execute("select public.my_input_options()").fetchone()[0] is not None
+        c.execute("select public.gaf_add_block(%s, %s)", (member, far))
+        c.execute("select public.gaf_add_absence(%s, %s, %s, %s)", (member, atype, far + timedelta(days=40), far + timedelta(days=41)))
+        c.execute("select public.gaf_request_exemption(%s, %s, %s, %s)", (member, etype, far, far + timedelta(days=3)))
+        with pytest.raises(psycopg.Error, match="לא בגף שלך"):
+            with c.transaction():
+                c.execute("select public.gaf_add_block(%s, %s)", (outsider, far))
+        c.execute("select public.gaf_submit_constraints(%s)", (cycle,))
+        with pytest.raises(psycopg.Error, match="רק מפקד הגף"):
+            with c.transaction():
+                c.execute("select public.gaf_approve_constraints(%s)", (cycle,))
+        # a comment on the draft, while there is no board yet
+        c.execute("select public.gaf_comment(%s, null, 'נא לשים לב לחופשה של החייל')", (cycle,))
+        # nothing of the unit beyond the gaf screen: the tables stay closed to a representative
+        assert c.execute("select count(*) from soldiers").fetchone()[0] == 0
+        ov = c.execute("select public.gaf_overview(%s)", (cycle,)).fetchone()[0]
+        assert ov["submission"]["status"] == "submitted" and len(ov["comments"]) == 1
+    with session_as(conn, cmd) as c:
+        c.execute("select public.gaf_submit_constraints(%s)", (cycle,))
+        c.execute("select public.gaf_approve_constraints(%s)", (cycle,))
+        st = c.execute("select public.gaf_overview(%s)->'submission'->>'status'", (cycle,)).fetchone()[0]
+        assert st in ("approved", "late")
+        assert c.execute("select public.gaf_overview(%s)->>'is_commander'", (cycle,)).fetchone()[0] == "true"
+    # without the second factor: no gaf screen
+    with session_as(conn, rep, aal="aal1") as c:
+        with pytest.raises(psycopg.Error, match="רק מפקד גף או נציג גף"):
+            c.execute("select public.gaf_overview(%s)", (cycle,))
+    # נע"ת sees the submissions and comments, and marks a comment handled
+    with session_as(conn, rep) as c:
+        c.execute("select public.gaf_comment(%s, null, 'הערה לטיפול')", (cycle,))
+        cid = c.execute("select public.gaf_overview(%s)->'comments'->0->>'id'", (cycle,)).fetchone()[0]
+        c.execute("reset role")
+        c.execute("set local role authenticated")
+        _claims(c, COORD)
+        rep_json = c.execute("select public.gaf_reports(%s)", (cycle,)).fetchone()[0]
+        assert any(x["text"] == "הערה לטיפול" for x in rep_json["comments"])
+        c.execute("select public.handle_draft_comment(%s)", (cid,))
+        assert c.execute("select status from draft_comments where id = %s", (cid,)).fetchone()[0] == "handled"

@@ -40,3 +40,16 @@ describe("self-entry window", () => {
     expect(openCycle(cycles)?.id).toBe("b");
   });
 });
+
+describe("gaf screen", () => {
+  it("counts each soldier's constraints", async () => {
+    const { constraintCounts } = await import("../gaf");
+    const o = {
+      exemptions: [{ soldier_id: "a" }],
+      blocks: [{ soldier_id: "a" }, { soldier_id: "b" }],
+      absences: [{ soldier_id: "a" }],
+    } as unknown as import("../gaf").GafOverview;
+    const m = constraintCounts(o);
+    expect([m.get("a"), m.get("b"), m.get("c")]).toEqual([3, 1, undefined]);
+  });
+});

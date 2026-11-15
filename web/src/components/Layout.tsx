@@ -29,7 +29,7 @@ import {
 } from "@mui/material";
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { canRead, isSoldier, isStaff } from "../lib/api";
+import { canRead, isGafRole, isSoldier, isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
@@ -41,6 +41,7 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: "צפייה",
   gaf_commander: "מפקד גף",
   soldier: "חייל",
+  gaf_rep: "נציג גף",
 };
 
 /** Four areas instead of a link per screen; the cycle steps live inside "מחזור". */
@@ -58,6 +59,13 @@ const SOLDIER_LINKS = [
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
   { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
 ];
+
+/** A gaf representative: the gaf's screen and the published board. */
+const REP_LINKS = [
+  { to: "/", label: "הגף שלי", match: (p: string) => p === "/" || p === "/gaf" },
+  { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
+];
+const GAF_LINK = { to: "/gaf", label: "הגף שלי", match: (p: string) => p === "/gaf" };
 
 /** The cycle every step works on, chosen here once. */
 function CycleSwitcher({ dark }: { dark?: boolean }) {
@@ -200,7 +208,15 @@ export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
-  const links = staff ? STAFF_LINKS : reader ? STAFF_LINKS.filter((l) => l.to !== "/admin") : isSoldier(me) ? SOLDIER_LINKS : [];
+  const links = staff
+    ? STAFF_LINKS
+    : reader
+      ? [...STAFF_LINKS.filter((l) => l.to !== "/admin" && l.to !== "/board"), ...(isGafRole(me) ? [GAF_LINK] : []), STAFF_LINKS.find((l) => l.to === "/board")!]
+      : isGafRole(me)
+        ? REP_LINKS
+        : isSoldier(me)
+          ? SOLDIER_LINKS
+          : [];
   const current = links.find((l) => l.match(pathname));
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", "@media print": { bgcolor: "white" } }}>

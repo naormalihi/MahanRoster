@@ -1,4 +1,5 @@
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
+import type { GafOverview, GafReports } from "./gaf";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
@@ -770,8 +771,8 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("list_users")) as AppUser[];
   }
 
-  async createUser(username: string, password: string, soldierId: string | null) {
-    return check(await this.sb.rpc("create_user", { p_username: username, p_password: password, p_role: "gaf_commander", p_soldier: soldierId })) as string;
+  async createUser(username: string, password: string, soldierId: string | null, role: "gaf_commander" | "gaf_rep" = "gaf_commander") {
+    return check(await this.sb.rpc("create_user", { p_username: username, p_password: password, p_role: role, p_soldier: soldierId })) as string;
   }
 
   async resetUserPassword(userId: string, password: string) {
@@ -840,6 +841,46 @@ export class SupabaseApi implements Api {
 
   async cancelMyAbsence(id: string) {
     maybe(await this.sb.rpc("cancel_my_absence", { p_id: id }));
+  }
+
+  async gafOverview(cycleId: string): Promise<GafOverview> {
+    return check(await this.sb.rpc("gaf_overview", { p_cycle: cycleId })) as GafOverview;
+  }
+
+  async gafAddBlock(soldierId: string, day: string) {
+    maybe(await this.sb.rpc("gaf_add_block", { p_soldier: soldierId, p_day: day }));
+  }
+
+  async gafAddAbsence(soldierId: string, typeId: string, from: string, to: string) {
+    maybe(await this.sb.rpc("gaf_add_absence", { p_soldier: soldierId, p_type: typeId, p_from: from, p_to: to }));
+  }
+
+  async gafRequestExemption(soldierId: string, typeId: string, from: string, to: string) {
+    maybe(await this.sb.rpc("gaf_request_exemption", { p_soldier: soldierId, p_type: typeId, p_start: from, p_end: to }));
+  }
+
+  async gafCancelEntry(kind: "block" | "absence", id: string) {
+    maybe(await this.sb.rpc("gaf_cancel_entry", { p_kind: kind, p_id: id }));
+  }
+
+  async gafSubmit(cycleId: string) {
+    maybe(await this.sb.rpc("gaf_submit_constraints", { p_cycle: cycleId }));
+  }
+
+  async gafApprove(cycleId: string) {
+    maybe(await this.sb.rpc("gaf_approve_constraints", { p_cycle: cycleId }));
+  }
+
+  async gafComment(cycleId: string, slotId: string | null, text: string) {
+    maybe(await this.sb.rpc("gaf_comment", { p_cycle: cycleId, p_slot: slotId, p_text: text }));
+  }
+
+  async gafReports(cycleId: string): Promise<GafReports> {
+    return check(await this.sb.rpc("gaf_reports", { p_cycle: cycleId })) as GafReports;
+  }
+
+  async handleDraftComment(id: string, handled: boolean) {
+    maybe(await this.sb.rpc("handle_draft_comment", { p_id: id, p_handled: handled }));
   }
 
   async myScores(): Promise<MyScore[]> {

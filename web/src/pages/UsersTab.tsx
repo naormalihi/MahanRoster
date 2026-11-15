@@ -12,6 +12,7 @@ import {
   Chip,
   CircularProgress,
   Dialog,
+  MenuItem,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -77,6 +78,7 @@ function Handover({ username, password }: { username: string; password: string }
 function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onClose: () => void; onDone: () => void }) {
   const { api } = useAuth();
   const [soldier, setSoldier] = useState<string | null>(null);
+  const [role, setRole] = useState<"gaf_commander" | "gaf_rep">("gaf_commander");
   const [username, setUsername] = useState("");
   const [password] = useState(() => tempPassword());
   const [busy, setBusy] = useState(false);
@@ -88,7 +90,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
     setBusy(true);
     setError(null);
     try {
-      await api!.createUser(username.trim().toLowerCase(), password, soldier);
+      await api!.createUser(username.trim().toLowerCase(), password, soldier, role);
       setDone(true);
       props.onDone();
     } catch (e) {
@@ -99,14 +101,21 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
 
   return (
     <Dialog open onClose={props.onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>משתמש חדש – מפקד גף</DialogTitle>
+      <DialogTitle>משתמש חדש – {role === "gaf_rep" ? "נציג גף" : "מפקד גף"}</DialogTitle>
       <DialogContent dividers>
         {done ? (
           <Handover username={username.trim().toLowerCase()} password={password} />
         ) : (
           <Stack spacing={2}>
+            <TextField select label="תפקיד" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+              <MenuItem value="gaf_commander">מפקד גף</MenuItem>
+              <MenuItem value="gaf_rep">נציג גף</MenuItem>
+            </TextField>
             <Typography variant="body2" color="text.secondary">
-              מפקד גף רואה את כל נתוני היחידה (מחזור, אילוצים, פוטנציאל, טיוטה, חיילים ולוח) לקריאה בלבד, ולא יכול לשנות דבר.
+              {role === "gaf_commander"
+                ? 'מפקד גף רואה את כל נתוני היחידה לקריאה בלבד, ובמסך "הגף שלי" מזין אילוצים לחיילי הגף, מאשר את אילוצי הגף ומעיר על הטיוטה.'
+                : 'נציג גף עובד רק במסך "הגף שלי": רואה את חיילי הגף והאילוצים שלהם, מזין לחיילים שנעדרים, מגיש למפקד הגף ומעיר על הטיוטה.'}{" "}
+              הגף נקבע לפי החייל שהחשבון משויך אליו.
             </Typography>
             <SoldierPicker soldiers={props.soldiers} value={soldier} onChange={setSoldier} autoFocus />
             <TextField

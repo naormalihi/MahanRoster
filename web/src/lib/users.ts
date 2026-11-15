@@ -24,7 +24,7 @@ export const ROLE_NAME: Record<Role, string> = {
   coordinator: "נע\"ת תורנויות",
   deputy: "ממלא מקום",
   viewer: "צפייה משותפת",
-  gaf_commander: "מפקד גף – צפייה",
+  gaf_commander: "מפקד גף",
   gaf_rep: "נציג גף",
   unit_commander: "מפקד יחידה",
   soldier: "חייל",
