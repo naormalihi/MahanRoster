@@ -18,7 +18,7 @@ import type {
   ExemptionType,
   StageState,
 } from "./cycles";
-import type { MyDuty, MyScore, SoldierAccount } from "./me";
+import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
@@ -252,6 +252,15 @@ export interface Api {
   redeemInvite(code: string, username: string, password: string): Promise<string>;
   myDuties(): Promise<MyDuty[]>;
   myScores(): Promise<MyScore[]>;
+  // stage 2.2 – the soldier's own constraints
+  myInputOptions(): Promise<InputOptions>;
+  myRequests(): Promise<MyRequests>;
+  submitExemption(typeId: string, from: string, to: string): Promise<void>;
+  withdrawMyExemption(id: string): Promise<void>;
+  addMyDateBlock(day: string): Promise<void>;
+  cancelMyDateBlock(id: string): Promise<void>;
+  addMyAbsence(typeId: string, from: string, to: string): Promise<void>;
+  cancelMyAbsence(id: string): Promise<void>;
 
   listUsers(): Promise<AppUser[]>;
   /** A gaf-commander account with a temporary password, linked to a soldier record. */

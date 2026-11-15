@@ -55,6 +55,7 @@ const STAFF_LINKS = [
 /** A soldier with his own account: his duties and the published board. */
 const SOLDIER_LINKS = [
   { to: "/", label: "התורנויות שלי", match: (p: string) => p === "/" },
+  { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
   { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
 ];
 

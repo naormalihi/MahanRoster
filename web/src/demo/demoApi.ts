@@ -1151,6 +1151,96 @@ export class DemoApi implements Api {
     return out.sort((x, y) => x.starts_at.localeCompare(y.starts_at));
   }
 
+  async myInputOptions() {
+    await delay();
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      exemption_types: EXEMPTION_TYPES.map((t) => ({ id: t.id, name: t.name })),
+      absence_types: ABSENCE_TYPES.filter((t) => t.name !== "מחלה"),
+      block_quota_per_month: 1,
+      cycles: this.cycleList
+        .filter((c) => c.end_date >= today)
+        .map((c) => ({
+          id: c.id, name: c.name, start_date: c.start_date, end_date: c.end_date, deadline: c.exemption_deadline,
+          open: c.status !== "published" && c.status !== "closed" && (!c.exemption_deadline || Date.parse(c.exemption_deadline) > Date.now()),
+        })),
+    };
+  }
+
+  private demoOpen(day: string) {
+    return !this.cycleList.some(
+      (c) => c.start_date <= day && day <= c.end_date &&
+        (c.status === "published" || c.status === "closed" || (!!c.exemption_deadline && Date.parse(c.exemption_deadline) <= Date.now())),
+    );
+  }
+
+  async myRequests() {
+    await delay();
+    this.seedConstraints();
+    const me = this.mySoldier();
+    const exName = new Map(EXEMPTION_TYPES.map((t) => [t.id, t.name]));
+    const abName = new Map(ABSENCE_TYPES.map((t) => [t.id, t.name]));
+    return {
+      exemptions: this.exemptionList
+        .filter((e) => e.soldier_id === me && e.source !== "computed")
+        .map((e) => ({ id: e.id, type: exName.get(e.exemption_type_id) ?? "", start_date: e.start_date, end_date: e.end_date, status: e.status,
+          is_urgent: e.is_urgent, mine: e.source === "soldier", decision_reason: e.decision_reason })),
+      blocks: this.blockList
+        .filter((b) => b.soldier_id === me && b.status === "active")
+        .map((b) => ({ id: b.id, day: b.day, mine: b.received_via === "system", open: this.demoOpen(b.day) })),
+      absences: this.absenceList
+        .filter((a) => a.soldier_id === me && a.status === "active")
+        .map((a) => ({ id: a.id, type: abName.get(a.absence_type_id) ?? "", starts_at: a.starts_at, ends_at: a.ends_at,
+          mine: a.received_via === "system", open: this.demoOpen(a.starts_at.slice(0, 10)) })),
+    };
+  }
+
+  async submitExemption(typeId: string, from: string, to: string) {
+    await delay();
+    if (to < from) throw new Error("תאריכים לא תקינים");
+    const me = this.mySoldier()!;
+    const urgent = !this.demoOpen(from) || !this.demoOpen(to);
+    this.exemptionList.push({
+      id: `ex${Date.now()}`, soldier_id: me, exemption_type_id: typeId, kind: "full", start_date: from, end_date: to,
+      excluded_task_type_ids: null, restricted_hours: null, is_urgent: urgent, status: "pending", source: "soldier",
+      proof_checked_at: null, decided_at: null, decision_reason: null, received_via: "system", received_at: new Date().toISOString(),
+    } as Exemption);
+  }
+
+  async withdrawMyExemption(id: string) {
+    const e = this.exemptionList.find((x) => x.id === id && x.status === "pending");
+    if (!e) throw new Error("אפשר לבטל רק בקשה שעוד ממתינה");
+    Object.assign(e, { status: "cancelled", decision_reason: "בוטל על ידי החייל" });
+  }
+
+  async addMyDateBlock(day: string) {
+    await delay();
+    const me = this.mySoldier()!;
+    if (!this.demoOpen(day)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לנע\"ת");
+    if (this.blockList.some((b) => b.soldier_id === me && b.status === "active" && b.day.slice(0, 7) === day.slice(0, 7)))
+      throw new Error("כבר יש לך חסימה בחודש הזה (מכסה: 1 בחודש). בטל אותה כדי לבחור יום אחר");
+    this.blockList.push({ id: `b${Date.now()}`, soldier_id: me, cycle_id: null, day, status: "active", received_via: "system" });
+  }
+
+  async cancelMyDateBlock(id: string) {
+    const b = this.blockList.find((x) => x.id === id);
+    if (b) b.status = "cancelled";
+  }
+
+  async addMyAbsence(typeId: string, from: string, to: string) {
+    await delay();
+    if (to < from) throw new Error("תאריכים לא תקינים");
+    if (!this.demoOpen(from)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לנע\"ת");
+    const end = new Date(Date.parse(to) + 86_400_000).toISOString().slice(0, 10);
+    this.absenceList.push({ id: `ab${Date.now()}`, soldier_id: this.mySoldier()!, absence_type_id: typeId, starts_at: `${from}T00:00:00+02:00`,
+      ends_at: `${end}T00:00:00+02:00`, status: "active", cancel_reason: null, received_via: "system" });
+  }
+
+  async cancelMyAbsence(id: string) {
+    const a = this.absenceList.find((x) => x.id === id);
+    if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי החייל" });
+  }
+
   async myScores() {
     await delay();
     const me = this.mySoldier();

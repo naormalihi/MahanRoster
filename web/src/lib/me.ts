@@ -60,3 +60,47 @@ export function splitDuties(duties: MyDuty[], now: number): { upcoming: MyDuty[]
   const past = duties.filter((d) => Date.parse(d.ends_at) <= now).sort((a, b) => b.starts_at.localeCompare(a.starts_at));
   return { upcoming, past };
 }
+
+// ----- stage 2.2: the soldier enters his own constraints -----
+
+export interface InputCycle {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  deadline: string | null;
+  /** self-entry of blocks and absences still open (before the deadline, not published) */
+  open: boolean;
+}
+
+export interface InputOptions {
+  exemption_types: { id: string; name: string }[];
+  absence_types: { id: string; name: string }[];
+  block_quota_per_month: number;
+  cycles: InputCycle[];
+}
+
+export interface MyRequests {
+  exemptions: {
+    id: string;
+    type: string;
+    start_date: string;
+    end_date: string;
+    status: "pending" | "approved" | "rejected" | "expired" | "cancelled";
+    is_urgent: boolean;
+    mine: boolean;
+    decision_reason: string | null;
+  }[];
+  blocks: { id: string; day: string; mine: boolean; open: boolean }[];
+  absences: { id: string; type: string; starts_at: string; ends_at: string; mine: boolean; open: boolean }[];
+}
+
+/** Is self-entry open on this day? Closed when a cycle that holds it is past its deadline or published. */
+export function entryOpen(day: string, cycles: InputCycle[]): boolean {
+  return !cycles.some((c) => c.start_date <= day && day <= c.end_date && !c.open);
+}
+
+/** The cycle still collecting with the nearest deadline, for "open until". */
+export function openCycle(cycles: InputCycle[]): InputCycle | undefined {
+  return cycles.filter((c) => c.open).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+}

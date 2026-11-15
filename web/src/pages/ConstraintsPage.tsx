@@ -427,6 +427,7 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                   <TableCell>
                     {nameOf(ctx, r.soldier_id)}
                     {r.is_urgent && <Chip size="small" color="error" variant="outlined" label="דחוף" sx={{ mr: 1 }} />}
+                    {r.source === "soldier" && <Chip size="small" color="info" variant="outlined" label="הגיש בעצמו" sx={{ mr: 1 }} />}
                   </TableCell>
                   <TableCell>{gafOf(ctx, r.soldier_id)}</TableCell>
                   <TableCell>{typeName.get(r.exemption_type_id)}</TableCell>

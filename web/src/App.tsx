@@ -11,6 +11,7 @@ import { CyclesPage } from "./pages/CyclesPage";
 import { CycleWorkspace } from "./pages/CycleWorkspace";
 import { HomePage } from "./pages/HomePage";
 import { MyPage } from "./pages/MyPage";
+import { RequestsPage } from "./pages/RequestsPage";
 import { CycleProvider } from "./lib/cycleContext";
 import { SoldiersPage } from "./pages/SoldiersPage";
 
@@ -45,6 +46,7 @@ function Gate() {
         <Routes>
           <Route path="/" element={reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
           <Route path="/board" element={<BoardPage />} />
+          {isSoldier(me) && <Route path="/requests" element={<RequestsPage />} />}
           {reader && (
             <>
               <Route path="/cycle" element={ro(<CycleWorkspace step="overview" />)} />
