@@ -28,3 +28,15 @@ describe("soldier accounts", () => {
     expect(past.map((x) => x.assignment_id)).toEqual(["a"]);
   });
 });
+
+describe("self-entry window", () => {
+  const c = (id: string, start: string, end: string, open: boolean) => ({ id, name: id, start_date: start, end_date: end, deadline: null, open });
+  it("is closed only inside a cycle past its deadline", async () => {
+    const { entryOpen, openCycle } = await import("../me");
+    const cycles = [c("a", "2027-01-01", "2027-06-30", false), c("b", "2027-07-01", "2027-12-31", true)];
+    expect(entryOpen("2027-03-01", cycles)).toBe(false);
+    expect(entryOpen("2027-08-01", cycles)).toBe(true);
+    expect(entryOpen("2028-03-01", cycles)).toBe(true); // no cycle yet
+    expect(openCycle(cycles)?.id).toBe("b");
+  });
+});
