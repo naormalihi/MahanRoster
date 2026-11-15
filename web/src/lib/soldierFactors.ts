@@ -1,4 +1,4 @@
-import type { Absence, AbsenceType, Exemption, ExemptionType } from "./cycles";
+import { addDaysIso, type Absence, type AbsenceType, type Exemption, type ExemptionType } from "./cycles";
 import { activeLoadRole, effectiveHomeNightly, effectiveParent, type SoldierDetail } from "./soldiers";
 
 /**
@@ -6,7 +6,7 @@ import { activeLoadRole, effectiveHomeNightly, effectiveParent, type SoldierDeta
  * Only what applies is listed; the wording says what it does, not just what it is.
  */
 
-export type FactorIcon = "away" | "night" | "relief" | "parent" | "shachar" | "range" | "holiday" | "service";
+export type FactorIcon = "away" | "night" | "relief" | "parent" | "shachar" | "range" | "holiday" | "service" | "newcomer";
 
 export interface Factor {
   icon: FactorIcon;
@@ -28,6 +28,8 @@ export interface FactorInput {
   taskName: (id: string) => string;
   /** his duty on a holiday or its eve, a year back to a year ahead */
   holiday?: { day: string; task_name: string } | null;
+  /** the training period of a new soldier, in days (settings) */
+  graceDays?: number;
   today: string;
 }
 
@@ -109,6 +111,20 @@ export function soldierFactors(x: FactorInput): Factor[] {
   if (effectiveParent(s, x.cycle.start)) out.push({ icon: "parent", title: "הורה", effect: "פתוחות לו גם תורנויות מזכות (שמיועדות למשרתי הורה ולבעלי פטור מזכה)." });
   if (s.is_shachar && s.service_type === "mandatory")
     out.push({ icon: "shachar", title: "שח\"ר", effect: "משובץ רק לתורנויות שמסומנות \"גם לשח\"ר\" או \"רק לשח\"ר\"." });
+
+  // new soldier: no duties during his training period
+  if (s.unit_join_date && x.graceDays) {
+    const last = addDaysIso(s.unit_join_date, x.graceDays - 1);
+    if (last >= x.cycle.start) {
+      const opening = s.opening_score != null ? ` נכנס עם ניקוד פתיחה ${Number(s.opening_score).toFixed(1)} – ממוצע הקבוצה שלו.` : "";
+      out.push({
+        icon: "newcomer",
+        title: `חייל חדש – בהכשרה עד ${dm(last)}`,
+        tag: { text: "חוסם", tone: "warning" },
+        effect: `לא משובץ לתורנויות עד ${dm(last)}.${opening}`,
+      });
+    }
+  }
 
   // weapon range: no date entered = assumed valid; only an entered date can block
   if (!s.range_valid_until) {

@@ -1309,6 +1309,23 @@ function ScoringTab() {
           </Box>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
+              חייל חדש ביחידה
+            </Typography>
+            <TextField
+              type="number"
+              label="תקופת הכשרה (ימים)"
+              value={s.grace_days}
+              onChange={(e) => setS({ ...s, grace_days: Math.round(Number(e.target.value)) })}
+              slotProps={{ htmlInput: { min: 0, max: 365, step: 1 } }}
+              helperText={
+                (s.grace_days >= 30 ? `≈ ${Math.round(s.grace_days / 30)} חודשים. ` : "") +
+                "חייל חדש לא משובץ לתורנויות בימים הראשונים שלו ביחידה, מתחילת המחזור הראשון שלו, ומקבל עליהם זיכוי. 0 = בלי תקופת הכשרה. חל מהחישוב הבא של הפוטנציאל."
+              }
+              sx={{ maxWidth: 320 }}
+            />
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
               סגירת אילוצים ופטורים במחזור חדש
             </Typography>
             <TextField

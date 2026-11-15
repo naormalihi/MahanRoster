@@ -218,7 +218,7 @@ export class SupabaseApi implements Api {
           `id, full_name, service_type, gender, gaf_id, appointment_rank_id, appointment_rank_until, enlistment_date, release_date,
            career_start_date, range_valid_until, is_shachar, shachar_start_date, parent_status, parent_override,
            parent_override_reason, parent_override_until, second_role_signed_at, is_active,
-           home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until, tash_level,
+           home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until, tash_level, unit_join_date, opening_score,
            gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name),
            soldier_load_roles(load_role_id, valid_from, valid_to, load_roles(name, factor))`,
         )
@@ -306,6 +306,7 @@ export class SupabaseApi implements Api {
       surprise_multiplier: v.surprise_multiplier == null ? 1.5 : Number(v.surprise_multiplier),
       exemption_deadline_days: v.exemption_deadline_days == null ? 40 : Number(v.exemption_deadline_days),
       fairness_tolerance_pct: v.fairness_tolerance_pct == null ? 20 : Number(v.fairness_tolerance_pct),
+      grace_days: v.grace_days == null ? 90 : Number(v.grace_days),
     };
   }
 
