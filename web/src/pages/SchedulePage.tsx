@@ -1,6 +1,7 @@
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Alert,
   AlertTitle,
@@ -111,7 +112,7 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
           <Typography variant="h3" sx={{ flex: 1 }}>
-            {job.status === "queued" ? "ממתין שמנוע השיבוץ יתחיל" : "מנוע השיבוץ רץ"}
+            {job.status === "queued" ? "ממתין שמנוע השיבוץ יתחיל" : job.kind === "update" ? "מעדכן את השיבוץ" : "מנוע השיבוץ רץ"}
           </Typography>
           {job.status === "running" && job.params.slots ? (
             <Typography variant="body2" sx={{ fontWeight: 700 }} title="משבצות שאוישו עד עכשיו מתוך כל המשבצות">
@@ -134,7 +135,9 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
         <Typography variant="body2" color="text.secondary">
           {job.status === "queued"
             ? "ההרצה מתחילה בדרך כלל תוך דקה."
-            : "המנוע משבץ חודש אחרי חודש. הרצה של חצי שנה לוקחת עד כ-7 דקות. אפשר לסגור את הדף ולחזור."}
+            : job.kind === "update"
+              ? "הפוטנציאל חושב מחדש. המנוע בודק את הטיוטה חודש אחרי חודש: חודש שהכול בו עדיין חוקי נשאר כמו שהוא, וחודש שהשתנה בו משהו משובץ מחדש מהטיוטה. בסוף – ליטוש האיזון. אפשר לסגור את הדף ולחזור."
+              : "המנוע משבץ חודש אחרי חודש. הרצה של חצי שנה לוקחת עד כ-7 דקות. אפשר לסגור את הדף ולחזור."}
         </Typography>
         {stuck && (
           <Alert severity="warning">
@@ -377,11 +380,11 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
     }
   }
 
-  async function run() {
+  async function run(kind: "full" | "update" = "full") {
     setConfirm(false);
     setError(null);
     try {
-      await api!.requestSchedule(cycleId);
+      await api!.requestSchedule(cycleId, kind);
       await loadJobs();
       setCycles(await api!.cycles());
       void reloadCycle();
@@ -436,15 +439,6 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                 </IconButton>
                 <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
                   <MenuItem
-                    disabled={!slots?.length || cycle.status === "published" || cycle.status === "closed"}
-                    onClick={() => {
-                      setMenu(null);
-                      setConfirm(true);
-                    }}
-                  >
-                    הרצה מחדש
-                  </MenuItem>
-                  <MenuItem
                     onClick={() => {
                       setMenu(null);
                       setDetails(true);
@@ -467,6 +461,27 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                   })()}
                 </Menu>
               </Stack>
+              {last.kind === "update" && last.warnings?.[0]?.startsWith("עדכון שיבוץ:") && (
+                <Alert severity="success" sx={{ mt: 1.5 }}>
+                  {last.warnings[0].replace("עדכון שיבוץ:", "העדכון הסתיים:")}.
+                </Alert>
+              )}
+              {cycle.status !== "published" && cycle.status !== "closed" && !!slots?.length && (
+                <Stack spacing={1} sx={{ mt: 1.5 }}>
+                  <Button variant="contained" startIcon={<RefreshIcon />} onClick={() => void run("update")} fullWidth>
+                    עדכון שיבוץ · כ-2 דקות
+                  </Button>
+                  <Typography variant="caption" color="text.secondary">
+                    יוצא מהטיוטה הנוכחית: מסיר רק שיבוצים שכבר לא חוקיים, משבץ את מה שחסר ומאזן מחדש. הפוטנציאל מחושב מחדש, ושינויים ידניים נשמרים.
+                  </Typography>
+                  <Button variant="outlined" onClick={() => setConfirm(true)} fullWidth>
+                    שיבוץ מלא מחדש · כ-7 דקות
+                  </Button>
+                  <Typography variant="caption" color="text.secondary">
+                    מתחיל מאפס ומחליף את כל הטיוטה. מתאים אחרי שינוי גדול בלוח הבסיס או בכוח האדם.
+                  </Typography>
+                </Stack>
+              )}
             </Paper>
           ) : (
             <>
@@ -481,8 +496,8 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                   />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
-                  המנוע משבץ מבצע ועתודה לכל משבצת, לפי כללי הזכאות, החפיפות והאילוצים, ומאזן ניקוד, סופי שבוע ועתודות בתוך כל אוכלוסייה. הרצה חדשה
-                  מחליפה את הטיוטה הקודמת של המנוע; שיבוצים ידניים נשמרים.
+                  המנוע משבץ מבצע ועתודה לכל משבצת, לפי כללי הזכאות, החפיפות והאילוצים, ומאזן ניקוד, סופי שבוע ועתודות בתוך כל אוכלוסייה. לפני
+                  ההרצה הפוטנציאל מחושב מחדש. הרצה חדשה מחליפה את הטיוטה הקודמת של המנוע; שיבוצים ידניים נשמרים.
                 </Typography>
                 <Box>
                   <Button
@@ -561,16 +576,17 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
         </>
       )}
       <Dialog open={confirm} onClose={() => setConfirm(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>הרצת שיבוץ</DialogTitle>
+        <DialogTitle>{last?.status === "done" ? "שיבוץ מלא מחדש" : "הרצת שיבוץ"}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2">
+            {last?.status === "done" && "המנוע יתחיל מאפס ויחליף את כל הטיוטה. לשינויים קטנים עדיף \"עדכון שיבוץ\", שיוצא מהטיוטה הנוכחית. "}
             המנוע ישבץ את {slots?.length ?? 0} המשבצות של {cycle?.name}. הטיוטה הקודמת של המנוע תוחלף; שיבוצים ידניים ומשבצות שכבר פורסמו לא ישתנו.
             {!cycle?.potential_computed_at && " הדרגות והאוכלוסיות יינעלו עכשיו למחזור."}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirm(false)}>ביטול</Button>
-          <Button variant="contained" onClick={run}>
+          <Button variant="contained" onClick={() => void run("full")}>
             הרצה
           </Button>
         </DialogActions>

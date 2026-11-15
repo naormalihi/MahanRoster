@@ -25,7 +25,7 @@ from collections import defaultdict
 from dataclasses import replace
 from datetime import timedelta
 
-from .models import ROLE_PERFORMER, ROLE_RESERVE, Absence, CreditOut, Problem, Solution
+from .models import ROLE_PERFORMER, ROLE_RESERVE, Absence, CreditOut, FixedAssignment, Problem, Solution
 from .scoring import weekend_units
 from .solver import SCALE, build_assignments, pool_stats, prepare, solve
 from .verify import violations
@@ -47,10 +47,55 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
     solution, then "improving" (balancing the load) until it is done."""
     t0 = _time.time()
     groups = windows(problem)
+    if problem.start:
+        return _solve_months(problem, groups, log, on_progress, t0)
     if len(groups) <= 1:
         n = len(problem.slots)
         return solve(problem, log=log, on_solution=(lambda s, _f: on_progress(0, 1, s, n, "improving")) if on_progress else None)
 
+    return _solve_months(problem, groups, log, on_progress, t0)
+
+
+# An update run: time for a month whose draft must be repaired, as a share of a full run's, and
+# for a month kept as it is (the model only checks it).
+UPDATE_TIME_SHARE = 0.4
+KEPT_MONTH_SECONDS = 10.0
+
+
+def _month_start(sub: Problem, start: list[FixedAssignment]):
+    """The draft of one month, the part of it that still holds, and whether that part staffs the
+    whole month (so the month is kept as it is)."""
+    ids = {k.id for k in sub.slots}
+    mine = [f for f in start if f.slot_id in ids]
+    prep = prepare(sub)
+    slots = {k.id: k for k in sub.slots}
+    rest = {t.id: timedelta(hours=t.min_rest_hours) for t in sub.task_types}
+    busy = defaultdict(list)  # duties of the months before (repaired ones too) and published ones
+    for b in sub.busy:
+        busy[b.soldier_id].append(b)
+
+    def free(f) -> bool:
+        k = slots[f.slot_id]
+        end = k.ends_at + rest[k.task_type_id]
+        return not any(b.starts_at < end and k.starts_at < b.ends_at for b in busy[f.soldier_id])
+
+    valid = [f for f in mine if f.soldier_id in prep.eligible.get(f.slot_id, ()) and free(f)]
+    have = defaultdict(int)
+    for f in valid:
+        have[f.slot_id, f.role] += 1
+    for f in sub.fixed:
+        have[f.slot_id, f.role] += 1
+    full = all(
+        have[k.id, ROLE_PERFORMER] >= k.performers_needed
+        and (k.is_penalty or have[k.id, ROLE_RESERVE] >= k.reserves_needed)
+        for k in sub.slots
+    )
+    return mine, valid, full and len(valid) == len(mine)
+
+
+def _solve_months(problem: Problem, groups, log, on_progress, t0) -> Solution:
+    update = bool(problem.start)
+    kept = removed = 0
     tasks = {t.id: t for t in problem.task_types}
     per_window_time = max(10.0, problem.settings.time_limit_seconds / len(groups))
     state = {s.id: (s.baseline_score, s.baseline_weekends, s.baseline_reserves) for s in problem.soldiers}
@@ -80,10 +125,23 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
             settings=replace(problem.settings, time_limit_seconds=per_window_time),
         )
         before = staffed
+        hint = None
+        if update:
+            mine, valid, whole = _month_start(sub, problem.start)
+            removed += len(mine) - len(valid)
+            if whole:
+                # every duty of the month still holds: kept as it is
+                kept += len(valid)
+                sub = replace(sub, fixed=list(sub.fixed) + valid,
+                              settings=replace(sub.settings, time_limit_seconds=KEPT_MONTH_SECONDS))
+            else:
+                hint = {(f.soldier_id, f.slot_id, f.role) for f in valid}
+                sub = replace(sub, settings=replace(sub.settings, time_limit_seconds=max(10.0, per_window_time * UPDATE_TIME_SHARE)))
         sol = solve(
             sub,
             log=log,
             on_solution=(lambda s, _f, i=i, before=before: on_progress(i, len(groups), before + s, total_slots, "improving")) if on_progress else None,
+            hint=hint,
         )
         # a duty counts as staffed once it has all its performers
         got = defaultdict(int)
@@ -120,9 +178,17 @@ def solve_rolling(problem: Problem, log: bool = False, on_progress=None) -> Solu
     if on_progress:
         on_progress(len(groups), len(groups), staffed, total_slots, "polishing")
     budget = max(20.0, problem.settings.time_limit_seconds * 0.2)
+    before_polish = set(chosen)
     chosen, polished = polish(problem, chosen, credit_pts, budget, log=log)
     if polished:
         warnings.append(f"ליטוש האיזון: {polished} קבוצות חולקו מחדש על פני כל המחזור")
+    if update:
+        draft = {(f.soldier_id, f.slot_id, f.role) for f in problem.start}
+        now = set(chosen)
+        warnings.insert(0, (
+            f"עדכון שיבוץ: {len(draft & now)} שיבוצים נשארו, {removed} הוסרו כי כבר לא חוקיים, "
+            f"{len(now - draft)} שובצו מחדש, {len(before_polish - now)} הועברו לאיזון"
+        ))
 
     prep = prepare(problem)
     worst = max(statuses, key=lambda s: STATUS_RANK.get(s, 9))

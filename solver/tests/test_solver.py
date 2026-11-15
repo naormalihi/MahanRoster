@@ -310,3 +310,29 @@ def test_duties_spread_over_weeks_not_in_a_row():
     order = [{a.slot_id: a.soldier_id for a in solve(p).assignments}[f"w{i}"] for i in range(4)]
     assert order.count("A") == 2
     assert all(order[i] != order[i + 1] for i in range(3)), order
+
+
+def test_update_run_keeps_the_draft_where_it_holds_and_repairs_the_rest():
+    from dataclasses import replace
+
+    from mahanroster_solver.models import Absence, FixedAssignment
+    from mahanroster_solver.rolling import solve_rolling
+
+    days = [f"2027-01-{d:02d}" for d in range(4, 29, 3)] + [f"2027-02-{d:02d}" for d in range(1, 26, 3)]
+    slots = [slot(f"g{i}", "guard", f"{d}T08:00", f"{d}T20:00", r=1) for i, d in enumerate(days)]
+    p = problem([soldier(x) for x in "ABCDEF"], slots, settings=FAST)
+    first = solve_rolling(p)
+    assert not first.unfilled and violations(p, first) == []
+    draft = [FixedAssignment(a.slot_id, a.soldier_id, a.role) for a in first.assignments]
+
+    # A is away in February now: his February duties must go, January stays as it was
+    from .helpers import dt
+
+    away = Absence("A", dt("2027-02-01T00:00"), dt("2027-03-01T00:00"))
+    upd = replace(p, absences=[away], start=draft)
+    sol = solve_rolling(upd)
+    assert not sol.unfilled and violations(upd, sol) == []
+    jan = lambda s: {(a.slot_id, a.soldier_id, a.role) for a in s.assignments if a.slot_id in {k.id for k in slots[:9]}}  # noqa: E731
+    assert jan(sol) == jan(first) or any("הועברו לאיזון" in w and not w.endswith(" 0 הועברו לאיזון") for w in sol.warnings)
+    assert not any(a.soldier_id == "A" and a.slot_id in {k.id for k in slots[9:]} for a in sol.assignments)
+    assert sol.warnings[0].startswith("עדכון שיבוץ:")

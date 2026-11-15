@@ -651,7 +651,7 @@ export class SupabaseApi implements Api {
     return rows.map((r) => ({ ...r, wall_time: r.wall_time === null ? null : Number(r.wall_time) }));
   }
 
-  async requestSchedule(cycleId: string, kind: "full" | "stability" = "full") {
+  async requestSchedule(cycleId: string, kind: "full" | "stability" | "update" = "full") {
     return String(check(await this.sb.rpc("request_schedule", { p_cycle: cycleId, p_kind: kind })));
   }
 
