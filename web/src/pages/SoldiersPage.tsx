@@ -54,7 +54,7 @@ import {
   type SoldierPatch,
 } from "../lib/soldiers";
 import type { Cycle, Exemption, ExemptionType } from "../lib/cycles";
-import { cycleScores, lastPublishedCycle, summarize } from "../lib/lastCycle";
+import { currentCycle, currentScore, cycleScores, isPublished, nextCycle, summarize } from "../lib/lastCycle";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
 const RANGE_CHIP: Record<
@@ -502,12 +502,16 @@ export function SoldiersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SoldierDetail | null>(null);
   const [bulk, setBulk] = useState(false);
-  // the last published cycle, as a reference: points per soldier and who was in it
-  const [last, setLast] = useState<{
+  // by today's date: the cycle today falls in (current) and the first one after it (next) –
+  // points per soldier and who is in it
+  type Ref = {
     cycle: Cycle;
     scores: Map<string, { points: number; duties: number }>;
     members: { soldier_id: string; group: string }[];
-  } | null>(null);
+    ids: Set<string>;
+  };
+  const [cur, setCur] = useState<Ref | null>(null);
+  const [nxt, setNxt] = useState<Ref | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -538,27 +542,26 @@ export function SoldiersPage() {
   }, [load]);
 
   useEffect(() => {
+    const loadRef = async (c: Cycle | undefined): Promise<Ref | null> => {
+      if (!c) return null;
+      const [as, sn] = await Promise.all([api!.draftAssignments(c.id), api!.snapshotSoldiers(c.id)]);
+      const scores = cycleScores(as);
+      const members = sn.map((x) => ({ soldier_id: x.soldier_id, group: x.service_type === "career" ? "קבע" : "חובה" }));
+      return { cycle: c, scores, members, ids: new Set([...members.map((m) => m.soldier_id), ...scores.keys()]) };
+    };
     (async () => {
-      const c = lastPublishedCycle(await api!.cycles());
-      if (!c) return;
-      const [as, sn] = await Promise.all([
-        api!.draftAssignments(c.id),
-        api!.snapshotSoldiers(c.id),
-      ]);
-      setLast({
-        cycle: c,
-        scores: cycleScores(as),
-        members: sn.map((x) => ({
-          soldier_id: x.soldier_id,
-          group: x.service_type === "career" ? "קבע" : "חובה",
-        })),
-      });
-    })().catch(() => setLast(null));
+      const cycles = await api!.cycles();
+      const today = todayIso();
+      const [c, n] = await Promise.all([loadRef(currentCycle(cycles, today)), loadRef(nextCycle(cycles, today))]);
+      setCur(c);
+      setNxt(n);
+    })().catch(() => {
+      setCur(null);
+      setNxt(null);
+    });
   }, [api]);
-  const wasInLast = useMemo(
-    () => new Set(last?.members.map((m) => m.soldier_id) ?? []),
-    [last],
-  );
+  const nowScore = (s: SoldierDetail) => currentScore(s.opening_score, cur?.scores.get(s.id), !!cur?.ids.has(s.id));
+  const groupOf = (s: SoldierDetail) => (s.service_type === "career" ? "קבע" : "חובה");
   // a duty on a holiday or its eve, from a year back to a year ahead (published cycles)
   const [holidayDuty, setHolidayDuty] = useState<
     Map<string, { day: string; task_name: string }>
@@ -680,10 +683,15 @@ export function SoldiersPage() {
       first: "desc",
     },
     {
-      label: last ? `ניקוד ${last.cycle.name}` : "ניקוד מחזור אחרון",
-      key: "score",
-      by: (s) =>
-        last && wasInLast.has(s.id) ? (last.scores.get(s.id)?.points ?? 0) : -1,
+      label: `ניקוד נוכחי${cur ? ` · ${cur.cycle.name}` : " · אין מחזור פעיל"}`,
+      key: "score_now",
+      by: (s) => nowScore(s)?.points ?? -1,
+      first: "desc",
+    },
+    {
+      label: nxt ? `ניקוד עתידי · ${nxt.cycle.name}${isPublished(nxt.cycle) ? "" : " (טיוטה)"}` : "ניקוד עתידי",
+      key: "score_next",
+      by: (s) => (nxt?.ids.has(s.id) ? (nxt.scores.get(s.id)?.points ?? 0) : -1),
       first: "desc",
     },
     {
@@ -947,23 +955,47 @@ export function SoldiersPage() {
         </Alert>
       )}
 
-      {last && (
+      {rows && rows.length > 0 && (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Typography variant="subtitle2">
-            רפרנס – המחזור האחרון שפורסם: {last.cycle.name}
+            ניקוד נוכחי – {cur ? cur.cycle.name : "אין מחזור פעיל"}
           </Typography>
-          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 2, mt: 0.5 }}>
-            {summarize(last.members, last.scores).map((g) => (
-              <Typography key={g.key} variant="body2">
-                <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ ·
-                טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
-                {g.zero ? ` · ${g.zero} בלי תורנות` : ""}
-              </Typography>
-            ))}
-          </Stack>
+          {cur ? (
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 2, mt: 0.5 }}>
+              {summarize(
+                rows.filter((s) => s.is_active && cur.ids.has(s.id)).map((s) => ({ soldier_id: s.id, group: groupOf(s) })),
+                new Map(rows.map((s) => [s.id, { points: nowScore(s)?.points ?? 0 }])),
+              ).map((g) => (
+                <Typography key={g.key} variant="body2">
+                  <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ · טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
+                  {g.zero ? ` · ${g.zero} בלי תורנות` : ""}
+                </Typography>
+              ))}
+            </Stack>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              היום לא נופל באף מחזור – בעמודה מופיע רק ניקוד הפתיחה של חיילים חדשים.
+            </Typography>
+          )}
+          <Typography variant="subtitle2" sx={{ mt: 1 }}>
+            ניקוד עתידי – {nxt ? `${nxt.cycle.name}${isPublished(nxt.cycle) ? "" : " (טיוטה)"}` : "אין מחזור הבא"}
+          </Typography>
+          {nxt && (
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 2, mt: 0.5 }}>
+              {summarize(
+                nxt.members.length ? nxt.members : rows.filter((s) => s.is_active && nxt.ids.has(s.id)).map((s) => ({ soldier_id: s.id, group: groupOf(s) })),
+                nxt.scores,
+              ).map((g) => (
+                <Typography key={g.key} variant="body2">
+                  <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ · טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
+                  {g.zero ? ` · ${g.zero} בלי תורנות` : ""}
+                </Typography>
+              ))}
+            </Stack>
+          )}
           <Typography variant="caption" color="text.secondary">
-            ניקוד = סכום הנקודות של התורנויות שבוצעו או שנשארו בלוח (בלי
-            עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של אותו מחזור.
+            לפי התאריך של היום. נוכחי = ניקוד פתיחה (לחיילים חדשים) ועוד התורנויות במחזור שהיום בתוכו; עתידי = המחזור הבא. ניקוד = סכום
+            הנקודות של התורנויות שבלוח (בלי עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של המחזור.
           </Typography>
         </Paper>
       )}
@@ -971,7 +1003,7 @@ export function SoldiersPage() {
       {rows && rows.length > 0 && (
         <Paper sx={{ overflow: "hidden" }}>
           <Box sx={{ overflowX: "auto", maxHeight: "70vh" }}>
-            <Table size="small" stickyHeader sx={{ minWidth: 1080 }}>
+            <Table size="small" stickyHeader sx={{ minWidth: 1180 }}>
               <TableHead>
                 <TableRow>
                   <TableCell padding="checkbox">
@@ -1097,20 +1129,32 @@ export function SoldiersPage() {
                         )}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
-                        {!last || !wasInLast.has(s.id) ? (
+                        {(() => {
+                          const n = nowScore(s);
+                          if (!n) return "—";
+                          const note = n.opening
+                            ? n.duties
+                              ? `פתיחה ${n.opening.toFixed(1)} + ${n.duties} תורנויות`
+                              : "ניקוד פתיחה"
+                            : `${n.duties} תורנויות`;
+                          return (
+                            <>
+                              <b>{n.points.toFixed(1)}</b>
+                              <Typography component="span" variant="caption" color="text.secondary">
+                                {" "}· {note}
+                              </Typography>
+                            </>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {!nxt || !nxt.ids.has(s.id) ? (
                           "—"
                         ) : (
                           <>
-                            <b>
-                              {(last.scores.get(s.id)?.points ?? 0).toFixed(1)}
-                            </b>
-                            <Typography
-                              component="span"
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {" "}
-                              · {last.scores.get(s.id)?.duties ?? 0} תורנויות
+                            <b>{(nxt.scores.get(s.id)?.points ?? 0).toFixed(1)}</b>
+                            <Typography component="span" variant="caption" color="text.secondary">
+                              {" "}· {nxt.scores.get(s.id)?.duties ?? 0} תורנויות
                             </Typography>
                           </>
                         )}
