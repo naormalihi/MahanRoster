@@ -307,8 +307,9 @@ def test_duties_spread_over_weeks_not_in_a_row():
     weds = ["2027-01-06", "2027-01-13", "2027-01-20", "2027-01-27"]
     slots = [slot(f"w{i}", "guard", f"{d}T13:00", f"{d}T20:00", r=0) for i, d in enumerate(weds)]
     p = problem([soldier("A", baseline_score=0), soldier("B", baseline_score=1), soldier("C", baseline_score=1)], slots, settings=FAST)
-    order = [{a.slot_id: a.soldier_id for a in solve(p).assignments}[f"w{i}"] for i in range(4)]
-    # whatever the split, no one performs in two weeks in a row
+    got = {a.slot_id: a.soldier_id for a in solve(p).assignments}  # one run (the comprehension used to solve per week)
+    order = [got[f"w{i}"] for i in range(4)]
+    assert order.count("A") == 2
     assert all(order[i] != order[i + 1] for i in range(3)), order
 
 
