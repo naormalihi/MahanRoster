@@ -37,6 +37,7 @@ import type { Cycle } from "../lib/cycles";
 import { dayKey, dayLabel, TZ } from "../lib/dates";
 import { UnpublishDialog, type UnpublishImpact } from "../components/UnpublishDialog";
 import { REASON_LABEL } from "../lib/potential";
+import { OFFLINE_TEXT, pollFailures } from "../lib/network";
 import {
   JOB_STATUS_LABEL,
   poolName,
@@ -322,12 +323,17 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
       .catch((e) => setError((e as Error).message));
   }, [api]);
 
+  // a dropped connection during a run is retried quietly; it shows only if it lasts
+  const polls = useRef(pollFailures());
   const loadJobs = useCallback(async () => {
     if (!cycleId) return;
     try {
       setJobs(await api!.scheduleJobs(cycleId));
+      polls.current.ok();
+      setError((err) => (err === OFFLINE_TEXT ? null : err));
     } catch (e) {
-      setError((e as Error).message);
+      const text = polls.current.fail(e);
+      if (text) setError(text);
     }
   }, [api, cycleId]);
 
