@@ -10,6 +10,7 @@ const base: TaskTypeInput = {
   service_restriction: "any",
   requires_weapon: false,
   is_weekend_type: false,
+  includes_holidays: false,
   shachar_compatible: false,
   shachar_only: false,
   tash_rule: "auto",

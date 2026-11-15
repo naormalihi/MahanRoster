@@ -46,7 +46,7 @@ import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { useCanEdit } from "../components/ReadOnly";
 import type { SlotRow } from "../lib/baseSchedule";
-import type { TaskType } from "../lib/catalog";
+import { israeliHolidays, type TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
 import { fairRows, shortGroupName, verdicts, type FairRow } from "../lib/fairness";
@@ -940,6 +940,11 @@ function SoldierLoadDialog(props: {
     assigned: "משובץ בה",
     free: "זכאי ופנוי – המנוע בחר אחרים לטובת האיזון",
   };
+  // holiday days of the cycle, to say when a duty's weight already covers the holiday
+  const holidayDays = useMemo(
+    () => new Set(israeliHolidays(ctx.cycle.start_date, ctx.cycle.end_date).map((d) => d.day)),
+    [ctx.cycle.start_date, ctx.cycle.end_date],
+  );
   const mine = ctx.assignments
     .filter((a) => a.soldier_id === r.soldier_id && !["dropped", "swapped_out", "cancelled_approved"].includes(a.status))
     .map((a) => ({ a, k: slotOf.get(a.slot_id) }))
@@ -1051,7 +1056,14 @@ function SoldierLoadDialog(props: {
                         {a.role === "reserve" && <Chip size="small" variant="outlined" label="עתודה" sx={{ mr: 0.5 }} />}
                         {a.source === "manual" && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5 }} />}
                       </TableCell>
-                      <TableCell sx={{ textAlign: "end" }}>{a.role === "performer" ? `${a.normalized_points} נק׳` : ""}</TableCell>
+                      <TableCell sx={{ textAlign: "end", whiteSpace: "nowrap" }}>
+                        {a.role === "performer" ? `${a.normalized_points} נק׳` : ""}
+                        {a.role === "performer" && ctx.tasks.get(k!.task_type_id)?.includes_holidays && holidayDays.has(dayKey(k!.starts_at)) && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                            חג – כלול במשקל
+                          </Typography>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

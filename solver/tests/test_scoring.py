@@ -136,3 +136,24 @@ def test_multipliers_by_holiday_and_day_of_it():
     assert one_day("2026-12-06") == 1.0    # חנוכה: "חג" names no holiday, so the rest days only
     s.multipliers.append(Multiplier("חנוכה", 1.2, holidays=["hanukkah"]))
     assert one_day("2026-12-06") == 1.2    # by name it counts
+
+
+def test_task_whose_weight_includes_holidays_gets_no_holiday_multiplier():
+    from dataclasses import replace
+
+    s = Settings(
+        multipliers=[
+            Multiplier("סוף שבוע", 3.0, weekdays=[4, 5], skip_shabbat_types=True),
+            Multiplier("ערב חג", 6.0, holidays=["yom_kippur"], holiday_kinds=["eve"]),
+            Multiplier("חנוכה", 3.0, holidays=["hanukkah"], holiday_kinds=["day"]),
+            Multiplier("לפי סוג יום", 2.0, day_types=["holiday"]),
+        ],
+        day_holidays={"2027-10-10": ["yom_kippur", "eve"], "2027-12-26": ["hanukkah", "day"]},
+        day_types={"2027-10-11": "holiday"},
+    )
+    week = replace(GUARD, includes_holidays=True)
+    one_day = lambda t, d: raw_points(t, dt(f"{d}T10:00"), dt(f"{d}T20:00"), s, set())  # noqa: E731
+    assert one_day(GUARD, "2027-10-10") == 6.0 and one_day(week, "2027-10-10") == 1.0
+    assert one_day(GUARD, "2027-12-26") == 3.0 and one_day(week, "2027-12-26") == 1.0
+    assert one_day(GUARD, "2027-10-11") == 2.0 and one_day(week, "2027-10-11") == 1.0
+    assert one_day(week, "2027-10-15") == 3.0  # a Friday: the weekend multiplier still applies

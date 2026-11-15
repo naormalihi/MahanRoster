@@ -12,7 +12,7 @@ const id = (n: string) => RANKS.find((r) => r.name === n)!.id;
 
 const task = (id: string, name: string, o: Partial<TaskType> = {}): TaskType => ({
   id, code: id, name, category_id: "c", weight: 1, min_rest_hours: 0, service_restriction: "any", requires_weapon: false,
-  is_weekend_type: false, shachar_compatible: false, qualifying_duty: false, allowed_rank_ids: null,
+  is_weekend_type: false, includes_holidays: false, shachar_compatible: false, qualifying_duty: false, allowed_rank_ids: null,
   gender: null, default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
 }) as TaskType;
 const TASKS = [

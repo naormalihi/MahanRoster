@@ -97,6 +97,7 @@ const EMPTY_TASK: TaskTypeInput = {
   service_restriction: "any",
   requires_weapon: false,
   is_weekend_type: false,
+  includes_holidays: false,
   shachar_compatible: false,
   shachar_only: false,
   tash_rule: "auto",
@@ -366,6 +367,17 @@ export function TaskDialog(props: {
               label="תורנות שבת (המשקל כבר כולל את סוף השבוע, בלי מקדם נוסף)"
             />
             <FormControlLabel
+              control={<Switch checked={t.includes_holidays} onChange={(e) => set("includes_holidays", e.target.checked)} />}
+              label={
+                <span>
+                  המשקל כבר כולל חגים (בלי מקדם חג)
+                  <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                    מקדמי לוח החגים לא חלים עליה. החג עדיין נחשב לה כ"תורנות חג".
+                  </Typography>
+                </span>
+              }
+            />
+            <FormControlLabel
               control={<Switch checked={t.qualifying_duty} onChange={(e) => set("qualifying_duty", e.target.checked)} />}
               label="תורנות מזכה (פתוחה גם למשרתי הורה ולבעלי פטור מזכה)"
             />
@@ -496,6 +508,7 @@ function CatalogTab() {
                 <TableCell>
                   <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
                     {t.is_weekend_type && <Chip size="small" label="שבת" />}
+                    {t.includes_holidays && <Chip size="small" label="כולל חג" />}
                     {t.qualifying_duty && <Chip size="small" color="primary" variant="outlined" label="מזכה" />}
                     {t.requires_weapon && <Chip size="small" variant="outlined" label="נשק" />}
                     {t.shachar_only ? (

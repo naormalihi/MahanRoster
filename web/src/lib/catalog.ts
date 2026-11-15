@@ -15,6 +15,8 @@ export interface TaskType {
   service_restriction: ServiceRestriction;
   requires_weapon: boolean;
   is_weekend_type: boolean;
+  /** the weight already covers holidays (a week-long task): no holiday multiplier */
+  includes_holidays: boolean;
   shachar_compatible: boolean;
   /** only mandatory-service שח"ר soldiers may do it (implies shachar_compatible) */
   shachar_only: boolean;
