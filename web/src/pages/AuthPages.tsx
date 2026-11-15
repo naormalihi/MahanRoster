@@ -28,6 +28,8 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
 
 export function LoginPage() {
   const { api, refresh } = useAuth();
+  // the join link the codes are handed out with opens straight on the join form
+  const [joining, setJoining] = useState(() => new URLSearchParams(window.location.search).has("join"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +49,15 @@ export function LoginPage() {
     }
   }
 
+  if (joining) return <JoinPage onBack={() => setJoining(false)} />;
+
   return (
     <Card title="MahanRoster" subtitle="מערכת התורנויות של היחידה">
       <form onSubmit={submit}>
         <Stack spacing={2}>
           {api?.demo && (
             <Alert severity="info">
-              מצב הדגמה. משתמשים: <b>naat</b> (נע"ת), <b>board</b> (צפייה), <b>cmd</b> (מפקד גף), <b>new.user</b>. כל סיסמה מתקבלת.
+              מצב הדגמה. משתמשים: <b>naat</b> (נע"ת), <b>board</b> (צפייה), <b>cmd</b> (מפקד גף), <b>chayal</b> (חייל), <b>new.user</b>. כל סיסמה מתקבלת.
             </Alert>
           )}
           <TextField
@@ -78,9 +82,98 @@ export function LoginPage() {
           <Button type="submit" variant="contained" size="large" disabled={busy}>
             כניסה
           </Button>
+          <Button onClick={() => setJoining(true)}>יש לי קוד הצטרפות</Button>
           <Typography variant="caption" color="text.secondary">
             שכחת סיסמה? פנה לנע"ת התורנויות לאיפוס.
           </Typography>
+        </Stack>
+      </form>
+    </Card>
+  );
+}
+
+/**
+ * A soldier opens his account with the one-time code he got from נע"ת: the code ties the
+ * account to his record (no personal number is asked), and he picks a username and a password.
+ */
+function JoinPage({ onBack }: { onBack: () => void }) {
+  const { api, refresh } = useAuth();
+  const [code, setCode] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [again, setAgain] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const problem = password && username ? passwordProblems(password, username) : null;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (problem) return setError(problem);
+    if (password !== again) return setError("שתי הסיסמאות לא זהות");
+    setBusy(true);
+    setError(null);
+    try {
+      const name = await api!.redeemInvite(code, username, password);
+      await api!.signIn(name, password);
+      window.history.replaceState(null, "", "/");
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="הצטרפות" subtitle="חשבון אישי במערכת התורנויות">
+      <form onSubmit={submit}>
+        <Stack spacing={2}>
+          <Typography variant="body2" color="text.secondary">
+            את הקוד קיבלת מנע"ת התורנויות. הוא אישי ומשמש פעם אחת.
+          </Typography>
+          <TextField
+            label="קוד הצטרפות"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="XXXXX-XXXXX"
+            autoComplete="one-time-code"
+            autoFocus
+            required
+            slotProps={{ htmlInput: { dir: "ltr", autoCapitalize: "characters", style: { fontFamily: "monospace", letterSpacing: 2 } } }}
+          />
+          <TextField
+            label="שם משתמש"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase())}
+            helperText="אותיות לטיניות קטנות, ספרות, נקודה או מקף (למשל avi.cohen)"
+            autoComplete="username"
+            required
+            slotProps={{ htmlInput: { dir: "ltr", autoCapitalize: "none" } }}
+          />
+          <TextField
+            label="סיסמה"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={!!problem}
+            helperText={problem ?? "לפחות 10 תווים, אותיות וספרות"}
+            autoComplete="new-password"
+            required
+            slotProps={{ htmlInput: { dir: "ltr" } }}
+          />
+          <TextField
+            label="הסיסמה שוב"
+            type="password"
+            value={again}
+            onChange={(e) => setAgain(e.target.value)}
+            autoComplete="new-password"
+            required
+            slotProps={{ htmlInput: { dir: "ltr" } }}
+          />
+          {error && <Alert severity="error">{error}</Alert>}
+          <Button type="submit" variant="contained" size="large" disabled={busy}>
+            פתיחת חשבון
+          </Button>
+          <Button onClick={onBack}>יש לי כבר חשבון – כניסה</Button>
         </Stack>
       </form>
     </Card>

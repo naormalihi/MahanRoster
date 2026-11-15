@@ -1,0 +1,155 @@
+import CopyIcon from "@mui/icons-material/ContentCopy";
+import DownloadIcon from "@mui/icons-material/DownloadOutlined";
+import {
+  Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  MenuItem,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { useState } from "react";
+import { useAuth } from "../lib/auth";
+
+interface Person {
+  id: string;
+  full_name: string;
+  gaf_name: string;
+}
+
+/**
+ * Join codes for the chosen soldiers. Each code is shown here once (the system keeps only a
+ * hash): download the list or copy it, and hand every soldier his own code.
+ */
+export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: string) => boolean; onClose: () => void; onDone: () => void }) {
+  const { api } = useAuth();
+  const [days, setDays] = useState(30);
+  const [codes, setCodes] = useState<{ soldier_id: string; code: string }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const eligible = props.soldiers.filter((s) => !props.hasAccount(s.id));
+  const skipped = props.soldiers.length - eligible.length;
+  const byId = new Map(props.soldiers.map((s) => [s.id, s]));
+  const join = `${window.location.origin}/?join=1`;
+
+  async function create() {
+    setBusy(true);
+    setError(null);
+    try {
+      setCodes(await api!.createSoldierInvites(eligible.map((s) => s.id), days));
+      props.onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  }
+
+  const rows = (codes ?? []).map((c) => ({ ...byId.get(c.soldier_id)!, code: c.code }));
+  const text = rows.map((r) => `${r.full_name} (${r.gaf_name}): ${r.code}`).join("\n");
+
+  async function download() {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([["שם", "גף", "קוד הצטרפות"], ...rows.map((r) => [r.full_name, r.gaf_name, r.code])]);
+    ws["!cols"] = [{ wch: 22 }, { wch: 16 }, { wch: 14 }];
+    const wb = XLSX.utils.book_new();
+    wb.Workbook = { Views: [{ RTL: true }] };
+    XLSX.utils.book_append_sheet(wb, ws, "קודי הצטרפות");
+    XLSX.writeFile(wb, "קודי הצטרפות.xlsx");
+  }
+
+  return (
+    <Dialog open onClose={props.onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>קודי הצטרפות</DialogTitle>
+      <DialogContent dividers>
+        {!codes ? (
+          <Stack spacing={2}>
+            <Typography variant="body2">
+              לכל חייל קוד אישי חד-פעמי. החייל נכנס לאתר, בוחר "יש לי קוד הצטרפות", מקליד את הקוד ובוחר שם משתמש וסיסמה. אחרי זה הוא רואה את
+              התורנויות שלו, למה שובץ והניקוד שלו מול הממוצע.
+            </Typography>
+            <Typography variant="body2">
+              ייווצרו קודים ל-<b>{eligible.length}</b> חיילים
+              {skipped ? ` (${skipped} כבר עם חשבון – בלי קוד)` : ""}. קוד חדש מבטל קוד קודם של אותו חייל.
+            </Typography>
+            <TextField select label="תוקף" value={days} onChange={(e) => setDays(Number(e.target.value))} sx={{ maxWidth: 200 }}>
+              {[7, 14, 30, 60].map((d) => (
+                <MenuItem key={d} value={d}>
+                  {d} ימים
+                </MenuItem>
+              ))}
+            </TextField>
+            {error && <Alert severity="error">{error}</Alert>}
+          </Stack>
+        ) : (
+          <Stack spacing={2}>
+            <Alert severity="warning">
+              הקודים מוצגים <b>פעם אחת בלבד</b> – המערכת שומרת רק טביעה שלהם. הורד את הרשימה או העתק אותה לפני הסגירה.
+            </Alert>
+            <Typography variant="body2">
+              כתובת ההצטרפות: <Box component="span" dir="ltr">{join}</Box>
+            </Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>שם</TableCell>
+                  <TableCell>גף</TableCell>
+                  <TableCell>קוד</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{r.full_name}</TableCell>
+                    <TableCell>{r.gaf_name}</TableCell>
+                    <TableCell dir="ltr" sx={{ fontFamily: "monospace", fontWeight: 700, textAlign: "start", whiteSpace: "nowrap" }}>
+                      {r.code}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        {!codes ? (
+          <>
+            <Button onClick={props.onClose}>ביטול</Button>
+            <Button variant="contained" onClick={create} disabled={busy || eligible.length === 0}>
+              יצירת קודים
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              startIcon={<CopyIcon />}
+              onClick={async () => {
+                await navigator.clipboard.writeText(`הצטרפות למערכת התורנויות: ${join}\n\n${text}`);
+                setCopied(true);
+              }}
+            >
+              {copied ? "הועתק" : "העתקה"}
+            </Button>
+            <Button startIcon={<DownloadIcon />} onClick={download}>
+              הורדת קובץ
+            </Button>
+            <Button variant="contained" onClick={props.onClose}>
+              סגירה
+            </Button>
+          </>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}

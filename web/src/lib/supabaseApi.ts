@@ -1,3 +1,4 @@
+import type { MyDuty, MyScore, SoldierAccount } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
@@ -801,5 +802,33 @@ export class SupabaseApi implements Api {
 
   async unpublishCycle(cycleId: string) {
     return Number(check(await this.sb.rpc("unpublish_cycle", { p_cycle: cycleId })));
+  }
+
+  async createSoldierInvites(soldierIds: string[], days: number) {
+    return check(await this.sb.rpc("create_soldier_invites", { p_soldiers: soldierIds, p_days: days })) as { soldier_id: string; code: string }[];
+  }
+
+  async revokeSoldierInvites(soldierIds: string[]) {
+    return Number(check(await this.sb.rpc("revoke_soldier_invites", { p_soldiers: soldierIds })));
+  }
+
+  async soldierAccounts(): Promise<SoldierAccount[]> {
+    return check(await this.sb.rpc("soldier_account_status")) as SoldierAccount[];
+  }
+
+  async redeemInvite(code: string, username: string, password: string) {
+    return check(await this.sb.rpc("redeem_invite", { p_code: code, p_username: username, p_password: password })) as string;
+  }
+
+  async myDuties(): Promise<MyDuty[]> {
+    return (check(await this.sb.rpc("my_duties")) as MyDuty[]).map((d) => ({ ...d, points: Number(d.points) }));
+  }
+
+  async myScores(): Promise<MyScore[]> {
+    return (check(await this.sb.rpc("my_scores")) as MyScore[]).map((x) => ({
+      ...x,
+      points: Number(x.points),
+      group_mean: x.group_mean === null ? null : Number(x.group_mean),
+    }));
   }
 }

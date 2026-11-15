@@ -1678,3 +1678,47 @@ def test_delete_user_removes_or_closes_the_account(conn):
         conn.commit()
     with pytest.raises(psycopg.Error, match="שלך"):
         _as_coord(conn, "select public.delete_user(%s)", COORD)
+def test_soldier_joins_with_an_invite_code_and_sees_only_his_own(conn):
+    me, other = [r[0] for r in conn.execute(
+        "select id from soldiers s where is_active and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id desc limit 2").fetchall()]
+    (sid, code), = _as_coord(conn, "select * from public.create_soldier_invites(array[%s]::uuid[], 30)", me)
+    assert sid == me and len(code) == 11 and code[5] == "-"
+    stored = conn.execute("select code_hash from soldier_invites where soldier_id = %s", (me,)).fetchone()[0]
+    assert code not in stored and len(stored) == 64  # only a hash is kept
+    # a second code revokes the first
+    (_, code2), = _as_coord(conn, "select * from public.create_soldier_invites(array[%s]::uuid[], 30)", me)
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("set local role anon")
+        with pytest.raises(psycopg.Error, match="הקוד לא תקין"):
+            with conn.transaction():
+                conn.execute("select public.redeem_invite(%s, 'soldier.one', 'secret-pass-1')", (code,))
+        assert conn.execute("select public.redeem_invite(%s, 'Soldier.One', 'secret-pass-1')", (code2.lower(),)).fetchone()[0] == "soldier.one"
+        with pytest.raises(psycopg.Error, match="כבר נוצל"):
+            with conn.transaction():
+                conn.execute("select public.redeem_invite(%s, 'soldier.two', 'secret-pass-1')", (code2,))
+        conn.execute("reset role")
+        uid, must, linked = conn.execute("select id, must_change_password, soldier_id from app_users where username = 'soldier.one'").fetchone()
+        assert linked == me and must is False
+        assert conn.execute("select array_agg(role::text) from user_roles where user_id = %s", (uid,)).fetchone()[0] == ["soldier"]
+        # a published duty of his and one of someone else
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        k1, k2 = [r[0] for r in conn.execute("select id from slots where cycle_id = %s order by starts_at limit 2", (cycle,)).fetchall()]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, normalized_points, explanation) "
+                     "select %s, id, gaf_id, 'performer', 'assigned', 1.5, 'שובץ כי' from soldiers where id = %s", (k1, me))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (k2, other))
+        not_mine = {r[0] for r in conn.execute("select id from assignments where soldier_id <> %s", (me,)).fetchall()}
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")  # no second factor for soldiers
+        duties = conn.execute("select assignment_id, points, explanation from public.my_duties()").fetchall()
+        assert (1.5, "שובץ כי") in [(p, e) for _, p, e in duties]
+        assert not {a for a, _, _ in duties} & not_mine
+        (n, pts, size, mean), = conn.execute("select duties, points, group_size, group_mean from public.my_scores()").fetchall()
+        assert n >= 1 and pts >= 1.5 and size >= 1 and mean is not None
+        assert conn.execute("select count(*) from soldiers").fetchone()[0] == 0  # no unit data
+        assert conn.execute("select count(*) from exemptions").fetchone()[0] == 0
+        with pytest.raises(psycopg.Error):
+            with conn.transaction():
+                conn.execute("select * from public.create_soldier_invites(array[%s]::uuid[], 30)", (other,))
+        raise psycopg.Rollback()
