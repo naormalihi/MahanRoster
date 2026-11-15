@@ -110,9 +110,16 @@ export function soldierFactors(x: FactorInput): Factor[] {
   if (s.is_shachar && s.service_type === "mandatory")
     out.push({ icon: "shachar", title: "שח\"ר", effect: "משובץ רק לתורנויות שמסומנות \"גם לשח\"ר\" או \"רק לשח\"ר\"." });
 
-  // weapon range
-  if (!s.range_valid_until || s.range_valid_until < x.cycle.start) {
-    out.push({ icon: "range", title: "אין מטווח בתוקף", tag: { text: "חוסם", tone: "warning" }, effect: "לא משובץ לתורנויות שדורשות נשק." });
+  // weapon range: no date entered = assumed valid; only an entered date can block
+  if (!s.range_valid_until) {
+    // nothing to show
+  } else if (s.range_valid_until < x.cycle.start) {
+    out.push({
+      icon: "range",
+      title: `מטווח פג ב-${dm(s.range_valid_until)}`,
+      tag: { text: "חוסם", tone: "warning" },
+      effect: "לא משובץ לתורנויות שדורשות נשק.",
+    });
   } else if (s.range_valid_until < x.cycle.end) {
     out.push({
       icon: "range",

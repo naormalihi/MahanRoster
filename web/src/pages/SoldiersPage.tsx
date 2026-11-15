@@ -61,7 +61,7 @@ const RANGE_CHIP: Record<
   RangeState,
   { label: string; color: "default" | "error" | "warning" | "success" }
 > = {
-  missing: { label: "לא הוזן", color: "default" },
+  missing: { label: "נחשב בתוקף", color: "default" },
   expired: { label: "פג", color: "error" },
   expiring: { label: "פג בקרוב", color: "warning" },
   valid: { label: "בתוקף", color: "success" },

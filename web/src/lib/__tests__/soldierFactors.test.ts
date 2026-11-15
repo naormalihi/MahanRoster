@@ -54,4 +54,10 @@ describe("soldier factors", () => {
     expect(t).toEqual(["הקלה: ראש צוות ×0.5", "הורה", 'שח"ר', "מטווח בתוקף עד 12.3", "תורנות חג", "שחרור 15.5"]);
     expect(soldierFactors(base({ soldier: soldier({ load_roles: [{ load_role_id: "r", name: "ראש צוות", factor: 0.5, valid_from: "2026-01-01", valid_to: null }] }) }))[0].effect).toContain("50%");
   });
+  it("a range never entered is assumed valid; an entered date that passed blocks", () => {
+    const missing = soldierFactors(base({ soldier: soldier({ range_valid_until: null }) }));
+    expect(missing.some((f) => f.icon === "range")).toBe(false);
+    const old = soldierFactors(base({ soldier: soldier({ range_valid_until: "2026-12-01" }) }));
+    expect(old.find((f) => f.icon === "range")?.tag?.text).toBe("חוסם");
+  });
 });
