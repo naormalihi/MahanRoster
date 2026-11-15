@@ -29,7 +29,7 @@ import {
 } from "@mui/material";
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { canRead, isStaff } from "../lib/api";
+import { canRead, isSoldier, isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
@@ -40,6 +40,7 @@ const ROLE_LABEL: Record<string, string> = {
   deputy: "ממלא מקום",
   viewer: "צפייה",
   gaf_commander: "מפקד גף",
+  soldier: "חייל",
 };
 
 /** Four areas instead of a link per screen; the cycle steps live inside "מחזור". */
@@ -49,6 +50,12 @@ const STAFF_LINKS = [
   { to: "/soldiers", label: "חיילים", match: (p: string) => p.startsWith("/soldiers") },
   { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
   { to: "/admin", label: "הגדרות", match: (p: string) => p === "/admin" },
+];
+
+/** A soldier with his own account: his duties and the published board. */
+const SOLDIER_LINKS = [
+  { to: "/", label: "התורנויות שלי", match: (p: string) => p === "/" },
+  { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
 ];
 
 /** The cycle every step works on, chosen here once. */
@@ -192,7 +199,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
-  const links = staff ? STAFF_LINKS : reader ? STAFF_LINKS.filter((l) => l.to !== "/admin") : [];
+  const links = staff ? STAFF_LINKS : reader ? STAFF_LINKS.filter((l) => l.to !== "/admin") : isSoldier(me) ? SOLDIER_LINKS : [];
   const current = links.find((l) => l.match(pathname));
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", "@media print": { bgcolor: "white" } }}>

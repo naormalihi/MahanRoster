@@ -111,6 +111,9 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 export class DemoApi implements Api {
   readonly demo = true;
   private user: { name: string; roles: Role[]; mustChange: boolean; aal2: boolean } | null = null;
+  // version 2.1: soldier accounts (username → soldier) and open invite codes (code → soldier, expiry)
+  private accounts = new Map<string, string>();
+  private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean }>();
   private soldierList: ExistingSoldier[] = [];
   private gafList: NamedRef[] = GAFIM.map((name, i) => ({ id: `g${i}`, name }));
   private rankList: NamedRef[] = RANKS.map((name, i) => ({ id: `r${i}`, name }));
@@ -229,6 +232,7 @@ export class DemoApi implements Api {
     else if (u === "board") this.user = { name: u, roles: ["viewer"], mustChange: false, aal2: true };
     else if (u === "new.user") this.user = { name: u, roles: ["viewer"], mustChange: true, aal2: true };
     else if (u === "cmd") this.user = { name: u, roles: ["gaf_commander"], mustChange: false, aal2: false };
+    else if (u === "chayal" || this.accounts.has(u)) this.user = { name: u, roles: ["soldier"], mustChange: false, aal2: true };
     else throw new Error("שם משתמש או סיסמה שגויים");
   }
 
@@ -1050,6 +1054,102 @@ export class DemoApi implements Api {
     await delay();
     const u = this.users.find((x) => x.user_id === userId);
     if (u) Object.assign(u, { soldier_id: soldierId, soldier_name: this.soldierList.find((x) => x.id === soldierId)?.full_name ?? null });
+  }
+
+  async createSoldierInvites(soldierIds: string[], days: number) {
+    await delay();
+    const taken = new Set(this.accounts.values());
+    const out: { soldier_id: string; code: string }[] = [];
+    for (const id of soldierIds) {
+      if (taken.has(id)) continue;
+      for (const [c, i] of this.invites) if (i.soldier_id === id && !i.used) this.invites.delete(c);
+      const raw = Array.from({ length: 10 }, () => "ABCDEFGHJKMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]).join("");
+      this.invites.set(raw, { soldier_id: id, created: new Date().toISOString(), expires: new Date(Date.now() + days * 86_400_000).toISOString(), used: false });
+      out.push({ soldier_id: id, code: `${raw.slice(0, 5)}-${raw.slice(5)}` });
+    }
+    return out;
+  }
+
+  async revokeSoldierInvites(soldierIds: string[]) {
+    let n = 0;
+    for (const [c, i] of this.invites) if (soldierIds.includes(i.soldier_id) && !i.used) (this.invites.delete(c), n++);
+    return n;
+  }
+
+  async soldierAccounts() {
+    await delay();
+    const byUser = new Map([...this.accounts].map(([u, sid]) => [sid, u]));
+    return this.soldierList.map((s) => {
+      const inv = [...this.invites.values()].filter((i) => i.soldier_id === s.id).pop();
+      return {
+        soldier_id: s.id,
+        username: byUser.get(s.id) ?? null,
+        is_locked: byUser.has(s.id) ? false : null,
+        invited_at: inv?.created ?? null,
+        invite_expires_at: inv?.expires ?? null,
+        invite_state: inv ? (inv.used ? ("used" as const) : ("open" as const)) : null,
+      };
+    });
+  }
+
+  async redeemInvite(code: string, username: string, password: string) {
+    await delay();
+    const inv = this.invites.get(code.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+    if (!inv) throw new Error("הקוד לא תקין. בדוק אותו או בקש קוד חדש מנע\"ת התורנויות");
+    if (inv.used) throw new Error("הקוד כבר נוצל. אם זה לא אתה – פנה לנע\"ת התורנויות");
+    const u = username.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{3,32}$/.test(u)) throw new Error("שם משתמש: 3–32 אותיות לטיניות קטנות, ספרות, נקודה, מקף או קו תחתון");
+    if (password.length < 10) throw new Error("סיסמה: לפחות 10 תווים");
+    if (this.accounts.has(u) || ["naat", "board", "cmd", "chayal", "new.user"].includes(u)) throw new Error("שם המשתמש תפוס. בחר שם אחר");
+    inv.used = true;
+    this.accounts.set(u, inv.soldier_id);
+    return u;
+  }
+
+  /** The demo soldier "chayal" is the second soldier of the list. */
+  private mySoldier() {
+    if (!this.user) return null;
+    return this.accounts.get(this.user.name) ?? (this.user.name === "chayal" ? this.soldierList[1]?.id : null) ?? null;
+  }
+
+  async myDuties() {
+    await delay();
+    const me = this.mySoldier();
+    const out = [];
+    for (const c of this.cycleList.filter((x) => x.status === "published" || x.status === "closed")) {
+      const slots = new Map((this.slotsByCycle.get(c.id) ?? []).map((k) => [k.id, k]));
+      for (const a of this.draft.filter((x) => x.cycle_id === c.id && x.soldier_id === me && !["draft", "dropped", "swapped_out", "cancelled_approved"].includes(x.status))) {
+        const k = slots.get(a.slot_id);
+        if (!k) continue;
+        out.push({
+          assignment_id: a.id, cycle_id: c.id, cycle_name: c.name, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "",
+          starts_at: k.starts_at, ends_at: k.ends_at, role: a.role, status: a.status, points: a.normalized_points, explanation: a.explanation,
+          report_at: null, report_place: null, briefing_at: null, briefing_place: null, equipment: null,
+        });
+      }
+    }
+    return out.sort((x, y) => x.starts_at.localeCompare(y.starts_at));
+  }
+
+  async myScores() {
+    await delay();
+    const me = this.mySoldier();
+    const mine = this.soldierList.find((s) => s.id === me);
+    return this.cycleList
+      .filter((c) => c.status === "published" || c.status === "closed")
+      .sort((a, b) => b.start_date.localeCompare(a.start_date))
+      .map((c) => {
+        const peers = this.soldierList.filter((s) => s.is_active && s.service_type === mine?.service_type);
+        const pts = (id: string) =>
+          this.draft.filter((a) => a.cycle_id === c.id && a.soldier_id === id && a.role === "performer" && a.status !== "draft").reduce((n, a) => n + a.normalized_points, 0);
+        const mean = peers.length ? peers.reduce((n, s) => n + pts(s.id), 0) / peers.length : null;
+        return {
+          cycle_id: c.id, cycle_name: c.name, start_date: c.start_date, end_date: c.end_date,
+          duties: this.draft.filter((a) => a.cycle_id === c.id && a.soldier_id === me && a.role === "performer" && a.status !== "draft").length,
+          points: me ? pts(me) : 0, group_label: mine?.service_type === "career" ? "קבע" : "חובה", group_size: peers.length,
+          group_mean: mean === null ? null : Math.round(mean * 100) / 100,
+        };
+      });
   }
 
   async unpublishCycle(cycleId: string) {
