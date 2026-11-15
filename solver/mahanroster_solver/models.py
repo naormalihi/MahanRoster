@@ -209,6 +209,9 @@ class Weights:
     reserve: float = 1.0  # balance how often each soldier is a reserve
     consecutive_weekends: float = 2.0
     same_week: float = 1.0  # more than one duty in the same week
+    # duties in two weeks in a row: a performer duty in both weeks, or a reserve in one of them
+    consecutive_weeks: float = 3.0
+    consecutive_weeks_reserve: float = 1.0
     cross_gaf_reserve: float = 5.0  # career reserve from another gaf
     home_nightly_preference: float = 100.0  # a "ת"ש 7" slot given to someone else (≈ 10 points of fairness)
     # A holiday duty for someone who already did one in the past year (or earlier in this cycle):
