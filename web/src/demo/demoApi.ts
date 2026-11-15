@@ -794,7 +794,7 @@ export class DemoApi implements Api {
     return mine.map(({ cycle_id: _c, ...j }) => ({ ...j })).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 
-  async requestSchedule(cycleId: string, kind: "full" | "stability" = "full") {
+  async requestSchedule(cycleId: string, kind: "full" | "stability" | "update" = "full") {
     await delay(300);
     if (this.jobs.some((j) => j.cycle_id === cycleId && (j.status === "queued" || j.status === "running")))
       throw new Error("a scheduling run is already in progress for this cycle");

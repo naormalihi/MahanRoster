@@ -1548,3 +1548,16 @@ def test_duty_whose_weight_includes_holidays_gets_no_holiday_multiplier(conn):
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
         assert any(t["includes_holidays"] for t in doc["task_types"])
         raise psycopg.Rollback()
+
+
+def test_update_run_starts_from_the_draft(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        k = conn.execute("select id from slots where cycle_id = %s and cancelled_at is null order by starts_at limit 1", (cycle,)).fetchone()[0]
+        sol = conn.execute("select id, gaf_id from soldiers where is_active order by full_name limit 1").fetchone()
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source) values (%s, %s, %s, 'performer', 'draft', 'solver')",
+                     (k, sol[0], sol[1]))
+        doc = conn.execute("select public.build_solver_input(%s, 'update')", (cycle,)).fetchone()[0]
+        assert {"slot_id": str(k), "soldier_id": str(sol[0]), "role": "performer"} in doc["start"]
+        assert conn.execute("select public.build_solver_input(%s, 'full')", (cycle,)).fetchone()[0]["start"] == []
+        raise psycopg.Rollback()

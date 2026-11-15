@@ -25,7 +25,7 @@ export interface PoolStats {
 export interface ScheduleJob {
   id: string;
   status: JobStatus;
-  kind: "full" | "stability" | "simulation";
+  kind: "full" | "stability" | "update" | "simulation";
   progress: number;
   created_at: string;
   started_at: string | null;

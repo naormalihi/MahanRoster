@@ -55,7 +55,7 @@ export function useCycleFacts(cycle: Cycle | undefined) {
       api!.scheduleJobs(cycle.id),
       published ? api!.draftAssignments(cycle.id) : Promise.resolve([]),
     ]);
-    const job = jobs.find((j) => j.kind === "full" || j.kind === "stability") ?? null;
+    const job = jobs.find((j) => j.kind === "full" || j.kind === "stability" || j.kind === "update") ?? null;
     setFacts({
       pendingExemptions: ex.filter((e) => e.status === "pending").length,
       slots: slots.length,

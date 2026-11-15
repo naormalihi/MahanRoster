@@ -209,7 +209,8 @@ export interface Api {
   // scheduling runs
   scheduleJobs(cycleId: string): Promise<ScheduleJob[]>;
   /** "stability" keeps every published assignment and fills the rest (e.g. duties added after publishing). */
-  requestSchedule(cycleId: string, kind?: "full" | "stability"): Promise<string>;
+  /** "update" starts from the current draft: keeps it where it holds, repairs the rest, balances. */
+  requestSchedule(cycleId: string, kind?: "full" | "stability" | "update"): Promise<string>;
   /** A duty added by hand to a cycle (after publishing: then filled by a stability run). */
   addSlot(cycleId: string, slot: NewSlot): Promise<void>;
   /** Approve the engine's draft for duties added after publishing; the cycle stays published. */
