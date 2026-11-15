@@ -35,6 +35,7 @@ import {
   BASE_TEMPLATE_HEADERS,
   type BuildResult,
   type RankRef,
+  slotName,
   type SlotRow,
 } from "../lib/baseSchedule";
 import { HOLIDAY_TYPES, type TaskType } from "../lib/catalog";
@@ -71,9 +72,9 @@ const SKIP = "__skip__";
 
 function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) => void; label?: string; onNew?: () => void }) {
   const groups = props.refs.categories
-    .map((c) => ({ c, tasks: props.refs.tasks.filter((t) => t.is_active && t.category_id === c.id) }))
+    .map((c) => ({ c, tasks: props.refs.tasks.filter((t) => t.is_active && !t.is_special && t.category_id === c.id) }))
     .filter((g) => g.tasks.length);
-  const loose = props.refs.tasks.filter((t) => t.is_active && !props.refs.categories.some((c) => c.id === t.category_id));
+  const loose = props.refs.tasks.filter((t) => t.is_active && !t.is_special && !props.refs.categories.some((c) => c.id === t.category_id));
   return (
     <TextField
       select
@@ -144,7 +145,7 @@ function ImportCard(props: {
   const [creating, setCreating] = useState<string | null>(null); // an unknown name opened as a new type
 
   const result: BuildResult | null = useMemo(
-    () => (rows ? buildSlots(rows, { aliases: refs.aliases, tasks: refs.tasks, ranks: refs.ranks, weekendIsoDays: refs.weekend, cycle, holidays: refs.holidays }) : null),
+    () => (rows ? buildSlots(rows, { aliases: refs.aliases, tasks: refs.tasks.filter((t) => !t.is_special), ranks: refs.ranks, weekendIsoDays: refs.weekend, cycle, holidays: refs.holidays }) : null),
     [rows, refs, cycle],
   );
   const taskName = new Map(refs.tasks.map((t) => [t.id, t.name]));
@@ -220,7 +221,7 @@ function ImportCard(props: {
           <TaskDialog
             task={null}
             initialName={creating}
-            all={refs.tasks}
+            all={refs.tasks.filter((t) => !t.is_special)}
             categories={refs.categories}
             ranks={refs.ranks}
             onClose={() => setCreating(null)}
@@ -270,7 +271,7 @@ function ImportCard(props: {
         {result && result.unmapped.length > 0 && (
           <Alert severity="warning" icon={false}>
             <Stack spacing={1.5}>
-              {!refs.tasks.some((t) => t.is_active) && (
+              {!refs.tasks.some((t) => t.is_active && !t.is_special) && (
                 <Alert severity="error">
                   בקטלוג אין סוגי תורנות פעילים, ולכן אין למה להתאים. הוסף סוג מכל שם כאן (&quot;+ סוג תורנות חדש&quot; ברשימה) או בהגדרות ← קטלוג.
                 </Alert>
@@ -449,7 +450,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
         <Chip label={`הכל (${props.slots.length})`} color={task ? "default" : "primary"} onClick={() => setTask("")} />
         {[...counts].map(([id, n]) => (
-          <Chip key={id} label={`${taskName.get(id) ?? "?"} (${n})`} color={task === id ? "primary" : "default"} variant={task === id ? "filled" : "outlined"} onClick={() => setTask(id)} />
+          <Chip key={id} label={`${props.refs.tasks.find((t) => t.id === id)?.is_special ? "הקפצה מיוחדת" : (taskName.get(id) ?? "?")} (${n})`} color={task === id ? "primary" : "default"} variant={task === id ? "filled" : "outlined"} onClick={() => setTask(id)} />
         ))}
       </Stack>
       {selected.size > 0 && !props.locked && (
@@ -489,7 +490,10 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
                   {span(s.starts_at, s.ends_at)}
                 </TableCell>
                 <TableCell>
-                  {taskName.get(s.task_type_id)}
+                  {slotName(s, (id) => taskName.get(id))}
+                  {s.fixed_points != null && (
+                    <Chip size="small" color="warning" variant="outlined" label={`הקפצה מיוחדת · ${Number(s.fixed_points)} נק׳`} sx={{ mr: 0.5 }} />
+                  )}
                   {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
                   {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                         {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
@@ -533,7 +537,7 @@ export function SlotsPage() {
       .then(([c, tasks, categories, ranks, aliases, sc, cal]) => {
         setCycles(c);
         const holidays = new Set(cal.filter((d) => HOLIDAY_TYPES.has(d.day_type)).map((d) => d.day));
-        setRefs({ tasks: tasks.filter((x) => !x.is_special), categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
+        setRefs({ tasks, categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
       })
       .catch((e) => setError((e as Error).message));
   }, [api]);
