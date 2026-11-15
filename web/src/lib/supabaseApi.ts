@@ -1,3 +1,4 @@
+import type { AppNotification } from "./notifications";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
@@ -854,6 +855,30 @@ export class SupabaseApi implements Api {
 
   async cancelMyAbsence(id: string) {
     maybe(await this.sb.rpc("cancel_my_absence", { p_id: id }));
+  }
+
+  async myNotifications(): Promise<AppNotification[]> {
+    return check(await this.sb.rpc("my_notifications")) as AppNotification[];
+  }
+
+  async markNotificationsRead(ids: string[] | null) {
+    maybe(await this.sb.rpc("mark_notifications_read", { p_ids: ids }));
+  }
+
+  async ackNotification(id: string) {
+    maybe(await this.sb.rpc("ack_notification", { p_id: id }));
+  }
+
+  async vapidPublicKey() {
+    return (check(await this.sb.rpc("vapid_public_key")) as string | null) ?? null;
+  }
+
+  async savePushSubscription(s: { endpoint: string; p256dh: string; auth: string }) {
+    maybe(await this.sb.rpc("save_push_subscription", { p_endpoint: s.endpoint, p_p256dh: s.p256dh, p_auth: s.auth, p_user_agent: navigator.userAgent }));
+  }
+
+  async deletePushSubscription(endpoint: string) {
+    maybe(await this.sb.rpc("delete_push_subscription", { p_endpoint: endpoint }));
   }
 
   async myScores(): Promise<MyScore[]> {

@@ -30,6 +30,7 @@ import {
 import { dayKey } from "../lib/dates";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
 import type { AppUser } from "../lib/users";
+import type { AppNotification } from "../lib/notifications";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
 import type { ScheduleJob } from "../lib/schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
@@ -114,6 +115,15 @@ export class DemoApi implements Api {
   // version 2.1: soldier accounts (username → soldier) and open invite codes (code → soldier, expiry)
   private accounts = new Map<string, string>();
   private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean }>();
+  // stage 2.5: the demo soldier's notifications
+  private notes: AppNotification[] = [
+    { id: "n1", type: "reserve_activated", title: "העתודה שלך הופעלה – אתה מבצע את התורנות", body: "קצין תורן – חול, ג׳ 05/01 08:00", url: "/",
+      requires_ack: true, read_at: null, acked_at: null, created_at: new Date(Date.now() - 20 * 60_000).toISOString() },
+    { id: "n2", type: "exemption_decided", title: "בקשת הפטור אושרה", body: "פטור מלא, 10/08–20/08", url: "/requests",
+      requires_ack: false, read_at: null, acked_at: null, created_at: new Date(Date.now() - 5 * 3600_000).toISOString() },
+    { id: "n3", type: "board_published", title: "לוח התורנויות פורסם – דצמבר 2026 – מאי 2027", body: "יש לך 3 תורנויות ו-2 עתודות. הראשונה: א׳ 03/01 08:00.",
+      url: "/", requires_ack: false, read_at: new Date().toISOString(), acked_at: null, created_at: new Date(Date.now() - 3 * 86_400_000).toISOString() },
+  ];
   private soldierList: ExistingSoldier[] = [];
   private gafList: NamedRef[] = GAFIM.map((name, i) => ({ id: `g${i}`, name }));
   private rankList: NamedRef[] = RANKS.map((name, i) => ({ id: `r${i}`, name }));
@@ -1240,6 +1250,28 @@ export class DemoApi implements Api {
     const a = this.absenceList.find((x) => x.id === id);
     if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי החייל" });
   }
+
+  async myNotifications() {
+    await delay();
+    return this.user?.roles.includes("soldier") ? this.notes.map((n) => ({ ...n })) : [];
+  }
+
+  async markNotificationsRead(ids: string[] | null) {
+    for (const n of this.notes) if (!ids || ids.includes(n.id)) n.read_at ??= new Date().toISOString();
+  }
+
+  async ackNotification(id: string) {
+    const n = this.notes.find((x) => x.id === id);
+    if (n) Object.assign(n, { acked_at: new Date().toISOString(), read_at: n.read_at ?? new Date().toISOString() });
+  }
+
+  async vapidPublicKey() {
+    return null;
+  }
+
+  async savePushSubscription() {}
+
+  async deletePushSubscription() {}
 
   async myScores() {
     await delay();

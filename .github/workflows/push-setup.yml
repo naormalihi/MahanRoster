@@ -1,0 +1,22 @@
+name: push-setup
+
+# One time: makes the VAPID key pair for Web Push. The private key goes straight into
+# Supabase Vault ('vapid_private_key'), the public key into settings – nothing is printed.
+# Running it again does nothing once the keys exist.
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r notify/requirements.txt
+      - name: Make the keys
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python notify/notify_worker.py --setup
