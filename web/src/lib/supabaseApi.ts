@@ -1,4 +1,5 @@
 import type { AppNotification } from "./notifications";
+import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
@@ -781,8 +782,8 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("list_users")) as AppUser[];
   }
 
-  async createUser(username: string, password: string, soldierId: string | null) {
-    return check(await this.sb.rpc("create_user", { p_username: username, p_password: password, p_role: "gaf_commander", p_soldier: soldierId })) as string;
+  async createUser(username: string, password: string, soldierId: string | null, role: "gaf_commander" | "unit_commander" = "gaf_commander") {
+    return check(await this.sb.rpc("create_user", { p_username: username, p_password: password, p_role: role, p_soldier: soldierId })) as string;
   }
 
   async resetUserPassword(userId: string, password: string) {
@@ -855,6 +856,10 @@ export class SupabaseApi implements Api {
 
   async cancelMyAbsence(id: string) {
     maybe(await this.sb.rpc("cancel_my_absence", { p_id: id }));
+  }
+
+  async unitDashboard(): Promise<UnitDashboard> {
+    return check(await this.sb.rpc("unit_dashboard")) as UnitDashboard;
   }
 
   async myNotifications(): Promise<AppNotification[]> {

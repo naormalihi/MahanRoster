@@ -21,3 +21,11 @@ describe("notifications", () => {
     expect(isIos("Mozilla/5.0 (Linux; Android 14)")).toBe(false);
   });
 });
+
+describe("dashboard", () => {
+  it("compares gafs by points per soldier", async () => {
+    const { perSoldier } = await import("../dashboard");
+    expect(perSoldier({ soldiers: 4, points: 10 })).toBe(2.5);
+    expect(perSoldier({ soldiers: 0, points: 0 })).toBe(0);
+  });
+});

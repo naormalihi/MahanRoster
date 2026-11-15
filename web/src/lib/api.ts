@@ -19,6 +19,7 @@ import type {
   StageState,
 } from "./cycles";
 import type { AppNotification } from "./notifications";
+import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
@@ -39,7 +40,9 @@ export interface Me {
 
 export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinator") || me.roles.includes("deputy"));
 /** Gaf commanders: read-only access to the whole unit. */
-export const isCommander = (me: Me | null) => !!me && me.roles.includes("gaf_commander");
+export const isCommander = (me: Me | null) => !!me && (me.roles.includes("gaf_commander") || me.roles.includes("unit_commander"));
+/** The unit commander (version 2.0, stage 2.6): reads everything, and has the dashboard as his home. */
+export const isUnitCommander = (me: Me | null) => !!me && me.roles.includes("unit_commander");
 /** Sees the planning screens (staff edit, commanders only read). */
 export const canRead = (me: Me | null) => isStaff(me) || isCommander(me);
 /** A soldier with his own account (version 2.1): his duties and the published board. */
@@ -262,6 +265,8 @@ export interface Api {
   cancelMyDateBlock(id: string): Promise<void>;
   addMyAbsence(typeId: string, from: string, to: string): Promise<void>;
   cancelMyAbsence(id: string): Promise<void>;
+  // stage 2.6 – the unit commander's dashboard
+  unitDashboard(): Promise<UnitDashboard>;
   // stage 2.5 – notifications
   myNotifications(): Promise<AppNotification[]>;
   markNotificationsRead(ids: string[] | null): Promise<void>;
@@ -272,7 +277,7 @@ export interface Api {
 
   listUsers(): Promise<AppUser[]>;
   /** A gaf-commander account with a temporary password, linked to a soldier record. */
-  createUser(username: string, password: string, soldierId: string | null): Promise<string>;
+  createUser(username: string, password: string, soldierId: string | null, role?: "gaf_commander" | "unit_commander"): Promise<string>;
   resetUserPassword(userId: string, password: string): Promise<void>;
   setUserLocked(userId: string, locked: boolean): Promise<void>;
   /** Deletes a gaf commander's account; one whose name is on records is closed and hidden instead. */

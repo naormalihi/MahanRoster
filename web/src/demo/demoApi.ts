@@ -31,6 +31,7 @@ import { dayKey } from "../lib/dates";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
 import type { AppUser } from "../lib/users";
 import type { AppNotification } from "../lib/notifications";
+import type { UnitDashboard } from "../lib/dashboard";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
 import type { ScheduleJob } from "../lib/schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "../lib/potential";
@@ -242,6 +243,7 @@ export class DemoApi implements Api {
     else if (u === "board") this.user = { name: u, roles: ["viewer"], mustChange: false, aal2: true };
     else if (u === "new.user") this.user = { name: u, roles: ["viewer"], mustChange: true, aal2: true };
     else if (u === "cmd") this.user = { name: u, roles: ["gaf_commander"], mustChange: false, aal2: false };
+    else if (u === "magad") this.user = { name: u, roles: ["unit_commander"], mustChange: false, aal2: true };
     else if (u === "chayal" || this.accounts.has(u)) this.user = { name: u, roles: ["soldier"], mustChange: false, aal2: true };
     else throw new Error("שם משתמש או סיסמה שגויים");
   }
@@ -1051,13 +1053,13 @@ export class DemoApi implements Api {
     return this.users.map((u) => ({ ...u, roles: [...u.roles] }));
   }
 
-  async createUser(username: string, password: string, soldierId: string | null) {
+  async createUser(username: string, password: string, soldierId: string | null, role: "gaf_commander" | "unit_commander" = "gaf_commander") {
     await delay(300);
     if (this.users.some((u) => u.username === username)) throw new Error("שם המשתמש כבר קיים");
     if (password.length < 10) throw new Error("סיסמה זמנית: לפחות 10 תווים");
     const s = this.soldierList.find((x) => x.id === soldierId);
     const id = crypto.randomUUID();
-    this.users.push({ user_id: id, username, soldier_id: soldierId, soldier_name: s?.full_name ?? null, is_locked: false, must_change_password: true, last_login_at: null, roles: [{ id: crypto.randomUUID(), role: "gaf_commander", gaf_id: null, valid_from: null, valid_to: null }] });
+    this.users.push({ user_id: id, username, soldier_id: soldierId, soldier_name: s?.full_name ?? null, is_locked: false, must_change_password: true, last_login_at: null, roles: [{ id: crypto.randomUUID(), role, gaf_id: null, valid_from: null, valid_to: null }] });
     return id;
   }
 
@@ -1249,6 +1251,39 @@ export class DemoApi implements Api {
   async cancelMyAbsence(id: string) {
     const a = this.absenceList.find((x) => x.id === id);
     if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי החייל" });
+  }
+
+  async unitDashboard(): Promise<UnitDashboard> {
+    await delay();
+    this.seedConstraints();
+    const c = this.cycleList.filter((x) => x.status === "published" || x.status === "closed").sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+    const live = this.draft.filter((a) => c && a.cycle_id === c.id && a.role === "performer" && !["draft", "dropped", "swapped_out", "cancelled_approved"].includes(a.status));
+    const pts = (id: string) => live.filter((a) => a.soldier_id === id).reduce((n, a) => n + a.normalized_points, 0);
+    const active = this.soldierList.filter((s) => s.is_active);
+    const gafs = [...new Set(active.map((s) => s.gaf_name))].sort();
+    const pops = (["career", "mandatory"] as const).map((pop) => {
+      const v = active.filter((s) => s.service_type === pop).map((s) => pts(s.id));
+      return { population: pop, soldiers: v.length, mean: v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : 0,
+        min: v.length ? Math.min(...v) : 0, max: v.length ? Math.max(...v) : 0, without: v.filter((x) => x === 0).length };
+    });
+    const planning = this.cycleList.find((x) => x.status !== "published" && x.status !== "closed");
+    return {
+      cycle: c ? { id: c.id, name: c.name, start_date: c.start_date, end_date: c.end_date } : null,
+      planning: planning ? { name: planning.name, status: planning.status, deadline: planning.exemption_deadline } : null,
+      by_gaf: gafs.map((g) => {
+        const ss = active.filter((s) => s.gaf_name === g);
+        return { gaf: g, soldiers: ss.length, duties: live.filter((a) => ss.some((s) => s.id === a.soldier_id)).length, points: ss.reduce((n, s) => n + pts(s.id), 0) };
+      }),
+      by_population: pops,
+      requests: { pending: this.exemptionList.filter((e) => e.status === "pending").length, urgent: this.exemptionList.filter((e) => e.status === "pending" && e.is_urgent).length,
+        by_soldiers: this.exemptionList.filter((e) => e.status === "pending" && e.source === "soldier").length },
+      accounts: { soldiers: active.length, with_account: this.accounts.size + 1 },
+      settings_changes: [
+        { at: new Date(Date.now() - 2 * 86_400_000).toISOString(), action: "update", entity: "score_multipliers", name: "סוף שבוע", by: "naat" },
+        { at: new Date(Date.now() - 9 * 86_400_000).toISOString(), action: "update", entity: "task_types", name: "קצין תורן – חול", by: "naat" },
+        { at: new Date(Date.now() - 20 * 86_400_000).toISOString(), action: "insert", entity: "calendar_days", name: "2027-04-22", by: "naat" },
+      ],
+    };
   }
 
   async myNotifications() {
