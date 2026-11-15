@@ -39,6 +39,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { isStaff } from "../lib/api";
+import { accountLabel, type SoldierAccount } from "../lib/me";
+import { InviteDialog } from "../components/InviteDialog";
 import {
   activeLoadRole,
   activeLoadRoles,
@@ -483,7 +486,18 @@ function BulkRangeDialog(props: {
 // ---------------------------------------------------------------------------
 
 export function SoldiersPage() {
-  const { api } = useAuth();
+  const { api, me } = useAuth();
+  const staffUser = isStaff(me);
+  const [accounts, setAccounts] = useState<Map<string, SoldierAccount>>(new Map());
+  const [inviting, setInviting] = useState(false);
+  const loadAccounts = useCallback(async () => {
+    if (!staffUser) return;
+    const a = await api!.soldierAccounts().catch(() => [] as SoldierAccount[]);
+    setAccounts(new Map(a.map((x) => [x.soldier_id, x])));
+  }, [api, staffUser]);
+  useEffect(() => {
+    void loadAccounts();
+  }, [loadAccounts]);
   const [rows, setRows] = useState<SoldierDetail[] | null>(null);
   const [ranks, setRanks] = useState<NamedRef[]>([]);
   const [loadRoles, setLoadRoles] = useState<LoadRoleRef[]>([]);
@@ -719,6 +733,16 @@ export function SoldiersPage() {
       key: "second",
       by: (s) => s.second_role_signed_at ?? "",
     },
+    ...(staffUser
+      ? [
+          {
+            label: "חשבון",
+            key: "account",
+            by: (s: SoldierDetail) => (accounts.get(s.id)?.username ? 2 : accounts.get(s.id)?.invite_state === "open" ? 1 : 0),
+            first: "desc" as const,
+          },
+        ]
+      : []),
     { label: "" },
   ];
   const sortCol = sort && columns.find((c) => c.key === sort.key);
@@ -935,6 +959,11 @@ export function SoldiersPage() {
               <Button variant="contained" onClick={() => setBulk(true)}>
                 עדכון מטווח לנבחרים
               </Button>
+              {staffUser && (
+                <Button variant="outlined" onClick={() => setInviting(true)}>
+                  קודי הצטרפות
+                </Button>
+              )}
               <Button onClick={() => setSelected(new Set())}>
                 ניקוי בחירה
               </Button>
@@ -1248,6 +1277,15 @@ export function SoldiersPage() {
                             })}
                       </TableCell>
                       <TableCell>{fmt(s.second_role_signed_at)}</TableCell>
+                      {staffUser &&
+                        (() => {
+                          const a = accountLabel(accounts.get(s.id), todayIso());
+                          return (
+                            <TableCell sx={{ whiteSpace: "nowrap" }}>
+                              {a.tone === "default" ? "—" : <Chip size="small" variant="outlined" color={a.tone} label={a.text} />}
+                            </TableCell>
+                          );
+                        })()}
                       <TableCell padding="checkbox">
                         <IconButton
                           aria-label={`עריכת ${s.full_name}`}
@@ -1283,6 +1321,14 @@ export function SoldiersPage() {
             setEditing(null);
             await load();
           }}
+        />
+      )}
+      {inviting && (
+        <InviteDialog
+          soldiers={(rows ?? []).filter((x) => selected.has(x.id) && x.is_active)}
+          hasAccount={(id) => !!accounts.get(id)?.username}
+          onClose={() => setInviting(false)}
+          onDone={() => void loadAccounts()}
         />
       )}
       {bulk && (

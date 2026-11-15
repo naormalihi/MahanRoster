@@ -18,6 +18,7 @@ import type {
   ExemptionType,
   StageState,
 } from "./cycles";
+import type { MyDuty, MyScore, SoldierAccount } from "./me";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
@@ -40,6 +41,8 @@ export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinato
 export const isCommander = (me: Me | null) => !!me && me.roles.includes("gaf_commander");
 /** Sees the planning screens (staff edit, commanders only read). */
 export const canRead = (me: Me | null) => isStaff(me) || isCommander(me);
+/** A soldier with his own account (version 2.1): his duties and the published board. */
+export const isSoldier = (me: Me | null) => !!me && me.roles.includes("soldier");
 
 export interface MfaState {
   /** signed in with password only, and a TOTP factor exists */
@@ -240,6 +243,15 @@ export interface Api {
   publishCycle(cycleId: string): Promise<number>;
   /** Back to draft; only before the cycle starts, by the coordinator. */
   unpublishCycle(cycleId: string): Promise<number>;
+  // version 2.1 – soldier accounts
+  /** One-time join codes for the soldiers (active, no account yet); each code is returned once. */
+  createSoldierInvites(soldierIds: string[], days: number): Promise<{ soldier_id: string; code: string }[]>;
+  revokeSoldierInvites(soldierIds: string[]): Promise<number>;
+  soldierAccounts(): Promise<SoldierAccount[]>;
+  /** The join screen, before signing in: returns the username. */
+  redeemInvite(code: string, username: string, password: string): Promise<string>;
+  myDuties(): Promise<MyDuty[]>;
+  myScores(): Promise<MyScore[]>;
 
   listUsers(): Promise<AppUser[]>;
   /** A gaf-commander account with a temporary password, linked to a soldier record. */
