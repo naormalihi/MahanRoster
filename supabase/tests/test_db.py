@@ -1607,3 +1607,64 @@ def test_soldier_joins_with_an_invite_code_and_sees_only_his_own(conn):
             with conn.transaction():
                 conn.execute("select * from public.create_soldier_invites(array[%s]::uuid[], 30)", (other,))
         raise psycopg.Rollback()
+
+
+def _soldier_account(conn, username):
+    """A soldier with his own account (made through an invite code); returns (user id, soldier id)."""
+    sid = conn.execute(
+        "select id from soldiers s where is_active and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 1").fetchone()[0]
+    (_, code), = _as_coord(conn, "select * from public.create_soldier_invites(array[%s]::uuid[], 30)", sid)
+    conn.execute("select public.redeem_invite(%s, %s, 'secret-pass-1')", (code, username))
+    return conn.execute("select id from app_users where username = %s", (username,)).fetchone()[0], sid
+
+
+def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
+    from datetime import date, timedelta
+
+    uid, sid = _soldier_account(conn, "self.input")
+    etype = conn.execute("select id from exemption_types where auto_rule is null order by name limit 1").fetchone()[0]
+    atype = conn.execute("select id from absence_types where not requires_approval order by name limit 1").fetchone()[0]
+    today = date.today()
+    far = today + timedelta(days=800)  # beyond every planned cycle: open
+    with session_as(conn, uid, aal="aal1") as c:
+        opts = c.execute("select public.my_input_options()").fetchone()[0]
+        assert any(t["id"] == str(etype) for t in opts["exemption_types"]) and opts["block_quota_per_month"] >= 1
+        eid = c.execute("select public.submit_exemption(%s, %s, %s)", (etype, far, far + timedelta(days=10))).fetchone()[0]
+        b1 = c.execute("select public.add_my_date_block(%s)", (far,)).fetchone()[0]
+        with pytest.raises(psycopg.Error, match="כבר יש לך חסימה"):
+            with c.transaction():
+                c.execute("select public.add_my_date_block(%s)", (far + timedelta(days=1),))
+        aid = c.execute("select public.add_my_absence(%s, %s, %s)", (atype, far + timedelta(days=40), far + timedelta(days=42))).fetchone()[0]
+        mine = c.execute("select public.my_requests()").fetchone()[0]
+        assert [e["status"] for e in mine["exemptions"] if e["mine"]] == ["pending"]
+        own = lambda k: [x for x in mine[k] if x["mine"]]
+        assert len(own("blocks")) == 1 and len(own("absences")) == 1
+        c.execute("select public.withdraw_my_exemption(%s)", (eid,))
+        c.execute("select public.cancel_my_date_block(%s)", (b1,))
+        c.execute("select public.cancel_my_absence(%s)", (aid,))
+        mine = c.execute("select public.my_requests()").fetchone()[0]
+        assert [e["status"] for e in mine["exemptions"] if e["mine"]] == ["cancelled"] and own("blocks") == [] and own("absences") == []
+
+    # a cycle whose deadline has passed: blocks and absences close, an exemption becomes urgent
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set exemption_deadline = now() - interval '1 day', status = 'approving', "
+                     "start_date = current_date + 5, end_date = current_date + 60 where id = %s", (cycle,))
+        day = today + timedelta(days=10)
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        with pytest.raises(psycopg.Error, match="נסגר"):
+            with conn.transaction():
+                conn.execute("select public.add_my_date_block(%s)", (day,))
+        with pytest.raises(psycopg.Error, match="נסגר"):
+            with conn.transaction():
+                conn.execute("select public.add_my_absence(%s, %s, %s)", (atype, day, day))
+        conn.execute("select public.submit_exemption(%s, %s, %s)", (etype, day, day + timedelta(days=2)))
+        reqs = conn.execute("select public.my_requests()").fetchone()[0]["exemptions"]
+        assert [e["is_urgent"] for e in reqs if e["mine"] and e["start_date"] == str(day)] == [True]
+        raise psycopg.Rollback()
+
+    # not a soldier: no self-entry
+    with session_as(conn, COORD) as c:
+        with pytest.raises(psycopg.Error, match="רק חייל"):
+            c.execute("select public.add_my_date_block(%s)", (far,))

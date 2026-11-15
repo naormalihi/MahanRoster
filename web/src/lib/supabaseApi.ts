@@ -1,4 +1,4 @@
-import type { MyDuty, MyScore, SoldierAccount } from "./me";
+import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
@@ -808,6 +808,38 @@ export class SupabaseApi implements Api {
 
   async myDuties(): Promise<MyDuty[]> {
     return (check(await this.sb.rpc("my_duties")) as MyDuty[]).map((d) => ({ ...d, points: Number(d.points) }));
+  }
+
+  async myInputOptions(): Promise<InputOptions> {
+    return check(await this.sb.rpc("my_input_options")) as InputOptions;
+  }
+
+  async myRequests(): Promise<MyRequests> {
+    return check(await this.sb.rpc("my_requests")) as MyRequests;
+  }
+
+  async submitExemption(typeId: string, from: string, to: string) {
+    maybe(await this.sb.rpc("submit_exemption", { p_type: typeId, p_start: from, p_end: to }));
+  }
+
+  async withdrawMyExemption(id: string) {
+    maybe(await this.sb.rpc("withdraw_my_exemption", { p_id: id }));
+  }
+
+  async addMyDateBlock(day: string) {
+    maybe(await this.sb.rpc("add_my_date_block", { p_day: day }));
+  }
+
+  async cancelMyDateBlock(id: string) {
+    maybe(await this.sb.rpc("cancel_my_date_block", { p_id: id }));
+  }
+
+  async addMyAbsence(typeId: string, from: string, to: string) {
+    maybe(await this.sb.rpc("add_my_absence", { p_type: typeId, p_from: from, p_to: to }));
+  }
+
+  async cancelMyAbsence(id: string) {
+    maybe(await this.sb.rpc("cancel_my_absence", { p_id: id }));
   }
 
   async myScores(): Promise<MyScore[]> {
