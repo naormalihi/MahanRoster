@@ -1655,3 +1655,26 @@ def test_delete_slot_logs_and_removes(conn):
                 with conn.transaction():
                     conn.execute("select public.delete_slot(%s, 'x')", (old,))
         raise psycopg.Rollback()
+
+
+def test_delete_user_removes_or_closes_the_account(conn):
+    uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', null)", "cmd.del1", "temp-pass-123")[0][0]
+    assert _as_coord(conn, "select public.delete_user(%s)", uid)[0][0] == "deleted"
+    assert conn.execute("select count(*) from app_users where id = %s", (uid,)).fetchone()[0] == 0
+    assert conn.execute("select count(*) from auth.users where id = %s", (uid,)).fetchone()[0] == 0
+
+    # a user whose name is on a record: closed, hidden, name freed
+    uid2 = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', null)", "cmd.del2", "temp-pass-123")[0][0]
+    conn.execute("update cycles set published_by = %s where id = %s", (uid2, conn.cycle_id))
+    conn.commit()
+    try:
+        assert _as_coord(conn, "select public.delete_user(%s)", uid2)[0][0] == "closed"
+        assert conn.execute("select is_locked, deleted_at is not null, username from app_users where id = %s", (uid2,)).fetchone() == (True, True, f"deleted.{str(uid2)[:8]}")
+        assert conn.execute("select count(*) from user_roles where user_id = %s", (uid2,)).fetchone()[0] == 0
+        assert not any(u == "cmd.del2" for (u,) in _as_coord(conn, "select username from public.list_users()"))
+        _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', null)", "cmd.del2", "temp-pass-123")  # the name is free again
+    finally:
+        conn.execute("update cycles set published_by = null where id = %s", (conn.cycle_id,))
+        conn.commit()
+    with pytest.raises(psycopg.Error, match="שלך"):
+        _as_coord(conn, "select public.delete_user(%s)", COORD)

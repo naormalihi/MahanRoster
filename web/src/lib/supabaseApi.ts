@@ -787,6 +787,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("reset_user_password", { p_user: userId, p_password: password }));
   }
 
+  async deleteUser(userId: string) {
+    return check(await this.sb.rpc("delete_user", { p_user: userId })) as "deleted" | "closed";
+  }
+
   async setUserLocked(userId: string, locked: boolean) {
     maybe(await this.sb.rpc("set_user_locked", { p_user: userId, p_locked: locked }));
   }

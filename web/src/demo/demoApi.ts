@@ -1054,6 +1054,12 @@ export class DemoApi implements Api {
     if (u) u.must_change_password = true;
   }
 
+  async deleteUser(userId: string) {
+    await delay(200);
+    void userId;
+    return "deleted" as const;
+  }
+
   async setUserLocked(userId: string, locked: boolean) {
     await delay();
     const u = this.users.find((x) => x.user_id === userId);
