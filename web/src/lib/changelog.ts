@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.30.1",
+    date: "2026-11-15",
+    items: ["תפעול › תורנות חדשה: התאריך חייב להיות בתוך המחזור. ברירת המחדל היא מחר, ואם מחר מחוץ למחזור – היום הראשון (או האחרון) שלו"],
+  },
+  {
     version: "1.30.0",
     date: "2026-11-15",
     items: [

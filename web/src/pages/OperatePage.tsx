@@ -69,7 +69,7 @@ const SPECIAL_CODE = { any: "special_any", mandatory: "special_mandatory", caree
 
 function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved: () => void }) {
   const { api } = useAuth();
-  const { cycleId } = useCycle();
+  const { cycleId, cycle } = useCycle();
   const active = props.tasks.filter((t) => t.is_active && !t.is_special);
   const specials = props.tasks.filter((t) => t.is_special);
   const [ranks, setRanks] = useState<RankRef[]>([]);
@@ -80,11 +80,14 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
   const [specialPoints, setSpecialPoints] = useState<number | "">("");
   const [specialWho, setSpecialWho] = useState<keyof typeof SPECIAL_CODE>("any");
   const [specialRanks, setSpecialRanks] = useState<string[]>([]);
+  // tomorrow, kept inside the cycle: a duty belongs to the cycle its date falls in
   const tomorrow = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
+    if (cycle && dayKey(d) < cycle.start_date) return new Date(`${cycle.start_date}T12:00:00`);
+    if (cycle && dayKey(d) > cycle.end_date) return new Date(`${cycle.end_date}T12:00:00`);
     return d;
-  }, []);
+  }, [cycle]);
   const [taskId, setTaskId] = useState(active[0]?.id ?? "");
   const [times, setTimes] = useState(() => defaultTimes(active[0], tomorrow));
   const [performers, setPerformers] = useState(1);
@@ -112,6 +115,8 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
       if (!specialType) return setError("סוג ההקפצה המיוחדת חסר במערכת – צריך לעדכן את בסיס הנתונים");
     }
     if (!(end > start)) return setError("הסיום חייב להיות אחרי ההתחלה");
+    if (cycle && (dayKey(start) < cycle.start_date || dayKey(start) > cycle.end_date))
+      return setError(`התחלת התורנות חייבת להיות בתוך המחזור (${cycle.start_date.split("-").reverse().join("/")} – ${cycle.end_date.split("-").reverse().join("/")})`);
     if (performers < 1 || reserves < 0) return setError("לפחות מבצע אחד");
     const slot: NewSlot = special
       ? {

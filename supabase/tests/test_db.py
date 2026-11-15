@@ -1602,3 +1602,18 @@ def test_update_special_slot_rescores(conn):
             assert conn.execute("select special_name, fixed_points from slots where id = %s", (k,)).fetchone() == ("משימה חדשה", 6)
             assert conn.execute("select points from assignments where slot_id = %s", (k,)).fetchone()[0] == 6
         raise psycopg.Rollback()
+
+
+def test_a_duty_added_by_hand_starts_inside_its_cycle(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        task = conn.execute("select id from task_types order by code limit 1").fetchone()[0]
+        with session_as(conn, COORD):
+            with pytest.raises(psycopg.errors.RaiseException, match="מחוץ למחזור"):
+                with conn.transaction():
+                    conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values (%s, %s, %s::date - 30, %s::date - 29)",
+                                 (cycle, task, start, start))
+            conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values (%s, %s, (%s::date + 1)::timestamp at time zone 'Asia/Jerusalem', (%s::date + 2)::timestamp at time zone 'Asia/Jerusalem')",
+                         (cycle, task, start, start))
+        raise psycopg.Rollback()
