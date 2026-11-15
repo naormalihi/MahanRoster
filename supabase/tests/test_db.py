@@ -1486,3 +1486,36 @@ def test_new_run_saves_when_a_manual_reserve_points_at_an_old_engine_performer(c
         new_p = conn.execute("select id from assignments where slot_id = %s and role = 'performer'", (k,)).fetchone()[0]
         assert res_pair == new_p
         raise psycopg.Rollback()
+
+
+def test_history_counts_published_board(conn):
+    """The score before a cycle counts the duties left on earlier published boards, not only 'done'."""
+    cycle = conn.cycle_id
+    with conn.transaction():
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        prev = conn.execute(
+            "insert into cycles (name, start_date, end_date, status) values ('קודם', %s, %s, 'published') returning id",
+            (start - timedelta(days=60), start - timedelta(days=1))).fetchone()[0]
+        task = conn.execute("select id from task_types order by code limit 1").fetchone()[0]
+        sol = conn.execute("select id from soldiers where is_active and release_date is null order by full_name limit 1").fetchone()[0]
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        before = conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
+                              (cycle, sol)).fetchone()[0]
+
+        def duty(days_before, role, status, pts):
+            k = conn.execute(
+                """insert into slots (cycle_id, task_type_id, starts_at, ends_at)
+                   values (%s, %s, (%s::timestamp at time zone 'Asia/Jerusalem'), (%s::timestamp at time zone 'Asia/Jerusalem') + interval '1 day')
+                   returning id""", (prev, task, start - timedelta(days=days_before), start - timedelta(days=days_before))).fetchone()[0]
+            conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, points, normalized_points) "
+                         "select %s, id, gaf_id, %s, %s, %s, %s from soldiers where id = %s", (k, role, status, pts, pts, sol))
+
+        duty(30, "performer", "assigned", 5)   # on the board, not yet marked done
+        duty(20, "performer", "done", 2)
+        duty(10, "performer", "dropped", 7)    # left the board
+        duty(5, "reserve", "reserve_idle", 0)
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        after = conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
+                             (cycle, sol)).fetchone()[0]
+        assert after - before == 7
+        raise psycopg.Rollback()
