@@ -31,6 +31,9 @@ def greedy(problem: Problem, prep) -> list[tuple[str, str, str]]:
     holidays = set(problem.holidays)
     had_holiday = {s.id: s.recent_holiday for s in problem.soldiers}  # a holiday duty: past year or here
     chosen: list[tuple[str, str, str]] = []
+    duty_weeks = defaultdict(set)  # soldier -> Sundays of the weeks he performs in
+    gap_cost = problem.settings.weights.consecutive_weeks * 100  # same scale as the points
+    sunday = lambda d: d - timedelta(days=(d.weekday() + 1) % 7)  # noqa: E731
     fixed = defaultdict(list)
     for f in problem.fixed:
         fixed[f.slot_id].append(f)
@@ -88,13 +91,21 @@ def greedy(problem: Problem, prep) -> list[tuple[str, str, str]]:
         ]
         perf_cand = [sid for sid in cand if nights_ok(sid, k.id)]
         holiday = is_holiday_slot(k, holidays)
-        perf_cand.sort(key=lambda sid: (holiday and had_holiday[sid], score[sid] + prep.pts[sid, k.id], weekends[sid], sid))
+        sun = sunday(k.starts_at.date())
+        near = (sun - timedelta(days=7), sun + timedelta(days=7))
+        perf_cand.sort(key=lambda sid: (
+            holiday and had_holiday[sid],
+            score[sid] + prep.pts[sid, k.id] + (gap_cost if any(w in duty_weeks[sid] for w in near) else 0),
+            weekends[sid],
+            sid,
+        ))
         while len(performers) < k.performers_needed and perf_cand:
             sid = perf_cand.pop(0)
             cand.remove(sid)
             performers.append(sid)
             take(sid, k.id, ROLE_PERFORMER, a, b)
             score[sid] += prep.pts[sid, k.id]
+            duty_weeks[sid].add(sun)
             weekends[sid] += prep.wk_units[k.id]
             month_count[sid, month] += 1
 

@@ -209,6 +209,11 @@ def _week_key(d: date) -> tuple[int, int]:
     return sunday.isocalendar()[:2]
 
 
+def _sunday(d: date) -> date:
+    """The Sunday that opens the Israeli week of a day."""
+    return d - timedelta(days=(d.weekday() + 1) % 7)
+
+
 def _weekend_key(d: date) -> date:
     """The Friday that opens the weekend a day belongs to."""
     return d - timedelta(days=(d.weekday() - 4) % 7)
@@ -491,11 +496,18 @@ def solve(
         _, n = pool_of[sid]
         weekends = defaultdict(list)
         weeks = defaultdict(list)
+        by_sunday = defaultdict(list)  # performer duties per week, keyed by the week's Sunday
+        any_sunday = defaultdict(list)  # performer or reserve
         for kid in kids:
             k = slots[kid]
             if k.is_penalty:
                 continue
             weeks[_week_key(k.starts_at.date())].append(x[sid, kid])
+            sun = _sunday(k.starts_at.date())
+            by_sunday[sun].append(x[sid, kid])
+            any_sunday[sun].append(x[sid, kid])
+            if (sid, kid) in r:
+                any_sunday[sun].append(r[sid, kid])
             if prep.wk_units[kid]:
                 weekends[_weekend_key(k.starts_at.date())].append(x[sid, kid])
         on = {}
@@ -508,6 +520,20 @@ def solve(
                 b = m.NewBoolVar(f"cw_{sid}_{fri}")
                 m.Add(b >= on[fri] + on[nxt] - 1)
                 objective.append(coef(w.consecutive_weekends * SCALE) * b)
+        # Two weeks in a row: spread a soldier's duties out as far as the balance allows.
+        for weight, groups, tag in ((w.consecutive_weeks, by_sunday, "cp"), (w.consecutive_weeks_reserve, any_sunday, "ca")):
+            if not weight:
+                continue
+            onw = {}
+            for sun, vars_ in groups.items():
+                onw[sun] = m.NewBoolVar(f"{tag}on_{sid}_{sun}")
+                m.AddMaxEquality(onw[sun], vars_)
+            for sun in onw:
+                nxt = sun + timedelta(days=7)
+                if nxt in onw:
+                    b = m.NewBoolVar(f"{tag}_{sid}_{sun}")
+                    m.Add(b >= onw[sun] + onw[nxt] - 1)
+                    objective.append(coef(weight * SCALE) * b)
         for key, vars_ in weeks.items():
             if len(vars_) > 1:
                 ex = m.NewIntVar(0, len(vars_), f"wx_{sid}_{key[0]}_{key[1]}")
