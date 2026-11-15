@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import timedelta
+from datetime import date, timedelta
 import os
 import sys
 import uuid
@@ -1364,8 +1364,8 @@ def test_new_soldier_opens_at_group_average(conn):
             "select s.id, s.service_type, s.gaf_id, s.computed_rank_id from soldiers s where s.is_active and s.is_shachar = false "
             "and s.release_date is null order by s.full_name limit 1").fetchone()
         new = conn.execute(
-            """insert into soldiers (soldier_key, full_name, service_type, gaf_id, computed_rank_id, unit_join_date)
-               values (repeat('a', 64), 'חייל חדש', %s, %s, %s, current_date) returning id""", peer[1:]).fetchone()[0]
+            """insert into soldiers (soldier_key, full_name, service_type, gaf_id, computed_rank_id)
+               values (repeat('a', 64), 'חייל חדש', %s, %s, %s) returning id""", peer[1:]).fetchone()[0]
         conn.execute("select public.snapshot_cycle(%s)", (cycle,))
         group = conn.execute("select fairness_group from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
                              (cycle, new)).fetchone()[0]
@@ -1380,8 +1380,13 @@ def test_new_soldier_opens_at_group_average(conn):
         # a second snapshot keeps the same opening, and old soldiers get none
         conn.execute("select public.snapshot_cycle(%s)", (cycle,))
         assert conn.execute("select opening_score from soldiers where id = %s", (new,)).fetchone()[0] == opening
-        assert conn.execute("select count(*) from soldiers where opening_score_at > now() - interval '1 minute' and id <> %s",
+        assert conn.execute("select count(*) from soldiers where opening_score_at > now() - interval '2 hours' and id <> %s",
                             (new,)).fetchone()[0] == 0
+        # dated at the cycle's start (inside its window), and he joins the unit with the cycle
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        at, joined = conn.execute("select (opening_score_at at time zone 'Asia/Jerusalem')::date, unit_join_date from soldiers where id = %s",
+                                  (new,)).fetchone()
+        assert at == start and joined == max(start, date.today())
         raise psycopg.Rollback()
 
 
