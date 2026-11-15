@@ -124,6 +124,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
   const [editSpecial, setEditSpecial] = useState<{ name: string; points: string } | null>(null);
+  const [deleting, setDeleting] = useState<{ reason: string } | null>(null);
 
   useEffect(() => {
     api!.slotPeople(slotId).then(setData, (e) => setError((e as Error).message));
@@ -287,10 +288,74 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
             </Alert>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: "space-between" }}>
+          {data && !started ? (
+            <Button color="error" disabled={busy} onClick={() => setDeleting({ reason: "" })}>
+              מחיקת התורנות
+            </Button>
+          ) : (
+            <span />
+          )}
           <Button onClick={onClose}>סגירה</Button>
         </DialogActions>
       </Dialog>
+      {deleting && data && (
+        <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>מחיקת התורנות</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={1.5}>
+              <Typography>
+                למחוק את <b>{data.slot.task_name}</b>, {when}?
+              </Typography>
+              {people.length > 0 ? (
+                <>
+                  <Typography variant="body2" color="text.secondary">
+                    {`יוסרו ממנה ${performing.length} מבצעים ו-${idle.length} עתודות, והניקוד שלהם על התורנות יירד. המחיקה נרשמת ביומן השינויים.`}
+                  </Typography>
+                  <TextField
+                    label="סיבה"
+                    value={deleting.reason}
+                    onChange={(e) => setDeleting({ reason: e.target.value })}
+                    placeholder="המשימה בוטלה"
+                    required
+                    fullWidth
+                  />
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  אין עליה אף אחד.
+                </Typography>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleting(null)}>ביטול</Button>
+            <Button
+              color="error"
+              variant="contained"
+              disabled={busy || (people.length > 0 && !deleting.reason.trim())}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  await api!.deleteSlot(data.slot.id, deleting.reason.trim() || undefined);
+                  setDeleting(null);
+                  announceBoardChange();
+                  onChanged();
+                  onClose();
+                } catch (e) {
+                  setDeleting(null);
+                  setError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              מחיקה
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       {activating && data && (
         <ActivateDialog
           slot={data.slot}
