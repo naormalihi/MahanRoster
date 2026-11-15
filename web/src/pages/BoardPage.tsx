@@ -86,6 +86,11 @@ function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime
     >
       <Stack direction="row" sx={{ alignItems: "flex-start", gap: 0.5 }}>
       <Stack direction="row" sx={{ alignItems: "baseline", columnGap: 1.25, rowGap: 0, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+        {r.special_points != null && (
+          <Box component="span" sx={{ fontSize: 11, color: "warning.dark", border: 1, borderColor: "warning.light", borderRadius: 1, px: 0.5 }}>
+            הקפצה מיוחדת · {Number(r.special_points)} נק׳
+          </Box>
+        )}
         {performers.length ? (
           performers.map((p, i) => (
             <Box key={i} component="span" sx={{ display: "inline-flex", alignItems: "baseline", gap: 0.5 }}>

@@ -47,6 +47,7 @@ import { useCycle } from "../lib/cycleContext";
 import { useCanEdit } from "../components/ReadOnly";
 import type { SlotRow } from "../lib/baseSchedule";
 import { israeliHolidays, type TaskType } from "../lib/catalog";
+import { slotName } from "../lib/baseSchedule";
 import type { Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
 import { fairRows, shortGroupName, verdicts, type FairRow } from "../lib/fairness";
@@ -308,7 +309,7 @@ function BoardView({
     if (filter === "manual" && !people.some((a) => a.source === "manual")) return false;
     if (filter === "weekend" && !isWeekend(k, v)) return false;
     if (terms.length) {
-      const hay = [ctx.tasks.get(k.task_type_id)?.name ?? "", ...people.map((a) => name(a.soldier_id)), dateWords(k.starts_at)].join(" ");
+      const hay = [slotName(k, (id) => ctx.tasks.get(id)?.name), ...people.map((a) => name(a.soldier_id)), dateWords(k.starts_at)].join(" ");
       if (!terms.every((t) => hay.includes(t))) return false;
     }
     return true;
@@ -880,7 +881,7 @@ function WhyReasonRow(props: {
                   ))
                 : rows.map(({ it, k }) => (
                     <Typography key={it.slot_id} variant="body2">
-                      {dayDm(k.starts_at)} · {props.taskName(k.task_type_id)}
+                      {dayDm(k.starts_at)} · {k.special_name || props.taskName(k.task_type_id)}
                       {props.busy && (
                         <Typography component="span" variant="body2" color="text.secondary">
                           {busyText(it, k)}
@@ -1052,7 +1053,7 @@ function SoldierLoadDialog(props: {
                     <TableRow key={a.id}>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>{dayFmt.format(new Date(k!.starts_at))}</TableCell>
                       <TableCell>
-                        {ctx.tasks.get(k!.task_type_id)?.name}
+                        {slotName(k!, (id) => ctx.tasks.get(id)?.name)}
                         {a.role === "reserve" && <Chip size="small" variant="outlined" label="עתודה" sx={{ mr: 0.5 }} />}
                         {a.source === "manual" && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5 }} />}
                       </TableCell>

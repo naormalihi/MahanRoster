@@ -185,6 +185,8 @@ class Slot:
     gender: Optional[str] = None
     is_penalty: bool = False
     penalty_soldier_id: Optional[str] = None
+    # A special call-up (הקפצה מיוחדת): the points entered for the whole duty; no multiplier.
+    fixed_points: Optional[float] = None
     # A duty added after publishing that caught its performer by surprise (הקפצה):
     # its points are multiplied by settings.surprise_multiplier.
     is_surprise: bool = False

@@ -435,7 +435,7 @@ function CatalogTab() {
   const load = useCallback(async () => {
     try {
       const [t, c, r] = await Promise.all([api!.taskTypes(), api!.dutyCategories(), api!.ranks()]);
-      setTasks(t);
+      setTasks(t.filter((x) => !x.is_special));
       setCategories(c);
       setRanks(r);
     } catch (e) {
@@ -1620,7 +1620,7 @@ function AliasesTab() {
     try {
       const [a, t] = await Promise.all([api!.taskTypeAliases(), api!.taskTypes()]);
       setAliases(a.sort((x, y) => x.alias.localeCompare(y.alias, "he")));
-      setTasks(t);
+      setTasks(t.filter((x) => !x.is_special));
     } catch (e) {
       setError((e as Error).message);
     }

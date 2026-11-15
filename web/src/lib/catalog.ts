@@ -17,6 +17,8 @@ export interface TaskType {
   is_weekend_type: boolean;
   /** the weight already covers holidays (a week-long task): no holiday multiplier */
   includes_holidays: boolean;
+  /** hidden type that carries a special call-up (הקפצה מיוחדת); not in the catalog */
+  is_special?: boolean;
   shachar_compatible: boolean;
   /** only mandatory-service שח"ר soldiers may do it (implies shachar_compatible) */
   shachar_only: boolean;

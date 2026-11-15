@@ -33,7 +33,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { OFFLINE_TEXT, pollFailures } from "../lib/network";
 import type { ExistingSoldier } from "../lib/roster";
 import { useAuth } from "../lib/auth";
-import type { NewSlot, SlotRow } from "../lib/baseSchedule";
+import { slotName, type NewSlot, type RankRef, type SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import { useCycle } from "../lib/cycleContext";
 import { dayKey, dayLabel, timeLabel } from "../lib/dates";
@@ -63,10 +63,23 @@ export function defaultTimes(t: Pick<TaskType, "default_start_time" | "default_e
   return { start: localInput(start), end: localInput(end) };
 }
 
+/** The value of the duty picker for a special call-up (הקפצה מיוחדת). */
+const SPECIAL = "__special__";
+const SPECIAL_CODE = { any: "special_any", mandatory: "special_mandatory", career: "special_career" } as const;
+
 function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved: () => void }) {
   const { api } = useAuth();
   const { cycleId } = useCycle();
-  const active = props.tasks.filter((t) => t.is_active);
+  const active = props.tasks.filter((t) => t.is_active && !t.is_special);
+  const specials = props.tasks.filter((t) => t.is_special);
+  const [ranks, setRanks] = useState<RankRef[]>([]);
+  useEffect(() => {
+    api!.rankRefs().then((r) => setRanks([...r].sort((a, b) => a.sort_order - b.sort_order))).catch(() => setRanks([]));
+  }, [api]);
+  const [specialName, setSpecialName] = useState("");
+  const [specialPoints, setSpecialPoints] = useState<number | "">("");
+  const [specialWho, setSpecialWho] = useState<keyof typeof SPECIAL_CODE>("any");
+  const [specialRanks, setSpecialRanks] = useState<string[]>([]);
   const tomorrow = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -82,6 +95,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
 
   function pickTask(id: string) {
     setTaskId(id);
+    if (id === SPECIAL) return;
     const day = times.start ? new Date(times.start) : tomorrow;
     setTimes(defaultTimes(props.tasks.find((t) => t.id === id), day));
   }
@@ -90,16 +104,35 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
     const start = new Date(times.start);
     const end = new Date(times.end);
     if (!taskId) return setError("בחר תורנות");
+    const special = taskId === SPECIAL;
+    const specialType = specials.find((t) => t.code === SPECIAL_CODE[specialWho]);
+    if (special) {
+      if (!specialName.trim()) return setError("תן שם למשימה");
+      if (specialPoints === "" || specialPoints < 0.5 || specialPoints > 100) return setError("ניקוד למבצע – בין 0.5 ל-100");
+      if (!specialType) return setError("סוג ההקפצה המיוחדת חסר במערכת – צריך לעדכן את בסיס הנתונים");
+    }
     if (!(end > start)) return setError("הסיום חייב להיות אחרי ההתחלה");
     if (performers < 1 || reserves < 0) return setError("לפחות מבצע אחד");
-    const slot: NewSlot = {
-      task_type_id: taskId,
-      starts_at: start.toISOString(),
-      ends_at: end.toISOString(),
-      performers_needed: performers,
-      reserves_needed: reserves,
-      is_surprise: surprise,
-    };
+    const slot: NewSlot = special
+      ? {
+          task_type_id: specialType!.id,
+          starts_at: start.toISOString(),
+          ends_at: end.toISOString(),
+          performers_needed: performers,
+          reserves_needed: reserves,
+          is_surprise: false,
+          special_name: specialName.trim(),
+          fixed_points: Number(specialPoints),
+          allowed_rank_ids: specialRanks.length ? specialRanks : null,
+        }
+      : {
+          task_type_id: taskId,
+          starts_at: start.toISOString(),
+          ends_at: end.toISOString(),
+          performers_needed: performers,
+          reserves_needed: reserves,
+          is_surprise: surprise,
+        };
     setBusy(true);
     try {
       await api!.addSlot(cycleId, slot);
@@ -116,12 +149,64 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
       <DialogContent dividers>
         <Stack spacing={2}>
           <TextField select label="תורנות" value={taskId} onChange={(e) => pickTask(e.target.value)} fullWidth>
+            {specials.length > 0 && (
+              <MenuItem value={SPECIAL} sx={{ fontWeight: 600 }}>
+                הקפצה מיוחדת (לא מהקטלוג)
+              </MenuItem>
+            )}
             {active.map((t) => (
               <MenuItem key={t.id} value={t.id}>
                 {t.name}
               </MenuItem>
             ))}
           </TextField>
+          {taskId === SPECIAL && (
+            <Paper variant="outlined" sx={{ p: 1.5, borderColor: "primary.main" }}>
+              <Stack spacing={1.5}>
+                <TextField label="שם המשימה" value={specialName} onChange={(e) => setSpecialName(e.target.value)} required fullWidth />
+                <Stack direction="row" spacing={1.5}>
+                  <TextField
+                    type="number"
+                    label="ניקוד למבצע"
+                    value={specialPoints}
+                    onChange={(e) => setSpecialPoints(e.target.value === "" ? "" : Number(e.target.value))}
+                    slotProps={{ htmlInput: { min: 0.5, max: 100, step: 0.5 } }}
+                    required
+                    fullWidth
+                  />
+                  <TextField select label="מי יכול לבצע" value={specialWho} onChange={(e) => setSpecialWho(e.target.value as keyof typeof SPECIAL_CODE)} fullWidth>
+                    <MenuItem value="any">כולם</MenuItem>
+                    <MenuItem value="mandatory">חובה</MenuItem>
+                    <MenuItem value="career">קבע</MenuItem>
+                  </TextField>
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  הניקוד הוא לכל התורנות, בלי מקדמי שבת, חג או הקפצה. לדוגמה, אמ"ת שווה 13 ושמירה שווה 1.
+                </Typography>
+                <TextField
+                  select
+                  label="דרגות (לא חובה)"
+                  value={specialRanks}
+                  onChange={(e) => setSpecialRanks(typeof e.target.value === "string" ? e.target.value.split(",") : (e.target.value as string[]))}
+                  slotProps={{
+                    select: {
+                      multiple: true,
+                      renderValue: (v) => ((v as string[]).length ? (v as string[]).map((id) => ranks.find((r) => r.id === id)?.name).join(", ") : "כל הדרגות"),
+                      displayEmpty: true,
+                    },
+                    inputLabel: { shrink: true },
+                  }}
+                  fullWidth
+                >
+                  {ranks.map((r) => (
+                    <MenuItem key={r.id} value={r.id}>
+                      {r.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+            </Paper>
+          )}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField type="datetime-local" label="התחלה" value={times.start} onChange={(e) => setTimes({ ...times, start: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
             <TextField type="datetime-local" label="סיום" value={times.end} onChange={(e) => setTimes({ ...times, end: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
@@ -130,10 +215,16 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
             <TextField type="number" label="מבצעים" value={performers} onChange={(e) => setPerformers(Number(e.target.value))} slotProps={{ htmlInput: { min: 1 } }} fullWidth />
             <TextField type="number" label="עתודות" value={reserves} onChange={(e) => setReserves(Number(e.target.value))} slotProps={{ htmlInput: { min: 0 } }} fullWidth />
           </Stack>
-          <FormControlLabel
-            control={<Checkbox checked={surprise} onChange={(e) => setSurprise(e.target.checked)} />}
-            label="הקפצה – תורנות שלא הוכרזה מראש (הניקוד מוכפל במקדם ההקפצה)"
-          />
+          {taskId === SPECIAL ? (
+            <Typography variant="body2" color="text.secondary">
+              אין מקדם הקפצה – הניקוד שהוזן הוא הניקוד.
+            </Typography>
+          ) : (
+            <FormControlLabel
+              control={<Checkbox checked={surprise} onChange={(e) => setSurprise(e.target.checked)} />}
+              label="הקפצה – תורנות שלא הוכרזה מראש (הניקוד מוכפל במקדם ההקפצה)"
+            />
+          )}
         </Stack>
       </DialogContent>
       {error && (
@@ -249,7 +340,7 @@ export function OperatePage() {
   const found = terms.length
     ? slots.filter((k) => {
         if (Date.parse(k.ends_at) <= Date.now() || !of(k.id).some(live)) return false;
-        const hay = [taskName.get(k.task_type_id) ?? "", ...of(k.id).filter(live).map((a) => name(a.soldier_id)), ...dateOf(k.starts_at)].join(" ");
+        const hay = [slotName(k, (id) => taskName.get(id)), ...of(k.id).filter(live).map((a) => name(a.soldier_id)), ...dateOf(k.starts_at)].join(" ");
         return terms.every((t) => hay.includes(t));
       })
     : [];
@@ -304,8 +395,11 @@ export function OperatePage() {
                           {dayLabel(k.starts_at)} {timeLabel(k.starts_at)}
                         </TableCell>
                         <TableCell>
-                          {taskName.get(k.task_type_id) ?? "?"}{" "}
+                          {slotName(k, (id) => taskName.get(id))}{" "}
                           {k.is_surprise && <Chip size="small" color="warning" icon={<BoltIcon />} label="הקפצה" />}
+                          {k.fixed_points != null && (
+                            <Chip size="small" color="warning" variant="outlined" icon={<BoltIcon />} label={`הקפצה מיוחדת · ${Number(k.fixed_points)} נק׳`} />
+                          )}
                         </TableCell>
                         <TableCell>
                           {d.length === 0 ? (
@@ -417,7 +511,7 @@ export function OperatePage() {
                       sx={{ py: 1, px: 0.5, cursor: "pointer", borderRadius: 1, "&:hover": { bgcolor: "action.hover" } }}
                     >
                       <Typography sx={{ fontWeight: 600 }}>
-                        {taskName.get(k.task_type_id) ?? "?"} · {dayLabel(k.starts_at)} {timeLabel(k.starts_at)}
+                        {slotName(k, (id) => taskName.get(id))} · {dayLabel(k.starts_at)} {timeLabel(k.starts_at)}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {mine.filter(performs).map((a) => name(a.soldier_id) + (a.status === "reserve_activated" ? " (עתודה שהופעלה)" : "")).join(", ") || "לא מאויש"}
@@ -460,7 +554,7 @@ export function OperatePage() {
           <DialogTitle>מחיקת תורנות</DialogTitle>
           <DialogContent dividers>
             <Typography>
-              למחוק את <b>{taskName.get(deleting.task_type_id) ?? "התורנות"}</b> ב{dayLabel(deleting.starts_at)} {timeLabel(deleting.starts_at)}?
+              למחוק את <b>{slotName(deleting, (id) => taskName.get(id))}</b> ב{dayLabel(deleting.starts_at)} {timeLabel(deleting.starts_at)}?
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               אין עליה שיבוץ מפורסם. הצעות המנוע לתורנות, אם יש, יימחקו איתה.

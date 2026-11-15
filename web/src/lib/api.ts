@@ -73,6 +73,8 @@ export interface BoardRow {
   /** performers who came in as an activated reserve, and the performers they replaced */
   activated?: string[];
   replaced?: string[];
+  /** a special call-up: the points entered for it */
+  special_points?: number | null;
 }
 
 /** The people of one published duty, for the actions on it (staff). */
@@ -84,7 +86,7 @@ export interface SlotPerson {
   replaced_id: string | null; // an activated reserve: the performer he replaced
 }
 export interface SlotPeople {
-  slot: { id: string; cycle_id: string; starts_at: string; ends_at: string; task_name: string; published: boolean };
+  slot: { id: string; cycle_id: string; starts_at: string; ends_at: string; task_name: string; published: boolean; fixed_points?: number | null; special_name?: string | null };
   people: SlotPerson[];
 }
 
@@ -213,6 +215,8 @@ export interface Api {
   requestSchedule(cycleId: string, kind?: "full" | "stability" | "update"): Promise<string>;
   /** A duty added by hand to a cycle (after publishing: then filled by a stability run). */
   addSlot(cycleId: string, slot: NewSlot): Promise<void>;
+  /** Renames a special call-up or changes its points (before it starts); re-scores who is on it. */
+  updateSpecialSlot(slotId: string, name: string, points: number): Promise<void>;
   /** Approve the engine's draft for duties added after publishing; the cycle stays published. */
   publishAdditions(cycleId: string): Promise<number>;
   /**
