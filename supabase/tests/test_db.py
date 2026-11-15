@@ -1524,3 +1524,27 @@ def test_history_counts_published_board(conn):
                              (cycle, sol)).fetchone()[0]
         assert after - before == 7
         raise psycopg.Rollback()
+
+
+def test_duty_whose_weight_includes_holidays_gets_no_holiday_multiplier(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        day = start + timedelta(days=3)
+        conn.execute("insert into calendar_days (day, day_type, source, note, holiday, holiday_kind) values (%s, 'observance', 'manual', 'חנוכה', 'hanukkah', 'day') "
+                     "on conflict (day) do update set day_type = 'observance', holiday = 'hanukkah', holiday_kind = 'day'", (day,))
+        conn.execute("update score_multipliers set is_active = false")
+        conn.execute("insert into score_multipliers (name, value, holidays, holiday_kinds) values ('חנוכה', 3, '{hanukkah}', '{day}')")
+        task, weight = conn.execute("select id, weight from task_types where not is_weekend_type order by code limit 1").fetchone()
+        sol = conn.execute("select id from soldiers where is_active order by full_name limit 1").fetchone()[0]
+        k = conn.execute(
+            """insert into slots (cycle_id, task_type_id, starts_at, ends_at) values
+               (%s, %s, (%s::timestamp at time zone 'Asia/Jerusalem') + interval '10 hours', (%s::timestamp at time zone 'Asia/Jerusalem') + interval '20 hours')
+               returning id""", (cycle, task, day, day)).fetchone()[0]
+        pts = lambda: conn.execute("select raw from app.slot_points(%s, %s)", (k, sol)).fetchone()[0]  # noqa: E731
+        assert pts() == weight * 3
+        conn.execute("update task_types set includes_holidays = true where id = %s", (task,))
+        assert pts() == weight
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        assert any(t["includes_holidays"] for t in doc["task_types"])
+        raise psycopg.Rollback()

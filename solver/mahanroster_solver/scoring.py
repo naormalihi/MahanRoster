@@ -85,7 +85,7 @@ def is_weekend_day(day: date, settings: Settings) -> bool:
 
 def unit_day_multiplier(day: date, task: TaskType, settings: Settings, holidays: set[date]) -> float:
     m = 1.0
-    if day in holidays:
+    if day in holidays and not task.includes_holidays:
         m = max(m, settings.holiday_multiplier)
     if is_weekend_day(day, settings) and not task.is_weekend_type:
         m = max(m, settings.weekend_multiplier)
@@ -93,12 +93,21 @@ def unit_day_multiplier(day: date, task: TaskType, settings: Settings, holidays:
 
 
 REST_HOLIDAYS = ("rosh_hashana", "yom_kippur", "sukkot", "pesach", "shavuot", "independence")
+# calendar day types that are not about holidays
+PLAIN_DAY_TYPES = ("weekday", "weekend")
+
+
+def is_holiday_multiplier(m: Multiplier) -> bool:
+    """A multiplier set by holiday: by name / kind, or by a holiday day type of the calendar."""
+    return bool(m.holidays or m.holiday_kinds or any(t not in PLAIN_DAY_TYPES for t in m.day_types))
 
 
 def multiplier_applies(
     m: Multiplier, day: date, task: TaskType, starts_at: datetime, ends_at: datetime, settings: Settings
 ) -> bool:
     if m.skip_shabbat_types and task.is_weekend_type:
+        return False
+    if task.includes_holidays and is_holiday_multiplier(m):
         return False
     if m.day_types and settings.day_types.get(day.isoformat()) not in m.day_types:
         return False

@@ -34,6 +34,9 @@ class TaskType:
     requires_weapon: bool = False
     # A Shabbat variant has its own weight, so the weekend multiplier is not applied.
     is_weekend_type: bool = False
+    # The weight already covers holidays (a week-long task): no holiday multiplier. Still a
+    # holiday duty for who-did-a-holiday fairness.
+    includes_holidays: bool = False
     shachar_compatible: bool = False
     # Only mandatory-service שח"ר soldiers may do it (implies shachar_compatible).
     shachar_only: bool = False

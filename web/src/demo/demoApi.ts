@@ -73,12 +73,12 @@ const POPULATIONS: Population[] = [
 ];
 const tt = (code: string, name: string, cat: number, weight: number, o: Partial<TaskTypeInput> = {}): TaskType => ({
   id: `t_${code}`, code, name, category_id: `c${cat}`, weight, min_rest_hours: 0, service_restriction: "any",
-  requires_weapon: false, is_weekend_type: false, shachar_compatible: false, shachar_only: false, tash_rule: "auto", qualifying_duty: false,
+  requires_weapon: false, is_weekend_type: false, includes_holidays: false, shachar_compatible: false, shachar_only: false, tash_rule: "auto", qualifying_duty: false,
   allowed_rank_ids: null, gender: null,
   default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
 }) as TaskType;
 const DEMO_TASKS: TaskType[] = [
-  tt("hagnash", "הגנ\"ש – חול", 0, 1, { allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#2f7d5b" }),
+  tt("hagnash", "הגנ\"ש – חול", 0, 1, { includes_holidays: true, allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#2f7d5b" }),
   tt("katzin_toran", "קצין תורן – חול", 1, 1, { allowed_rank_ids: ["r7", "r8", "r9"], color: "#3b6ea8" }),
   tt("katzin_toran_shabbat", "קצין תורן – שבת", 1, 3, { allowed_rank_ids: ["r7", "r8", "r9"], is_weekend_type: true, color: "#3b6ea8" }),
   tt("mamlachat_yom", "ממלכ\"ת יום – חול", 3, 0.75, { qualifying_duty: true, shachar_compatible: true, default_end_time: "17:00", color: "#6a7ab0" }),
