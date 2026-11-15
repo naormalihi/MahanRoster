@@ -30,6 +30,7 @@ import {
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { canRead, isSoldier, isStaff } from "../lib/api";
+import { NotificationBell } from "./NotificationBell";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
@@ -242,6 +243,7 @@ export function Layout({ children }: { children: ReactNode }) {
               {who}
             </Typography>
           )}
+          {isSoldier(me) && <NotificationBell />}
           {!(compact && links.length) && (
             <Button color="inherit" startIcon={<LogoutIcon />} onClick={signOut}>
               יציאה

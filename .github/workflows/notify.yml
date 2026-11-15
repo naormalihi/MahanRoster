@@ -1,0 +1,31 @@
+name: notify
+
+# Pushes queued notifications to the soldiers' phones (Web Push), and queues the day-before
+# reminders. Woken by the database when notifications are queued (workflow_dispatch through
+# pg_net, like the solve workflow), and every 15 minutes. Uses the SUPABASE_DB_URL secret;
+# the VAPID private key is read from Supabase Vault (made once by the push-setup workflow).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: notify/requirements.txt
+      - run: pip install -r notify/requirements.txt
+      - name: Push
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python notify/notify_worker.py

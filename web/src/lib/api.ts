@@ -18,6 +18,7 @@ import type {
   ExemptionType,
   StageState,
 } from "./cycles";
+import type { AppNotification } from "./notifications";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser } from "./users";
@@ -261,6 +262,13 @@ export interface Api {
   cancelMyDateBlock(id: string): Promise<void>;
   addMyAbsence(typeId: string, from: string, to: string): Promise<void>;
   cancelMyAbsence(id: string): Promise<void>;
+  // stage 2.5 – notifications
+  myNotifications(): Promise<AppNotification[]>;
+  markNotificationsRead(ids: string[] | null): Promise<void>;
+  ackNotification(id: string): Promise<void>;
+  vapidPublicKey(): Promise<string | null>;
+  savePushSubscription(s: { endpoint: string; p256dh: string; auth: string }): Promise<void>;
+  deletePushSubscription(endpoint: string): Promise<void>;
 
   listUsers(): Promise<AppUser[]>;
   /** A gaf-commander account with a temporary password, linked to a soldier record. */

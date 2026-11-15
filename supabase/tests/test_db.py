@@ -1783,3 +1783,53 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
     with session_as(conn, COORD) as c:
         with pytest.raises(psycopg.Error, match="רק חייל"):
             c.execute("select public.add_my_date_block(%s)", (far,))
+
+
+def test_soldier_is_notified_of_his_board_changes_and_decisions(conn):
+    from datetime import timedelta
+
+    uid, sid = _soldier_account(conn, "notify.me")
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'review', published_at = null where id = %s", (cycle,))
+        k1, k2, k3 = [r[0] for r in conn.execute(
+            "select id from slots where cycle_id = %s and cancelled_at is null order by starts_at limit 3", (cycle,)).fetchall()]
+        # the duties are in the future
+        conn.execute("update slots set starts_at = now() + interval '1 day', ends_at = now() + interval '2 days' where id in (%s, %s, %s)", (k1, k2, k3))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'draft' from soldiers where id = %s", (k1, sid))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'reserve', 'draft' from soldiers where id = %s", (k2, sid))
+        # publishing: one notification, not one per duty
+        conn.execute("update assignments set status = case when role = 'performer' then 'assigned'::assignment_status else 'reserve_idle'::assignment_status end "
+                     "where soldier_id = %s and status = 'draft'", (sid,))
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        types = lambda: [r[0] for r in conn.execute("select type from notifications where recipient_user_id = %s order by created_at, type", (uid,)).fetchall()]
+        assert types() == ["board_published"]
+        body = conn.execute("select payload->>'body' from notifications where recipient_user_id = %s", (uid,)).fetchone()[0]
+        assert "תורנויות" in body and "עתודות" in body and "הראשונה" in body
+        # after publishing: an added duty, an activated reserve, a removed duty
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (k3, sid))
+        conn.execute("update assignments set status = 'reserve_activated' where slot_id = %s and soldier_id = %s", (k2, sid))
+        conn.execute("update assignments set status = 'dropped' where slot_id = %s and soldier_id = %s", (k1, sid))
+        assert sorted(types()) == sorted(["board_published", "duty_added", "reserve_activated", "duty_removed"])
+        assert conn.execute("select requires_ack from notifications where recipient_user_id = %s and type = 'reserve_activated'", (uid,)).fetchone()[0]
+        # the reminder the day before, once
+        conn.execute("update slots set starts_at = now() + interval '20 hours', ends_at = now() + interval '44 hours' where id = %s", (k3,))
+        assert conn.execute("select app.queue_reminders()").fetchone()[0] >= 1
+        n = conn.execute("select app.queue_reminders()").fetchone()[0]
+        assert n == 0
+        # an exemption decision
+        etype = conn.execute("select id from exemption_types where auto_rule is null limit 1").fetchone()[0]
+        eid = conn.execute("insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, source) "
+                           "values (%s, %s, 'full', current_date + 300, current_date + 301, 'pending', 'soldier') returning id", (sid, etype)).fetchone()[0]
+        conn.execute("update exemptions set status = 'rejected', decision_reason = 'אין אסמכתא', decided_at = now() where id = %s", (eid,))
+        assert "אין אסמכתא" in conn.execute("select payload->>'body' from notifications where recipient_user_id = %s and type = 'exemption_decided'", (uid,)).fetchone()[0]
+        # the soldier reads his own, and only his own
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        mine = conn.execute("select id, title from public.my_notifications()").fetchall()
+        assert len(mine) >= 5 and conn.execute("select count(*) from notifications").fetchone()[0] == len(mine)
+        conn.execute("select public.mark_notifications_read(null)")
+        assert conn.execute("select count(*) from public.my_notifications() where read_at is null").fetchone()[0] == 0
+        conn.execute("select public.save_push_subscription('https://push.example/abc', 'p256', 'authkey', 'test')")
+        assert conn.execute("select count(*) from push_subscriptions").fetchone()[0] == 1
+        raise psycopg.Rollback()

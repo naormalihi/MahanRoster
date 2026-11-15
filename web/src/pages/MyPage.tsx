@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
+import { PushControl } from "../components/NotificationBell";
 import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
 import { splitDuties, type MyDuty, type MyScore } from "../lib/me";
 
@@ -150,6 +151,10 @@ export function MyPage() {
       )}
 
       {scores[0] && <ScoreCard s={scores[0]} />}
+
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <PushControl />
+      </Paper>
 
       {upcoming.length > 1 && (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
