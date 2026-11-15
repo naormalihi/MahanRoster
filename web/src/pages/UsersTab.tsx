@@ -3,6 +3,7 @@ import CopyIcon from "@mui/icons-material/ContentCopyOutlined";
 import KeyIcon from "@mui/icons-material/KeyOutlined";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import LockOpenIcon from "@mui/icons-material/LockOpenOutlined";
 import {
   Alert,
@@ -140,6 +141,7 @@ export function UsersTab() {
   const [creating, setCreating] = useState(false);
   const [reset, setReset] = useState<{ user: AppUser; password: string; done: boolean } | null>(null);
   const [linking, setLinking] = useState<{ user: AppUser; soldier: string | null } | null>(null);
+  const [deleting, setDeleting] = useState<AppUser | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -237,6 +239,13 @@ export function UsersTab() {
                           </IconButton>
                         </Tooltip>
                       )}
+                      {commander && !self && (
+                        <Tooltip title="מחיקת המשתמש">
+                          <IconButton size="small" color="error" onClick={() => setDeleting(u)}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -244,6 +253,38 @@ export function UsersTab() {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {deleting && (
+        <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>מחיקת משתמש</DialogTitle>
+          <DialogContent dividers>
+            <Typography>
+              למחוק את <b>{deleting.username}</b>
+              {deleting.soldier_name ? ` (${deleting.soldier_name})` : ""}?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              המשתמש לא יוכל להיכנס יותר, ושם המשתמש יתפנה. אם שמו רשום על פעולות במערכת (אישורים, החלטות), החשבון נסגר ומוסתר במקום להימחק,
+              כדי לשמור מי עשה מה. המחיקה נרשמת ביומן.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleting(null)}>ביטול</Button>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={() => {
+                const u = deleting;
+                setDeleting(null);
+                void act(async () => {
+                  await api!.deleteUser(u.user_id);
+                });
+              }}
+            >
+              מחיקה
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {creating && <CreateDialog soldiers={soldiers} taken={(users ?? []).map((u) => u.username)} onClose={() => setCreating(false)} onDone={load} />}

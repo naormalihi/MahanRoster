@@ -246,6 +246,8 @@ export interface Api {
   createUser(username: string, password: string, soldierId: string | null): Promise<string>;
   resetUserPassword(userId: string, password: string): Promise<void>;
   setUserLocked(userId: string, locked: boolean): Promise<void>;
+  /** Deletes a gaf commander's account; one whose name is on records is closed and hidden instead. */
+  deleteUser(userId: string): Promise<"deleted" | "closed">;
   setUserSoldier(userId: string, soldierId: string | null): Promise<void>;
 }
 
