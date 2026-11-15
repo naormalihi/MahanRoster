@@ -30,6 +30,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { OFFLINE_TEXT, pollFailures } from "../lib/network";
 import type { ExistingSoldier } from "../lib/roster";
 import { useAuth } from "../lib/auth";
 import type { NewSlot, SlotRow } from "../lib/baseSchedule";
@@ -195,7 +196,19 @@ export function OperatePage() {
   const running = jobs.find(isActive);
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => void load(), 4000);
+    const polls = pollFailures();
+    const t = setInterval(() => {
+      load().then(
+        () => {
+          polls.ok();
+          setMsg((m) => (m?.text === OFFLINE_TEXT ? null : m));
+        },
+        (e) => {
+          const text = polls.fail(e);
+          if (text) setMsg({ ok: false, text });
+        },
+      );
+    }, 4000);
     return () => clearInterval(t);
   }, [running, load]);
 
