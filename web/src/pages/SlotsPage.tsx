@@ -40,11 +40,11 @@ import {
 } from "../lib/baseSchedule";
 import { HOLIDAY_TYPES, type TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
-import { TZ } from "../lib/dates";
+import { shortDayLabel, spanLabel, TZ } from "../lib/dates";
 
 const tsFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 const dowFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "short" });
-const span = (a: string, b: string) => `${dowFmt.format(new Date(a))} ${tsFmt.format(new Date(a))} – ${tsFmt.format(new Date(b))}`;
+const span = (a: string, b: string) => `${shortDayLabel(a)}, ${spanLabel(a, b)}`;
 
 function Loading() {
   return (
@@ -397,8 +397,8 @@ function ImportCard(props: {
                         {s.weekendSwitched && <Chip size="small" label="שבת" sx={{ mr: 0.5 }} />}
                         {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
                         {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
-                        {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
-                        {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
+                  {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
+                  {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -464,16 +464,15 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox" />
+              {!props.locked && <TableCell padding="checkbox" />}
               <TableCell>מועד</TableCell>
               <TableCell>תורנות</TableCell>
-              <TableCell>דרגות</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {shown.map((s) => (
               <TableRow key={s.id} hover selected={selected.has(s.id)}>
-                <TableCell padding="checkbox">
+                {!props.locked && <TableCell padding="checkbox">
                   <Checkbox
                     size="small"
                     disabled={s.assigned > 0}
@@ -485,21 +484,22 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
                       setSelected(n);
                     }}
                   />
+                </TableCell>}
+                <TableCell sx={{ whiteSpace: "nowrap", verticalAlign: "top" }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{shortDayLabel(s.starts_at)}</Typography>
+                  <Typography variant="caption" color="text.secondary">{spanLabel(s.starts_at, s.ends_at)}</Typography>
                 </TableCell>
-                <TableCell sx={{ whiteSpace: "nowrap" }} dir="ltr">
-                  {span(s.starts_at, s.ends_at)}
-                </TableCell>
-                <TableCell>
-                  {slotName(s, (id) => taskName.get(id))}
+                <TableCell sx={{ verticalAlign: "top" }}>
+                  <Typography variant="body2" component="span" sx={{ ml: 0.5 }}>{slotName(s, (id) => taskName.get(id))}</Typography>
                   {s.fixed_points != null && (
                     <Chip size="small" color="warning" variant="outlined" label={`הקפצה מיוחדת · ${Number(s.fixed_points)} נק׳`} sx={{ mr: 0.5 }} />
                   )}
                   {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
                   {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
-                        {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
-                        {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
+                  {s.allowed_rank_ids && <Chip size="small" variant="outlined" label={`רק ${s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ")}`} sx={{ mr: 0.5 }} />}
+                  {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
+                  {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
                 </TableCell>
-                <TableCell>{s.allowed_rank_ids ? s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ") : "לפי הסוג"}</TableCell>
               </TableRow>
             ))}
           </TableBody>

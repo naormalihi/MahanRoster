@@ -9,6 +9,8 @@ const shortFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "shor
 export const dayKey = (iso: string | Date) => keyFmt.format(typeof iso === "string" ? new Date(iso) : iso);
 export const dayLabel = (iso: string | Date) => dayFmt.format(typeof iso === "string" ? new Date(iso) : iso);
 export const timeLabel = (iso: string) => timeFmt.format(new Date(iso));
+/** "יום ה׳, 1.7" – short day with date. */
+export const shortDayLabel = (iso: string | Date) => shortFmt.format(typeof iso === "string" ? new Date(iso) : iso);
 
 /** "08:00 – 16:00", "08:00 – 08:00 למחרת", "08:00 – 08:00, יום א׳ 7.1" */
 export function spanLabel(startIso: string, endIso: string) {
