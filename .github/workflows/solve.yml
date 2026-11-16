@@ -34,6 +34,9 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set"; exit 1; fi
+          # pipefail: a worker that fails (cannot connect, crashes) fails the run, instead of
+          # hiding behind tee's success
+          set -o pipefail
           python -m mahanroster_solver.worker 2>&1 | tee worker.log
       - name: Summary
         if: always()
