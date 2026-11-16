@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.12.0",
+    date: "2026-11-17",
+    items: ["הגדרות › משתמשים: אפשר ליצור נע\"ת תורנויות נוסף, עם כל ההרשאות. בכניסה הראשונה הוא מחליף סיסמה ומגדיר אימות דו-שלבי"],
+  },
+  {
     version: "2.11.0",
     date: "2026-11-16",
     items: [

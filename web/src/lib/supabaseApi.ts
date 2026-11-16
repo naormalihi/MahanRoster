@@ -23,7 +23,7 @@ import {
   type StageState,
 } from "./cycles";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
-import type { AppUser } from "./users";
+import type { AppUser, CreatableRole } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
@@ -815,7 +815,7 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("list_users")) as AppUser[];
   }
 
-  async createUser(username: string, password: string, soldierId: string | null, role: "gaf_commander" | "unit_commander" = "gaf_commander") {
+  async createUser(username: string, password: string, soldierId: string | null, role: CreatableRole = "gaf_commander") {
     return check(await this.sb.rpc("create_user", { p_username: username, p_password: password, p_role: role, p_soldier: soldierId })) as string;
   }
 

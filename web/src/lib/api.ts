@@ -22,7 +22,7 @@ import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
-import type { AppUser } from "./users";
+import type { AppUser, CreatableRole } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
 import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
@@ -280,7 +280,7 @@ export interface Api {
 
   listUsers(): Promise<AppUser[]>;
   /** A gaf-commander account with a temporary password, linked to a soldier record. */
-  createUser(username: string, password: string, soldierId: string | null, role?: "gaf_commander" | "unit_commander"): Promise<string>;
+  createUser(username: string, password: string, soldierId: string | null, role?: CreatableRole): Promise<string>;
   resetUserPassword(userId: string, password: string): Promise<void>;
   setUserLocked(userId: string, locked: boolean): Promise<void>;
   /** Deletes a gaf commander's account; one whose name is on records is closed and hidden instead. */

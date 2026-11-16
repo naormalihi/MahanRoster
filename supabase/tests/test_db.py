@@ -2072,3 +2072,21 @@ def test_call_up_by_notice(conn):
         conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
         assert row(d) == (False, 4.0)
         raise psycopg.Rollback()
+
+
+def test_coordinator_creates_another_coordinator(conn):
+    with session_as(conn, COORD) as c:
+        uid = c.execute("select public.create_user('naat.two', 'temp-pass-123', 'coordinator', null)").fetchone()[0]
+        c.execute("reset role")
+        assert c.execute("select must_change_password from app_users where id = %s", (uid,)).fetchone()[0] is True
+        assert [r[0] for r in c.execute("select role from user_roles where user_id = %s", (uid,)).fetchall()] == ["coordinator"]
+        # the new one manages users too, after the second factor
+        c.execute("set local role authenticated")
+        _claims(c, uid)
+        assert c.execute("select count(*) from public.list_users()").fetchone()[0] >= 2
+        c.execute("select public.set_user_locked(%s, true)", (str(COORD),))  # another coordinator: allowed
+        with pytest.raises(psycopg.Error):
+            c.execute("select public.set_user_locked(%s, true)", (str(uid),))  # himself: never
+    with session_as(conn, COORD) as c:
+        with pytest.raises(psycopg.Error):  # still no other roles
+            c.execute("select public.create_user('x.admin', 'temp-pass-123', 'soldier', null)")
