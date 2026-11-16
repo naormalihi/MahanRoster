@@ -67,6 +67,7 @@ import {
 } from "../lib/cycles";
 import type { ExistingSoldier } from "../lib/roster";
 import { DeadlineEditor } from "../components/DeadlineEditor";
+import { EmptyState } from "../components/EmptyState";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
@@ -405,7 +406,7 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
         {pending > 0 && <Chip color="warning" label={`${pending} ממתינים לאישור`} onClick={() => setStatus("pending")} />}
       </Stack>
       {shown.length === 0 ? (
-        <Alert severity="info">אין פטורים להצגה במחזור הזה.</Alert>
+        <EmptyState size="sm" title="אין פטורים להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -584,7 +585,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
         <FormControlLabel control={<Switch checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label="הצג מבוטלות" />
       </Stack>
       {shown.length === 0 ? (
-        <Alert severity="info">אין היעדרויות להצגה במחזור הזה.</Alert>
+        <EmptyState size="sm" title="אין היעדרויות להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -723,7 +724,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
         {deadlinePassed && " מועד הסגירה של המחזור עבר: חסימה חדשה עכשיו היא חריגה מהנוהל."}
       </Typography>
       {shown.length === 0 ? (
-        <Alert severity="info">אין חסימות להצגה במחזור הזה.</Alert>
+        <EmptyState size="sm" title="אין חסימות להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">

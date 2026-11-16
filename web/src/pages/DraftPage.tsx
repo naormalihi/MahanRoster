@@ -45,6 +45,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { useCanEdit } from "../components/ReadOnly";
+import { Mascot } from "../components/Mascot";
 import type { SlotRow } from "../lib/baseSchedule";
 import { israeliHolidays, type TaskType } from "../lib/catalog";
 import { slotName } from "../lib/baseSchedule";
@@ -1265,6 +1266,7 @@ export function DraftPage() {
   const [tolerance, setTolerance] = useState(20);
   const [publishing, setPublishing] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [celebrate, setCelebrate] = useState(false);
 
   useEffect(() => {
     api!.scoringSettings().then((x) => setTolerance(x.fairness_tolerance_pct), () => undefined);
@@ -1308,7 +1310,7 @@ export function DraftPage() {
     try {
       await api!.publishCycle(cycleId);
       setPublishing(false);
-      setMsg({ ok: true, text: "הלוח פורסם. הוא מופיע עכשיו ב\"לוח מפורסם\" לכל מי שיש לו גישה." });
+      setCelebrate(true);
       setCycles(await api!.cycles());
       void reloadCycle();
       void load();
@@ -1320,6 +1322,7 @@ export function DraftPage() {
 
   return (
     <Stack spacing={2}>
+      <PublishedDialog open={celebrate} onClose={() => setCelebrate(false)} />
       {msg && (
         <Alert severity={msg.ok ? "success" : "error"} onClose={() => setMsg(null)}>
           {msg.text}
@@ -1367,5 +1370,27 @@ export function DraftPage() {
         </DialogActions>
       </Dialog>
     </Stack>
+  );
+}
+
+/** Once, right after publishing: Turanchik cheers, and what happens next. */
+export function PublishedDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogContent sx={{ textAlign: "center", pt: 3 }}>
+        <Mascot pose="cheer" height={150} sx={{ mx: "auto", mb: 1.5 }} />
+        <Typography variant="h3" sx={{ mb: 0.5 }}>
+          הלוח פורסם!
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          הוא מופיע עכשיו ב&quot;לוח מפורסם&quot; לכל מי שיש לו גישה, והחיילים עם חשבון אישי קיבלו התראה. משלב זה שינויים נעשים בתפעול.
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ justifyContent: "center", pb: 2 }}>
+        <Button variant="contained" onClick={onClose}>
+          מעולה
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
