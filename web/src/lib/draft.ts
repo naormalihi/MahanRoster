@@ -48,6 +48,9 @@ export interface SlotView {
   missingReserves: number;
 }
 
+/** Does the duty: a performer, or a reserve that was activated in the performer's place. */
+export const performs = (a: { role: string; status: string }) => a.role === "performer" || a.status === "reserve_activated";
+
 export function bySlot(
   slots: { id: string; performers_needed: number; reserves_needed: number }[],
   assignments: DraftAssignment[],
@@ -57,7 +60,7 @@ export function bySlot(
   for (const a of assignments) {
     const v = out.get(a.slot_id);
     if (!v) continue;
-    (a.role === "performer" ? v.performers : v.reserves).push(a);
+    (performs(a) ? v.performers : v.reserves).push(a);
   }
   for (const s of slots) {
     const v = out.get(s.id)!;
@@ -113,7 +116,7 @@ export function loads(
   for (const a of assignments) {
     const l = m.get(a.soldier_id);
     if (!l) continue;
-    if (a.role === "performer") {
+    if (performs(a)) {
       l.points += a.normalized_points;
       l.duties++;
       l.weekends += a.weekend_units;

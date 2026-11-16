@@ -21,6 +21,14 @@ describe("draft", () => {
     const v = bySlot([{ id: "k", performers_needed: 2, reserves_needed: 1 }], [a("1", "k", "s1", "performer"), a("2", "k", "s2", "reserve")]);
     expect(v.get("k")).toMatchObject({ missingPerformers: 1, missingReserves: 0 });
   });
+  it("an activated reserve fills the performer's place and carries the points", () => {
+    const act = a("2", "k", "s2", "reserve", 16.9, { status: "reserve_activated", weekend_units: 1 });
+    const v = bySlot([{ id: "k", performers_needed: 1, reserves_needed: 1 }], [act, a("3", "k", "s3", "reserve", 0, { status: "reserve_idle" })]);
+    expect(v.get("k")).toMatchObject({ missingPerformers: 0, missingReserves: 0 });
+    expect(v.get("k")!.performers.map((x) => x.soldier_id)).toEqual(["s2"]);
+    const [l] = loads([{ soldier_id: "s2", balance_population: "mandatory", baseline_score: 0 }], [act]);
+    expect(l).toMatchObject({ points: 16.9, duties: 1, reserves: 0, weekends: 1 });
+  });
   it("sums load per soldier and the pool mean", () => {
     const ls = loads(
       [

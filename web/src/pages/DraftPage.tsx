@@ -52,11 +52,13 @@ import { slotName } from "../lib/baseSchedule";
 import type { Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
 import { fairRows, shortGroupName, verdicts, type FairRow } from "../lib/fairness";
+import { SlotActionsDialog } from "../components/SlotActions";
 import {
   ROLE_LABEL,
   byProfile,
   bySlot,
   loads,
+  performs,
   rankCandidates,
   summarizeReasons,
   type SlotView,
@@ -94,6 +96,8 @@ export interface Ctx {
   assignments: DraftAssignment[];
   reload: () => void;
   locked: boolean;
+  /** Published and editable by this user: a duty opens the board's actions (activate, remove, replace). */
+  operate?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,6 +295,7 @@ function BoardView({
   onOpenSoldier: (id: string) => void;
 }) {
   const [editing, setEditing] = useState<{ slot: SlotRow; role: Role; current: DraftAssignment | null } | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
   // where the chip was when clicked: the chips re-render when the menu opens, so the element itself
   // would be gone and the menu would jump to the corner of the screen
   const [menu, setMenu] = useState<{ at: { top: number; left: number }; a: DraftAssignment; slot: SlotRow } | null>(null);
@@ -333,10 +338,11 @@ function BoardView({
       <Tooltip title={a.explanation ?? ""}>
         <Chip
           size="small"
-          variant={a.role === "performer" ? "filled" : "outlined"}
+          variant={performs(a) ? "filled" : "outlined"}
           color={a.source === "manual" ? "secondary" : "default"}
-          label={`${a.role === "reserve" ? "עתודה: " : ""}${s?.full_name ?? "?"}`}
+          label={`${a.status === "reserve_activated" ? "עתודה שהופעלה: " : a.role === "reserve" ? "עתודה: " : ""}${s?.full_name ?? "?"}`}
           onClick={(e) => {
+            e.stopPropagation();
             const r = e.currentTarget.getBoundingClientRect();
             setMenu({ at: { top: r.bottom, left: r.left + r.width / 2 }, a, slot });
           }}
@@ -417,7 +423,12 @@ function BoardView({
               const v = views.get(k.id)!;
               const t = ctx.tasks.get(k.task_type_id);
               return (
-                <Paper key={k.id} variant="outlined" sx={{ p: 1.25, borderInlineStart: `4px solid ${t?.color ?? "#999"}`, minWidth: 0 }}>
+                <Paper
+                  key={k.id}
+                  variant="outlined"
+                  onClick={ctx.operate ? () => setActing(k.id) : undefined}
+                  sx={{ p: 1.25, borderInlineStart: `4px solid ${t?.color ?? "#999"}`, minWidth: 0, cursor: ctx.operate ? "pointer" : undefined }}
+                >
                   <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mb: 0.75 }}>
                     <Typography sx={{ fontWeight: 600, flex: 1, minWidth: 0 }} noWrap>
                       {t?.name}
@@ -469,6 +480,7 @@ function BoardView({
         )}
       </Menu>
       {editing && <AssignDialog ctx={ctx} {...editing} onClose={() => setEditing(null)} />}
+      {acting && <SlotActionsDialog slotId={acting} onClose={() => setActing(null)} onChanged={ctx.reload} />}
     </Stack>
   );
 }
@@ -1073,12 +1085,12 @@ function SoldierLoadDialog(props: {
                       <TableCell sx={{ whiteSpace: "nowrap" }}>{dayFmt.format(new Date(k!.starts_at))}</TableCell>
                       <TableCell>
                         {slotName(k!, (id) => ctx.tasks.get(id)?.name)}
-                        {a.role === "reserve" && <Chip size="small" variant="outlined" label="עתודה" sx={{ mr: 0.5 }} />}
+                        {a.role === "reserve" && <Chip size="small" variant="outlined" label={a.status === "reserve_activated" ? "עתודה שהופעלה" : "עתודה"} sx={{ mr: 0.5 }} />}
                         {a.source === "manual" && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5 }} />}
                       </TableCell>
                       <TableCell sx={{ textAlign: "end", whiteSpace: "nowrap" }}>
-                        {a.role === "performer" ? `${a.normalized_points} נק׳` : ""}
-                        {a.role === "performer" && ctx.tasks.get(k!.task_type_id)?.includes_holidays && holidayDays.has(dayKey(k!.starts_at)) && (
+                        {performs(a) ? `${a.normalized_points} נק׳` : ""}
+                        {performs(a) && ctx.tasks.get(k!.task_type_id)?.includes_holidays && holidayDays.has(dayKey(k!.starts_at)) && (
                           <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                             חג – כלול במשקל
                           </Typography>
@@ -1353,7 +1365,7 @@ export function DraftPage() {
       ) : assignments.length === 0 ? null : (
         <>
           <DraftBody
-            ctx={{ cycle, slots, tasks, soldiers, assignments, reload: load, locked: locked || !canEdit }}
+            ctx={{ cycle, slots, tasks, soldiers, assignments, reload: load, locked: locked || !canEdit, operate: locked && canEdit && cycle.status === "published" }}
             snapshot={snapshot}
             cells={cells}
             categories={categories}
