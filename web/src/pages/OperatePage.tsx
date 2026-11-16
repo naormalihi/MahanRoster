@@ -262,7 +262,7 @@ export function OperatePage() {
   const [jobs, setJobs] = useState<ScheduleJob[]>([]);
   const [adding, setAdding] = useState(false);
   const [openSlot, setOpenSlot] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<SlotRow | null>(null);
+  const [deleting, setDeleting] = useState<{ slot: SlotRow; reason: string } | null>(null);
   const [assigning, setAssigning] = useState<{ slot: SlotRow; role: "performer" | "reserve" } | null>(null);
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -419,7 +419,7 @@ export function OperatePage() {
                             <MoreIcon fontSize="small" />
                           </IconButton>
                         ) : (
-                          <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting(k)}>
+                          <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting({ slot: k, reason: "" })}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         )}
@@ -487,7 +487,7 @@ export function OperatePage() {
                               <MoreIcon fontSize="small" />
                             </IconButton>
                           ) : (
-                            <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting(k)}>
+                            <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting({ slot: k, reason: "" })}>
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           )}
@@ -607,23 +607,26 @@ export function OperatePage() {
         <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
           <DialogTitle>מחיקת תורנות</DialogTitle>
           <DialogContent dividers>
-            <Typography>
-              למחוק את <b>{slotName(deleting, (id) => taskName.get(id))}</b> ב{dayLabel(deleting.starts_at)} {timeLabel(deleting.starts_at)}?
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              אין עליה שיבוץ מפורסם. הצעות המנוע לתורנות, אם יש, יימחקו איתה.
-            </Typography>
+            <Stack spacing={1.5}>
+              <Typography>
+                למחוק את <b>{slotName(deleting.slot, (id) => taskName.get(id))}</b> ב{dayLabel(deleting.slot.starts_at)} {timeLabel(deleting.slot.starts_at)}?
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                גם אם היא פורסמה: מי שהיה עליה יורד ממנה והניקוד שלו על התורנות יורד. הצעות המנוע נמחקות איתה. המחיקה נרשמת ביומן.
+              </Typography>
+              <TextField label="סיבה" value={deleting.reason} onChange={(e) => setDeleting({ ...deleting, reason: e.target.value })} required fullWidth autoFocus />
+            </Stack>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleting(null)}>ביטול</Button>
             <Button
               color="error"
               variant="contained"
-              disabled={busy}
+              disabled={busy || !deleting.reason.trim()}
               onClick={() => {
-                const k = deleting;
+                const d = deleting;
                 setDeleting(null);
-                void run(() => api!.deletePendingSlot(k.id), "התורנות נמחקה.");
+                void run(() => api!.deleteSlot(d.slot.id, d.reason.trim()).then(() => announceBoardChange()), "התורנות נמחקה.");
               }}
             >
               מחיקה
