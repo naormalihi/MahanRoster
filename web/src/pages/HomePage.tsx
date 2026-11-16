@@ -10,6 +10,10 @@ import { stageLabel } from "../lib/cycles";
 import { addDays, dayLabel, timeLabel } from "../lib/dates";
 import { nextAction, STEPS, stepStates } from "../lib/workspace";
 import { TONE_ICON, useCycleFacts } from "./CycleWorkspace";
+import { ORPHAN_KIND, orphanRequests, type Orphan } from "../lib/orphans";
+import { dayKey } from "../lib/dates";
+
+const fmtDay = (iso: string) => iso.slice(0, 10).split("-").reverse().slice(0, 2).join("/") + "/" + iso.slice(2, 4);
 
 function Card({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
@@ -33,6 +37,21 @@ export function HomePage() {
   const { facts } = useCycleFacts(cycle);
   const [week, setWeek] = useState<BoardRow[] | null>(null);
 
+  // requests for days no cycle covers – invisible in the constraints screens until one does
+  const [orphans, setOrphans] = useState<Orphan[]>([]);
+  const [names, setNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!staff || !cycles) return;
+    const today = dayKey(new Date());
+    const until = dayKey(addDays(new Date(), 450));
+    Promise.all([api!.exemptions(today, until), api!.absences(today, until), api!.dateBlocks(today, until), api!.soldiers()])
+      .then(([e, a, b, s]) => {
+        setOrphans(orphanRequests(e, a, b, cycles, today));
+        setNames(new Map(s.map((x) => [x.id, x.full_name])));
+      })
+      .catch(() => setOrphans([]));
+  }, [api, staff, cycles]);
+
   useEffect(() => {
     const now = new Date();
     api!.board(now.toISOString(), addDays(now, 7).toISOString()).then(setWeek).catch(() => setWeek([]));
@@ -51,6 +70,32 @@ export function HomePage() {
           {me?.username ? `, ${me.username}` : ""} · מה ממתין לך היום
         </Typography>
       </Box>
+
+      {orphans.length > 0 && (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" component={RouterLink} to="/cycles">
+              ניהול מחזורים
+            </Button>
+          }
+        >
+          <b>
+            {orphans.length === 1 ? "בקשה אחת" : `${orphans.length} בקשות`} לתאריכים שאין להם מחזור
+          </b>{" "}
+          – הן לא מופיעות באילוצים עד שייפתח מחזור לתאריכים האלה (או שמחזור קיים יוארך).
+          <Box component="ul" sx={{ m: 0, mt: 0.5, pr: 2.5, pl: 0 }}>
+            {orphans.slice(0, 6).map((o) => (
+              <li key={o.id}>
+                {names.get(o.soldier_id) ?? "חייל"} · {ORPHAN_KIND[o.kind]}
+                {o.pending ? " (ממתין)" : ""} · {fmtDay(o.from)}
+                {o.to !== o.from ? `–${fmtDay(o.to)}` : ""}
+              </li>
+            ))}
+            {orphans.length > 6 && <li>ועוד {orphans.length - 6}</li>}
+          </Box>
+        </Alert>
+      )}
 
       {cycles && !cycle && (
         <Alert severity="info" action={<Button color="inherit" component={RouterLink} to="/cycles">ניהול מחזורים</Button>}>

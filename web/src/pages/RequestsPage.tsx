@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../lib/auth";
 import { STATUS_LABEL, type RequestStatus } from "../lib/cycles";
 import { dayKey, dayLabel } from "../lib/dates";
+import { inSomeCycle } from "../lib/orphans";
 import { entryOpen, openCycle, type InputOptions, type MyRequests } from "../lib/me";
 
 const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "default"> = {
@@ -290,6 +291,9 @@ export function RequestsPage() {
                 <Typography variant="body2" color="text.secondary">
                   הבקשה ממתינה עד שנע"ת יראה את האסמכתא ויחליט{exName(form.type) ? ` על "${exName(form.type)}"` : ""}.
                 </Typography>
+              )}
+              {form.from && !inSomeCycle(form.from, form.kind === "block" ? form.from : form.to, opts.cycles) && (
+                <Alert severity="info">עוד אין מחזור לתאריכים האלה. הבקשה תישמר, ונע"ת יראה אותה כשייפתח מחזור שמכסה אותם.</Alert>
               )}
               {formUrgent && <Alert severity="warning">התאריכים אחרי מועד סגירת האילוצים – הבקשה תסומן דחופה.</Alert>}
               {formClosed && <Alert severity="warning">איסוף האילוצים לתאריכים האלה נסגר – פנה לנע"ת.</Alert>}
