@@ -12,7 +12,15 @@ on:
 concurrency: db-migrate
 
 jobs:
+  # an encrypted copy of the database before anything changes it (see backup.yml)
+  backup:
+    uses: ./.github/workflows/backup.yml
+    with:
+      reason: before migration
+    secrets: inherit
+
   migrate:
+    needs: backup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
