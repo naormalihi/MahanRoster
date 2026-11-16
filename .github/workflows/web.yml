@@ -1,10 +1,16 @@
 name: web
 
+# Runs once per pull request (and again on each new push to it), not on every push to a branch:
+# a push and its pull request used to run the same checks twice. Free private repos get
+# 2,000 Actions minutes a month. A newer push to the same pull request cancels the older run.
 on:
-  push:
-    paths: ["web/**", ".github/workflows/web.yml"]
   pull_request:
     paths: ["web/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
