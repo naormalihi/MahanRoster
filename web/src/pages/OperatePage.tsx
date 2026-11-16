@@ -46,6 +46,7 @@ import type { DraftAssignment } from "../lib/draft";
 import { isActive, jobErrorText, topReasons, type ScheduleJob } from "../lib/schedule";
 import { REASON_LABEL } from "../lib/potential";
 import { pendingSlots } from "../lib/workspace";
+import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 /** "2026-11-10T08:00" in Israel time for a date + "HH:MM" (the browser runs in Israel time). */
 const localInput = (d: Date) => {
@@ -251,6 +252,7 @@ const live = (a: DraftAssignment) => a.status !== "draft";
 const performs = (a: DraftAssignment) => a.role === "performer" || a.status === "reserve_activated";
 
 export function OperatePage() {
+  const narrow = useNarrow();
   const { api } = useAuth();
   const { cycle, cycleId } = useCycle();
   const [tasks, setTasks] = useState<TaskType[]>([]);
@@ -380,6 +382,53 @@ export function OperatePage() {
           </Typography>
           {pending.length === 0 ? (
             <Typography color="text.secondary">אין תורנויות שממתינות לשיבוץ.</Typography>
+          ) : narrow ? (
+            <CardList>
+              {pending.map((k) => {
+                const d = drafts(k.id);
+                return (
+                  <RowCard
+                    key={k.id}
+                    title={slotName(k, (id) => taskName.get(id))}
+                    chips={
+                      <>
+                        {k.is_surprise && <Chip size="small" color="warning" icon={<BoltIcon />} label="הקפצה" />}
+                        {k.fixed_points != null && <Chip size="small" color="warning" variant="outlined" icon={<BoltIcon />} label={`הקפצה מיוחדת · ${Number(k.fixed_points)} נק׳`} />}
+                      </>
+                    }
+                    sub={`${dayLabel(k.starts_at)} · ${timeLabel(k.starts_at)}`}
+                    lines={
+                      d.length === 0
+                        ? ["עוד לא שובץ", unfilledWhy(k.id) && <Box component="span" sx={{ color: "warning.dark" }}>המנוע לא מצא: {unfilledWhy(k.id)}</Box>]
+                        : d.map((a) => (
+                            <span key={a.id}>
+                              הצעת המנוע – {a.role === "performer" ? "מבצע" : "עתודה"}: <b>{name(a.soldier_id)}</b>
+                              {a.role === "performer" ? ` · ${a.points} נק׳` : ""}
+                            </span>
+                          ))
+                    }
+                    actions={
+                      <>
+                        {missingRoles(k).map((role) => (
+                          <Button key={role} size="small" variant="outlined" onClick={() => setAssigning({ slot: k, role })}>
+                            שיבוץ {role === "performer" ? "מבצע" : "עתודה"}
+                          </Button>
+                        ))}
+                        {of(k.id).some(live) ? (
+                          <IconButton size="small" aria-label="פעולות על התורנות" onClick={() => setOpenSlot(k.id)}>
+                            <MoreIcon fontSize="small" />
+                          </IconButton>
+                        ) : (
+                          <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting(k)}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                      </>
+                    }
+                  />
+                );
+              })}
+            </CardList>
           ) : (
             <Box sx={{ overflowX: "auto" }}>
               <Table size="small">
