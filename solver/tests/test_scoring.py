@@ -24,17 +24,18 @@ def test_remainder_is_an_extra_unit():
 
 
 def test_weekend_multiplier_on_regular_type():
-    # Friday 08:00 – Sunday 08:00: two units, both start on Fri/Sat
-    assert pts(GUARD, "2027-01-08T08:00", "2027-01-10T08:00") == pytest.approx(3.0)
+    # Friday 08:00 – Sunday 08:00: the weight once, by the weekend multiplier
+    assert pts(GUARD, "2027-01-08T08:00", "2027-01-10T08:00") == pytest.approx(1.5)
 
 
 def test_shabbat_type_has_no_weekend_multiplier():
-    assert pts(SHABBAT, "2027-01-08T08:00", "2027-01-10T08:00") == pytest.approx(5.0)
+    assert pts(SHABBAT, "2027-01-08T08:00", "2027-01-10T08:00") == pytest.approx(2.5)
 
 
-def test_week_long_duty_scores_weekend_only_on_weekend_days():
-    # Sunday 08:00 to next Sunday 08:00 = 7 units: 5 weekdays + Friday + Saturday
-    assert pts(GUARD, "2027-01-03T08:00", "2027-01-10T08:00") == pytest.approx(5 + 2 * 1.5)
+def test_weight_is_the_points_of_the_whole_duty():
+    # a week (Sunday to Sunday) is worth its weight, once, by the highest multiplier on its days
+    assert pts(GUARD, "2027-01-03T08:00", "2027-01-10T08:00") == pytest.approx(1.5)
+    assert pts(GUARD, "2027-01-04T08:00", "2027-01-07T08:00") == pytest.approx(1.0)  # Monday to Thursday
 
 
 def test_holiday_and_weekend_take_the_higher_multiplier():
@@ -54,11 +55,12 @@ def test_night_multiplier_only_for_short_mostly_night_duties():
     assert pts(NIGHT, "2027-01-04T20:00", "2027-01-05T08:00") == pytest.approx(1.25)
 
 
-def test_normalization_by_load_factor_per_unit_day():
+def test_normalization_by_load_factor_on_the_start_day():
     leader = soldier("A", load_roles=[LoadRolePeriod(0.5, date(2027, 1, 5))])
-    # Monday unit at factor 1.0, Tuesday unit at factor 0.5
-    got = normalized_points(leader, GUARD, dt("2027-01-04T08:00"), dt("2027-01-06T08:00"), S, set())
-    assert got == pytest.approx(1.0 + 2.0)
+    # starts Monday (factor 1.0): the factor from Tuesday does not apply
+    assert normalized_points(leader, GUARD, dt("2027-01-04T08:00"), dt("2027-01-06T08:00"), S, set()) == pytest.approx(1.0)
+    # starts Tuesday (factor 0.5)
+    assert normalized_points(leader, GUARD, dt("2027-01-05T08:00"), dt("2027-01-06T08:00"), S, set()) == pytest.approx(2.0)
 
 
 def test_lowest_factor_wins_with_several_roles():
@@ -67,7 +69,7 @@ def test_lowest_factor_wins_with_several_roles():
 
 
 def test_weekend_units_count():
-    assert weekend_units(dt("2027-01-08T08:00"), dt("2027-01-10T08:00"), S, set()) == 2
+    assert weekend_units(dt("2027-01-08T08:00"), dt("2027-01-10T08:00"), S, set()) == 1  # one duty, one weekend
     assert weekend_units(dt("2027-01-04T08:00"), dt("2027-01-05T08:00"), S, set()) == 0
 
 
