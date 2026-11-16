@@ -52,6 +52,14 @@
           setTimeout(function () { location.reload(); }, 1500);
         }
         window.__appUpdate = update;
+        // the back button can restore this page from the browser's memory, after a deploy:
+        // check that its files are still there, and update if not
+        window.addEventListener("pageshow", function (e) {
+          if (!e.persisted) return;
+          var s = document.querySelector('script[type="module"][src*="/assets/"]');
+          if (!s) return;
+          fetch(s.src, { method: "HEAD", cache: "no-store" }).then(function (r) { if (!r.ok) update(); }).catch(function () {});
+        });
         function show(msg) {
           if (STALE.test(msg)) return update();
           if (window.__updating) return;
