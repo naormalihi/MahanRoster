@@ -2,13 +2,14 @@ import { Alert, Box, Button, Paper, Stack, TextField, Typography } from "@mui/ma
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { passwordProblems } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { Mascot, type MascotPose } from "../components/Mascot";
 
-function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+function Card({ title, subtitle, pose = "wave", children }: { title: string; subtitle?: string; pose?: MascotPose; children: ReactNode }) {
   return (
     <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", bgcolor: "background.default", px: 2 }}>
       <Paper sx={{ p: { xs: 3, sm: 4 }, width: "100%", maxWidth: 400 }}>
         <Stack spacing={2.5}>
-          <Box component="img" src="/brand/emblem.png" alt="סמל יחידת מה״ן" sx={{ width: 150, mx: "auto", display: "block" }} />
+          <Mascot pose={pose} height={170} sx={{ mx: "auto" }} />
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", justifyContent: "center", textAlign: "center" }}>
             <Box>
               <Typography variant="h2">{title}</Typography>
@@ -20,6 +21,12 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
             </Box>
           </Stack>
           {children}
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "center", pt: 0.5 }}>
+            <Box component="img" src="/brand/emblem-mark.png" alt="" sx={{ height: 26 }} />
+            <Typography variant="caption" color="text.secondary">
+              יחידת מה״ן
+            </Typography>
+          </Stack>
         </Stack>
       </Paper>
     </Box>
@@ -52,7 +59,7 @@ export function LoginPage() {
   if (joining) return <JoinPage onBack={() => setJoining(false)} />;
 
   return (
-    <Card title="MahanRoster" subtitle="מערכת התורנויות של היחידה">
+    <Card title="תורנצ׳יק" subtitle="מערכת התורנויות של יחידת מה״ן">
       <form onSubmit={submit}>
         <Stack spacing={2}>
           {api?.demo && (
@@ -212,7 +219,7 @@ export function MfaPage() {
   }
 
   return (
-    <Card title="אימות דו-שלבי" subtitle={enrolling ? "הגדרה חד-פעמית" : "הזן את הקוד מאפליקציית האימות"}>
+    <Card pose="clipboard" title="אימות דו-שלבי" subtitle={enrolling ? "הגדרה חד-פעמית" : "הזן את הקוד מאפליקציית האימות"}>
       <form onSubmit={submit}>
         <Stack spacing={2}>
           {enrolling && (
@@ -269,7 +276,7 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <Card title="החלפת סיסמה" subtitle="קיבלת סיסמה זמנית. בחר סיסמה חדשה כדי להמשיך.">
+    <Card pose="point" title="החלפת סיסמה" subtitle="קיבלת סיסמה זמנית. בחר סיסמה חדשה כדי להמשיך.">
       <form onSubmit={submit}>
         <Stack spacing={2}>
           <TextField

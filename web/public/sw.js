@@ -1,4 +1,4 @@
-/* MahanRoster service worker – only for push notifications (no offline cache, so a new
+/* תורנצ׳יק (MahanRoster) service worker – only for push notifications (no offline cache, so a new
    version of the site is always what loads). */
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
@@ -8,13 +8,13 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "MahanRoster", body: event.data ? event.data.text() : "" };
+    data = { title: "תורנצ׳יק", body: event.data ? event.data.text() : "" };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "MahanRoster", {
+    self.registration.showNotification(data.title || "תורנצ׳יק", {
       body: data.body || "",
-      icon: "/brand/apple-touch-icon.png",
-      badge: "/brand/favicon-64.png",
+      icon: "/brand/icon-192.png",
+      badge: "/brand/owl/badge-96.png",
       tag: data.tag,
       lang: "he",
       dir: "rtl",

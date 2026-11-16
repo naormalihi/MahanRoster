@@ -64,7 +64,7 @@ def push(conn) -> int:
     sent, done = 0, set()
     for nid, payload, ntype, sub_id, endpoint, p256dh, auth in items:
         data = json.dumps(
-            {"title": payload.get("title", "MahanRoster"), "body": payload.get("body", ""), "url": payload.get("url", "/"), "tag": str(nid), "type": ntype},
+            {"title": payload.get("title", "תורנצ׳יק"), "body": payload.get("body", ""), "url": payload.get("url", "/"), "tag": str(nid), "type": ntype},
             ensure_ascii=False,
         )
         try:

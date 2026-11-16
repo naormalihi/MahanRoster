@@ -220,9 +220,9 @@ export function Layout({ children }: { children: ReactNode }) {
               <MenuIcon />
             </IconButton>
           )}
-          <Box component="img" src="/brand/emblem-mark-light.png" alt="סמל יחידת מה״ן" sx={{ height: 34, ml: 1 }} />
-          <Typography variant="h3" component="div" sx={{ fontWeight: 700, ml: 2 }}>
-            MahanRoster
+          <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ height: 36, width: 36, ml: 1 }} />
+          <Typography variant="h3" component="div" sx={{ fontWeight: 800, ml: 2 }}>
+            תורנצ׳יק
           </Typography>
           {compact && (
             <Typography variant="body2" sx={{ opacity: 0.85 }}>
@@ -262,9 +262,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
           <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Box component="img" src="/brand/emblem-mark.png" alt="" sx={{ height: 36 }} />
+            <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ height: 40, width: 40 }} />
             <Box>
-              <Typography sx={{ fontWeight: 700 }}>MahanRoster</Typography>
+              <Typography sx={{ fontWeight: 800 }}>תורנצ׳יק</Typography>
               <Typography variant="caption" color="text.secondary">
                 {who}
               </Typography>
