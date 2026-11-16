@@ -1141,6 +1141,14 @@ def test_activate_reserve_whole_and_partial(conn):
         doc = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]
         fixed = [f for f in doc["fixed"] if f["slot_id"] == str(k1)]
         assert fixed == [{"slot_id": str(k1), "soldier_id": str(b), "role": "performer"}]
+        # and everywhere load is counted: the candidates of another duty count the activated reserve's points
+        k3 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                          "(%s, %s, now() + interval '50 days', now() + interval '51 days') returning id", (cycle, tid)).fetchone()[0]
+        got = _as_coord(conn, "select cycle_points from public.slot_candidates(%s) where soldier_id = %s", k3, b)
+        base = conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s", (cycle, b)).fetchone()
+        assert got and base
+        assert float(got[0][0]) >= float(base[0]) + float(pts) - 0.01
+        assert conn.execute("select app.performs('reserve', 'reserve_activated'), app.performs('reserve', 'reserve_idle')").fetchone() == (True, False)
 
         # partial: a 3-day duty, the reserve takes over from day 2
         k2 = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
