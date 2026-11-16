@@ -31,6 +31,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { isStaff } from "../lib/api";
 import { useCycle } from "../lib/cycleContext";
 import type { SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
@@ -317,14 +318,15 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
   }, [api, cycleId, jobs?.length]);
 
   useEffect(() => {
-    Promise.all([api!.cycles(), api!.taskTypes(), api!.dispatchConfigured()])
+    // whether the automatic start is set up is a staff question; a reader just watches
+    Promise.all([api!.cycles(), api!.taskTypes(), isStaff(me) ? api!.dispatchConfigured() : Promise.resolve(null)])
       .then(([c, t, conf]) => {
         setCycles(c);
         setTasks(new Map(t.map((x) => [x.id, x])));
         setConfigured(conf);
       })
       .catch((e) => setError((e as Error).message));
-  }, [api]);
+  }, [api, me]);
 
   // a dropped connection during a run is retried quietly; it shows only if it lasts
   const polls = useRef(pollFailures());

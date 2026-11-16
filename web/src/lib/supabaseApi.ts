@@ -30,15 +30,19 @@ import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potent
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
 
+/** The server's "permission denied" (a reader reaching a staff action), in words. */
+export const READ_ONLY_TEXT = 'צפייה בלבד – הפעולה הזו שמורה לנע"ת התורנויות.';
+const errorText = (m: string) => (/permission denied/i.test(m) ? READ_ONLY_TEXT : m);
+
 function check<T>(res: { data: T; error: { message: string } | null }): NonNullable<T> {
-  if (res.error) throw new Error(res.error.message);
+  if (res.error) throw new Error(errorText(res.error.message));
   if (res.data === null || res.data === undefined) throw new Error("no data returned");
   return res.data as NonNullable<T>;
 }
 
 /** For queries where "no row" is a valid answer (maybeSingle). */
 function maybe<T>(res: { data: T; error: { message: string } | null }): T {
-  if (res.error) throw new Error(res.error.message);
+  if (res.error) throw new Error(errorText(res.error.message));
   return res.data;
 }
 
