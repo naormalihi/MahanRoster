@@ -1,3 +1,4 @@
+import { dayKey } from "./dates";
 /** Version 2.1: a soldier's own account – joining with an invite code, his duties and his score. */
 
 export type InviteState = "open" | "used" | "revoked" | "expired";
@@ -103,4 +104,45 @@ export function entryOpen(day: string, cycles: InputCycle[]): boolean {
 /** The cycle still collecting with the nearest deadline, for "open until". */
 export function openCycle(cycles: InputCycle[]): InputCycle | undefined {
   return cycles.filter((c) => c.open).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+}
+
+export interface CycleRequests {
+  /** null = the days no cycle covers yet */
+  cycle: InputCycle | null;
+  exemptions: MyRequests["exemptions"];
+  blocks: MyRequests["blocks"];
+  absences: MyRequests["absences"];
+}
+
+/**
+ * The soldier's requests by cycle: each cycle (from the current one on) with what falls in it,
+ * and a last group for days no cycle covers yet. A request across two cycles shows in both;
+ * one that ended before the cycles listed is left out.
+ */
+export function requestsByCycle(mine: MyRequests, cycles: InputCycle[], today: string): CycleRequests[] {
+  const absDays = (a: { starts_at: string; ends_at: string }) => ({
+    from: dayKey(a.starts_at),
+    to: dayKey(new Date(Date.parse(a.ends_at) - 1)),
+  });
+  const hit = (from: string, to: string, c: InputCycle) => c.start_date <= to && c.end_date >= from;
+  const groups: CycleRequests[] = cycles.map((c) => ({
+    cycle: c,
+    exemptions: mine.exemptions.filter((e) => hit(e.start_date, e.end_date, c)),
+    blocks: mine.blocks.filter((b) => hit(b.day, b.day, c)),
+    absences: mine.absences.filter((a) => {
+      const d = absDays(a);
+      return hit(d.from, d.to, c);
+    }),
+  }));
+  const none = (from: string, to: string) => to >= today && !cycles.some((c) => hit(from, to, c));
+  const orphan: CycleRequests = {
+    cycle: null,
+    exemptions: mine.exemptions.filter((e) => none(e.start_date, e.end_date)),
+    blocks: mine.blocks.filter((b) => none(b.day, b.day)),
+    absences: mine.absences.filter((a) => {
+      const d = absDays(a);
+      return none(d.from, d.to);
+    }),
+  };
+  return orphan.exemptions.length + orphan.blocks.length + orphan.absences.length ? [...groups, orphan] : groups;
 }

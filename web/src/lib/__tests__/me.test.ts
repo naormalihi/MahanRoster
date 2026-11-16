@@ -40,3 +40,28 @@ describe("self-entry window", () => {
     expect(openCycle(cycles)?.id).toBe("b");
   });
 });
+
+describe("requests by cycle", () => {
+  it("puts each request under the cycles it falls in, and the rest apart", async () => {
+    const { requestsByCycle } = await import("../me");
+    const cycles = [
+      { id: "c1", name: "א", start_date: "2027-01-01", end_date: "2027-06-30", deadline: null, open: true },
+      { id: "c2", name: "ב", start_date: "2027-07-01", end_date: "2027-12-31", deadline: null, open: false },
+    ];
+    const ex = (id: string, start_date: string, end_date: string) => ({ id, type: "t", start_date, end_date, status: "pending" as const, is_urgent: false, mine: true, decision_reason: null });
+    const g = requestsByCycle(
+      {
+        exemptions: [ex("dec", "2026-12-01", "2026-12-31"), ex("across", "2027-06-20", "2027-07-10"), ex("old", "2026-10-01", "2026-10-20")],
+        blocks: [{ id: "b", day: "2027-02-03", mine: true, open: true }],
+        absences: [{ id: "a", type: "t", starts_at: "2026-12-26T22:00:00Z", ends_at: "2026-12-31T22:00:00Z", mine: true, open: true }],
+      },
+      cycles,
+      "2026-11-16",
+    );
+    expect(g.map((x) => [x.cycle?.id ?? null, x.exemptions.map((e) => e.id), x.blocks.length, x.absences.length])).toEqual([
+      ["c1", ["across"], 1, 0],
+      ["c2", ["across"], 0, 0],
+      [null, ["dec"], 0, 1],
+    ]);
+  });
+});
