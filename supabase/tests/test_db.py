@@ -1967,4 +1967,23 @@ def test_soldiers_hear_about_changes_to_a_published_board(conn):
         duty(320)
         _as_coord(conn, "select public.unpublish_cycle(%s)", cycle)
         assert got(a, "board_withdrawn") == 1 and got(b, "board_withdrawn") == 1
+
+
+def test_engine_drafts_are_not_audited_row_by_row(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a = conn.execute("select id from soldiers where is_active order by id limit 1").fetchone()[0]
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '200 days', now() + interval '201 days') returning id", (cycle, tid)).fetchone()[0]
+        count = lambda i: conn.execute("select count(*) from audit_log where entity_type = 'assignments' and entity_id = %s", (str(i),)).fetchone()[0]  # noqa: E731
+        d = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source) select %s, id, gaf_id, 'performer', 'draft', 'solver' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
+        conn.execute("update assignments set points = 3 where id = %s", (d,))
+        assert count(d) == 0  # an engine draft: not recorded
+        conn.execute("update assignments set status = 'assigned' where id = %s", (d,))
+        assert count(d) == 1  # published: recorded
+        conn.execute("delete from assignments where id = %s", (d,))
+        assert count(d) == 2
+        m = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason) select %s, id, gaf_id, 'performer', 'draft', 'manual', 'בדיקה' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
+        assert count(m) == 1  # a manual draft is a decision: recorded
         raise psycopg.Rollback()
