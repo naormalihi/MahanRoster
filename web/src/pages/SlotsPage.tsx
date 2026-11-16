@@ -365,7 +365,7 @@ function ImportCard(props: {
             )}
             {holidayMismatch.length > 0 && (
               <Alert severity="info">
-                <b>עמודת "חג" בקובץ לא תואמת את לוח החגים ב-{holidayMismatch.length} משבצות.</b> מקדם החג נקבע לפי לוח החגים (במסך הגדרות); אם הקובץ צודק,
+                <b>עמודת "חג" בקובץ לא תואמת את לוח החגים ב-{holidayMismatch.length} משבצות.</b> תוספת החג נקבעת לפי לוח החגים (במסך הגדרות); אם הקובץ צודק,
                 עדכן את לוח החגים.
                 <List dense disablePadding>
                   {holidayMismatch.slice(0, 15).map((s) => (

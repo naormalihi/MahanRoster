@@ -62,6 +62,7 @@ import {
   holidayPhrase,
   calendarMatch,
   calendarOnly,
+  multiplierValueLabel,
   type HolidayKey,
   type HolidayKind,
   type CalendarDay,
@@ -366,15 +367,15 @@ export function TaskDialog(props: {
             />
             <FormControlLabel
               control={<Switch checked={t.is_weekend_type} onChange={(e) => set("is_weekend_type", e.target.checked)} />}
-              label="תורנות שבת (המשקל כבר כולל את סוף השבוע, בלי מקדם נוסף)"
+              label="תורנות שבת (המשקל כבר כולל את סוף השבוע, בלי תוספת סוף שבוע)"
             />
             <FormControlLabel
               control={<Switch checked={t.includes_holidays} onChange={(e) => set("includes_holidays", e.target.checked)} />}
               label={
                 <span>
-                  המשקל כבר כולל חגים (בלי מקדם חג)
+                  המשקל כבר כולל חגים (בלי תוספת חג)
                   <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                    מקדמי לוח החגים לא חלים עליה. החג עדיין נחשב לה כ"תורנות חג".
+                    התוספות של לוח החגים לא חלות עליה. החג עדיין נחשב לה כ"תורנות חג".
                   </Typography>
                 </span>
               }
@@ -809,10 +810,10 @@ function MultiplierDialog(props: {
             />
           </Stack>
           <Alert severity="info" icon={false}>
-            המקדם חל על יום של תורנות כשכל התנאים שבחרת מתקיימים. בתוך תנאי מספיק אחת האפשרויות. כשכמה מקדמים חלים, נלקח הגבוה מביניהם.
+            המקדם חל על יום של תורנות כשכל התנאים שבחרת מתקיימים. בתוך תנאי מספיק אחת האפשרויות. הערך שלו מתווסף למשקל של התורנות (לא מכפיל אותו). כשכמה מקדמים חלים, מתווסף רק הגבוה מביניהם.
           </Alert>
           <Typography variant="body2" color="text.secondary">
-            מקדם לחג מסוים (ערב חג, החג, חול המועד) נקבע בטבלה "מקדם לכל יום חג" בהמשך העמוד.
+            תוספת לחג מסוים (ערב חג, החג, חול המועד) נקבעת בטבלה "תוספת לכל יום חג" בהמשך העמוד.
           </Typography>
           {(m.holidays.length > 0 || m.holiday_kinds.length > 0) && (
             // a multiplier made before the table keeps its holiday condition until it is cleared
@@ -969,7 +970,7 @@ function HolidayCell(props: { h: HolidayKey; k: HolidayKind; row: ScoreMultiplie
         size="small"
         type="number"
         value={text}
-        placeholder="1"
+        placeholder="0"
         disabled={busy}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => void commit()}
@@ -986,7 +987,7 @@ function HolidayCell(props: { h: HolidayKey; k: HolidayKind; row: ScoreMultiplie
         props.other &&
         props.other.value > (own ?? 1) && (
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.2, mt: 0.25 }}>
-            חל ×{effective} · {props.other.name}
+            חל +{effective} · {props.other.name}
           </Typography>
         )
       )}
@@ -1019,10 +1020,10 @@ function HolidayMatrix({ list, calendar, onChanged }: { list: ScoreMultiplier[];
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
       <Stack spacing={1.5}>
-        <Typography variant="h3">מקדם לכל יום חג</Typography>
+        <Typography variant="h3">תוספת לכל יום חג</Typography>
         <Typography variant="body2" color="text.secondary">
-          כתוב מקדם בתא כדי לקבוע אותו לאותו יום (ריק = בלי מקדם משלו). אם מקדם כללי מהרשימה למעלה גבוה יותר, הוא חל – והתא מראה אותו. גם בסוף שבוע
-          או בתורנות לילה נלקח תמיד המקדם הגבוה.
+          כתוב בתא כמה נקודות מתווספות לתורנות באותו יום (ריק = בלי תוספת). התוספת מתווספת למשקל ולא מכפילה אותו: מטבח (4) בערב ראש השנה (6) = 10.
+          ביום שהוא גם סוף שבוע וגם חג מתווסף רק הגבוה מביניהם: מטבח בחול המועד שחל ביום שישי = 4 + 3 = 7. תורנות של כמה ימים מקבלת את התוספת הגבוהה פעם אחת.
         </Typography>
         {narrow ? (
           <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
@@ -1266,7 +1267,8 @@ function ScoringTab() {
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            הניקוד של תורנות הוא המשקל שלה – לתורנות כולה, לא תלוי במספר הימים – כפול המקדם הגבוה מבין המקדמים שחלים על אחד מימיה (פעם אחת). מקדמים לא מצטברים זה על זה, ומקדם שהתורנות כבר כוללת (שבת, חגים) לא חל עליה. שינוי
+            הניקוד של תורנות הוא המשקל שלה – לתורנות כולה, לא תלוי במספר הימים – ועוד הערך הגבוה מבין המקדמים שחלים על אחד מימיה (סוף שבוע, חג, ערב חג…),
+            פעם אחת. מקדמים לא מצטברים: מטבח (4) בשישי = 7, בערב ראש השנה = 10. הקפצה מכפילה את הסכום. מקדם שהתורנות כבר כוללת (שבת, חגים) לא חל עליה. שינוי
             חל על השיבוץ הבא; ניקוד שכבר נצבר לא משתנה.
           </Typography>
           {narrow ? (
@@ -1274,12 +1276,13 @@ function ScoringTab() {
               {[
                 ...list
                   .filter((m) => !m.holiday_cell)
-                  .map((m) => ({ key: m.id, name: m.name, value: m.value, when: describeMultiplier(m, typeName), active: m.is_active, open: () => setEditing(m) })),
+                  .map((m) => ({ key: m.id, name: m.name, value: m.value, label: multiplierValueLabel(m), when: describeMultiplier(m, typeName), active: m.is_active, open: () => setEditing(m) })),
                 {
                   key: "surprise",
                   name: "הקפצה",
                   value: saved?.surprise_multiplier ?? 1.5,
-                  when: 'תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מוכפל על המקדם של היום',
+                  when: 'תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מכפיל את כל הניקוד שלה',
+                  label: `×${saved?.surprise_multiplier ?? 1.5}`,
                   active: true,
                   open: () => setSurprise(String(saved?.surprise_multiplier ?? 1.5)),
                 },
@@ -1289,7 +1292,7 @@ function ScoringTab() {
                     <Typography sx={{ fontWeight: 700, flex: 1 }}>
                       {r.name} {!r.active && <Chip size="small" label="לא פעיל" />}
                     </Typography>
-                    <Chip size="small" color="secondary" variant="outlined" label={`×${r.value}`} />
+                    <Chip size="small" color="secondary" variant="outlined" label={r.label} />
                     <EditIcon fontSize="small" color="action" />
                   </Stack>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
@@ -1315,7 +1318,7 @@ function ScoringTab() {
                     <TableCell sx={{ fontWeight: 600 }}>
                       {m.name} {!m.is_active && <Chip size="small" label="לא פעיל" />}
                     </TableCell>
-                    <TableCell>×{m.value}</TableCell>
+                    <TableCell>{multiplierValueLabel(m)}</TableCell>
                     <TableCell>{describeMultiplier(m, typeName)}</TableCell>
                     <TableCell>
                       <IconButton size="small" aria-label="עריכה" onClick={() => setEditing(m)}>
@@ -1327,7 +1330,7 @@ function ScoringTab() {
                 <TableRow hover onClick={() => setSurprise(String(saved?.surprise_multiplier ?? 1.5))} sx={{ cursor: "pointer" }}>
                   <TableCell sx={{ fontWeight: 600 }}>הקפצה</TableCell>
                   <TableCell>×{saved?.surprise_multiplier}</TableCell>
-                  <TableCell>תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מוכפל על המקדם של היום</TableCell>
+                  <TableCell>תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מכפיל את כל הניקוד שלה</TableCell>
                   <TableCell>
                     <IconButton size="small" aria-label="עריכה" onClick={() => setSurprise(String(saved?.surprise_multiplier ?? 1.5))}>
                       <EditIcon fontSize="small" />
@@ -1443,7 +1446,7 @@ function ScoringTab() {
               value={surprise}
               onChange={(e) => setSurprise(e.target.value)}
               slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10 } }}
-              helperText="לתורנות שנוספה אחרי הפרסום וסומנה הקפצה. מוכפל בניקוד שלה, מעבר למקדם היום."
+              helperText="לתורנות שנוספה אחרי הפרסום וסומנה הקפצה. מכפיל את כל הניקוד שלה – המשקל ועוד התוספת."
               fullWidth
               autoFocus
             />
@@ -1637,7 +1640,7 @@ function CalendarTab() {
         </Button>
       </Stack>
       <Typography variant="body2" color="text.secondary">
-        חגי ישראל לשנים 2026–2035 כבר טעונים. חג וערב חג נספרים כימי סוף שבוע באיזון. המקדם של כל סוג יום נקבע בלשונית "מקדמי ניקוד". חול המועד לא מסומן; אפשר להוסיף אותו ידנית, וגם סוגי יום חדשים. "רענון" משלים ימים שנמחקו ולא נוגע בימים שנערכו ידנית.
+        חגי ישראל לשנים 2026–2035 כבר טעונים. חג וערב חג נספרים כימי סוף שבוע באיזון. המקדם או התוספת של כל סוג יום נקבעים בלשונית "מקדמי ניקוד". חול המועד לא מסומן; אפשר להוסיף אותו ידנית, וגם סוגי יום חדשים. "רענון" משלים ימים שנמחקו ולא נוגע בימים שנערכו ידנית.
       </Typography>
       {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
       {!days ? (

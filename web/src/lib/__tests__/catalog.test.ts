@@ -121,3 +121,13 @@ describe("holidays by name", () => {
     expect(calendarMatch({ ...anyDay, holidays: ["hanukkah"] }, hanukkah)).toBe(true);
   });
 });
+
+describe("multiplier values", () => {
+  it("are shown as an addition to the weight", async () => {
+    const { multiplierValueLabel } = await import("../catalog");
+    const eve = { ...EMPTY_MULTIPLIER, holiday_kinds: ["eve" as const], value: 6 };
+    const weekend = { ...EMPTY_MULTIPLIER, weekdays: [5, 6], value: 3 };
+    expect(multiplierValueLabel(eve)).toBe("+6");
+    expect(multiplierValueLabel(weekend)).toBe("+3");
+  });
+});

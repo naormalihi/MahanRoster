@@ -1,16 +1,20 @@
 """Duty scoring: day units, multipliers and load-factor normalization.
 
-P = W_task × M for the whole duty – the weight is the points of the duty, however
+P = W_task + V for the whole duty – the weight is the points of the duty, however
 many days it lasts.
 
-* M is the highest multiplier on any of the duty's days, applied once. The duty
-  is split into 24-hour units (a remainder is one more unit) only to find its
-  days and to share P equally between them.
+* V is the highest value of the multipliers that apply on any of the duty's days
+  (weekend, holiday, eve…), added once, 0 when none applies: a kitchen duty (4)
+  on a Friday (3) is 7, on ערב ראש השנה (6) 10, on חול המועד that falls on a
+  Friday (3 and 3) 7. Values never multiply the weight and never add up.
+* A call-up (הקפצה) multiplies the whole of P (in the solver's preparation).
+* The duty is split into 24-hour units (a remainder is one more unit) only to
+  find its days and to share P equally between them.
 * Normalized points = P / F, where F is the soldier's load factor on the day the
   duty starts.
 
-With user-defined multipliers (settings.multipliers, from the database), M is
-the highest multiplier whose conditions all hold for the unit, at least 1:
+With user-defined multipliers (settings.multipliers, from the database), a
+multiplier applies to a unit when all its conditions hold:
 the unit's day has one of the calendar day types / is one of the weekdays /
 is in the date range; the duty is shorter than 24 hours and most of its hours
 fall in the time window. One marked skip_shabbat_types is not applied to
@@ -134,26 +138,21 @@ def unit_points(
 ) -> list[tuple[date, float]]:
     """(day, raw points) for every day unit of a duty.
 
-    The weight is the points of the whole duty, however long it is: W × M, where M is the
-    highest multiplier on any of its days (once, not per day). Every 24-hour unit carries an
+    The weight is the points of the whole duty, however long it is: W + V – V the highest value
+    that applies on any of its days, added once. Every 24-hour unit carries an
     equal share, so a duty split between soldiers splits its points by the days each held it.
     The day of every unit is the duty's start – the load factor on that day applies.
     """
     units = day_units(starts_at, ends_at)
     if settings.multipliers is not None:
-        mult = max(
-            [1.0]
-            + [
-                m.value
-                for u in units
-                for m in settings.multipliers
-                if multiplier_applies(m, u.date(), task, starts_at, ends_at, settings)
-            ]
-        )
+        applying = [
+            m for u in units for m in settings.multipliers if multiplier_applies(m, u.date(), task, starts_at, ends_at, settings)
+        ]
+        total = task.weight + max([0.0] + [m.value for m in applying])
     else:
         night = settings.night_multiplier if is_night_duty(starts_at, ends_at, settings) else 1.0
-        mult = max(unit_day_multiplier(u.date(), task, settings, holidays) for u in units) * night
-    share = task.weight * mult / len(units)
+        total = task.weight * max(unit_day_multiplier(u.date(), task, settings, holidays) for u in units) * night
+    share = total / len(units)
     first = units[0].date()
     return [(first, share) for _ in units]
 
