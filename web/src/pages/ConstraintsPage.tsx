@@ -1041,6 +1041,7 @@ export function ConstraintsPage() {
   const { api } = useAuth();
   const [params, setParams] = useSearchParams();
   const tab = TABS.find((t) => t.key === params.get("tab"))?.key ?? "exemptions";
+  const narrow = useNarrow();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const [soldiers, setSoldiers] = useState<ExistingSoldier[]>([]);
   const { cycleId } = useCycle();
@@ -1072,9 +1073,15 @@ export function ConstraintsPage() {
           <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
             <DeadlineEditor cycle={ctx.cycle} onSaved={() => setCyclesVersion((v) => v + 1)} />
           </Stack>
-          <Tabs value={tab} onChange={(_, v) => setParams({ tab: v }, { replace: true })} variant="scrollable" allowScrollButtonsMobile>
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setParams({ tab: v }, { replace: true })}
+            variant={narrow ? "fullWidth" : "scrollable"}
+            allowScrollButtonsMobile
+            sx={narrow ? { "& .MuiTab-root": { minWidth: 0, px: 0.5 } } : undefined}
+          >
             {TABS.map((t) => (
-              <Tab key={t.key} value={t.key} label={t.label} />
+              <Tab key={t.key} value={t.key} label={narrow && t.key === "excel" ? "תבנית" : t.label} />
             ))}
           </Tabs>
           <Box key={`${ctx.cycle.id}-${version}`}>

@@ -54,6 +54,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
  * the coming weekend, the load by population and by gaf, open requests, and every change
  * נע"ת made to the rules in the last month.
  */
+/** Points with one decimal, without a "-0.0". */
+const pts = (x: number | string) => (Math.abs(Number(x)) < 0.05 ? 0 : Number(x)).toFixed(1);
+
 export function DashboardPage() {
   const { api } = useAuth();
   const [d, setD] = useState<UnitDashboard | null>(null);
@@ -140,9 +143,11 @@ export function DashboardPage() {
                   <TableRow key={p.population}>
                     <TableCell sx={{ fontWeight: 600 }}>{POP[p.population] ?? p.population}</TableCell>
                     <TableCell>{p.soldiers}</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>{Number(p.mean).toFixed(1)}</TableCell>
-                    <TableCell>
-                      {Number(p.min).toFixed(1)}–{Number(p.max).toFixed(1)}
+                    <TableCell sx={{ fontWeight: 600 }}>{pts(p.mean)}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      <span dir="ltr">
+                        {pts(p.min)}–{pts(p.max)}
+                      </span>
                     </TableCell>
                     <TableCell>{p.without}</TableCell>
                   </TableRow>

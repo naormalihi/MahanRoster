@@ -52,6 +52,7 @@ import {
 } from "../lib/cycles";
 import { dayKey } from "../lib/dates";
 import { DeadlineEditor } from "../components/DeadlineEditor";
+import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const today = () => dayKey(new Date());
@@ -213,6 +214,7 @@ export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?:
 
 export function CyclesPage() {
   const { api } = useAuth();
+  const narrow = useNarrow();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const [editing, setEditing] = useState<Cycle | "new" | null>(null);
   const { cycleId: selected, setCycleId: setSelected, reload: reloadContext } = useCycle();
@@ -253,7 +255,31 @@ export function CyclesPage() {
       {cycles.length === 0 && (
         <Alert severity="info">עוד אין מחזורים. צור את המחזור הראשון: חצי שנה, עם מועד סגירה לאילוצים ולפטורים.</Alert>
       )}
-      {cycles.length > 0 && (
+      {cycles.length > 0 && narrow && (
+        <CardList>
+          {cycles.map((c) => (
+            <RowCard
+              key={c.id}
+              onClick={() => setSelected(c.id)}
+              title={c.name}
+              chips={
+                <>
+                  <Chip size="small" label={stageLabel(c.status)} color={c.status === "published" ? "success" : "default"} />
+                  {c.id === shown?.id && <Chip size="small" variant="outlined" color="primary" label="בעבודה" />}
+                </>
+              }
+              sub={`${fmt(c.start_date)} – ${fmt(c.end_date)}`}
+              lines={[c.exemption_deadline ? `סגירת אילוצים ${fmt(deadlineDay(c.exemption_deadline))}` : "בלי מועד סגירת אילוצים"]}
+              actions={
+                <Button size="small" startIcon={<EditIcon fontSize="small" />} onClick={() => setEditing(c)}>
+                  עריכה
+                </Button>
+              }
+            />
+          ))}
+        </CardList>
+      )}
+      {cycles.length > 0 && !narrow && (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
