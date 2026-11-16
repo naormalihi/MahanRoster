@@ -20,7 +20,7 @@ export function Mascot({ pose, height = 140, sx }: { pose: MascotPose; height?: 
       alt={ALT[pose]}
       loading="lazy"
       decoding="async"
-      sx={[{ height, width: "auto", display: "block", userSelect: "none", pointerEvents: "none" }, ...(Array.isArray(sx) ? sx : [sx])]}
+      sx={[{ height, width: "auto", maxWidth: "100%", objectFit: "contain", alignSelf: "center", flexShrink: 0, display: "block", userSelect: "none", pointerEvents: "none" }, ...(Array.isArray(sx) ? sx : [sx])]}
     />
   );
 }
