@@ -71,7 +71,7 @@ function Sheet({ page, printed }: { page: SheetPage; printed: string }) {
         <h1>לוח תורנויות · {page.title}</h1>
         <span className="s">{page.count} תורנויות</span>
         {page.updated && <span className="upd">עודכן {dmFmt.format(new Date(page.updated))}</span>}
-        <span className="p">הודפס {printed} · MahanRoster</span>
+        <span className="p">הודפס {printed} · תורנצ׳יק</span>
       </div>
       <table style={{ fontSize: `${page.fontPt}pt` }}>
         <thead>

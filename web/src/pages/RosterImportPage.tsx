@@ -175,7 +175,7 @@ export function RosterImportPage() {
 
   function downloadKeyBackup() {
     const text = [
-      "MahanRoster – מפתח היחידה לטעינת כוח אדם",
+      "תורנצ׳יק (MahanRoster) – מפתח היחידה לטעינת כוח אדם",
       `נשמר: ${new Date().toLocaleString("he-IL")}`,
       "",
       unitKey,
