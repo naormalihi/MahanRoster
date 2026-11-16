@@ -78,7 +78,7 @@ export function DashboardPage() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h1">לוח מחוונים</Typography>
+        <Typography variant="h1">נתוני היחידה</Typography>
         <Typography variant="body2" color="text.secondary">
           {d.cycle ? `המחזור בתוקף: ${d.cycle.name} (${fmt(d.cycle.start_date)}–${fmt(d.cycle.end_date)})` : "עוד אין מחזור שפורסם"}
           {d.planning ? ` · בתכנון: ${d.planning.name} – ${stageLabel(d.planning.status as CycleStatus)}` : ""}

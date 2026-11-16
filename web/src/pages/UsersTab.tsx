@@ -114,7 +114,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
             </TextField>
             <Typography variant="body2" color="text.secondary">
               {role === "unit_commander"
-                ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא לוח המחוונים – כולל כל שינוי הגדרות שנע\"ת עשה בחודש האחרון."
+                ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא \"נתוני היחידה\" – כולל כל שינוי הגדרות שנע\"ת עשה בחודש האחרון."
                 : "מפקד גף רואה את כל נתוני היחידה (מחזור, אילוצים, פוטנציאל, טיוטה, חיילים ולוח) לקריאה בלבד, ולא יכול לשנות דבר."}
             </Typography>
             <SoldierPicker soldiers={props.soldiers} value={soldier} onChange={setSoldier} autoFocus />

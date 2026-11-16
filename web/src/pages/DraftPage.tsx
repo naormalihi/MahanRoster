@@ -1352,7 +1352,7 @@ export function DraftPage() {
         <DialogContent dividers>
           <Stack spacing={1.5}>
             <Typography variant="body2">
-              הטיוטה של {cycle?.name} תפורסם ותופיע ב"לוח מפורסם". אחרי הפרסום הלוח נעול לעריכה בעורך; כל שינוי עובר דרך החלפה או הפלה ומתועד.
+              הטיוטה של {cycle?.name} תפורסם ותופיע ב"לוח התורנויות". אחרי הפרסום הלוח נעול לעריכה בעורך; כל שינוי עובר דרך החלפה או הפלה ומתועד.
             </Typography>
             {missing + missingR > 0 && (
               <Alert severity="warning">
@@ -1383,7 +1383,7 @@ export function PublishedDialog({ open, onClose }: { open: boolean; onClose: () 
           הלוח פורסם!
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          הוא מופיע עכשיו ב&quot;לוח מפורסם&quot; לכל מי שיש לו גישה, והחיילים עם חשבון אישי קיבלו התראה. משלב זה שינויים נעשים בתפעול.
+          הוא מופיע עכשיו ב&quot;לוח התורנויות&quot; לכל מי שיש לו גישה, והחיילים עם חשבון אישי קיבלו התראה. משלב זה שינויים נעשים בתפעול.
         </Typography>
       </DialogContent>
       <DialogActions sx={{ justifyContent: "center", pb: 2 }}>

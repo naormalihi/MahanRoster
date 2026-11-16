@@ -210,9 +210,9 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography variant="h1">{cycle.name}</Typography>
+          <Typography variant="h1">תכנון ושיבוץ</Typography>
           <Typography variant="body2" color="text.secondary">
-            {fmt(cycle.start_date)} – {fmt(cycle.end_date)}
+            {cycle.name} · {fmt(cycle.start_date)} – {fmt(cycle.end_date)}
           </Typography>
         </Box>
         <Chip label={`שלב: ${stageLabel(cycle.status)}`} color={locked ? "success" : "primary"} variant={locked ? "filled" : "outlined"} />
