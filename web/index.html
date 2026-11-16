@@ -22,9 +22,39 @@
       <b>האפליקציה לא הצליחה לעלות.</b>
       <pre id="boot-error-text" style="white-space:pre-wrap;direction:ltr;text-align:left;font-size:12px;margin-top:12px"></pre>
     </div>
+    <!-- A new version was deployed while this tab ran an older one: its pages are gone from the server.
+         The owl says so and the page reloads itself into the new version. -->
+    <div id="app-update" style="display:none;position:fixed;inset:0;z-index:9999;background:#fbf6ec;font-family:Assistant,Arial,sans-serif;color:#1a1466;text-align:center;padding:24px">
+      <div style="max-width:360px;margin:12vh auto 0">
+        <img src="/brand/owl/clipboard.webp" alt="" width="180" height="180" style="width:180px;height:180px;object-fit:contain" />
+        <h1 style="font-size:24px;margin:16px 0 8px">תורנצ׳יק מתעדכן</h1>
+        <p id="app-update-text" style="font-size:17px;margin:0;color:#3d3a5c">יצאה גרסה חדשה. אני טוען אותה בשבילך, זה ייקח רגע…</p>
+        <button id="app-update-btn" type="button" onclick="location.reload()" style="display:none;margin-top:20px;font:inherit;font-weight:700;font-size:17px;padding:10px 24px;border:0;border-radius:10px;background:#1a1466;color:#fff;cursor:pointer">טעינה מחדש</button>
+      </div>
+    </div>
     <script>
       (function () {
+        var STALE = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS|ChunkLoadError|failed to load \S*\/assets\//i;
+        function update() {
+          if (window.__updating) return;
+          window.__updating = true;
+          document.getElementById("boot-error").style.display = "none";
+          document.getElementById("app-update").style.display = "block";
+          var last = 0;
+          try { last = +sessionStorage.getItem("mahan.updateReload") || 0; } catch (e) {}
+          if (Date.now() - last < 30000) {
+            // reloaded a moment ago and still failing: let the user try again rather than loop
+            document.getElementById("app-update-text").textContent = "העדכון לוקח קצת יותר זמן מהרגיל. נסה לטעון שוב בעוד רגע.";
+            document.getElementById("app-update-btn").style.display = "inline-block";
+            return;
+          }
+          try { sessionStorage.setItem("mahan.updateReload", String(Date.now())); } catch (e) {}
+          setTimeout(function () { location.reload(); }, 1500);
+        }
+        window.__appUpdate = update;
         function show(msg) {
+          if (STALE.test(msg)) return update();
+          if (window.__updating) return;
           var box = document.getElementById("boot-error");
           var root = document.getElementById("root");
           if (root && root.childElementCount > 0 && !window.__bootFailed) return;

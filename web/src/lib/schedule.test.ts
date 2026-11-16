@@ -25,5 +25,10 @@ describe("warningText", () => {
     expect(t).toContain("התורנות מוגבלת לחובה או לקבע; הדרגה מחוץ לטווח");
     expect(t).not.toContain(s);
   });
+  it("names the duties and soldiers in the independent check's findings", () => {
+    const s1 = "2ed1d797-3726-46f2-8167-23137b359fe7", s2 = "3c20d13b-5c65-4a56-bb4d-bbffe4a449a7", p = "73d46e09-df65-4212-80d7-6bba9b92f3e8";
+    const t = warningText(`verifier: ${p}: אין מנוחה מספקת בין ${s1} ל-${s2}`, (id) => (id === s1 ? "מטבח (א׳)" : "רס״ר (ב׳)"), () => "נועה כהן", {}, (id) => id !== p);
+    expect(t).toBe("נועה כהן: אין מנוחה מספקת בין מטבח (א׳) ל-רס״ר (ב׳)");
+  });
   it("passes other warnings through", () => expect(warningText("משהו אחר", String, String, {})).toBe("משהו אחר"));
 });

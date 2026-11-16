@@ -109,6 +109,7 @@ export function warningText(
   slot: (id: string) => string,
   soldier: (id: string) => string,
   reasons: Record<string, string>,
+  isSlot: (id: string) => boolean = () => false,
 ): string {
   const rules = (codes: string) => codes.split(/,\s*/).map((c) => reasons[c] ?? c).join("; ");
   let m = w.match(FIXED_BREAKS);
@@ -117,7 +118,11 @@ export function warningText(
   if (m) return `שיבוץ ב${slot(m[1])} לחייל שכבר לא ברשימה – לא נכלל בהרצה.`;
   m = w.match(PENALTY_CLASH);
   if (m) return `משבצת קנס ב${slot(m[1])} של ${soldier(m[2])} מתנגשת: ${rules(m[3])}.`;
-  return w;
+  // anything else (the independent check's findings among them): ids become duties and names
+  return w
+    .replace(/^verifier:\s*/, "")
+    .replace(/\((performer|reserve)\)/g, (_, r) => (r === "performer" ? "(מבצע)" : "(עתודה)"))
+    .replace(new RegExp(UUID, "g"), (id) => (isSlot(id) ? slot(id) : soldier(id)));
 }
 
 /** A failed run's error in words: the engine statuses become an explanation. */

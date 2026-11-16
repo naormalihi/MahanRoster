@@ -218,7 +218,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
         {(job.warnings?.length ?? 0) > 0 && (
           <Alert severity="info">
             {job.warnings!.slice(0, 10).map((w, i) => (
-              <div key={i}>{warningText(w, slotLabel, (id) => names.get(id) ?? "חייל לא מוכר", REASON_LABEL)}</div>
+              <div key={i}>{warningText(w, slotLabel, (id) => names.get(id) ?? "חייל לא מוכר", REASON_LABEL, (id) => slots.has(id))}</div>
             ))}
             {job.warnings!.length > 10 && <div>ועוד {job.warnings!.length - 10} אזהרות.</div>}
           </Alert>
@@ -400,6 +400,8 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
   if (!cycles) return error ? <Alert severity="error">{error}</Alert> : <Loading />;
   const cycle = cycles.find((c) => c.id === cycleId);
   const last = jobs?.find((j) => !isActive(j));
+  // a published cycle keeps showing its published run, even when a later run failed
+  const shown = last?.status === "done" ? last : (jobs?.find((j) => j.status === "done") ?? last);
   const slotMap = new Map((slots ?? []).map((s) => [s.id, s]));
 
   return (
@@ -419,7 +421,7 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
             <Loading />
           ) : active ? (
             <ActiveJob job={active} onChanged={loadJobs} />
-          ) : last?.status === "done" ? (
+          ) : last && (last.status === "done" || cycle.status === "published" || cycle.status === "closed") ? (
             <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                 <CheckCircleIcon color="success" />
@@ -433,9 +435,9 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                     </Typography>
                   )}
                   <Typography variant="caption" color="text.secondary">
-                    הרצה אחרונה {fmtTs(last.finished_at ?? last.created_at)}
-                    {last.wall_time ? ` · ${Math.round(last.wall_time)} ש׳` : ""}
-                    {last.unfilled?.length ? ` · ${last.unfilled.reduce((n, u) => n + u.missing, 0)} לא אוישו` : ""}
+                    הרצה אחרונה {fmtTs(shown!.finished_at ?? shown!.created_at)}
+                    {shown!.wall_time ? ` · ${Math.round(shown!.wall_time)} ש׳` : ""}
+                    {shown!.unfilled?.length ? ` · ${shown!.unfilled.reduce((n, u) => n + u.missing, 0)} לא אוישו` : ""}
                   </Typography>
                 </Box>
                 <IconButton aria-label="פעולות על ההרצה" onClick={(e) => setMenu(e.currentTarget)}>
@@ -465,6 +467,12 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                   })()}
                 </Menu>
               </Stack>
+              {last.status === "failed" && (
+                <Alert severity="warning" sx={{ mt: 1.5 }}>
+                  הרצה מ-{fmtTs(last.finished_at ?? last.created_at)} נכשלה, והלוח המפורסם לא השתנה. הפרטים בתפריט ⋮ ← פרטי ההרצה.
+                  {cycle.status === "published" && " כדי להריץ שוב: ⋮ ← ביטול פרסום."}
+                </Alert>
+              )}
               {last.kind === "update" && last.warnings?.[0]?.startsWith("עדכון שיבוץ:") && (
                 <Alert severity="success" sx={{ mt: 1.5 }}>
                   {last.warnings[0].replace("עדכון שיבוץ:", "העדכון הסתיים:")}.
