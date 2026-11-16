@@ -46,6 +46,22 @@ function maybe<T>(res: { data: T; error: { message: string } | null }): T {
   return res.data;
 }
 
+/**
+ * The API returns at most 1,000 rows per request (Supabase's "max rows"), and a longer answer is
+ * cut without an error. Reads that can pass that are taken page by page; each needs a stable order.
+ */
+export const PAGE_SIZE = 1000;
+export async function allPages<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const rows = check(await page(from, from + PAGE_SIZE - 1)) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) return out;
+  }
+}
+
 export class SupabaseApi implements Api {
   readonly demo = false;
   private sb: SupabaseClient;
@@ -120,9 +136,9 @@ export class SupabaseApi implements Api {
   }
 
   async board(fromIso: string, toIso: string): Promise<BoardRow[]> {
-    return check(
-      await this.sb.from("published_board").select("*").gte("starts_at", fromIso).lt("starts_at", toIso).order("starts_at"),
-    ) as BoardRow[];
+    return allPages<BoardRow>((from, to) =>
+      this.sb.from("published_board").select("*").gte("starts_at", fromIso).lt("starts_at", toIso).order("starts_at").order("slot_id").range(from, to),
+    );
   }
 
   async soldiers(): Promise<ExistingSoldier[]> {
@@ -357,9 +373,9 @@ export class SupabaseApi implements Api {
   }
 
   async calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]> {
-    return check(
-      await this.sb.from("calendar_days").select("day, day_type, source, note, holiday, holiday_kind").gte("day", fromIso).lte("day", toIso).order("day"),
-    ) as CalendarDay[];
+    return allPages<CalendarDay>((from, to) =>
+      this.sb.from("calendar_days").select("day, day_type, source, note, holiday, holiday_kind").gte("day", fromIso).lte("day", toIso).order("day").range(from, to),
+    );
   }
 
   async saveCalendarDays(days: CalendarDay[]) {
@@ -514,7 +530,9 @@ export class SupabaseApi implements Api {
   }
 
   async potentialMatrix(cycleId: string): Promise<PotentialCell[]> {
-    const rows = check(await this.sb.rpc("potential_matrix", { p_cycle: cycleId })) as PotentialCell[];
+    const rows = await allPages<PotentialCell>((from, to) =>
+      this.sb.rpc("potential_matrix", { p_cycle: cycleId }).order("soldier_id").order("category_id").range(from, to),
+    );
     return rows.map((r) => ({
       ...r,
       value: Number(r.value),
@@ -523,7 +541,10 @@ export class SupabaseApi implements Api {
   }
 
   async potentialDaily(cycleId: string): Promise<DailyAvailability[]> {
-    return check(await this.sb.rpc("potential_daily", { p_cycle: cycleId })) as DailyAvailability[];
+    // a half-year × the categories is ~1,500 rows: past one page
+    return allPages<DailyAvailability>((from, to) =>
+      this.sb.rpc("potential_daily", { p_cycle: cycleId }).order("day").order("category_id").range(from, to),
+    );
   }
 
   async recentHolidayDuties(sinceIso: string): Promise<HolidayDuty[]> {
@@ -586,16 +607,19 @@ export class SupabaseApi implements Api {
   }
 
   async cycleSlots(cycleId: string): Promise<SlotRow[]> {
-    const rows = check(
-      await this.sb
+    // a half-year of a larger unit passes 1,000 duties
+    const rows = (await allPages((from, to) =>
+      this.sb
         .from("slots")
         .select(
           "id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed, allowed_rank_ids, gender, instructions, notes, source_line, prefer_home_nightly, daily_hours, briefing_at, is_surprise, special_name, fixed_points, assignments(status)",
         )
         .eq("cycle_id", cycleId)
         .is("cancelled_at", null)
-        .order("starts_at"),
-    ) as unknown as (Omit<SlotRow, "assigned"> & { assignments: { status: string }[] })[];
+        .order("starts_at")
+        .order("id")
+        .range(from, to),
+    )) as unknown as (Omit<SlotRow, "assigned"> & { assignments: { status: string }[] })[];
     return rows.map(({ assignments, ...r }) => ({ ...r, assigned: assignments.filter((a) => a.status !== "draft").length }));
   }
 
