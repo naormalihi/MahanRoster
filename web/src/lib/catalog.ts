@@ -265,6 +265,17 @@ export function calendarMatch(m: Pick<ScoreMultiplierInput, "day_types" | "holid
   return true;
 }
 
+/**
+ * A multiplier set by holiday (by name / kind, or by a holiday day type of the calendar): its value
+ * is added to the duty's weight, not multiplied – a kitchen duty (4) on ערב ראש השנה (6) is 10.
+ */
+export const isHolidayMultiplier = (m: Pick<ScoreMultiplierInput, "holidays" | "holiday_kinds" | "day_types">) =>
+  m.holidays.length > 0 || m.holiday_kinds.length > 0 || m.day_types.some((t) => t !== "weekday" && t !== "weekend");
+
+/** "+6" for a holiday addition, "×3" for a multiplier. */
+export const multiplierValueLabel = (m: Pick<ScoreMultiplierInput, "holidays" | "holiday_kinds" | "day_types" | "value">) =>
+  `${isHolidayMultiplier(m) ? "+" : "×"}${m.value}`;
+
 /** A multiplier that depends on the calendar only (no weekdays, hours or dates). */
 export const calendarOnly = (m: ScoreMultiplierInput) =>
   (m.day_types.length > 0 || m.holidays.length > 0 || m.holiday_kinds.length > 0) && !m.weekdays.length && !m.time_window && !m.date_from && !m.date_to;

@@ -8,6 +8,7 @@ postgresql://postgres:postgres@localhost:5432/postgres. A throwaway database
 
 from __future__ import annotations
 
+from decimal import Decimal
 import hashlib
 import json
 from datetime import date, timedelta
@@ -1570,7 +1571,7 @@ def test_duty_whose_weight_includes_holidays_gets_no_holiday_multiplier(conn):
                (%s, %s, (%s::timestamp at time zone 'Asia/Jerusalem') + interval '10 hours', (%s::timestamp at time zone 'Asia/Jerusalem') + interval '20 hours')
                returning id""", (cycle, task, day, day)).fetchone()[0]
         pts = lambda: conn.execute("select raw from app.slot_points(%s, %s)", (k, sol)).fetchone()[0]  # noqa: E731
-        assert pts() == weight * 3
+        assert pts() == weight + 3  # a holiday adds its value
         conn.execute("update task_types set includes_holidays = true where id = %s", (task,))
         assert pts() == weight
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
@@ -1892,3 +1893,27 @@ def test_unit_commander_reads_the_unit_and_its_dashboard(conn):
     with session_as(conn, uid, aal="aal1") as c:
         with pytest.raises(psycopg.Error):
             c.execute("select public.unit_dashboard()")
+
+
+def test_holiday_adds_and_weekend_multiplies_once(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        fri = start + timedelta(days=(4 - start.weekday()) % 7)  # the first Friday of the cycle
+        conn.execute("insert into calendar_days (day, day_type, source, note, holiday, holiday_kind) values (%s, 'chol_hamoed', 'manual', 'חול המועד', 'pesach', 'chol_hamoed') "
+                     "on conflict (day) do update set day_type = 'chol_hamoed', holiday = 'pesach', holiday_kind = 'chol_hamoed'", (fri,))
+        conn.execute("update score_multipliers set is_active = false")
+        conn.execute("insert into score_multipliers (name, value, weekdays, skip_shabbat_types) values ('סופ״ש בדיקה', 3, '{5,6}', true)")
+        conn.execute("insert into score_multipliers (name, value, holidays, holiday_kinds) values ('חוה״מ', 3, '{pesach}', '{chol_hamoed}')")
+        task = conn.execute("select id from task_types where not is_weekend_type order by code limit 1").fetchone()[0]
+        conn.execute("update task_types set weight = 4, includes_holidays = false where id = %s", (task,))
+        sol = conn.execute("select id from soldiers where is_active order by full_name limit 1").fetchone()[0]
+        k = conn.execute(
+            """insert into slots (cycle_id, task_type_id, starts_at, ends_at) values
+               (%s, %s, (%s::timestamp at time zone 'Asia/Jerusalem') - interval '16 hours', (%s::timestamp at time zone 'Asia/Jerusalem') + interval '32 hours')
+               returning id""", (cycle, task, fri, fri)).fetchone()[0]  # Thursday 08:00 to Saturday 08:00
+        pts = lambda: conn.execute("select raw from app.slot_points(%s, %s)", (k, sol)).fetchone()[0]  # noqa: E731
+        assert pts() == 4 * 3 + 3
+        conn.execute("update slots set is_surprise = true where id = %s", (k,))
+        assert pts() == round((4 * 3 + 3) * Decimal(str(conn.execute("select app.setting('surprise_multiplier') #>> '{}'").fetchone()[0])), 2)
+        raise psycopg.Rollback()
