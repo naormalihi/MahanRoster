@@ -219,18 +219,19 @@ export function UsersTab() {
             const actions = (
               <>
                 {commander && (
-                  <>
-                    <Tooltip title="שיוך לחייל">
-                      <IconButton size="small" aria-label="שיוך לחייל" onClick={() => setLinking({ user: u, soldier: u.soldier_id })}>
-                        <LinkIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="סיסמה זמנית חדשה">
-                      <IconButton size="small" aria-label="סיסמה זמנית חדשה" onClick={() => setReset({ user: u, password: tempPassword(), done: false })}>
-                        <KeyIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </>
+                  <Tooltip title="שיוך לחייל">
+                    <IconButton size="small" aria-label="שיוך לחייל" onClick={() => setLinking({ user: u, soldier: u.soldier_id })}>
+                      <LinkIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {/* any account but your own: a soldier, a commander or another coordinator who forgot it */}
+                {!self && (
+                  <Tooltip title="סיסמה זמנית חדשה">
+                    <IconButton size="small" aria-label="סיסמה זמנית חדשה" onClick={() => setReset({ user: u, password: tempPassword(), done: false })}>
+                      <KeyIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 )}
                 {!self && (
                   <Tooltip title={u.is_locked ? "שחרור נעילה" : "נעילה – המשתמש לא יוכל להיכנס"}>
