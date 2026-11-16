@@ -14,6 +14,8 @@ export interface DraftAssignment {
   weekend_units: number;
   explanation: string | null;
   manual_reason: string | null;
+  /** put on it less than the notice hours before it starts: points × the call-up multiplier */
+  is_surprise?: boolean;
 }
 
 export interface Conflict {

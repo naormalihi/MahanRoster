@@ -91,6 +91,7 @@ export interface SlotPerson {
   role: "performer" | "reserve";
   status: string;
   replaced_id: string | null; // an activated reserve: the performer he replaced
+  is_surprise?: boolean; // put on it less than the notice hours before it starts (הקפצה)
 }
 export interface SlotPeople {
   slot: { id: string; cycle_id: string; starts_at: string; ends_at: string; task_name: string; published: boolean; fixed_points?: number | null; special_name?: string | null };

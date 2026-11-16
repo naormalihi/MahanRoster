@@ -327,6 +327,7 @@ export class SupabaseApi implements Api {
       night_window: String(v.night_window),
       weekend_weekdays: (v.weekend_weekdays as number[]) ?? [],
       surprise_multiplier: v.surprise_multiplier == null ? 1.5 : Number(v.surprise_multiplier),
+      surprise_notice_hours: v.surprise_notice_hours == null ? 72 : Number(v.surprise_notice_hours),
       exemption_deadline_days: v.exemption_deadline_days == null ? 40 : Number(v.exemption_deadline_days),
       fairness_tolerance_pct: v.fairness_tolerance_pct == null ? 20 : Number(v.fairness_tolerance_pct),
       grace_days: v.grace_days == null ? 90 : Number(v.grace_days),
@@ -703,8 +704,8 @@ export class SupabaseApi implements Api {
     if (error) throw new Error(error.message);
     if (!sl) return null;
     const rows = check(
-      await this.sb.from("assignments").select("id, role, status, replaced_assignment_id, soldiers(full_name)").eq("slot_id", slotId).neq("status", "draft"),
-    ) as unknown as { id: string; role: "performer" | "reserve"; status: string; replaced_assignment_id: string | null; soldiers: { full_name: string } | null }[];
+      await this.sb.from("assignments").select("id, role, status, replaced_assignment_id, is_surprise, soldiers(full_name)").eq("slot_id", slotId).neq("status", "draft"),
+    ) as unknown as { id: string; role: "performer" | "reserve"; status: string; replaced_assignment_id: string | null; is_surprise: boolean; soldiers: { full_name: string } | null }[];
     const s = sl as unknown as { id: string; cycle_id: string; starts_at: string; ends_at: string; special_name: string | null; fixed_points: number | null; task_types: { name: string } | null; cycles: { status: string } | null };
     return {
       slot: {
@@ -717,7 +718,7 @@ export class SupabaseApi implements Api {
         fixed_points: s.fixed_points === null ? null : Number(s.fixed_points),
         published: s.cycles?.status === "published",
       },
-      people: rows.map((r) => ({ id: r.id, name: r.soldiers?.full_name ?? "?", role: r.role, status: r.status, replaced_id: r.replaced_assignment_id })),
+      people: rows.map((r) => ({ id: r.id, name: r.soldiers?.full_name ?? "?", role: r.role, status: r.status, replaced_id: r.replaced_assignment_id, is_surprise: r.is_surprise })),
     };
   }
 
@@ -774,7 +775,7 @@ export class SupabaseApi implements Api {
       const rows = check(
         await this.sb
           .from("assignments")
-          .select("id, slot_id, soldier_id, role, status, source, points, normalized_points, weekend_units, explanation, manual_reason, slots!inner(cycle_id)")
+          .select("id, slot_id, soldier_id, role, status, source, points, normalized_points, weekend_units, explanation, manual_reason, is_surprise, slots!inner(cycle_id)")
           .eq("slots.cycle_id", cycleId)
           .not("status", "in", "(dropped,cancelled_approved,swapped_out)")
           .range(from, from + 999),

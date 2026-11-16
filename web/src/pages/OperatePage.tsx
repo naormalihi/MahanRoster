@@ -1,5 +1,5 @@
 /**
- * Day-to-day work on a published cycle: duties added after publishing (with the הקפצה flag),
+ * Day-to-day work on a published cycle: duties added after publishing (a call-up is set by notice, not here),
  * filled by an engine run that keeps the published board as it is, then approved.
  */
 import AddIcon from "@mui/icons-material/Add";
@@ -8,7 +8,6 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -16,7 +15,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
   LinearProgress,
   MenuItem,
   Paper,
@@ -93,7 +91,6 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
   const [times, setTimes] = useState(() => defaultTimes(active[0], tomorrow));
   const [performers, setPerformers] = useState(1);
   const [reserves, setReserves] = useState(1);
-  const [surprise, setSurprise] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -137,7 +134,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
           ends_at: end.toISOString(),
           performers_needed: performers,
           reserves_needed: reserves,
-          is_surprise: surprise,
+          is_surprise: false,
         };
     setBusy(true);
     try {
@@ -226,10 +223,9 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
               אין מקדם הקפצה – הניקוד שהוזן הוא הניקוד.
             </Typography>
           ) : (
-            <FormControlLabel
-              control={<Checkbox checked={surprise} onChange={(e) => setSurprise(e.target.checked)} />}
-              label="הקפצה – תורנות שלא הוכרזה מראש (הניקוד מוכפל במקדם ההקפצה)"
-            />
+            <Typography variant="body2" color="text.secondary">
+              מי שישובץ אליה פחות מסף ההקפצה לפני שהיא מתחילה (72 שעות, בהגדרות) יקבל עליה מקדם הקפצה לבד.
+            </Typography>
           )}
         </Stack>
       </DialogContent>
@@ -392,7 +388,6 @@ export function OperatePage() {
                     title={slotName(k, (id) => taskName.get(id))}
                     chips={
                       <>
-                        {k.is_surprise && <Chip size="small" color="warning" icon={<BoltIcon />} label="הקפצה" />}
                         {k.fixed_points != null && <Chip size="small" color="warning" variant="outlined" icon={<BoltIcon />} label={`הקפצה מיוחדת · ${Number(k.fixed_points)} נק׳`} />}
                       </>
                     }
@@ -450,7 +445,6 @@ export function OperatePage() {
                         </TableCell>
                         <TableCell>
                           {slotName(k, (id) => taskName.get(id))}{" "}
-                          {k.is_surprise && <Chip size="small" color="warning" icon={<BoltIcon />} label="הקפצה" />}
                           {k.fixed_points != null && (
                             <Chip size="small" color="warning" variant="outlined" icon={<BoltIcon />} label={`הקפצה מיוחדת · ${Number(k.fixed_points)} נק׳`} />
                           )}
