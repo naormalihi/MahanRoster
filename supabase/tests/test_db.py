@@ -1987,3 +1987,39 @@ def test_engine_drafts_are_not_audited_row_by_row(conn):
         m = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason) select %s, id, gaf_id, 'performer', 'draft', 'manual', 'בדיקה' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
         assert count(m) == 1  # a manual draft is a decision: recorded
         raise psycopg.Rollback()
+
+
+def test_solver_role_does_only_the_engines_work(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        job = conn.execute("insert into schedule_jobs (cycle_id, status, input) values (%s, 'queued', '{}') returning id", (cycle,)).fetchone()[0]
+        conn.execute("set local role mahan_solver")
+        row = conn.execute("select id, input from schedule_jobs where status = 'queued' order by created_at limit 1 for update skip locked").fetchone()
+        assert row is not None
+        conn.execute("update schedule_jobs set status = 'running', started_at = now(), progress = 1, params = params || '{\"phase\": \"x\"}' where id = %s", (job,))
+        for sql in ("select count(*) from soldiers", "select count(*) from app_users", "select count(*) from audit_log",
+                    "update schedule_jobs set result = '{}' where id = '%s'" % job):
+            conn.execute("savepoint s")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                conn.execute(sql)
+            conn.execute("rollback to savepoint s")
+        raise psycopg.Rollback()
+
+
+def test_solver_role_logged_in_directly_can_report_a_result(conn):
+    """The worker connects as mahan_solver (no SET ROLE): apply_solver_result accepts it."""
+    cycle = conn.cycle_id
+    job = conn.execute("insert into schedule_jobs (cycle_id, status, input) values (%s, 'running', '{}') returning id", (cycle,)).fetchone()[0]
+    conn.execute("alter role mahan_solver with login password 'test-only-solver'")
+    try:
+        base = _db_url(DB)
+        rest = base.split("://", 1)[1]
+        host_part = rest.split("@", 1)[1] if "@" in rest else rest
+        user_url = f"postgresql://mahan_solver:test-only-solver@{host_part}"
+        with psycopg.connect(user_url, autocommit=True) as w:
+            assert w.execute("select current_setting('role')").fetchone()[0] == "none"
+            assert w.execute("select public.apply_solver_result(%s, %s)", (job, Jsonb({"status": "INFEASIBLE"}))).fetchone()[0] == 0
+        assert conn.execute("select status from schedule_jobs where id = %s", (job,)).fetchone()[0] == "failed"
+    finally:
+        conn.execute("alter role mahan_solver with nologin password null")
+        conn.execute("delete from schedule_jobs where id = %s", (job,))
