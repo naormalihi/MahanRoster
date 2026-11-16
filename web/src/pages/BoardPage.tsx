@@ -30,6 +30,8 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  useMediaQuery,
+  type Theme,
 } from "@mui/material";
 import { createContext, Fragment, useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -39,7 +41,7 @@ import { PrintDialog } from "../components/BoardPrint";
 import { HOLIDAY_TYPES, israeliHolidays } from "../lib/catalog";
 import { timeWords } from "../lib/printSheet";
 import { useAuth } from "../lib/auth";
-import { daySummaries, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix } from "../lib/board";
+import { daySummaries, type DaySummary, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix } from "../lib/board";
 import { addDays, dayKey, dayLabel, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
 
 type Range = "week" | "next" | "weekend" | "month";
@@ -265,7 +267,90 @@ type View = "list" | "month" | "week";
 
 const weekdayShortFmt = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", weekday: "short" });
 const WEEKDAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+const WEEKDAY_LETTERS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const localDay = (key: string) => new Date(key + "T00:00:00");
+
+/** One day in a calendar grid: the date, a red dot when something is unstaffed, and the duty types. */
+function DayCell({ d, s, inMonth, isSel, today, onPick, tall }: { d: string; s?: DaySummary; inMonth: boolean; isSel: boolean; today: string; onPick: (d: string) => void; tall: boolean }) {
+  return (
+    <Box
+            role="button"
+      tabIndex={0}
+      aria-label={`${dayLabel(localDay(d))}${s ? `, ${s.total} תורנויות` : ""}`}
+      onClick={() => onPick(d)}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onPick(d)}
+      sx={{
+        minHeight: tall ? { xs: 58, sm: 96 } : 58,
+        p: { xs: 0.5, sm: 0.75 },
+        borderTop: 1,
+        borderInlineStart: 1,
+        borderColor: "divider",
+        cursor: "pointer",
+        opacity: inMonth ? 1 : 0.4,
+        bgcolor: isSel ? "rgba(26,20,102,0.07)" : isWeekend(d) ? "rgba(232,112,15,0.035)" : "background.paper",
+        outline: isSel ? "2px solid" : "none",
+        outlineColor: "primary.main",
+        outlineOffset: -2,
+        "&:hover": { bgcolor: "rgba(26,20,102,0.05)" },
+      }}
+    >
+      <Stack direction="row" sx={{ alignItems: "center", gap: 0.5 }}>
+        <Box
+          sx={{
+            fontSize: 13,
+            fontWeight: 700,
+            ...(d === today ? { bgcolor: "secondary.main", color: "#fff", borderRadius: "50%", width: 22, height: 22, display: "grid", placeItems: "center" } : null),
+          }}
+        >
+          {Number(d.slice(8))}
+        </Box>
+        {s && s.unstaffed > 0 && (
+          <Box title={`${s.unstaffed} לא מאוישות`} sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main" }} />
+        )}
+      </Stack>
+      {s && (
+        <>
+          <Box sx={{ display: tall ? { xs: "none", sm: "block" } : "none", mt: 0.25 }}>
+            {s.types.slice(0, 3).map((t) => (
+              <Box key={t.name} sx={{ display: "flex", alignItems: "center", gap: 0.5, fontSize: 11.5, lineHeight: 1.45, whiteSpace: "nowrap", overflow: "hidden" }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, bgcolor: t.color ?? "grey.500" }} />
+                <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {t.name}
+                </Box>
+                {t.count > 1 && <Box component="span" sx={{ color: "text.secondary" }}>×{t.count}</Box>}
+              </Box>
+            ))}
+            {s.types.length > 3 && (
+              <Box sx={{ fontSize: 11, color: "text.secondary" }}>+{s.types.slice(3).reduce((a, t) => a + t.count, 0)} נוספות</Box>
+            )}
+          </Box>
+          <Box sx={{ display: tall ? { xs: "flex", sm: "none" } : "flex", flexWrap: "wrap", gap: 0.4, mt: 0.5 }}>
+            {s.types.slice(0, 6).map((t) => (
+              <Box key={t.name} sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: t.color ?? "grey.500" }} />
+            ))}
+          </Box>
+        </>
+      )}
+    </Box>
+  );
+}
+
+function WeekdayHeader() {
+  return (
+    <>
+      {WEEKDAYS.map((w, i) => (
+        <Box key={w} sx={{ p: 0.75, textAlign: "center", fontSize: 12, fontWeight: 700, color: "text.secondary", bgcolor: i >= 5 ? "rgba(232,112,15,0.06)" : "action.hover" }}>
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+            {w}
+          </Box>
+          <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+            {WEEKDAY_LETTERS[i]}
+          </Box>
+        </Box>
+      ))}
+    </>
+  );
+}
 
 /** Month grid: a few type lines per day; a day opens its duties below. */
 function MonthView({ month, rows, query }: { month: Date; rows: BoardRow[]; query: string }) {
@@ -281,83 +366,10 @@ function MonthView({ month, rows, query }: { month: Date; rows: BoardRow[]; quer
     <Stack spacing={1.5}>
       <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 2 }}>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
-          {WEEKDAYS.map((w, i) => (
-            <Box key={w} sx={{ p: 0.75, textAlign: "center", fontSize: 12, fontWeight: 700, color: "text.secondary", bgcolor: i >= 5 ? "rgba(232,112,15,0.06)" : "action.hover" }}>
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                {w}
-              </Box>
-              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
-                {w[0]}׳
-              </Box>
-            </Box>
+          <WeekdayHeader />
+          {weeks.flat().map((d) => (
+            <DayCell key={d} d={d} s={sums.get(d)} inMonth={thisMonth(d)} isSel={d === selected} today={today} onPick={setPicked} tall />
           ))}
-          {weeks.flat().map((d) => {
-            const s = sums.get(d);
-            const inMonth = thisMonth(d);
-            const isSel = d === selected;
-            return (
-              <Box
-                key={d}
-                role="button"
-                tabIndex={0}
-                aria-label={`${dayLabel(localDay(d))}${s ? `, ${s.total} תורנויות` : ""}`}
-                onClick={() => setPicked(d)}
-                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setPicked(d)}
-                sx={{
-                  minHeight: { xs: 58, sm: 96 },
-                  p: { xs: 0.5, sm: 0.75 },
-                  borderTop: 1,
-                  borderInlineStart: 1,
-                  borderColor: "divider",
-                  cursor: "pointer",
-                  opacity: inMonth ? 1 : 0.4,
-                  bgcolor: isSel ? "rgba(26,20,102,0.07)" : isWeekend(d) ? "rgba(232,112,15,0.035)" : "background.paper",
-                  outline: isSel ? "2px solid" : "none",
-                  outlineColor: "primary.main",
-                  outlineOffset: -2,
-                  "&:hover": { bgcolor: "rgba(26,20,102,0.05)" },
-                }}
-              >
-                <Stack direction="row" sx={{ alignItems: "center", gap: 0.5 }}>
-                  <Box
-                    sx={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      ...(d === today ? { bgcolor: "secondary.main", color: "#fff", borderRadius: "50%", width: 22, height: 22, display: "grid", placeItems: "center" } : null),
-                    }}
-                  >
-                    {Number(d.slice(8))}
-                  </Box>
-                  {s && s.unstaffed > 0 && (
-                    <Box title={`${s.unstaffed} לא מאוישות`} sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main" }} />
-                  )}
-                </Stack>
-                {s && (
-                  <>
-                    <Box sx={{ display: { xs: "none", sm: "block" }, mt: 0.25 }}>
-                      {s.types.slice(0, 3).map((t) => (
-                        <Box key={t.name} sx={{ display: "flex", alignItems: "center", gap: 0.5, fontSize: 11.5, lineHeight: 1.45, whiteSpace: "nowrap", overflow: "hidden" }}>
-                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, bgcolor: t.color ?? "grey.500" }} />
-                          <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {t.name}
-                          </Box>
-                          {t.count > 1 && <Box component="span" sx={{ color: "text.secondary" }}>×{t.count}</Box>}
-                        </Box>
-                      ))}
-                      {s.types.length > 3 && (
-                        <Box sx={{ fontSize: 11, color: "text.secondary" }}>+{s.types.slice(3).reduce((a, t) => a + t.count, 0)} נוספות</Box>
-                      )}
-                    </Box>
-                    <Box sx={{ display: { xs: "flex", sm: "none" }, flexWrap: "wrap", gap: 0.4, mt: 0.5 }}>
-                      {s.types.slice(0, 6).map((t) => (
-                        <Box key={t.name} sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: t.color ?? "grey.500" }} />
-                      ))}
-                    </Box>
-                  </>
-                )}
-              </Box>
-            );
-          })}
         </Box>
       </Paper>
       {selected && (
@@ -373,8 +385,36 @@ function MonthView({ month, rows, query }: { month: Date; rows: BoardRow[]; quer
   );
 }
 
+/** The week: on a phone a strip of days with dots that opens a day below (like the month); on a wide screen the duty × day table. */
+function WeekView(props: { sunday: Date; rows: BoardRow[]; query: string }) {
+  const narrow = useMediaQuery((t: Theme) => t.breakpoints.down("md"));
+  return narrow ? <WeekStrip {...props} /> : <WeekTable {...props} />;
+}
+
+function WeekStrip({ sunday, rows, query }: { sunday: Date; rows: BoardRow[]; query: string }) {
+  const days = weekDays(dayKey(sunday));
+  const sums = daySummaries(rows);
+  const today = dayKey(new Date());
+  const [picked, setPicked] = useState<string | null>(null);
+  const selected = picked && days.includes(picked) ? picked : days.includes(today) ? today : (days.find((d) => sums.has(d)) ?? days[0]);
+  const dayRows = groupByDay(rows).find(([d]) => d === selected)?.[1] ?? [];
+  return (
+    <Stack spacing={1.5}>
+      <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 2 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
+          <WeekdayHeader />
+          {days.map((d) => (
+            <DayCell key={d} d={d} s={sums.get(d)} inMonth isSel={d === selected} today={today} onPick={setPicked} tall={false} />
+          ))}
+        </Box>
+      </Paper>
+      {dayRows.length ? <DayBlock day={selected} items={dayRows} query={query} /> : <Typography color="text.secondary">אין תורנויות ביום הזה.</Typography>}
+    </Stack>
+  );
+}
+
 /** Duty type × day: who does what this week. Made for printing and the notice board. */
-function WeekView({ sunday, rows, query }: { sunday: Date; rows: BoardRow[]; query: string }) {
+function WeekTable({ sunday, rows, query }: { sunday: Date; rows: BoardRow[]; query: string }) {
   const days = weekDays(dayKey(sunday));
   const matrix = weekMatrix(rows, days);
   const today = dayKey(new Date());
