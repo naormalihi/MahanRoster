@@ -1,0 +1,71 @@
+name: backup
+
+# An encrypted copy of the database outside Supabase: every night, and before every migration
+# (db-migrate calls this workflow first). The dump (schemas public and auth, so accounts come
+# back too) is encrypted with the passphrase in the BACKUP_PASSPHRASE secret and kept as a
+# workflow artifact for 30 days. Without the passphrase nothing can read it – keep a copy of it
+# somewhere safe outside GitHub. Restoring: see "גיבוי ושחזור" in README.md.
+on:
+  schedule:
+    - cron: "23 0 * * *" # 02:23 / 03:23 in Israel
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      reason:
+        type: string
+        default: "before migration"
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check secrets
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set"; exit 1; fi
+          if [ -z "$PASSPHRASE" ]; then echo "::error::BACKUP_PASSPHRASE secret is not set – add it under Settings › Secrets and variables › Actions"; exit 1; fi
+          if [ ${#PASSPHRASE} -lt 20 ]; then echo "::error::BACKUP_PASSPHRASE is shorter than 20 characters"; exit 1; fi
+      - name: Install a pg_dump that matches the server
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          command -v psql >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null)
+          major=$(psql "$DATABASE_URL" -At -X -c "show server_version_num" | cut -c1-2)
+          echo "server major version: $major"
+          if ! pg_dump --version | grep -q " $major\."; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsS -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+            sudo apt-get update -qq && sudo apt-get install -y -qq "postgresql-client-$major" >/dev/null
+          fi
+          echo "PG_DUMP=/usr/lib/postgresql/$major/bin/pg_dump" >> "$GITHUB_ENV"
+      - name: Dump and encrypt
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          stamp=$(date -u +%Y%m%d-%H%M)
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          # custom format (compressed); no owners or grants, so it restores into any project
+          "$PG_DUMP" "$DATABASE_URL" -Fc --no-owner --no-privileges -n public -n auth -f db.dump
+          size=$(stat -c %s db.dump)
+          if [ "$size" -lt 10000 ]; then echo "::error::the dump is only $size bytes"; exit 1; fi
+          printf '%s' "$PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "mahanroster-$stamp.dump.gpg" db.dump
+          shred -u db.dump
+          echo "### Backup $stamp (${{ inputs.reason || github.event_name }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "encrypted dump: $(stat -c %s mahanroster-$stamp.dump.gpg) bytes" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mahanroster-${{ env.STAMP }}
+          path: mahanroster-${{ env.STAMP }}.dump.gpg
+          retention-days: 30
+          if-no-files-found: error

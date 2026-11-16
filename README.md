@@ -45,3 +45,19 @@ pytest
 ### בדיקות
 
 הבדיקות רצות עם OR-Tools האמיתי. בסביבה שאין בה OR-Tools, הבדיקות משתמשות בתחליף מבוסס HiGHS (`tests/cpsat_shim.py`), שמתאים רק לבעיות קטנות. בדיקת הביצועים על יחידה מלאה רצה רק עם CP-SAT.
+
+## גיבוי ושחזור
+
+ה-workflow `backup` שומר עותק מוצפן של המסד (הסכמות `public` ו-`auth`, כך שגם החשבונות נשמרים). הוא רץ בכל לילה ולפני כל מיגרציה, ו-`db-migrate` לא מחיל מיגרציה בלי גיבוי שהצליח. כל עותק נשמר 30 יום כ-artifact של הריצה, בלשונית Actions.
+
+**הגדרה חד-פעמית:** מוסיפים סוד בשם `BACKUP_PASSPHRASE` (לפחות 20 תווים) תחת Settings › Secrets and variables › Actions. כדאי לשמור את הסיסמה גם מחוץ ל-GitHub, למשל במנהל הסיסמאות, כי בלעדיה אי אפשר לפתוח את הגיבוי.
+
+**שחזור** (למסד ריק, למשל פרויקט Supabase חדש):
+
+```bash
+gpg -d mahanroster-YYYYMMDD-HHMM.dump.gpg > db.dump            # מבקש את הסיסמה
+pg_restore --no-owner --no-privileges --clean --if-exists -d "$DATABASE_URL" db.dump
+```
+
+לשחזור טבלה אחת: `pg_restore -l db.dump` מציג את התוכן, ו-`-t <table>` משחזר רק אותה.
+
