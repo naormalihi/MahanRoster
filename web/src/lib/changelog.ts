@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.6.5",
+    date: "2026-11-16",
+    items: ["הגדרות › משתמשים: \"סיסמה זמנית חדשה\" לכל משתמש חוץ ממך – גם לחייל, למפקד יחידה ולחשבון צפייה (עד עכשיו רק למפקדי גפים)"],
+  },
+  {
     version: "2.6.4",
     date: "2026-11-16",
     items: [
