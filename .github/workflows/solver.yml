@@ -1,10 +1,16 @@
 name: solver
 
+# Runs once per pull request (and again on each new push to it), not on every push to a branch:
+# a push and its pull request used to run the same checks twice. Free private repos get
+# 2,000 Actions minutes a month. A newer push to the same pull request cancels the older run.
 on:
-  push:
-    paths: ["solver/**", ".github/workflows/solver.yml"]
   pull_request:
     paths: ["solver/**", ".github/workflows/solver.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -17,9 +23,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: solver/pyproject.toml
       - run: pip install -e ".[dev]"
       - run: pytest -q
+      # two minutes of solving: only when started by hand (Actions › solver › Run workflow)
       - name: Benchmark – fictitious month
+        if: github.event_name == 'workflow_dispatch'
         run: |
           python -m mahanroster_solver generate --months 1 -o problem.json
           python -m mahanroster_solver solve problem.json -o solution.json --time-limit 120 --workers 2
@@ -27,6 +37,7 @@ jobs:
           python -m mahanroster_solver report problem.json solution.json -o report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
         with:
           name: solver-report
           path: |
