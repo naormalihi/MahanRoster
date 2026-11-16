@@ -944,7 +944,7 @@ function HolidayCell(props: { h: HolidayKey; k: HolidayKind; row: ScoreMultiplie
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         error={!!error}
         slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10, "aria-label": `${HOLIDAY_NAME[props.h]} – ${HOLIDAY_KIND_NAME[props.k]}`, style: { padding: "6px 8px" } } }}
-        sx={{ width: 84 }}
+        sx={{ width: { xs: "100%", sm: 84 } }}
       />
       {error ? (
         <Typography variant="caption" color="error" sx={{ display: "block" }}>
@@ -982,6 +982,8 @@ function HolidayMatrix({ list, calendar, onChanged }: { list: ScoreMultiplier[];
     return hit.length ? { value: hit[0].value, name: hit[0].name } : null;
   };
   const cellRow = (h: HolidayKey, k: HolidayKind) => list.find((m) => m.holiday_cell && m.holidays[0] === h && m.holiday_kinds[0] === k);
+  // on a phone: one block per holiday, its days side by side, instead of a wide table
+  const narrow = useMediaQuery(useTheme().breakpoints.down("sm"));
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
       <Stack spacing={1.5}>
@@ -990,6 +992,25 @@ function HolidayMatrix({ list, calendar, onChanged }: { list: ScoreMultiplier[];
           כתוב מקדם בתא כדי לקבוע אותו לאותו יום (ריק = בלי מקדם משלו). אם מקדם כללי מהרשימה למעלה גבוה יותר, הוא חל – והתא מראה אותו. גם בסוף שבוע
           או בתורנות לילה נלקח תמיד המקדם הגבוה.
         </Typography>
+        {narrow ? (
+          <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+            {HOLIDAYS.map((h) => (
+              <Box key={h.key} sx={{ py: 1.25 }}>
+                <Typography sx={{ fontWeight: 700, mb: 0.75 }}>{h.name}</Typography>
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 1.25 }}>
+                  {HOLIDAY_KINDS.filter((k) => h.kinds.includes(k.key)).map((k) => (
+                    <Box key={k.key} sx={{ minWidth: 0 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.25 }}>
+                        {k.name}
+                      </Typography>
+                      <HolidayCell h={h.key} k={k.key} row={cellRow(h.key, k.key)} other={otherFor(h.key, k.key)} onChanged={onChanged} />
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            ))}
+          </Stack>
+        ) : (
         <Box sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
@@ -1020,6 +1041,7 @@ function HolidayMatrix({ list, calendar, onChanged }: { list: ScoreMultiplier[];
             </TableBody>
           </Table>
         </Box>
+        )}
       </Stack>
     </Paper>
   );
@@ -1138,6 +1160,7 @@ function LoadRolesCard() {
 
 function ScoringTab() {
   const { api } = useAuth();
+  const narrow = useMediaQuery(useTheme().breakpoints.down("sm"));
   const [list, setList] = useState<ScoreMultiplier[] | null>(null);
   const [types, setTypes] = useState<DayTypeRef[]>([]);
   const [editing, setEditing] = useState<ScoreMultiplier | "new" | null>(null);
@@ -1214,6 +1237,36 @@ function ScoringTab() {
             הניקוד של תורנות הוא המשקל שלה לכל יחידת 24 שעות, כפול המקדם הגבוה מבין המקדמים שחלים על היום. מקדמים לא מצטברים זה על זה. שינוי
             חל על השיבוץ הבא; ניקוד שכבר נצבר לא משתנה.
           </Typography>
+          {narrow ? (
+            <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+              {[
+                ...list
+                  .filter((m) => !m.holiday_cell)
+                  .map((m) => ({ key: m.id, name: m.name, value: m.value, when: describeMultiplier(m, typeName), active: m.is_active, open: () => setEditing(m) })),
+                {
+                  key: "surprise",
+                  name: "הקפצה",
+                  value: saved?.surprise_multiplier ?? 1.5,
+                  when: 'תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מוכפל על המקדם של היום',
+                  active: true,
+                  open: () => setSurprise(String(saved?.surprise_multiplier ?? 1.5)),
+                },
+              ].map((r) => (
+                <Box key={r.key} role="button" tabIndex={0} onClick={r.open} onKeyDown={(e) => e.key === "Enter" && r.open()} sx={{ py: 1.25, cursor: "pointer", opacity: r.active ? 1 : 0.5 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <Typography sx={{ fontWeight: 700, flex: 1 }}>
+                      {r.name} {!r.active && <Chip size="small" label="לא פעיל" />}
+                    </Typography>
+                    <Chip size="small" color="secondary" variant="outlined" label={`×${r.value}`} />
+                    <EditIcon fontSize="small" color="action" />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                    {r.when}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          ) : (
           <Box sx={{ overflowX: "auto" }}>
             <Table size="small">
               <TableHead>
@@ -1252,6 +1305,7 @@ function ScoringTab() {
               </TableBody>
             </Table>
           </Box>
+          )}
         </Stack>
       </Paper>
 
