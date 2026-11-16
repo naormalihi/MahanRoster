@@ -65,3 +65,13 @@ describe("requests by cycle", () => {
     ]);
   });
 });
+
+describe("requests by cycle – which cycles", () => {
+  it("shows the current and the next cycle, and a later one only with something in it", async () => {
+    const { requestsByCycle } = await import("../me");
+    const c = (id: string, start_date: string, end_date: string) => ({ id, name: id, start_date, end_date, deadline: null, open: true });
+    const cycles = [c("now", "2026-06-01", "2026-11-30"), c("next", "2026-12-01", "2027-05-31"), c("later", "2027-06-01", "2027-11-30"), c("far", "2027-12-01", "2028-05-31")];
+    const g = requestsByCycle({ exemptions: [], blocks: [{ id: "b", day: "2027-12-10", mine: true, open: true }], absences: [] }, cycles, "2026-11-16");
+    expect(g.map((x) => x.cycle?.id)).toEqual(["now", "next", "far"]);
+  });
+});

@@ -115,8 +115,9 @@ export interface CycleRequests {
 }
 
 /**
- * The soldier's requests by cycle: each cycle (from the current one on) with what falls in it,
- * and a last group for days no cycle covers yet. A request across two cycles shows in both;
+ * The soldier's requests by cycle: the current cycle and the next (a later one only when it
+ * already holds a request), each with what falls in it, and a last group for days no cycle
+ * covers yet. A request across two cycles shows in both;
  * one that ended before the cycles listed is left out.
  */
 export function requestsByCycle(mine: MyRequests, cycles: InputCycle[], today: string): CycleRequests[] {
@@ -144,5 +145,8 @@ export function requestsByCycle(mine: MyRequests, cycles: InputCycle[], today: s
       return none(d.from, d.to);
     }),
   };
-  return orphan.exemptions.length + orphan.blocks.length + orphan.absences.length ? [...groups, orphan] : groups;
+  // the cycle today falls in and the one after it; a later cycle only when something is already in it
+  const sorted = groups.sort((x, y) => x.cycle!.start_date.localeCompare(y.cycle!.start_date));
+  const shown = sorted.filter((g, i) => i < 2 || g.exemptions.length + g.blocks.length + g.absences.length > 0);
+  return orphan.exemptions.length + orphan.blocks.length + orphan.absences.length ? [...shown, orphan] : shown;
 }
