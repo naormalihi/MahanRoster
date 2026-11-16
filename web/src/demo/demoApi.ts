@@ -899,6 +899,20 @@ export class DemoApi implements Api {
     for (const [c, l] of this.slotsByCycle) this.slotsByCycle.set(c, l.filter((s) => s.id !== slotId));
   }
 
+  async unassignPublished(assignmentId: string, reason: string) {
+    await delay(300);
+    if (!reason.trim()) throw new Error("חובה לכתוב סיבה");
+    if (assignmentId.startsWith("bp|")) {
+      const row = this.boardRows.find((r) => r.slot_id === assignmentId.split("|")[1])!;
+      if (Date.parse(row.starts_at) <= Date.now()) throw new Error("התורנות כבר התחילה – במקום הסרה מפעילים עתודה");
+      const p = this.peopleOf(row).find((x) => x.id === assignmentId)!;
+      Object.assign(p, { status: "dropped" });
+      return this.syncBoard(row);
+    }
+    const a = this.draft.find((x) => x.id === assignmentId);
+    if (a) Object.assign(a, { status: "dropped" });
+  }
+
   async undoReserveActivation(reserveId: string) {
     await delay(300);
     if (reserveId.startsWith("bp|")) {

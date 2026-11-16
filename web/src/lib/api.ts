@@ -138,6 +138,8 @@ export interface Api {
   slotPeople(slotId: string): Promise<SlotPeople | null>;
   /** Undoes a reserve activation while the duty has not started. */
   undoReserveActivation(reserveId: string): Promise<void>;
+  /** Takes a performer or an idle reserve off a published duty that has not started (reason required). */
+  unassignPublished(assignmentId: string, reason: string): Promise<void>;
   /** Deletes a duty that waits for staffing and has nothing published on it. */
   deletePendingSlot(slotId: string): Promise<void>;
   /** Deletes a duty before it starts, also with published people (they come off, with their points); a reason is required then. */

@@ -1485,6 +1485,14 @@ def test_assign_published_staffs_a_waiting_duty(conn):
         assert conn.execute("select status, paired_assignment_id from assignments where id = %s", (r,)).fetchone() == ("reserve_idle", p)
         with pytest.raises(psycopg.Error):  # performer already staffed
             _as_coord(conn, "select public.assign_published(%s, 'performer', %s, null)", k, c)
+        # take him off to put someone else on: a reason is required, the row stays as dropped
+        with pytest.raises(psycopg.Error):
+            _as_coord(conn, "select public.unassign_published(%s, ' ')", p)
+        _as_coord(conn, "select public.unassign_published(%s, 'לא יכול')", p)
+        assert conn.execute("select status, manual_reason from assignments where id = %s", (p,)).fetchone() == ("dropped", "לא יכול")
+        assert conn.execute("select paired_assignment_id from assignments where id = %s", (r,)).fetchone()[0] is None
+        p2 = _as_coord(conn, "select public.assign_published(%s, 'performer', %s, null)", k, c)[0][0]
+        assert conn.execute("select status from assignments where id = %s", (p2,)).fetchone()[0] == "assigned"
         raise psycopg.Rollback()
 
 
