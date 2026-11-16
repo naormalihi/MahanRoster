@@ -34,6 +34,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/auth";
 import type { ExistingSoldier } from "../lib/roster";
 import { ROLE_NAME, tempPassword, usernameProblem, type AppUser } from "../lib/users";
+import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | null; onChange: (id: string | null) => void; autoFocus?: boolean }) {
   const options = useMemo(() => props.soldiers.filter((s) => s.is_active), [props.soldiers]);
@@ -144,6 +145,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
 
 export function UsersTab() {
   const { api, me } = useAuth();
+  const narrow = useNarrow();
   const [users, setUsers] = useState<AppUser[] | null>(null);
   const [soldiers, setSoldiers] = useState<ExistingSoldier[]>([]);
   const [creating, setCreating] = useState(false);
@@ -201,6 +203,81 @@ export function UsersTab() {
       {!users ? (
         <CircularProgress />
       ) : (
+        (() => {
+          const parts = (u: AppUser) => {
+            const self = u.user_id === me?.userId;
+            const commander = u.roles.some((r) => r.role === "gaf_commander");
+            const roles = u.roles.map((r) => <Chip key={r.id} size="small" label={ROLE_NAME[r.role] ?? r.role} color={r.role === "coordinator" ? "primary" : "default"} />);
+            const login = u.last_login_at ? new Date(u.last_login_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }) : "לא נכנס";
+            const status = u.is_locked ? (
+              <Chip size="small" color="error" label="נעול" />
+            ) : u.must_change_password ? (
+              <Chip size="small" color="warning" variant="outlined" label="ממתין לכניסה ראשונה" />
+            ) : (
+              <Chip size="small" color="success" variant="outlined" label="פעיל" />
+            );
+            const actions = (
+              <>
+                {commander && (
+                  <>
+                    <Tooltip title="שיוך לחייל">
+                      <IconButton size="small" aria-label="שיוך לחייל" onClick={() => setLinking({ user: u, soldier: u.soldier_id })}>
+                        <LinkIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="סיסמה זמנית חדשה">
+                      <IconButton size="small" aria-label="סיסמה זמנית חדשה" onClick={() => setReset({ user: u, password: tempPassword(), done: false })}>
+                        <KeyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )}
+                {!self && (
+                  <Tooltip title={u.is_locked ? "שחרור נעילה" : "נעילה – המשתמש לא יוכל להיכנס"}>
+                    <IconButton size="small" aria-label={u.is_locked ? "שחרור נעילה" : "נעילה"} onClick={() => act(() => api!.setUserLocked(u.user_id, !u.is_locked))}>
+                      {u.is_locked ? <LockOpenIcon fontSize="small" /> : <LockIcon fontSize="small" />}
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {commander && !self && (
+                  <Tooltip title="מחיקת המשתמש">
+                    <IconButton size="small" aria-label="מחיקת המשתמש" color="error" onClick={() => setDeleting(u)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </>
+            );
+            return { roles, login, status, actions };
+          };
+          return narrow ? (
+            <CardList>
+              {users.map((u) => {
+                const x = parts(u);
+                const gaf = u.soldier_id ? gafOf.get(u.soldier_id) : null;
+                return (
+                  <RowCard
+                    key={u.user_id}
+                    dim={u.is_locked}
+                    title={
+                      <Box component="span" sx={{ direction: "ltr", fontFamily: "monospace" }}>
+                        {u.username}
+                      </Box>
+                    }
+                    chips={
+                      <>
+                        {x.roles}
+                        {x.status}
+                      </>
+                    }
+                    sub={u.soldier_name ? `${u.soldier_name}${gaf ? ` · ${gaf}` : ""}` : undefined}
+                    lines={[`כניסה אחרונה: ${x.login}`]}
+                    actions={x.actions}
+                  />
+                );
+              })}
+            </CardList>
+          ) : (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
@@ -214,68 +291,28 @@ export function UsersTab() {
             </TableHead>
             <TableBody>
               {users.map((u) => {
-                const self = u.user_id === me?.userId;
-                const commander = u.roles.some((r) => r.role === "gaf_commander");
+                const x = parts(u);
                 return (
                   <TableRow key={u.user_id} hover sx={{ opacity: u.is_locked ? 0.55 : 1 }}>
                     <TableCell sx={{ direction: "ltr", textAlign: "right", fontFamily: "monospace" }}>{u.username}</TableCell>
                     <TableCell>
                       <Stack direction="row" sx={{ gap: 0.5, flexWrap: "wrap" }}>
-                        {u.roles.map((r) => (
-                          <Chip key={r.id} size="small" label={ROLE_NAME[r.role] ?? r.role} color={r.role === "coordinator" ? "primary" : "default"} />
-                        ))}
+                        {x.roles}
                       </Stack>
                     </TableCell>
                     <TableCell>{u.soldier_name ?? "—"}</TableCell>
                     <TableCell>{u.soldier_id ? gafOf.get(u.soldier_id) ?? "" : ""}</TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      {u.last_login_at ? new Date(u.last_login_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }) : "לא נכנס"}
-                    </TableCell>
-                    <TableCell>
-                      {u.is_locked ? (
-                        <Chip size="small" color="error" label="נעול" />
-                      ) : u.must_change_password ? (
-                        <Chip size="small" color="warning" variant="outlined" label="ממתין לכניסה ראשונה" />
-                      ) : (
-                        <Chip size="small" color="success" variant="outlined" label="פעיל" />
-                      )}
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      {commander && (
-                        <>
-                          <Tooltip title="שיוך לחייל">
-                            <IconButton size="small" onClick={() => setLinking({ user: u, soldier: u.soldier_id })}>
-                              <LinkIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="סיסמה זמנית חדשה">
-                            <IconButton size="small" onClick={() => setReset({ user: u, password: tempPassword(), done: false })}>
-                              <KeyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </>
-                      )}
-                      {!self && (
-                        <Tooltip title={u.is_locked ? "שחרור נעילה" : "נעילה – המשתמש לא יוכל להיכנס"}>
-                          <IconButton size="small" onClick={() => act(() => api!.setUserLocked(u.user_id, !u.is_locked))}>
-                            {u.is_locked ? <LockOpenIcon fontSize="small" /> : <LockIcon fontSize="small" />}
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {commander && !self && (
-                        <Tooltip title="מחיקת המשתמש">
-                          <IconButton size="small" color="error" onClick={() => setDeleting(u)}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{x.login}</TableCell>
+                    <TableCell>{x.status}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{x.actions}</TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
         </TableContainer>
+          );
+        })()
       )}
 
       {deleting && (

@@ -38,6 +38,7 @@ import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { LoadRoleRef } from "../lib/soldiers";
 import { UsersTab } from "./UsersTab";
+import { CardList, RowCard, useNarrow } from "../components/CardList";
 import {
   DAY_TYPE_LABEL,
   ISO_DAY_LABEL,
@@ -424,6 +425,7 @@ export function TaskDialog(props: {
 
 function CatalogTab() {
   const { api } = useAuth();
+  const narrow = useNarrow();
   const [tasks, setTasks] = useState<TaskType[] | null>(null);
   const [categories, setCategories] = useState<NamedRef[]>([]);
   const [ranks, setRanks] = useState<NamedRef[]>([]);
@@ -460,6 +462,20 @@ function CatalogTab() {
     if (t.gender) parts.push(t.gender === "male" ? "גברים" : "נשים");
     return parts.join(" · ") || "כולם";
   };
+  const hours = (t: TaskType) =>
+    t.weekday_hours && Object.keys(t.weekday_hours).length ? "לפי יום" : t.default_start_time ? `${t.default_start_time}–${t.default_end_time}` : "—";
+  const flags = (t: TaskType) => (
+    <>
+      {t.is_weekend_type && <Chip size="small" label="שבת" />}
+      {t.includes_holidays && <Chip size="small" label="כולל חג" />}
+      {t.qualifying_duty && <Chip size="small" color="primary" variant="outlined" label="מזכה" />}
+      {t.requires_weapon && <Chip size="small" variant="outlined" label="נשק" />}
+      {t.shachar_only ? <Chip size="small" color="primary" label='רק שח"ר' /> : t.shachar_compatible && <Chip size="small" variant="outlined" label='שח"ר' />}
+      {t.tash_rule === "home" && <Chip size="small" color="success" variant="outlined" label='מתאימה לת"ש' />}
+      {t.tash_rule === "closed" && <Chip size="small" variant="outlined" label='לא לת"ש' />}
+      {!t.is_active && <Chip size="small" label="לא פעילה" />}
+    </>
+  );
 
   return (
     <Stack spacing={2}>
@@ -477,6 +493,31 @@ function CatalogTab() {
           />
         )}
       </Stack>
+      {narrow ? (
+        <CardList>
+          {shown.map((t) => (
+            <RowCard
+              key={t.id}
+              dim={!t.is_active}
+              onClick={() => setEditing(t)}
+              lead={<Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: t.color ?? "grey.400", flexShrink: 0, mt: 0.9 }} />}
+              title={t.name}
+              chips={<Chip size="small" color="secondary" variant="outlined" label={`משקל ${t.weight}`} />}
+              sub={
+                <>
+                  {catName.get(t.category_id ?? "") ?? "בלי קטגוריה"} · <span dir="ltr">{hours(t)}</span>
+                </>
+              }
+              lines={[
+                `מי מבצע: ${who(t)}`,
+                <Stack key="f" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }}>
+                  {flags(t)}
+                </Stack>,
+              ]}
+            />
+          ))}
+        </CardList>
+      ) : (
       <Paper variant="outlined" sx={{ overflowX: "auto" }}>
         <Table size="small">
           <TableHead>
@@ -502,23 +543,12 @@ function CatalogTab() {
                 <TableCell>{catName.get(t.category_id ?? "") ?? "—"}</TableCell>
                 <TableCell>{t.weight}</TableCell>
                 <TableCell sx={{ whiteSpace: "nowrap" }} dir="ltr">
-                  {t.weekday_hours && Object.keys(t.weekday_hours).length ? "לפי יום" : t.default_start_time ? `${t.default_start_time}–${t.default_end_time}` : "—"}
+                  {hours(t)}
                 </TableCell>
                 <TableCell>{who(t)}</TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-                    {t.is_weekend_type && <Chip size="small" label="שבת" />}
-                    {t.includes_holidays && <Chip size="small" label="כולל חג" />}
-                    {t.qualifying_duty && <Chip size="small" color="primary" variant="outlined" label="מזכה" />}
-                    {t.requires_weapon && <Chip size="small" variant="outlined" label="נשק" />}
-                    {t.shachar_only ? (
-                      <Chip size="small" color="primary" label='רק שח"ר' />
-                    ) : (
-                      t.shachar_compatible && <Chip size="small" variant="outlined" label='שח"ר' />
-                    )}
-                    {t.tash_rule === "home" && <Chip size="small" color="success" variant="outlined" label='מתאימה לת"ש' />}
-                    {t.tash_rule === "closed" && <Chip size="small" variant="outlined" label='לא לת"ש' />}
-                    {!t.is_active && <Chip size="small" label="לא פעילה" />}
+                    {flags(t)}
                   </Stack>
                 </TableCell>
                 <TableCell>
@@ -531,6 +561,7 @@ function CatalogTab() {
           </TableBody>
         </Table>
       </Paper>
+      )}
       {editCats && (
         <CategoriesDialog
           categories={categories}
@@ -1533,6 +1564,7 @@ function DayDialog(props: { day: CalendarDay | null; types: DayTypeRef[]; onClos
 
 function CalendarTab() {
   const { api } = useAuth();
+  const narrow = useNarrow();
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
   const [days, setDays] = useState<CalendarDay[] | null>(null);
@@ -1611,6 +1643,28 @@ function CalendarTab() {
         <Loading />
       ) : days.length === 0 ? (
         <Alert severity="info">אין ימים מסומנים ל-{year}. לחץ על "רענון חגי ישראל".</Alert>
+      ) : narrow ? (
+        <CardList>
+          {days.map((d) => (
+            <RowCard
+              key={d.day}
+              title={`${fmt(d.day)} · ${weekdayOf(d.day)}`}
+              chips={<Chip size="small" color={CHIP_COLOR[d.day_type] ?? "info"} label={typeName(d.day_type)} />}
+              sub={d.note ?? undefined}
+              lines={[d.source === "manual" ? "נערך ידנית" : "אוטומטי"]}
+              actions={
+                <>
+                  <Button size="small" startIcon={<EditIcon fontSize="small" />} onClick={() => setEditing(d)}>
+                    עריכה
+                  </Button>
+                  <Button size="small" color="inherit" startIcon={<DeleteIcon fontSize="small" />} onClick={() => remove(d)}>
+                    מחיקה
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -1667,6 +1721,7 @@ function CalendarTab() {
 
 function AliasesTab() {
   const { api } = useAuth();
+  const narrow = useNarrow();
   const [aliases, setAliases] = useState<{ alias: string; task_type_id: string }[] | null>(null);
   const [tasks, setTasks] = useState<TaskType[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -1690,6 +1745,43 @@ function AliasesTab() {
       </Typography>
       {aliases.length === 0 ? (
         <Alert severity="info">עוד אין התאמות שמורות.</Alert>
+      ) : narrow ? (
+        <CardList>
+          {aliases.map((a) => (
+            <Box key={a.alias} sx={{ px: 1.5, py: 1.25 }}>
+              <Typography sx={{ fontWeight: 700, mb: 0.75 }}>{a.alias}</Typography>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  label="סוג תורנות"
+                  value={a.task_type_id}
+                  onChange={async (e) => {
+                    await api!.saveTaskTypeAliases([{ alias: a.alias, task_type_id: e.target.value }]);
+                    void load();
+                  }}
+                >
+                  {tasks.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                      {!t.is_active && " (לא פעילה)"}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <IconButton
+                  aria-label={`מחיקת ${a.alias}`}
+                  onClick={async () => {
+                    await api!.deleteTaskTypeAlias(a.alias);
+                    void load();
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+            </Box>
+          ))}
+        </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -1756,14 +1848,25 @@ const TABS = [
 export function AdminPage() {
   const [params, setParams] = useSearchParams();
   const tab = TABS.find((t) => t.key === params.get("tab"))?.key ?? "catalog";
+  const narrow = useNarrow();
   return (
     <Stack spacing={2}>
       <Typography variant="h1">הגדרות</Typography>
+      {narrow ? (
+        <TextField select size="small" label="מה להגדיר" value={tab} onChange={(e) => setParams({ tab: e.target.value }, { replace: true })}>
+          {TABS.map((t) => (
+            <MenuItem key={t.key} value={t.key}>
+              {t.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      ) : (
       <Tabs value={tab} onChange={(_, v) => setParams({ tab: v }, { replace: true })} variant="scrollable" allowScrollButtonsMobile>
         {TABS.map((t) => (
           <Tab key={t.key} value={t.key} label={t.label} />
         ))}
       </Tabs>
+      )}
       {tab === "catalog" && <CatalogTab />}
       {tab === "scoring" && <ScoringTab />}
       {tab === "calendar" && <CalendarTab />}
