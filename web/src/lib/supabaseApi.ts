@@ -705,6 +705,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("delete_pending_slot", { p_slot: slotId }));
   }
 
+  async unassignPublished(assignmentId: string, reason: string) {
+    maybe(await this.sb.rpc("unassign_published", { p_assignment: assignmentId, p_reason: reason }));
+  }
+
   async undoReserveActivation(reserveId: string) {
     maybe(await this.sb.rpc("undo_reserve_activation", { p_reserve: reserveId }));
   }

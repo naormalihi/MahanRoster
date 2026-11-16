@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import { canRead, isStaff } from "./api";
 import { useAuth } from "./auth";
 import { planningCycle, type Cycle } from "./cycles";
+import { RETURN_EVENT } from "./refreshOnReturn";
 import { dayKey } from "./dates";
 
 const KEY = "mahan.cycle";
@@ -52,10 +53,16 @@ export function CycleProvider({ children }: { children: ReactNode }) {
     setId((id) => (c.some((x) => x.id === id) ? id : defaultCycle(c, dayKey(new Date()))?.id ?? ""));
   }, [api, staff, me]);
 
-  // a stage can change on any screen (publish, a new run): refresh on navigation
+  // a stage can change on any screen (publish, a new run): refresh on navigation, and when the
+  // app comes back to the screen after a while
   useEffect(() => {
     reload().catch(() => setCycles((c) => c ?? []));
   }, [reload, pathname]);
+  useEffect(() => {
+    const on = () => void reload().catch(() => undefined);
+    window.addEventListener(RETURN_EVENT, on);
+    return () => window.removeEventListener(RETURN_EVENT, on);
+  }, [reload]);
 
   const setCycleId = useCallback((id: string) => {
     setId(id);

@@ -1,5 +1,6 @@
 import BoltIcon from "@mui/icons-material/BoltOutlined";
 import UndoIcon from "@mui/icons-material/Undo";
+import PersonRemoveIcon from "@mui/icons-material/PersonRemoveOutlined";
 import {
   Alert,
   Box,
@@ -125,6 +126,8 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
   const [version, setVersion] = useState(0);
   const [editSpecial, setEditSpecial] = useState<{ name: string; points: string } | null>(null);
   const [deleting, setDeleting] = useState<{ reason: string } | null>(null);
+  // taking one person off a published duty that has not started, to put someone else on it
+  const [removing, setRemoving] = useState<{ p: SlotPerson; reason: string } | null>(null);
 
   useEffect(() => {
     api!.slotPeople(slotId).then(setData, (e) => setError((e as Error).message));
@@ -246,6 +249,11 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
                         ביטול הפעלה
                       </Button>
                     )}
+                    {data.slot.published && !started && p.status === "assigned" && (
+                      <Button size="small" color="error" startIcon={<PersonRemoveIcon />} onClick={() => setRemoving({ p, reason: "" })} disabled={busy}>
+                        הסרה
+                      </Button>
+                    )}
                   </Stack>
                 ))}
                 {replaced.map((p) => (
@@ -270,6 +278,11 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
                     {data.slot.published && !ended && openPerformers.length > 0 && (
                       <Button size="small" variant="contained" color="warning" startIcon={<BoltIcon />} onClick={() => setActivating(p)}>
                         הפעלת עתודה
+                      </Button>
+                    )}
+                    {data.slot.published && !started && (
+                      <Button size="small" color="error" startIcon={<PersonRemoveIcon />} onClick={() => setRemoving({ p, reason: "" })} disabled={busy}>
+                        הסרה
                       </Button>
                     )}
                   </Stack>
@@ -299,6 +312,46 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
           <Button onClick={onClose}>סגירה</Button>
         </DialogActions>
       </Dialog>
+      {removing && data && (
+        <Dialog open onClose={() => setRemoving(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>הסרה מהתורנות</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={1.5}>
+              <Typography>
+                להסיר את <b>{removing.p.name}</b> ({removing.p.role === "performer" ? "מבצע" : "עתודה"}) מ{data.slot.task_name}, {when}?
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                הוא יקבל התראה, והניקוד על התורנות יירד ממנו. התורנות תופיע ב&quot;ממתינות לשיבוץ&quot;, ושם משבצים מחליף – רק חייל שאין לו תורנות באותן שעות.
+              </Typography>
+              <TextField label="סיבה" value={removing.reason} onChange={(e) => setRemoving({ ...removing, reason: e.target.value })} required fullWidth autoFocus />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRemoving(null)}>ביטול</Button>
+            <Button
+              color="error"
+              variant="contained"
+              disabled={busy || !removing.reason.trim()}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  await api!.unassignPublished(removing.p.id, removing.reason.trim());
+                  setRemoving(null);
+                  changed();
+                } catch (e) {
+                  setRemoving(null);
+                  setError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              הסרה
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       {deleting && data && (
         <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
           <DialogTitle>מחיקת התורנות</DialogTitle>

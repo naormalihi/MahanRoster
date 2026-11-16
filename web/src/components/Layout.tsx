@@ -33,6 +33,7 @@ import { canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
+import { useReturnCounter } from "../lib/refreshOnReturn";
 import { stageLabel } from "../lib/cycles";
 import { APP_VERSION, BUILD_DATE, BUILD_SHA, CHANGELOG } from "../lib/changelog";
 import { Mascot } from "./Mascot";
@@ -200,6 +201,7 @@ function VersionFooter() {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  const returned = useReturnCounter();
   const { me, api, signOut } = useAuth();
   const staff = isStaff(me);
   const reader = canRead(me);
@@ -304,7 +306,8 @@ export function Layout({ children }: { children: ReactNode }) {
           <Typography variant="body2">הודפס ב-{new Date().toLocaleDateString("he-IL")}</Typography>
         </Box>
       </Box>
-      <Container maxWidth="lg" sx={{ py: 3, px: { xs: 2, sm: 3 } }}>
+      {/* back to the app after a while: the screen loads its data again */}
+      <Container key={returned} maxWidth="lg" sx={{ py: 3, px: { xs: 2, sm: 3 } }}>
         {children}
       </Container>
     </Box>
