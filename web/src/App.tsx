@@ -1,10 +1,11 @@
 import { Alert, Box, CircularProgress } from "@mui/material";
-import { lazy, Suspense, type ReactElement } from "react";
+import { lazy, Suspense, useEffect, type ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { canRead, isSoldier, isStaff, isUnitCommander } from "./lib/api";
 import { ReadOnlyScope } from "./components/ReadOnly";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { isStaleBuild, showUpdate } from "./lib/staleBuild";
 import { ChangePasswordPage, LoginPage, MfaPage } from "./pages/AuthPages";
 import { BoardPage } from "./pages/BoardPage";
 import { CyclesPage } from "./pages/CyclesPage";
@@ -22,7 +23,13 @@ const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) 
 
 function Gate() {
   const { stage, me, error } = useAuth();
-  if (stage === "loading")
+  // back from another page, or a tab left open over a deploy: the old version's files are gone,
+  // so the owl screen reloads into the new version instead of a configuration error
+  const stale = stage === "error" && isStaleBuild(error);
+  useEffect(() => {
+    if (stale) showUpdate();
+  }, [stale]);
+  if (stage === "loading" || stale)
     return (
       <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />

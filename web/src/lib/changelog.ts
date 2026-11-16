@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.10.1",
+    date: "2026-11-16",
+    items: ["חזרה אחורה אחרי עדכון גרסה: במקום \"האפליקציה לא מוגדרת כראוי\" מופיע מסך העדכון עם הינשוף, והאפליקציה נטענת מחדש לבד"],
+  },
+  {
     version: "2.10.0",
     date: "2026-11-16",
     items: [
