@@ -19,8 +19,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../lib/auth";
 import { STATUS_LABEL, type RequestStatus } from "../lib/cycles";
 import { dayKey, dayLabel } from "../lib/dates";
-import { inSomeCycle } from "../lib/orphans";
-import { entryOpen, openCycle, type InputOptions, type MyRequests } from "../lib/me";
+import { entryOpen, requestsByCycle, type InputCycle, type InputOptions, type MyRequests } from "../lib/me";
 
 const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "default"> = {
   pending: "warning",
@@ -32,11 +31,12 @@ const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "def
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 const tomorrow = () => dayKey(new Date(Date.now() + 86_400_000));
 
-function Section(props: { title: string; hint: string; onAdd?: () => void; addLabel: string; children: ReactNode }) {
+/** One kind of request inside a cycle's card: its rows and the button to add one. */
+function Part(props: { title: string; note?: string; onAdd?: () => void; addLabel: string; children: ReactNode[] }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ alignItems: "center", mb: 0.5 }}>
-        <Typography variant="h3" sx={{ flex: 1 }}>
+    <Box sx={{ minWidth: 0 }}>
+      <Stack direction="row" sx={{ alignItems: "center", minHeight: 32 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, flex: 1 }}>
           {props.title}
         </Typography>
         {props.onAdd && (
@@ -45,11 +45,19 @@ function Section(props: { title: string; hint: string; onAdd?: () => void; addLa
           </Button>
         )}
       </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {props.hint}
-      </Typography>
-      <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>{props.children}</Stack>
-    </Paper>
+      {props.note && (
+        <Typography variant="caption" color="text.secondary">
+          {props.note}
+        </Typography>
+      )}
+      {props.children.length ? (
+        <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>{props.children}</Stack>
+      ) : (
+        <Typography variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
+          אין.
+        </Typography>
+      )}
+    </Box>
   );
 }
 
@@ -70,7 +78,7 @@ function Row(props: { main: ReactNode; sub?: ReactNode; chips?: ReactNode; actio
   );
 }
 
-type Form = { kind: "exemption" | "block" | "absence"; type: string; from: string; to: string };
+type Form = { kind: "exemption" | "block" | "absence"; cycle: InputCycle; type: string; from: string; to: string };
 
 /**
  * Stage 2.2: the soldier enters his own constraints – an exemption request (נע"ת decides
@@ -131,135 +139,153 @@ export function RequestsPage() {
       </Box>
     );
 
-  const collecting = openCycle(opts.cycles);
-  const closedNow = opts.cycles.find((c) => !c.open && c.start_date <= dayKey(new Date(Date.now() + 120 * 86_400_000)));
+  const today = dayKey(new Date());
+  const groups = requestsByCycle(mine, opts.cycles, today);
   const exName = (id: string) => opts.exemption_types.find((t) => t.id === id)?.name ?? "";
   const formClosed = form && form.from && form.kind !== "exemption" && (!entryOpen(form.from, opts.cycles) || (form.to && !entryOpen(form.to, opts.cycles)));
   const formUrgent = form && form.kind === "exemption" && form.from && (!entryOpen(form.from, opts.cycles) || (form.to && !entryOpen(form.to, opts.cycles)));
+  // a new request starts inside the cycle it was opened from
+  const start = (c: InputCycle) => (c.start_date > tomorrow() ? c.start_date : tomorrow());
+  const open = (kind: Form["kind"], c: InputCycle) =>
+    setForm({
+      kind,
+      cycle: c,
+      type: kind === "exemption" ? (opts.exemption_types[0]?.id ?? "") : kind === "absence" ? (opts.absence_types[0]?.id ?? "") : "",
+      from: start(c),
+      to: kind === "block" ? "" : start(c),
+    });
+
+  const exemptionRows = (list: MyRequests["exemptions"]) =>
+    list.map((e) => (
+      <Row
+        key={e.id}
+        main={e.type}
+        sub={
+          <>
+            {fmt(e.start_date)} – {fmt(e.end_date)}
+            {e.decision_reason && e.status !== "approved" ? ` · ${e.decision_reason}` : ""}
+            {!e.mine ? ' · הוזן ע"י נע"ת' : ""}
+          </>
+        }
+        chips={
+          <>
+            {e.is_urgent && <Chip size="small" color="error" variant="outlined" label="דחוף" />}
+            <Chip size="small" color={STATUS_COLOR[e.status]} label={STATUS_LABEL[e.status]} />
+          </>
+        }
+        action={
+          e.mine &&
+          e.status === "pending" && (
+            <Button size="small" color="inherit" onClick={() => act(() => api!.withdrawMyExemption(e.id))}>
+              ביטול
+            </Button>
+          )
+        }
+      />
+    ));
+  const blockRows = (list: MyRequests["blocks"]) =>
+    list.map((b) => (
+      <Row
+        key={b.id}
+        main={dayLabel(b.day)}
+        sub={!b.mine ? 'הוזן ע"י נע"ת' : undefined}
+        action={
+          b.mine &&
+          b.open && (
+            <Button size="small" color="inherit" onClick={() => act(() => api!.cancelMyDateBlock(b.id))}>
+              ביטול
+            </Button>
+          )
+        }
+      />
+    ));
+  const absenceRows = (list: MyRequests["absences"]) =>
+    list.map((a) => (
+      <Row
+        key={a.id}
+        main={a.type}
+        sub={
+          <>
+            {fmt(dayKey(a.starts_at))} – {fmt(dayKey(new Date(Date.parse(a.ends_at) - 1)))}
+            {!a.mine ? ' · הוזן ע"י נע"ת' : ""}
+          </>
+        }
+        action={
+          a.mine &&
+          a.open && (
+            <Button size="small" color="inherit" onClick={() => act(() => api!.cancelMyAbsence(a.id))}>
+              ביטול
+            </Button>
+          )
+        }
+      />
+    ));
 
   return (
     <Stack spacing={2} sx={{ maxWidth: 1040, mx: "auto", width: "100%" }}>
       <Box>
         <Typography variant="h1">הבקשות שלי</Typography>
         <Typography variant="body2" color="text.secondary">
-          פטורים, חסימות תאריך והיעדרויות – מכאן ישר למערכת.
+          פטורים, חסימות תאריך והיעדרויות לכל מחזור – מכאן ישר למערכת. את האסמכתא לפטור מציגים לנע"ת; המערכת לא שומרת מסמכים או פרטים רפואיים.
         </Typography>
       </Box>
-
-      {collecting ? (
-        <Alert severity="info">
-          איסוף האילוצים ל<b>{collecting.name}</b>{" "}
-          {collecting.deadline ? (
-            <>
-              פתוח עד <b>{dayLabel(collecting.deadline)}</b>
-            </>
-          ) : (
-            "פתוח"
-          )}
-          . אחרי זה חסימות והיעדרויות רק דרך נע"ת, ובקשת פטור תסומן דחופה.
-        </Alert>
-      ) : closedNow ? (
-        <Alert severity="warning">
-          איסוף האילוצים ל{closedNow.name} נסגר. חסימות והיעדרויות לתקופה הזו – דרך נע"ת. בקשת פטור אפשר עדיין להגיש, והיא תסומן דחופה.
-        </Alert>
-      ) : null}
       {error && <Alert severity="error">{error}</Alert>}
+      {groups.length === 0 && <Alert severity="info">עוד אין מחזור פתוח. כשנע"ת יפתח מחזור, תוכל להגיש כאן בקשות.</Alert>}
 
-      {/* on a wide screen: exemptions across, date blocks and absences side by side under them */}
-      <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1fr) minmax(0, 1fr)" }, "& > :first-of-type": { gridColumn: { md: "1 / -1" } } }}>
-      <Section
-        title="פטורים"
-        hint='בקשה עוברת לנע"ת. את האסמכתא מציגים לו – המערכת לא שומרת מסמכים או פרטים רפואיים.'
-        addLabel="בקשת פטור"
-        onAdd={() => setForm({ kind: "exemption", type: opts.exemption_types[0]?.id ?? "", from: tomorrow(), to: tomorrow() })}
-      >
-        {mine.exemptions.length === 0 && <Typography variant="body2" color="text.secondary">אין.</Typography>}
-        {mine.exemptions.map((e) => (
-          <Row
-            key={e.id}
-            main={e.type}
-            sub={
-              <>
-                {fmt(e.start_date)} – {fmt(e.end_date)}
-                {e.decision_reason && e.status !== "approved" ? ` · ${e.decision_reason}` : ""}
-                {!e.mine ? ' · הוזן ע"י נע"ת' : ""}
-              </>
-            }
-            chips={
-              <>
-                {e.is_urgent && <Chip size="small" color="error" variant="outlined" label="דחוף" />}
-                <Chip size="small" color={STATUS_COLOR[e.status]} label={STATUS_LABEL[e.status]} />
-              </>
-            }
-            action={
-              e.mine &&
-              e.status === "pending" && (
-                <Button size="small" color="inherit" onClick={() => act(() => api!.withdrawMyExemption(e.id))}>
-                  ביטול
-                </Button>
-              )
-            }
-          />
-        ))}
-      </Section>
-
-      <Section
-        title="חסימות תאריך"
-        hint={`יום אחד שבו לא תשובץ – עד ${opts.block_quota_per_month} בחודש.`}
-        addLabel="חסימת יום"
-        onAdd={() => setForm({ kind: "block", type: "", from: tomorrow(), to: "" })}
-      >
-        {mine.blocks.length === 0 && <Typography variant="body2" color="text.secondary">אין.</Typography>}
-        {mine.blocks.map((b) => (
-          <Row
-            key={b.id}
-            main={dayLabel(b.day)}
-            sub={!b.mine ? 'הוזן ע"י נע"ת' : undefined}
-            action={
-              b.mine &&
-              b.open && (
-                <Button size="small" color="inherit" onClick={() => act(() => api!.cancelMyDateBlock(b.id))}>
-                  ביטול
-                </Button>
-              )
-            }
-          />
-        ))}
-      </Section>
-
-      <Section
-        title="היעדרויות"
-        hint="חופשה, קורס, נסיעה – ימים שבהם לא תהיה ביחידה."
-        addLabel="היעדרות"
-        onAdd={() => setForm({ kind: "absence", type: opts.absence_types[0]?.id ?? "", from: tomorrow(), to: tomorrow() })}
-      >
-        {mine.absences.length === 0 && <Typography variant="body2" color="text.secondary">אין.</Typography>}
-        {mine.absences.map((a) => (
-          <Row
-            key={a.id}
-            main={a.type}
-            sub={
-              <>
-                {fmt(dayKey(a.starts_at))} – {fmt(dayKey(new Date(Date.parse(a.ends_at) - 1)))}
-                {!a.mine ? ' · הוזן ע"י נע"ת' : ""}
-              </>
-            }
-            action={
-              a.mine &&
-              a.open && (
-                <Button size="small" color="inherit" onClick={() => act(() => api!.cancelMyAbsence(a.id))}>
-                  ביטול
-                </Button>
-              )
-            }
-          />
-        ))}
-      </Section>
-      </Box>
+      {groups.map((g) => {
+        const c = g.cycle;
+        const blocksUsed = g.blocks.filter((b) => b.mine).length;
+        return (
+          <Paper key={c?.id ?? "none"} variant="outlined" sx={{ overflow: "hidden", opacity: c && !c.open ? 0.92 : 1 }}>
+            <Box sx={{ px: 2, py: 1.5, bgcolor: c ? (c.open ? "rgba(26,20,102,0.05)" : "action.hover") : "rgba(232,112,15,0.08)", borderBottom: 1, borderColor: "divider" }}>
+              <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                <Typography variant="h3" sx={{ flex: 1, minWidth: 180 }}>
+                  {c ? c.name : "בלי מחזור"}
+                </Typography>
+                {c ? (
+                  c.open ? (
+                    <Chip size="small" color="success" label={c.deadline ? `פתוח להגשה עד ${dayLabel(c.deadline)}` : "פתוח להגשה"} />
+                  ) : (
+                    <Chip size="small" color="warning" variant="outlined" label='נסגר – דרך נע"ת' />
+                  )
+                ) : (
+                  <Chip size="small" color="warning" label="ממתין למחזור" />
+                )}
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {c
+                  ? `${fmt(c.start_date)} – ${fmt(c.end_date)}${c.open ? "" : ' · חסימות והיעדרויות לתקופה הזו – דרך נע"ת. בקשת פטור אפשר עדיין להגיש, והיא תסומן דחופה.'}`
+                  : 'בקשות לתאריכים שעוד אין להם מחזור. הן שמורות, ונע"ת יראה אותן כשייפתח מחזור שמכסה אותן.'}
+              </Typography>
+            </Box>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "repeat(3, minmax(0, 1fr))" }, "& > *": { p: 2 }, "& > * + *": { borderTop: { xs: 1, md: 0 }, borderInlineStart: { md: 1 }, borderColor: "divider" } }}>
+              <Part title="פטורים" addLabel="בקשת פטור" onAdd={c ? () => open("exemption", c) : undefined}>
+                {exemptionRows(g.exemptions)}
+              </Part>
+              <Part
+                title="חסימות תאריך"
+                note={c ? `${blocksUsed} בשימוש · עד ${opts.block_quota_per_month} בחודש` : undefined}
+                addLabel="חסימת יום"
+                onAdd={c && c.open ? () => open("block", c) : undefined}
+              >
+                {blockRows(g.blocks)}
+              </Part>
+              <Part title="היעדרויות" addLabel="היעדרות" onAdd={c && c.open ? () => open("absence", c) : undefined}>
+                {absenceRows(g.absences)}
+              </Part>
+            </Box>
+          </Paper>
+        );
+      })}
 
       {form && (
         <Dialog open onClose={() => setForm(null)} fullWidth maxWidth="xs">
-          <DialogTitle>{form.kind === "exemption" ? "בקשת פטור" : form.kind === "block" ? "חסימת יום" : "היעדרות"}</DialogTitle>
+          <DialogTitle>
+            {form.kind === "exemption" ? "בקשת פטור" : form.kind === "block" ? "חסימת יום" : "היעדרות"}
+            <Typography variant="body2" color="text.secondary">
+              {form.cycle.name}
+            </Typography>
+          </DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2}>
               {form.kind !== "block" && (
@@ -276,7 +302,7 @@ export function RequestsPage() {
                 label={form.kind === "block" ? "יום" : "מתאריך"}
                 value={form.from}
                 onChange={(e) => setForm({ ...form, from: e.target.value, to: form.to && form.to < e.target.value ? e.target.value : form.to })}
-                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: tomorrow() } }}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: start(form.cycle), max: form.cycle.end_date } }}
               />
               {form.kind !== "block" && (
                 <TextField
@@ -284,7 +310,7 @@ export function RequestsPage() {
                   label="עד תאריך (כולל)"
                   value={form.to}
                   onChange={(e) => setForm({ ...form, to: e.target.value })}
-                  slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: form.from || tomorrow() } }}
+                  slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: form.from || start(form.cycle), max: form.kind === "absence" ? form.cycle.end_date : undefined } }}
                 />
               )}
               {form.kind === "exemption" && (
@@ -292,8 +318,10 @@ export function RequestsPage() {
                   הבקשה ממתינה עד שנע"ת יראה את האסמכתא ויחליט{exName(form.type) ? ` על "${exName(form.type)}"` : ""}.
                 </Typography>
               )}
-              {form.from && !inSomeCycle(form.from, form.kind === "block" ? form.from : form.to, opts.cycles) && (
-                <Alert severity="info">עוד אין מחזור לתאריכים האלה. הבקשה תישמר, ונע"ת יראה אותה כשייפתח מחזור שמכסה אותם.</Alert>
+              {form.from && (form.from < form.cycle.start_date || form.from > form.cycle.end_date) && (
+                <Alert severity="info">
+                  התאריך מחוץ ל{form.cycle.name} ({fmt(form.cycle.start_date)} – {fmt(form.cycle.end_date)}).
+                </Alert>
               )}
               {formUrgent && <Alert severity="warning">התאריכים אחרי מועד סגירת האילוצים – הבקשה תסומן דחופה.</Alert>}
               {formClosed && <Alert severity="warning">איסוף האילוצים לתאריכים האלה נסגר – פנה לנע"ת.</Alert>}
