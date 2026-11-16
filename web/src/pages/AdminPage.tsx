@@ -39,6 +39,7 @@ import { useAuth } from "../lib/auth";
 import type { LoadRoleRef } from "../lib/soldiers";
 import { UsersTab } from "./UsersTab";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
+import { PagerBar } from "../components/PagerBar";
 import {
   DAY_TYPE_LABEL,
   ISO_DAY_LABEL,
@@ -1838,11 +1839,11 @@ function AliasesTab() {
 }
 
 const TABS = [
-  { key: "catalog", label: "קטלוג תורנויות" },
-  { key: "aliases", label: "שמות מהבסיס" },
-  { key: "scoring", label: "מקדמי ניקוד" },
-  { key: "calendar", label: "לוח חגים" },
-  { key: "users", label: "משתמשים" },
+  { key: "catalog", label: "קטלוג תורנויות", about: "סוגי התורנויות, משקלים ושעות" },
+  { key: "aliases", label: "שמות מהבסיס", about: "שמות התורנויות בקובץ לוח הבסיס" },
+  { key: "scoring", label: "מקדמי ניקוד", about: "מקדמים, ימי חג והקלות" },
+  { key: "calendar", label: "לוח חגים", about: "חגים וימים מיוחדים בכל שנה" },
+  { key: "users", label: "משתמשים", about: "חשבונות והרשאות" },
 ] as const;
 
 export function AdminPage() {
@@ -1853,13 +1854,12 @@ export function AdminPage() {
     <Stack spacing={2}>
       <Typography variant="h1">הגדרות</Typography>
       {narrow ? (
-        <TextField select size="small" label="מה להגדיר" value={tab} onChange={(e) => setParams({ tab: e.target.value }, { replace: true })}>
-          {TABS.map((t) => (
-            <MenuItem key={t.key} value={t.key}>
-              {t.label}
-            </MenuItem>
-          ))}
-        </TextField>
+        <PagerBar
+          items={TABS.map((t) => ({ key: t.key, label: t.label, status: t.about }))}
+          current={tab}
+          onGo={(k) => setParams({ tab: k }, { replace: true })}
+          title={(x, i) => `${i + 1} מתוך ${TABS.length} · ${x.label}`}
+        />
       ) : (
       <Tabs value={tab} onChange={(_, v) => setParams({ tab: v }, { replace: true })} variant="scrollable" allowScrollButtonsMobile>
         {TABS.map((t) => (

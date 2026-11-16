@@ -5,18 +5,12 @@ import TodoIcon from "@mui/icons-material/RadioButtonUnchecked";
 import SyncIcon from "@mui/icons-material/Autorenew";
 import NextIcon from "@mui/icons-material/ArrowBack";
 import PrevIcon from "@mui/icons-material/ArrowForward";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
-  IconButton,
-  Menu,
-  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -33,6 +27,7 @@ import { stageLabel, type Cycle } from "../lib/cycles";
 import { pendingSlots, nextAction, STEPS, stepNav, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
 import { StagePanel } from "./CyclesPage";
 import { announceBoardChange } from "../components/SlotActions";
+import { PagerBar, type PagerItem } from "../components/PagerBar";
 
 const ConstraintsPage = lazy(() => import("./ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
 const PotentialPage = lazy(() => import("./PotentialPage").then((m) => ({ default: m.PotentialPage })));
@@ -125,96 +120,32 @@ function StepTabs({ step, states }: { step: StepKey; states: ReturnType<typeof s
  */
 function StepBar({ step, states }: { step: StepKey; states: ReturnType<typeof stepStates> | null }) {
   const navigate = useNavigate();
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const i = STEPS.findIndex((s) => s.key === step);
-  const cur = STEPS[i];
-  const stateOf = (k: StepKey): StepState | undefined => (k === "overview" ? undefined : states?.[k]);
-  const st = stateOf(step);
-  const go = (j: number) => j >= 0 && j < STEPS.length && navigate(STEPS[j].path);
+  const DOT: Record<Tone, string> = { done: "success.main", warn: "warning.main", busy: "info.main", todo: "grey.300" };
+  const items: PagerItem[] = STEPS.map((s) => {
+    const st: StepState | undefined = s.key === "overview" ? undefined : states?.[s.key];
+    return {
+      key: s.key,
+      label: s.label,
+      dot: st ? DOT[st.tone] : undefined,
+      status: st ? (
+        <>
+          {TONE_ICON[st.tone]}
+          {st.text}
+        </>
+      ) : (
+        "שלב ומה הלאה"
+      ),
+    };
+  });
+  const n = STEPS.length - 1;
   return (
-    <Paper variant="outlined" sx={{ px: 0.5, py: 0.75 }}>
-      <Stack direction="row" sx={{ alignItems: "center" }}>
-        <IconButton data-read aria-label="השלב הקודם" disabled={i <= 0} onClick={() => go(i - 1)}>
-          <ChevronRightIcon />
-        </IconButton>
-        <Box
-          data-read
-          component="button"
-          type="button"
-          onClick={(e) => setAnchor(e.currentTarget)}
-          aria-label="כל השלבים"
-          sx={{ all: "unset", flex: 1, minWidth: 0, textAlign: "center", cursor: "pointer", borderRadius: 1, py: 0.25, "&:hover": { bgcolor: "action.hover" } }}
-        >
-          <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
-            {i > 0 ? `שלב ${i} מתוך ${STEPS.length - 1} · ` : ""}
-            {cur.label}
-            <ExpandMoreIcon sx={{ fontSize: 18, verticalAlign: "middle", color: "text.secondary" }} />
-          </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5, fontSize: 12, color: "text.secondary" }}>
-            {st ? (
-              <>
-                {TONE_ICON[st.tone]}
-                {st.text}
-              </>
-            ) : (
-              "שלב ומה הלאה"
-            )}
-          </Box>
-          <Stack direction="row" spacing={0.75} sx={{ justifyContent: "center", mt: 0.75 }}>
-            {STEPS.map((s, j) => {
-              const t = stateOf(s.key)?.tone;
-              return (
-                <Box
-                  key={s.key}
-                  sx={{
-                    width: j === i ? 18 : 7,
-                    height: 7,
-                    borderRadius: 4,
-                    transition: "width .2s",
-                    bgcolor: j === i ? "primary.main" : t === "done" ? "success.main" : t === "warn" ? "warning.main" : t === "busy" ? "info.main" : "grey.300",
-                  }}
-                />
-              );
-            })}
-          </Stack>
-        </Box>
-        <IconButton data-read aria-label="השלב הבא" disabled={i >= STEPS.length - 1} onClick={() => go(i + 1)}>
-          <ChevronLeftIcon />
-        </IconButton>
-      </Stack>
-      <Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)} slotProps={{ paper: { sx: { minWidth: 260 } } }}>
-        {STEPS.map((s, j) => {
-          const t = stateOf(s.key);
-          return (
-            <MenuItem
-              key={s.key}
-              selected={s.key === step}
-              onClick={() => {
-                setAnchor(null);
-                navigate(s.path);
-              }}
-            >
-              <Box>
-                <Typography sx={{ fontWeight: 700, fontSize: 14 }}>
-                  {j > 0 ? `${j}. ` : ""}
-                  {s.label}
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, fontSize: 12, color: "text.secondary" }}>
-                  {t ? (
-                    <>
-                      {TONE_ICON[t.tone]}
-                      {t.text}
-                    </>
-                  ) : (
-                    "שלב ומה הלאה"
-                  )}
-                </Box>
-              </Box>
-            </MenuItem>
-          );
-        })}
-      </Menu>
-    </Paper>
+    <PagerBar
+      items={items}
+      current={step}
+      onGo={(k) => navigate(STEPS.find((s) => s.key === k)!.path)}
+      title={(x, i) => (i > 0 ? `שלב ${i} מתוך ${n} · ${x.label}` : x.label)}
+      menuLabel={(x, i) => (i > 0 ? `${i}. ${x.label}` : x.label)}
+    />
   );
 }
 
