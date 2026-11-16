@@ -1,17 +1,15 @@
 -- =============================================================================
--- A holiday adds to the weight instead of multiplying it.
+-- Multipliers add to the weight instead of multiplying it.
 --
---   points = (weight × M + H) × (surprise multiplier, when it is a call-up)
---   M = the highest multiplier that is not about holidays (the weekend…) on any of the duty's
---       days, at least 1, once.
---   H = the highest holiday value (a multiplier set by holiday name / kind, or by a holiday day
---       type) on any of the duty's days, 0 when none, added once.
+--   points = (weight + V) × (surprise multiplier, when it is a call-up)
+--   V = the highest value of the multipliers that apply on any of the duty's days (weekend,
+--       holiday, eve, חול המועד…), added once; 0 when none applies. Values never add up.
 --
--- A kitchen duty (4) on ערב ראש השנה (6) is 4 + 6 = 10, no longer 4 × 6 = 24; on חול המועד that
--- falls on a Friday it is 4 × 3 + 3 = 15. The task flags keep their meaning: a Shabbat type gets
--- no weekend multiplier, "includes holidays" gets no holiday addition. A special call-up keeps
--- its fixed points. Every existing assignment is rescored, and the history in the snapshots of
--- existing cycles follows (as in 074).
+-- A kitchen duty (4): on a Friday 4 + 3 = 7 (was 12); on ערב ראש השנה 4 + 6 = 10 (was 24); on
+-- חול המועד that falls on a Friday 4 + the higher of 3 and 3 = 7; a week through פסח 4 + 6 = 10.
+-- The task flags keep their meaning: a Shabbat type leaves the weekend out, "includes holidays"
+-- leaves the holidays out. A special call-up keeps its fixed points. Every existing assignment
+-- is rescored, and the history in the snapshots of existing cycles follows (as in 074).
 -- =============================================================================
 
 -- a multiplier set by holiday: by name / kind, or by a calendar day type that is not plain
@@ -80,10 +78,11 @@ language sql stable security definer set search_path = public, pg_temp as $$
     select i, (span.a + i * interval '24 hours')::date as day
     from span cross join generate_series(0, greatest(ceil(span.minutes / (24 * 60))::int, 1) - 1) i
   ),
-  -- the highest weekend-type multiplier and the highest holiday addition on any day, once each
+  -- the highest value that applies on any day (weekend or holiday alike), once
   m as (
-    select greatest(coalesce(max(app.unit_value(u.day, t.is_weekend_type, (select a from span), (select b from span), t.includes_holidays, false)), 1), 1) as mult,
-           coalesce(max(app.unit_value(u.day, t.is_weekend_type, (select a from span), (select b from span), t.includes_holidays, true)), 0) as added
+    select coalesce(max(greatest(
+             app.unit_value(u.day, t.is_weekend_type, (select a from span), (select b from span), t.includes_holidays, false),
+             app.unit_value(u.day, t.is_weekend_type, (select a from span), (select b from span), t.includes_holidays, true))), 0) as added
     from all_units u cross join t
   ),
   f as (
@@ -93,7 +92,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
   ),
   total as (
     select case when span.fixed_points is not null then span.fixed_points
-                else (t.weight * (select mult from m) + (select added from m)) * span.surprise end as p
+                else (t.weight + (select added from m)) * span.surprise end as p
     from span cross join t
   ),
   units as (
@@ -125,8 +124,8 @@ left join lateral (
 where sn.cycle_id = oh.cycle_id and sn.soldier_id = oh.soldier_id;
 
 insert into audit_log (actor_user_id, action, entity_type, entity_id, after)
-values (null, 'rescore_holiday_added', 'assignments', null,
-        jsonb_build_object('rows', (select count(*) from old_full), 'note', 'a holiday adds its value to the weight instead of multiplying it'));
+values (null, 'rescore_values_added', 'assignments', null,
+        jsonb_build_object('rows', (select count(*) from old_full), 'note', 'a multiplier adds its value to the weight instead of multiplying it'));
 
 drop table old_full;
 drop table old_hist;

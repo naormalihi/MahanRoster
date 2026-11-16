@@ -1,13 +1,12 @@
 """Duty scoring: day units, multipliers and load-factor normalization.
 
-P = W_task × M + H for the whole duty – the weight is the points of the duty,
-however many days it lasts.
+P = W_task + V for the whole duty – the weight is the points of the duty, however
+many days it lasts.
 
-* M is the highest multiplier that is not about holidays (the weekend, a time
-  window, a weekday…) on any of the duty's days, applied once, at least 1.
-* H is the holiday addition: the highest value of a holiday multiplier (by
-  holiday name / kind, or by a holiday day type) on any of the duty's days, added
-  once – a kitchen duty (4) on ערב ראש השנה (+6) is 10, not 24.
+* V is the highest value of the multipliers that apply on any of the duty's days
+  (weekend, holiday, eve…), added once, 0 when none applies: a kitchen duty (4)
+  on a Friday (3) is 7, on ערב ראש השנה (6) 10, on חול המועד that falls on a
+  Friday (3 and 3) 7. Values never multiply the weight and never add up.
 * A call-up (הקפצה) multiplies the whole of P (in the solver's preparation).
 * The duty is split into 24-hour units (a remainder is one more unit) only to
   find its days and to share P equally between them.
@@ -139,8 +138,8 @@ def unit_points(
 ) -> list[tuple[date, float]]:
     """(day, raw points) for every day unit of a duty.
 
-    The weight is the points of the whole duty, however long it is: W × M + H – M the highest
-    non-holiday multiplier and H the highest holiday addition on any of its days, once each. Every 24-hour unit carries an
+    The weight is the points of the whole duty, however long it is: W + V – V the highest value
+    that applies on any of its days, added once. Every 24-hour unit carries an
     equal share, so a duty split between soldiers splits its points by the days each held it.
     The day of every unit is the duty's start – the load factor on that day applies.
     """
@@ -149,9 +148,7 @@ def unit_points(
         applying = [
             m for u in units for m in settings.multipliers if multiplier_applies(m, u.date(), task, starts_at, ends_at, settings)
         ]
-        mult = max([1.0] + [m.value for m in applying if not is_holiday_multiplier(m)])
-        added = max([0.0] + [m.value for m in applying if is_holiday_multiplier(m)])
-        total = task.weight * mult + added
+        total = task.weight + max([0.0] + [m.value for m in applying])
     else:
         night = settings.night_multiplier if is_night_duty(starts_at, ends_at, settings) else 1.0
         total = task.weight * max(unit_day_multiplier(u.date(), task, settings, holidays) for u in units) * night

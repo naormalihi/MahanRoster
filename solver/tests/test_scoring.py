@@ -93,19 +93,19 @@ def cpts(task, a, b):
     return raw_points(task, dt(a), dt(b), CUSTOM, set())
 
 
-def test_custom_weekend_times_then_holiday_added():
-    # Friday + holiday on the same unit: weight × 1.5 for the weekend, + 2 for the holiday
-    assert cpts(GUARD, "2027-01-08T08:00", "2027-01-09T08:00") == pytest.approx(1.5 + 2.0)
+def test_custom_highest_value_is_added():
+    # Friday (1.5) + holiday (2) on the same unit: the weight + the higher, 2 – never both
+    assert cpts(GUARD, "2027-01-08T08:00", "2027-01-09T08:00") == pytest.approx(1 + 2.0)
 
 
 def test_custom_night_does_not_stack_on_weekend():
-    # Friday night, 20:00–08:00 (12h, mostly night): max(1.5, 1.25) = 1.5
-    assert cpts(NIGHT, "2027-01-15T20:00", "2027-01-16T08:00") == pytest.approx(NIGHT.weight * 1.5)
+    # Friday night, 20:00–08:00 (12h, mostly night): + max(1.5, 1.25) = + 1.5
+    assert cpts(NIGHT, "2027-01-15T20:00", "2027-01-16T08:00") == pytest.approx(NIGHT.weight + 1.5)
 
 
 def test_custom_day_type_weekday_and_date_range():
     assert cpts(GUARD, "2027-01-05T08:00", "2027-01-06T08:00") == pytest.approx(1 + 1.8)  # memorial (Tuesday): a day type, added
-    assert cpts(GUARD, "2027-01-07T08:00", "2027-01-08T08:00") == pytest.approx(1.3)  # Thursday in January
+    assert cpts(GUARD, "2027-01-07T08:00", "2027-01-08T08:00") == pytest.approx(1 + 1.3)  # Thursday in January
     assert cpts(GUARD, "2027-02-04T08:00", "2027-02-05T08:00") == pytest.approx(1.0)  # Thursday in February
 
 
@@ -159,7 +159,7 @@ def test_task_whose_weight_includes_holidays_gets_no_holiday_multiplier():
     assert one_day(GUARD, "2027-10-10") == 7.0 and one_day(week, "2027-10-10") == 1.0
     assert one_day(GUARD, "2027-12-26") == 4.0 and one_day(week, "2027-12-26") == 1.0
     assert one_day(GUARD, "2027-10-11") == 3.0 and one_day(week, "2027-10-11") == 1.0
-    assert one_day(week, "2027-10-15") == 3.0  # a Friday: the weekend multiplier still applies
+    assert one_day(week, "2027-10-15") == 4.0  # a Friday: the weekend value still applies (1 + 3)
 
 
 def test_special_callup_scores_its_own_points():
@@ -172,7 +172,7 @@ def test_special_callup_scores_its_own_points():
     assert prep.raw["sp"] == 4.0
 
 
-def test_holiday_is_added_once_and_a_callup_multiplies_the_sum():
+def test_highest_value_added_once_and_a_callup_multiplies_the_sum():
     from dataclasses import replace
 
     from mahanroster_solver.solver import prepare
@@ -190,9 +190,10 @@ def test_holiday_is_added_once_and_a_callup_multiplies_the_sum():
     )
     kitchen = replace(GUARD, weight=4.0)
     pts = lambda a, b: raw_points(kitchen, dt(a), dt(b), s, set())  # noqa: E731
-    assert pts("2027-09-29T08:00", "2027-09-30T08:00") == pytest.approx(4 + 6)        # ערב ר"ה on a Wednesday: 4 + 6, not 4 × 6
-    assert pts("2027-04-23T08:00", "2027-04-24T08:00") == pytest.approx(4 * 3 + 3)    # חול המועד on a Friday: × weekend, + holiday
-    assert pts("2027-04-22T08:00", "2027-04-25T08:00") == pytest.approx(4 * 3 + 3)    # three days of it: still once each
+    assert pts("2027-09-29T08:00", "2027-09-30T08:00") == pytest.approx(4 + 6)   # ערב ר"ה on a Wednesday: 4 + 6, not 4 × 6
+    assert pts("2027-04-23T08:00", "2027-04-24T08:00") == pytest.approx(4 + 3)   # חול המועד on a Friday: + the higher of 3 and 3
+    assert pts("2027-04-22T08:00", "2027-04-25T08:00") == pytest.approx(4 + 3)   # three days of it: once
+    assert pts("2027-01-08T08:00", "2027-01-09T08:00") == pytest.approx(4 + 3)   # a plain Friday: 4 + 3, not 4 × 3
     k = slot("k", "guard", "2027-09-29T08:00", "2027-09-30T08:00", is_surprise=True)
     prep = prepare(problem([soldier("A")], [k], tasks=(kitchen,), settings=s))
     assert prep.raw["k"] == pytest.approx((4 + 6) * 1.3)

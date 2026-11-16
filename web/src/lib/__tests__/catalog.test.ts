@@ -122,14 +122,12 @@ describe("holidays by name", () => {
   });
 });
 
-describe("holiday additions", () => {
-  it("a holiday multiplier adds, a weekend one multiplies", async () => {
-    const { isHolidayMultiplier, multiplierValueLabel } = await import("../catalog");
-    const base = { ...EMPTY_MULTIPLIER, value: 3 };
-    expect(isHolidayMultiplier({ ...base, holidays: ["pesach"] })).toBe(true);
-    expect(isHolidayMultiplier({ ...base, day_types: ["holiday_eve"] })).toBe(true);
-    expect(isHolidayMultiplier({ ...base, day_types: ["weekend"] })).toBe(false);
-    expect(multiplierValueLabel({ ...base, holiday_kinds: ["eve"], value: 6 })).toBe("+6");
-    expect(multiplierValueLabel(base)).toBe("×3");
+describe("multiplier values", () => {
+  it("are shown as an addition to the weight", async () => {
+    const { multiplierValueLabel } = await import("../catalog");
+    const eve = { ...EMPTY_MULTIPLIER, holiday_kinds: ["eve" as const], value: 6 };
+    const weekend = { ...EMPTY_MULTIPLIER, weekdays: [5, 6], value: 3 };
+    expect(multiplierValueLabel(eve)).toBe("+6");
+    expect(multiplierValueLabel(weekend)).toBe("+3");
   });
 });
