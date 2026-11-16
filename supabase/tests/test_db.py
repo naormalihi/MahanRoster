@@ -1927,3 +1927,44 @@ def test_highest_value_is_added_once(conn):
         conn.execute("update slots set is_surprise = true where id = %s", (k,))
         assert pts() == round((4 + 5) * Decimal(str(conn.execute("select app.setting('surprise_multiplier') #>> '{}'").fetchone()[0])), 2)
         raise psycopg.Rollback()
+
+
+def test_soldiers_hear_about_changes_to_a_published_board(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        conn.execute("update cycles set start_date = current_date + 10 where id = %s and start_date <= current_date", (cycle,))
+        conn.execute("update slots set starts_at = starts_at + interval '400 days', ends_at = ends_at + interval '400 days' where cycle_id = %s and starts_at <= now()", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        a, b = [r[0] for r in conn.execute("select id from soldiers where is_active order by id desc limit 2").fetchall()]
+        users = {}
+        for sid, name in ((a, "notify_a"), (b, "notify_b")):
+            uid = conn.execute("select app.create_auth_user(%s, 'x-long-password')", (name + "@users.invalid",)).fetchone()[0]
+            conn.execute("delete from app_users where soldier_id = %s", (sid,))
+            conn.execute("insert into app_users (id, username, soldier_id) values (%s, %s, %s)", (uid, name, sid))
+            users[sid] = uid
+        got = lambda sid, kind: conn.execute(  # noqa: E731
+            "select count(*) from notifications where recipient_user_id = %s and type = %s", (users[sid], kind)).fetchone()[0]
+
+        def duty(days):
+            k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                             "(%s, %s, now() + make_interval(days => %s), now() + make_interval(days => %s + 1)) returning id",
+                             (cycle, tid, days, days)).fetchone()[0]
+            p = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason) select %s, id, gaf_id, 'performer', 'assigned', 'manual', 'בדיקה' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
+            r = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason) select %s, id, gaf_id, 'reserve', 'reserve_idle', 'manual', 'בדיקה' from soldiers where id = %s returning id", (k, b)).fetchone()[0]
+            return k, p, r
+
+        # undoing an activation: the performer is back on, the reserve stands by again
+        k, p, r = duty(300)
+        _as_coord(conn, "select public.activate_reserve(%s)", r)
+        _as_coord(conn, "select public.undo_reserve_activation(%s)", r)
+        assert got(a, "duty_restored") == 1 and got(b, "activation_undone") == 1
+        # deleting a published duty: both hear it is cancelled
+        _as_coord(conn, "select public.delete_slot(%s, 'בוטלה')", k)
+        assert got(a, "duty_removed") >= 1 and got(b, "duty_removed") >= 1
+        # unpublishing: one message each, however many duties
+        duty(310)
+        duty(320)
+        _as_coord(conn, "select public.unpublish_cycle(%s)", cycle)
+        assert got(a, "board_withdrawn") == 1 and got(b, "board_withdrawn") == 1
+        raise psycopg.Rollback()
