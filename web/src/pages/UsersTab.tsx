@@ -33,7 +33,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/auth";
 import type { ExistingSoldier } from "../lib/roster";
-import { ROLE_NAME, tempPassword, usernameProblem, type AppUser } from "../lib/users";
+import { ROLE_NAME, tempPassword, usernameProblem, type AppUser, type CreatableRole } from "../lib/users";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | null; onChange: (id: string | null) => void; autoFocus?: boolean }) {
@@ -80,7 +80,7 @@ function Handover({ username, password }: { username: string; password: string }
 function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onClose: () => void; onDone: () => void }) {
   const { api } = useAuth();
   const [soldier, setSoldier] = useState<string | null>(null);
-  const [role, setRole] = useState<"gaf_commander" | "unit_commander">("gaf_commander");
+  const [role, setRole] = useState<CreatableRole>("gaf_commander");
   const [username, setUsername] = useState("");
   const [password] = useState(() => tempPassword());
   const [busy, setBusy] = useState(false);
@@ -103,7 +103,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
 
   return (
     <Dialog open onClose={props.onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>משתמש חדש – {role === "unit_commander" ? "מפקד יחידה" : "מפקד גף"}</DialogTitle>
+      <DialogTitle>משתמש חדש – {role === "gaf_commander" ? "מפקד גף" : ROLE_NAME[role]}</DialogTitle>
       <DialogContent dividers>
         {done ? (
           <Handover username={username.trim().toLowerCase()} password={password} />
@@ -112,12 +112,20 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
             <TextField select label="תפקיד" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
               <MenuItem value="gaf_commander">מפקד גף</MenuItem>
               <MenuItem value="unit_commander">מפקד יחידה</MenuItem>
+              <MenuItem value="coordinator">נע"ת תורנויות</MenuItem>
             </TextField>
+            {role === "coordinator" ? (
+              <Alert severity="warning">
+                נע"ת תורנויות נוסף מקבל את כל ההרשאות שלך: שיבוץ, פרסום, הגדרות וניהול משתמשים – כולל איפוס סיסמאות ונעילה של נע"ת אחרים. בכניסה הראשונה
+                הוא יחליף את הסיסמה הזמנית ויגדיר אימות דו-שלבי לפני שיוכל לפעול.
+              </Alert>
+            ) : (
             <Typography variant="body2" color="text.secondary">
               {role === "unit_commander"
                 ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא \"נתוני היחידה\" – כולל כל שינוי הגדרות שנע\"ת עשה בחודש האחרון."
                 : "מפקד גף רואה את כל נתוני היחידה (מחזור, אילוצים, פוטנציאל, טיוטה, חיילים ולוח) לקריאה בלבד, ולא יכול לשנות דבר."}
             </Typography>
+            )}
             <SoldierPicker soldiers={props.soldiers} value={soldier} onChange={setSoldier} autoFocus />
             <TextField
               label="שם משתמש (לטינית)"

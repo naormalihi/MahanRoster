@@ -29,7 +29,7 @@ import {
 } from "../lib/cycles";
 import { dayKey } from "../lib/dates";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "../lib/baseSchedule";
-import type { AppUser } from "../lib/users";
+import type { AppUser, CreatableRole } from "../lib/users";
 import type { AppNotification } from "../lib/notifications";
 import type { UnitDashboard } from "../lib/dashboard";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "../lib/draft";
@@ -1067,7 +1067,7 @@ export class DemoApi implements Api {
     return this.users.map((u) => ({ ...u, roles: [...u.roles] }));
   }
 
-  async createUser(username: string, password: string, soldierId: string | null, role: "gaf_commander" | "unit_commander" = "gaf_commander") {
+  async createUser(username: string, password: string, soldierId: string | null, role: CreatableRole = "gaf_commander") {
     await delay(300);
     if (this.users.some((u) => u.username === username)) throw new Error("שם המשתמש כבר קיים");
     if (password.length < 10) throw new Error("סיסמה זמנית: לפחות 10 תווים");

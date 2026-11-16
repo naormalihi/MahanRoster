@@ -30,6 +30,9 @@ export const ROLE_NAME: Record<Role, string> = {
   soldier: "חייל",
 };
 
+/** The accounts נע"ת creates in the users screen (soldiers come in with an invite code). */
+export type CreatableRole = "coordinator" | "gaf_commander" | "unit_commander";
+
 export const USERNAME_RULE = /^[a-z0-9._-]{3,32}$/;
 
 /** A temporary password without look-alike characters (0/O, 1/l/I). */
