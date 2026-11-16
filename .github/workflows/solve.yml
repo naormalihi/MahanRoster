@@ -29,7 +29,8 @@ jobs:
       - run: pip install "./solver[worker]"
       - name: Solve queued jobs
         env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # the engine's own role (see migration 081) once its secret exists; the owner until then
+          DATABASE_URL: ${{ secrets.SOLVER_DB_URL || secrets.SUPABASE_DB_URL }}
           PYTHONUNBUFFERED: "1"
         run: |
           if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set"; exit 1; fi
