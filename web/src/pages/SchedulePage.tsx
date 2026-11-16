@@ -38,6 +38,7 @@ import type { TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
 import { dayKey, dayLabel, TZ } from "../lib/dates";
 import { UnpublishDialog, type UnpublishImpact } from "../components/UnpublishDialog";
+import { WorkingOwl } from "../components/EmptyState";
 import { REASON_LABEL } from "../lib/potential";
 import { OFFLINE_TEXT, pollFailures } from "../lib/network";
 import {
@@ -112,6 +113,7 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+          <WorkingOwl />
           <Typography variant="h3" sx={{ flex: 1 }}>
             {job.status === "queued" ? "ממתין שמנוע השיבוץ יתחיל" : job.kind === "update" ? "מעדכן את השיבוץ" : "מנוע השיבוץ רץ"}
           </Typography>

@@ -3,7 +3,6 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
-  Alert,
   Box,
   Chip,
   CircularProgress,
@@ -14,6 +13,7 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
+import { EmptyState, ErrorState, greeting } from "../components/EmptyState";
 import { PushControl } from "../components/NotificationBell";
 import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
 import { splitDuties, type MyDuty, type MyScore } from "../lib/me";
@@ -119,7 +119,7 @@ export function MyPage() {
       .catch((e) => setError((e as Error).message));
   }, [api]);
 
-  if (error) return <Alert severity="error">{error}</Alert>;
+  if (error) return <ErrorState text={error} onRetry={() => window.location.reload()} />;
   if (!duties)
     return (
       <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
@@ -132,12 +132,17 @@ export function MyPage() {
 
   return (
     <Stack spacing={2} sx={{ maxWidth: 720 }}>
-      <Box>
-        <Typography variant="h1">התורנויות שלי</Typography>
-        <Typography variant="body2" color="text.secondary">
-          שלום{me?.username ? `, ${me.username}` : ""}
-        </Typography>
-      </Box>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+        <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ width: 48, height: 48, flexShrink: 0 }} />
+        <Box>
+          <Typography variant="h1">התורנויות שלי</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {greeting()}
+            {me?.username ? `, ${me.username}` : ""}
+            {next ? ` · התורנות הבאה ${dayLabel(next.starts_at)}` : ""}
+          </Typography>
+        </Box>
+      </Stack>
 
       {next ? (
         <Paper sx={{ p: 2, borderInlineStart: 4, borderColor: "primary.main" }}>
@@ -147,7 +152,7 @@ export function MyPage() {
           <DutyRow d={next} open onToggle={() => undefined} />
         </Paper>
       ) : (
-        <Alert severity="info">אין לך תורנויות קרובות בלוחות שפורסמו.</Alert>
+        <EmptyState pose="sleep" title="אין לך תורנויות קרובות" text="כשיתפרסם לוח חדש, התורנויות שלך יופיעו כאן ותקבל התראה." />
       )}
 
       {scores[0] && <ScoreCard s={scores[0]} />}

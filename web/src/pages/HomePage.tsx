@@ -1,5 +1,6 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import { EmptyState } from "../components/EmptyState";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { isStaff, type BoardRow } from "../lib/api";
@@ -110,7 +111,7 @@ export function HomePage() {
           {!week ? (
             <CircularProgress size={20} />
           ) : week.length === 0 ? (
-            <Typography color="text.secondary">אין תורנויות מפורסמות בשבעת הימים הקרובים.</Typography>
+            <EmptyState size="sm" pose="sleep" title="שקט השבוע" text="אין תורנויות מפורסמות בשבעת הימים הקרובים." />
           ) : (
             <>
               <Typography>

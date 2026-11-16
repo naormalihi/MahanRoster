@@ -35,6 +35,7 @@ import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
 import { APP_VERSION, BUILD_DATE, BUILD_SHA, CHANGELOG } from "../lib/changelog";
+import { Mascot } from "./Mascot";
 
 const ROLE_LABEL: Record<string, string> = {
   coordinator: "נע\"ת תורנויות",
@@ -167,7 +168,10 @@ function VersionFooter() {
         )}
       </Box>
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>מה חדש</DialogTitle>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Mascot pose="point" height={64} />
+          מה חדש בתורנצ׳יק
+        </DialogTitle>
         <DialogContent dividers>
           {CHANGELOG.map((r) => (
             <Box key={r.version} sx={{ "& + &": { mt: 2 } }}>

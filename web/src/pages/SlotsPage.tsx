@@ -27,6 +27,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
+import { EmptyState } from "../components/EmptyState";
 import {
   buildSlots,
   readRows,
@@ -444,7 +445,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
     props.onDeleted();
   }
 
-  if (!props.slots.length) return <Alert severity="info">אין עדיין משבצות במחזור הזה.</Alert>;
+  if (!props.slots.length) return <EmptyState title="עוד אין משבצות במחזור" text="קולטים את קובץ לוח הבסיס למעלה – ומכאן יוצאים לשיבוץ." />;
   return (
     <Stack spacing={1.5}>
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
