@@ -736,6 +736,15 @@ def test_candidates_match_the_engine_and_manual_changes(conn):
         _as_coord(conn, "select public.manual_assign(%s, 'reserve', %s, null, 'x')", slot.id, new_sid)
     doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
     assert any(f["slot_id"] == str(slot.id) and f["soldier_id"] == str(new_sid) for f in doc["fixed"])  # kept by the next run
+    # a second duty at the same hours: refused, whatever the reason (performer or reserve)
+    twin = conn.execute(
+        "insert into slots (cycle_id, task_type_id, starts_at, ends_at, performers_needed, reserves_needed) "
+        "select cycle_id, task_type_id, starts_at + interval '1 hour', ends_at + interval '1 hour', 1, 1 from slots where id = %s returning id",
+        (slot.id,)).fetchone()[0]
+    for role in ("performer", "reserve"):
+        with pytest.raises(psycopg.Error, match="חופפות"):
+            _as_coord(conn, f"select public.manual_assign(%s, '{role}', %s, null, 'בכל זאת')", twin, new_sid)
+    conn.execute("delete from slots where id = %s", (twin,))
     _as_coord(conn, "select public.remove_assignment(%s, 'בדיקה')", aid)
     assert conn.execute("select count(*) from assignments where id = %s", (aid,)).fetchone()[0] == 0
     assert conn.execute("select count(*) from audit_log where action = 'remove_assignment' and entity_id = %s", (str(aid),)).fetchone()[0] == 1
@@ -1460,9 +1469,13 @@ def test_assign_published_staffs_a_waiting_duty(conn):
     with conn.transaction():
         conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
         tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
-        a, b, c = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 3").fetchall()]
         k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
                          "(%s, %s, now() + interval '30 days', now() + interval '31 days') returning id", (cycle, tid)).fetchone()[0]
+        # soldiers free at those hours (two duties at once are refused)
+        a, b, c = [r[0] for r in conn.execute(
+            "select so.id from soldiers so where so.is_active and not exists (select 1 from assignments x join slots y on y.id = x.slot_id "
+            "where x.soldier_id = so.id and y.id <> %s and y.starts_at < now() + interval '31 days' and y.ends_at > now() + interval '30 days' "
+            "and x.status not in ('dropped', 'cancelled_approved', 'swapped_out')) order by so.id limit 3", (k,)).fetchall()]
         conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'draft' from soldiers where id = %s", (k, c))
         p = _as_coord(conn, "select public.assign_published(%s, 'performer', %s, null)", k, a)[0][0]
         st, src = conn.execute("select status, source from assignments where id = %s", (p,)).fetchone()
@@ -1480,8 +1493,12 @@ def test_new_run_saves_when_a_manual_reserve_points_at_an_old_engine_performer(c
     with conn.transaction():
         conn.execute("update cycles set status = 'review' where id = %s", (cycle,))
         k = conn.execute("select id from slots where cycle_id = %s order by starts_at limit 1", (cycle,)).fetchone()[0]
-        a, b = [r[0] for r in conn.execute("select id from soldiers where is_active order by id limit 2").fetchall()]
         conn.execute("delete from assignments where slot_id = %s", (k,))
+        # soldiers free at the slot's hours (two duties at once are refused)
+        a, b = [r[0] for r in conn.execute(
+            "select so.id from soldiers so, slots k where k.id = %s and so.is_active and not exists (select 1 from assignments x join slots y on y.id = x.slot_id "
+            "where x.soldier_id = so.id and y.starts_at < k.ends_at and y.ends_at > k.starts_at "
+            "and x.status not in ('dropped', 'cancelled_approved', 'swapped_out')) order by so.id limit 2", (k,)).fetchall()]
         p = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source) select %s, id, gaf_id, 'performer', 'draft', 'solver' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
         conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, paired_assignment_id) select %s, id, gaf_id, 'reserve', 'draft', 'manual', 'בדיקה', %s from soldiers where id = %s", (k, p, b))
         job = conn.execute("insert into schedule_jobs (cycle_id, kind, input, status) values (%s, 'full', '{}'::jsonb, 'running') returning id", (cycle,)).fetchone()[0]

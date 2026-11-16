@@ -146,6 +146,8 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
   }
 
   const task = ctx.tasks.get(slot.task_type_id);
+  // another duty at the same hours: no one holds two duties at once – not selectable at all
+  const overlapOf = (c: Candidate) => c.conflicts.filter((x) => Date.parse(x.starts_at) < Date.parse(slot.ends_at) && Date.parse(x.ends_at) > Date.parse(slot.starts_at));
   const warn = chosen && (chosen.reasons.length > 0 || chosen.conflicts.length > 0);
 
   return (
@@ -181,8 +183,9 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
               {shown.slice(0, 150).map((c) => {
                 const s = ctx.soldiers.get(c.soldier_id);
                 const bad = c.reasons.length > 0;
+                const clash = overlapOf(c);
                 return (
-                  <ListItemButton key={c.soldier_id} selected={chosen?.soldier_id === c.soldier_id} onClick={() => setChosen(c)} disabled={!!c.in_slot}>
+                  <ListItemButton key={c.soldier_id} selected={chosen?.soldier_id === c.soldier_id} onClick={() => setChosen(c)} disabled={!!c.in_slot || clash.length > 0}>
                     <ListItemText
                       primary={
                         <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
@@ -192,7 +195,11 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
                           </Typography>
                           {c.in_slot && <Chip size="small" label={`כבר ${ROLE_LABEL[c.in_slot]}`} />}
                           {bad && <Chip size="small" color="error" variant="outlined" label="לא זכאי" />}
-                          {c.conflicts.length > 0 && <Chip size="small" color="warning" variant="outlined" label="חופף" />}
+                          {clash.length > 0 ? (
+                            <Chip size="small" color="error" label="משובץ באותו זמן" />
+                          ) : (
+                            c.conflicts.length > 0 && <Chip size="small" color="warning" variant="outlined" label="מנוחה" />
+                          )}
                         </Stack>
                       }
                       secondary={
@@ -217,7 +224,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
           {warn && (
             <Alert severity="warning">
               {chosen!.reasons.length > 0 && <div>לא זכאי: {reasonText(chosen!.reasons)}.</div>}
-              {chosen!.conflicts.length > 0 && <div>חופף לתורנות אחרת.</div>}
+              {chosen!.conflicts.length > 0 && <div>בלי מספיק מנוחה מתורנות אחרת.</div>}
               אפשר לשבץ בכל זאת – {props.published ? "עם סיבה, שנשמרת ביומן" : "הנימוק נשמר ביומן"}.
             </Alert>
           )}
