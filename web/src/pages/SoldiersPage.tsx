@@ -4,6 +4,9 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
+import TuneIcon from "@mui/icons-material/Tune";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { CardList, RowCard } from "../components/CardList";
 import {
   Alert,
   Box,
@@ -11,6 +14,7 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -513,6 +517,11 @@ export function SoldiersPage() {
   const [exTypes, setExTypes] = useState<ExemptionType[]>([]);
   const [exFilter, setExFilter] = useState(""); // "" all · "now" · "any" · "pending" · "none"
   const [showInactive, setShowInactive] = useState(false);
+  // on a phone the filters and the score summary fold away, and the table becomes cards
+  const narrow = useMediaQuery(useTheme().breakpoints.down("sm"));
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const activeFilters = [gaf, rank, relief, exFilter, service, range].filter(Boolean).length;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SoldierDetail | null>(null);
   const [bulk, setBulk] = useState(false);
@@ -835,6 +844,30 @@ export function SoldiersPage() {
       )}
 
       <Paper sx={{ p: 2 }}>
+        {narrow && (
+          <Stack direction="row" spacing={1} sx={{ mb: filtersOpen ? 1.5 : 0, alignItems: "center" }}>
+            <TextField
+              sx={{ flex: 1 }}
+              size="small"
+              placeholder="חיפוש לפי שם"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+            <Button data-read variant={activeFilters ? "contained" : "outlined"} startIcon={<TuneIcon />} onClick={() => setFiltersOpen(!filtersOpen)}>
+              סינון{activeFilters ? ` (${activeFilters})` : ""}
+            </Button>
+          </Stack>
+        )}
+        <Collapse in={!narrow || filtersOpen} unmountOnExit={false}>
         <Box
           sx={{
             display: "grid",
@@ -847,7 +880,7 @@ export function SoldiersPage() {
           }}
         >
           <TextField
-            sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}
+            sx={{ gridColumn: { xs: "1 / -1", md: "auto" }, display: narrow ? "none" : undefined }}
             placeholder="חיפוש לפי שם"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -938,6 +971,7 @@ export function SoldiersPage() {
             <MenuItem value="valid">בתוקף</MenuItem>
           </TextField>
         </Box>
+        </Collapse>
         <Stack
           direction="row"
           spacing={1.5}
@@ -986,7 +1020,22 @@ export function SoldiersPage() {
 
       {rows && rows.length > 0 && (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
-          <Typography variant="subtitle2">
+          {narrow && (
+            <Box
+              data-read
+              component="button"
+              type="button"
+              onClick={() => setSummaryOpen(!summaryOpen)}
+              sx={{ all: "unset", display: "flex", width: "100%", alignItems: "center", cursor: "pointer" }}
+            >
+              <Typography variant="subtitle2" sx={{ flex: 1 }}>
+                ניקוד לפי אוכלוסייה – נוכחי ועתידי
+              </Typography>
+              <ExpandMoreIcon sx={{ transform: summaryOpen ? "rotate(180deg)" : "none", transition: "transform .2s", color: "text.secondary" }} />
+            </Box>
+          )}
+          <Collapse in={!narrow || summaryOpen}>
+          <Typography variant="subtitle2" sx={{ mt: narrow ? 1 : 0 }}>
             ניקוד נוכחי – {cur ? cur.cycle.name : "אין מחזור פעיל"}
           </Typography>
           {cur ? (
@@ -1026,10 +1075,89 @@ export function SoldiersPage() {
             לפי התאריך של היום. נוכחי = ניקוד פתיחה (לחיילים חדשים) ועוד התורנויות במחזור שהיום בתוכו; עתידי = המחזור הבא. ניקוד = סכום
             הנקודות של התורנויות שבלוח (בלי עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של המחזור.
           </Typography>
+          </Collapse>
         </Paper>
       )}
 
-      {rows && rows.length > 0 && (
+      {rows && rows.length > 0 && narrow && (
+        <>
+          <CardList>
+            {shown.map((s) => {
+              const lr = activeLoadRole(s);
+              const appointed = s.appointment_rank_id && (!s.appointment_rank_until || s.appointment_rank_until >= today);
+              const n = nowScore(s);
+              const a = staffUser ? accountLabel(accounts.get(s.id), todayIso()) : null;
+              const h = holidayDuty.get(s.id);
+              return (
+                <RowCard
+                  key={s.id}
+                  dim={!s.is_active}
+                  onClick={() => setEditing(s)}
+                  lead={
+                    <Checkbox
+                      size="small"
+                      sx={{ p: 0.25, mt: 0.1 }}
+                      checked={selected.has(s.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggle(s.id)}
+                      slotProps={{ input: { "aria-label": `בחירת ${s.full_name}` } }}
+                    />
+                  }
+                  title={s.full_name}
+                  chips={
+                    <>
+                      {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : s.tash_level ? <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} /> : null}
+                      {a && a.tone !== "default" && <Chip size="small" variant="outlined" color={a.tone} label={a.text} />}
+                    </>
+                  }
+                  sub={
+                    <>
+                      {s.rank_name}
+                      {appointed ? ` (מינוי ${rankName.get(s.appointment_rank_id!)})` : ""} · {s.gaf_name} · {SERVICE[effectiveService(s)]}
+                      {s.release_date ? ` · תום שירות ${fmt(s.release_date)}` : ""}
+                    </>
+                  }
+                  lines={[
+                    <>
+                      ניקוד <b>{n ? n.points.toFixed(1) : "—"}</b>
+                      {n ? ` (${n.opening ? (n.duties ? `פתיחה + ${n.duties} תורנויות` : "פתיחה") : `${n.duties} תורנויות`})` : ""}
+                      {nxt && nxt.ids.has(s.id) ? ` · הבא ${(nxt.scores.get(s.id)?.points ?? 0).toFixed(1)}` : ""}
+                      {h ? ` · ${h.day <= today ? "ביצע" : "משובץ"} תורנות חג` : ""}
+                    </>,
+                    (
+                      <Stack direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }} component="span">
+                        <RangeChip until={s.range_valid_until} />
+                        {activeLoadRoles(s).map((r) => (
+                          <Chip key={r.load_role_id + r.valid_from} size="small" label={`${r.name} ×${r.factor}`} color={r.load_role_id === lr?.load_role_id ? "primary" : "default"} variant={r.load_role_id === lr?.load_role_id ? "filled" : "outlined"} />
+                        ))}
+                        {(exBySoldier.get(s.id) ?? []).map((e) => {
+                          const now = e.start_date <= today;
+                          const pending = e.status === "pending";
+                          const type = exTypeName.get(e.exemption_type_id) ?? "פטור";
+                          return (
+                            <Chip
+                              key={e.id}
+                              size="small"
+                              label={`${type}${e.kind === "partial" ? " (חלקי)" : ""} · ${now ? `עד ${ddmm(e.end_date)}` : `מ-${ddmm(e.start_date)}`}${pending ? " · ממתין" : ""}`}
+                              color={pending ? "warning" : now ? "info" : "default"}
+                              variant={now && !pending ? "filled" : "outlined"}
+                            />
+                          );
+                        })}
+                      </Stack>
+                    ),
+                  ]}
+                />
+              );
+            })}
+          </CardList>
+          <Typography variant="caption" color="text.secondary">
+            מוצגים {shown.length} מתוך {rows.length}. לחיצה על חייל פותחת עריכה; סימון בתיבה – לפעולות על כמה חיילים.
+          </Typography>
+        </>
+      )}
+
+      {rows && rows.length > 0 && !narrow && (
         <Paper sx={{ overflow: "hidden" }}>
           <Box sx={{ overflowX: "auto", maxHeight: "70vh" }}>
             <Table size="small" stickyHeader sx={{ minWidth: 1180 }}>

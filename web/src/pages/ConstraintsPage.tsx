@@ -68,6 +68,7 @@ import {
 import type { ExistingSoldier } from "../lib/roster";
 import { DeadlineEditor } from "../components/DeadlineEditor";
 import { EmptyState } from "../components/EmptyState";
+import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
@@ -350,6 +351,7 @@ function ApproveDialog(props: { ex: Exemption; who: string; onClose: () => void;
 }
 
 function ExemptionsTab({ ctx }: { ctx: Ctx }) {
+  const narrow = useNarrow();
   const { api } = useAuth();
   const [params] = useSearchParams();
   const [rows, setRows] = useState<Exemption[] | null>(null);
@@ -407,6 +409,45 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
       </Stack>
       {shown.length === 0 ? (
         <EmptyState size="sm" title="אין פטורים להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
+      ) : narrow ? (
+        <CardList>
+          {shown.map((r) => (
+            <RowCard
+              key={r.id}
+              title={nameOf(ctx, r.soldier_id)}
+              chips={
+                <>
+                  <Tooltip title={r.decision_reason ?? ""}>
+                    <Chip size="small" color={STATUS_COLOR[r.status]} label={STATUS_LABEL[r.status]} />
+                  </Tooltip>
+                  {r.is_urgent && <Chip size="small" color="error" variant="outlined" label="דחוף" />}
+                  {r.source === "soldier" && <Chip size="small" color="info" variant="outlined" label="הגיש בעצמו" />}
+                </>
+              }
+              sub={`${typeName.get(r.exemption_type_id) ?? ""} · ${scope(r)}`}
+              lines={[
+                `${gafOf(ctx, r.soldier_id)} · ${fmt(r.start_date)} – ${fmt(r.end_date)}`,
+                r.source === "computed" ? "מחושב" : r.proof_checked_at ? `אסמכתא נבדקה ${fmt(r.proof_checked_at)}` : null,
+              ]}
+              actions={
+                r.status === "pending" ? (
+                  <>
+                    <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setApproving(r)}>
+                      אישור
+                    </Button>
+                    <Button size="small" color="error" startIcon={<CloseIcon />} onClick={() => setRejecting({ ex: r, action: "reject" })}>
+                      דחייה
+                    </Button>
+                  </>
+                ) : r.status === "approved" ? (
+                  <Button size="small" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
+                    ביטול
+                  </Button>
+                ) : undefined
+              }
+            />
+          ))}
+        </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -550,6 +591,7 @@ function AbsenceDialog(props: { ctx: Ctx; types: AbsenceType[]; onClose: () => v
 }
 
 function AbsencesTab({ ctx }: { ctx: Ctx }) {
+  const narrow = useNarrow();
   const { api } = useAuth();
   const [rows, setRows] = useState<Absence[] | null>(null);
   const [types, setTypes] = useState<AbsenceType[]>([]);
@@ -586,6 +628,35 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
       </Stack>
       {shown.length === 0 ? (
         <EmptyState size="sm" title="אין היעדרויות להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
+      ) : narrow ? (
+        <CardList>
+          {shown.map((r) => {
+            const d = absenceDays(r);
+            return (
+              <RowCard
+                key={r.id}
+                dim={r.status !== "active"}
+                title={nameOf(ctx, r.soldier_id)}
+                chips={
+                  r.status === "active" ? undefined : (
+                    <Tooltip title={r.cancel_reason ?? ""}>
+                      <Chip size="small" label="בוטלה" />
+                    </Tooltip>
+                  )
+                }
+                sub={`${typeName.get(r.absence_type_id) ?? ""} · ${fmt(d.from)} – ${fmt(d.to)} (${daysBetween(d.from, d.to)} ימים)`}
+                lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
+                actions={
+                  r.status === "active" ? (
+                    <Button size="small" color="inherit" onClick={() => setCancelling(r)}>
+                      ביטול
+                    </Button>
+                  ) : undefined
+                }
+              />
+            );
+          })}
+        </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
@@ -663,6 +734,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
 // ---------------------------------------------------------------------------
 
 function BlocksTab({ ctx }: { ctx: Ctx }) {
+  const narrow = useNarrow();
   const { api } = useAuth();
   const [rows, setRows] = useState<DateBlock[] | null>(null);
   const [quota, setQuota] = useState(1);
@@ -725,6 +797,33 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
       </Typography>
       {shown.length === 0 ? (
         <EmptyState size="sm" title="אין חסימות להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
+      ) : narrow ? (
+        <CardList>
+          {shown.map((r) => (
+            <RowCard
+              key={r.id}
+              dim={r.status !== "active"}
+              title={nameOf(ctx, r.soldier_id)}
+              chips={r.status === "active" ? undefined : <Chip size="small" label="בוטלה" />}
+              sub={fmt(r.day)}
+              lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
+              actions={
+                r.status === "active" ? (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={async () => {
+                      await api!.cancelDateBlock(r.id);
+                      void load();
+                    }}
+                  >
+                    ביטול
+                  </Button>
+                ) : undefined
+              }
+            />
+          ))}
+        </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
