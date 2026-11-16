@@ -149,6 +149,12 @@ class Absence:
 
 
 @dataclass
+class SlotExclusion:
+    slot_id: str
+    soldier_id: str
+
+
+@dataclass
 class DateBlock:
     soldier_id: str
     date: date
@@ -280,6 +286,9 @@ class Problem:
     # Periods a soldier is already committed outside this run (a duty from an earlier
     # window or an already-published duty), rest included. Treated like an absence.
     busy: list[Absence] = field(default_factory=list)
+    # Soldiers taken off a duty (removed with a reason, replaced by an activated reserve, released
+    # by an exemption): not proposed for that duty again.
+    excluded: list[SlotExclusion] = field(default_factory=list)
 
 
 @dataclass
