@@ -214,7 +214,6 @@ export function Layout({ children }: { children: ReactNode }) {
       : isSoldier(me)
         ? SOLDIER_LINKS
         : [];
-  const current = links.find((l) => l.match(pathname));
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", "@media print": { bgcolor: "white" } }}>
       <AppBar position="sticky" color="primary" elevation={0} sx={{ "@media print": { display: "none" } }}>
@@ -229,8 +228,8 @@ export function Layout({ children }: { children: ReactNode }) {
             תורנצ׳יק
           </Typography>
           {compact && (
-            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-              {current?.label}
+            <Typography variant="body2" sx={{ opacity: 0.85, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} dir="auto">
+              {me?.username}
             </Typography>
           )}
           {!compact &&
