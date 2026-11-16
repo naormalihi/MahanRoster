@@ -77,13 +77,14 @@ export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" |
 export interface ScoringSettings {
   night_window: string; // "22:00-06:00" – who sleeps at home is not given duties in it
   weekend_weekdays: number[]; // ISO: 1 = Monday … 7 = Sunday – for weekend balancing
-  surprise_multiplier: number; // a duty added after publishing that caught its performer by surprise
+  surprise_multiplier: number; // a soldier put on a duty at short notice (הקפצה)
+  surprise_notice_hours: number; // "short notice": less than this many hours before the duty starts
   exemption_deadline_days: number; // a new cycle's constraints close this many days before it starts
   fairness_tolerance_pct: number; // the load screen flags a soldier further than this % from his peers' mean
   grace_days: number; // a new soldier's training period: no duties for this many days from his first cycle
 }
 
-export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days"] as const;
+export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "surprise_notice_hours", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days"] as const;
 
 export const ISO_DAY_LABEL: Record<number, string> = { 7: "ראשון", 1: "שני", 2: "שלישי", 3: "רביעי", 4: "חמישי", 5: "שישי", 6: "שבת" };
 export const ISO_WEEK = [7, 1, 2, 3, 4, 5, 6];
@@ -95,6 +96,8 @@ export function scoringProblems(s: ScoringSettings): string[] {
   if (!WINDOW_RE.test(s.night_window)) p.push("חלון לילה בתבנית 22:00-06:00");
   if (!s.weekend_weekdays.length) p.push("בחר לפחות יום אחד של סוף שבוע");
   if (!(s.surprise_multiplier >= 1) || s.surprise_multiplier > 10) p.push("מקדם הקפצה – בין 1 ל-10");
+  if (!Number.isInteger(s.surprise_notice_hours) || s.surprise_notice_hours < 1 || s.surprise_notice_hours > 336)
+    p.push("סף הקפצה – בין 1 ל-336 שעות");
   if (!(s.fairness_tolerance_pct >= 1) || s.fairness_tolerance_pct > 100) p.push("טווח הוגנות – בין 1% ל-100%");
   if (!Number.isInteger(s.grace_days) || s.grace_days < 0 || s.grace_days > 365) p.push("תקופת הכשרה – בין 0 ל-365 ימים");
   if (!Number.isInteger(s.exemption_deadline_days) || s.exemption_deadline_days < 1 || s.exemption_deadline_days > 180)

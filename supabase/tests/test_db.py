@@ -2023,3 +2023,52 @@ def test_solver_role_logged_in_directly_can_report_a_result(conn):
     finally:
         conn.execute("alter role mahan_solver with nologin password null")
         conn.execute("delete from schedule_jobs where id = %s", (job,))
+
+
+def test_call_up_by_notice(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() - interval '10 days' where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        m = float(conn.execute("select coalesce((app.setting('surprise_multiplier') #>> '{}')::numeric, 1)").fetchone()[0])
+        a, b, c = [r[0] for r in conn.execute("select id from soldiers where is_active order by id desc limit 3").fetchall()]
+
+        def slot(hours):
+            return conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                                "(%s, %s, now() + make_interval(hours => %s), now() + make_interval(hours => %s + 24)) returning id",
+                                (cycle, tid, hours, hours)).fetchone()[0]
+
+        def put(k, sid, role="performer", status="assigned"):
+            return conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, points, normalized_points, source, manual_reason) "
+                                "select %s, id, gaf_id, %s, %s, 4, 4, 'manual', 'בדיקה' from soldiers where id = %s returning id",
+                                (k, role, status, sid)).fetchone()[0]
+
+        row = lambda i: conn.execute("select is_surprise, points::float from assignments where id = %s", (i,)).fetchone()  # noqa: E731
+        # put on a duty 48 hours ahead: a call-up; 5 days ahead: not
+        near = put(slot(48), a)
+        assert row(near) == (True, pytest.approx(4 * m))
+        far = put(slot(120), b)
+        assert row(far) == (False, 4.0)
+        # done keeps it; dropped loses it
+        conn.execute("update assignments set status = 'done' where id = %s", (near,))
+        assert row(near)[0] is True
+        # a reserve activated 30 hours ahead: a call-up; the activation undone: gone
+        k = slot(30)
+        r = put(k, c, "reserve", "reserve_idle")
+        assert row(r) == (False, 4.0)
+        conn.execute("update assignments set status = 'reserve_activated' where id = %s", (r,))
+        assert row(r) == (True, pytest.approx(4 * m))
+        conn.execute("update assignments set status = 'reserve_idle', points = 0, normalized_points = 0 where id = %s", (r,))
+        assert row(r) == (False, 0.0)
+        # recomputing the points keeps the multiplier of a called-up soldier
+        raw = float(conn.execute("select raw from app.slot_points(%s, %s)", (conn.execute("select slot_id from assignments where id = %s", (near,)).fetchone()[0], a)).fetchone()[0])
+        base = float(conn.execute("select t.weight from task_types t where id = %s", (tid,)).fetchone()[0])
+        assert raw >= base * m - 0.01
+        # the first publication is never a call-up
+        conn.execute("update cycles set status = 'review', published_at = null where id = %s", (cycle,))
+        d = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, points, normalized_points, source) "
+                         "select %s, id, gaf_id, 'performer', 'draft', 4, 4, 'solver' from soldiers where id = %s returning id", (slot(20), b)).fetchone()[0]
+        conn.execute("update assignments set status = 'assigned' where id = %s", (d,))
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        assert row(d) == (False, 4.0)
+        raise psycopg.Rollback()

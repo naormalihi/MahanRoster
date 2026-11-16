@@ -1201,17 +1201,20 @@ function ScoringTab() {
   const [saved, setSaved] = useState<ScoringSettings | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [surprise, setSurprise] = useState<string | null>(null);
+  const [surprise, setSurprise] = useState<{ mult: string; hours: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarDay[]>([]);
 
+  const openSurprise = () => setSurprise({ mult: String(saved?.surprise_multiplier ?? 1.5), hours: String(saved?.surprise_notice_hours ?? 72) });
   async function saveSurprise() {
-    const v = Number(surprise);
+    const v = Number(surprise!.mult);
+    const h = Number(surprise!.hours);
     if (!(v >= 1) || v > 10) return setMsg({ ok: false, text: "מקדם הקפצה – בין 1 ל-10" });
+    if (!Number.isInteger(h) || h < 1 || h > 336) return setMsg({ ok: false, text: "סף הקפצה – בין 1 ל-336 שעות" });
     try {
-      const next = { ...saved!, surprise_multiplier: v };
+      const next = { ...saved!, surprise_multiplier: v, surprise_notice_hours: h };
       await api!.saveScoringSettings(next);
       setSaved(next);
-      setS((x) => (x ? { ...x, surprise_multiplier: v } : x));
+      setS((x) => (x ? { ...x, surprise_multiplier: v, surprise_notice_hours: h } : x));
       setSurprise(null);
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
@@ -1281,10 +1284,10 @@ function ScoringTab() {
                   key: "surprise",
                   name: "הקפצה",
                   value: saved?.surprise_multiplier ?? 1.5,
-                  when: 'תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מכפיל את כל הניקוד שלה',
+                  when: `חייל ששובץ פחות מ-${saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו`,
                   label: `×${saved?.surprise_multiplier ?? 1.5}`,
                   active: true,
-                  open: () => setSurprise(String(saved?.surprise_multiplier ?? 1.5)),
+                  open: openSurprise,
                 },
               ].map((r) => (
                 <Box key={r.key} role="button" tabIndex={0} onClick={r.open} onKeyDown={(e) => e.key === "Enter" && r.open()} sx={{ py: 1.25, cursor: "pointer", opacity: r.active ? 1 : 0.5 }}>
@@ -1327,12 +1330,12 @@ function ScoringTab() {
                     </TableCell>
                   </TableRow>
                 ))}
-                <TableRow hover onClick={() => setSurprise(String(saved?.surprise_multiplier ?? 1.5))} sx={{ cursor: "pointer" }}>
+                <TableRow hover onClick={openSurprise} sx={{ cursor: "pointer" }}>
                   <TableCell sx={{ fontWeight: 600 }}>הקפצה</TableCell>
                   <TableCell>×{saved?.surprise_multiplier}</TableCell>
-                  <TableCell>תורנות שנוספה אחרי הפרסום וסומנה "הקפצה" · מכפיל את כל הניקוד שלה</TableCell>
+                  <TableCell>חייל ששובץ פחות מ-{saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו</TableCell>
                   <TableCell>
-                    <IconButton size="small" aria-label="עריכה" onClick={() => setSurprise(String(saved?.surprise_multiplier ?? 1.5))}>
+                    <IconButton size="small" aria-label="עריכה" onClick={openSurprise}>
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
@@ -1438,18 +1441,29 @@ function ScoringTab() {
 
       {surprise !== null && (
         <Dialog open onClose={() => setSurprise(null)} maxWidth="xs" fullWidth>
-          <DialogTitle>מקדם הקפצה</DialogTitle>
+          <DialogTitle>הקפצה</DialogTitle>
           <DialogContent dividers>
-            <TextField
-              type="number"
-              label="ערך"
-              value={surprise}
-              onChange={(e) => setSurprise(e.target.value)}
-              slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10 } }}
-              helperText="לתורנות שנוספה אחרי הפרסום וסומנה הקפצה. מכפיל את כל הניקוד שלה – המשקל ועוד התוספת."
-              fullWidth
-              autoFocus
-            />
+            <Stack spacing={2} sx={{ pt: 0.5 }}>
+              <TextField
+                type="number"
+                label="מקדם"
+                value={surprise.mult}
+                onChange={(e) => setSurprise({ ...surprise, mult: e.target.value })}
+                slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10 } }}
+                helperText="מכפיל את כל הניקוד של החייל שהוקפץ – המשקל ועוד התוספת."
+                fullWidth
+                autoFocus
+              />
+              <TextField
+                type="number"
+                label="סף (שעות)"
+                value={surprise.hours}
+                onChange={(e) => setSurprise({ ...surprise, hours: e.target.value })}
+                slotProps={{ htmlInput: { step: 1, min: 1, max: 336 } }}
+                helperText="חייל ששובץ פחות מזה לפני שהתורנות מתחילה – עתודה שהופעלה, מחליף או תורנות שנוספה – הוקפץ. הפרסום הראשון של מחזור לא נחשב."
+                fullWidth
+              />
+            </Stack>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setSurprise(null)}>ביטול</Button>

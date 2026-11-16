@@ -240,6 +240,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
                 {performing.map((p) => (
                   <Stack key={p.id} direction="row" spacing={1} sx={{ alignItems: "center", py: 0.25, flexWrap: "wrap" }}>
                     <Typography sx={{ fontWeight: 600 }}>{p.name}</Typography>
+                    {p.is_surprise && <Chip size="small" color="warning" icon={<BoltIcon />} label="הקפצה" />}
                     {p.status === "reserve_activated" && (
                       <Chip size="small" color="warning" variant="outlined" label={`עתודה שהופעלה${p.replaced_id ? ` · במקום ${byId.get(p.replaced_id)?.name ?? ""}` : ""}`} />
                     )}

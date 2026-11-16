@@ -1,3 +1,4 @@
+import BoltIcon from "@mui/icons-material/BoltOutlined";
 import PublishIcon from "@mui/icons-material/Publish";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
@@ -340,6 +341,7 @@ function BoardView({
           size="small"
           variant={performs(a) ? "filled" : "outlined"}
           color={a.source === "manual" ? "secondary" : "default"}
+          icon={a.is_surprise ? <BoltIcon /> : undefined}
           label={`${a.status === "reserve_activated" ? "עתודה שהופעלה: " : a.role === "reserve" ? "עתודה: " : ""}${s?.full_name ?? "?"}`}
           onClick={(e) => {
             e.stopPropagation();
