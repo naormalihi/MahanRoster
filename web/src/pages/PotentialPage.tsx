@@ -26,6 +26,7 @@ import {
   Tabs,
   TextField,
   Typography,
+  Chip,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NamedRef } from "../lib/api";
@@ -47,6 +48,7 @@ import {
   type SnapshotSoldier,
 } from "../lib/potential";
 import type { ExistingSoldier } from "../lib/roster";
+import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 const fmt = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const short = (iso: string) => `${Number(iso.slice(8, 10))}.${Number(iso.slice(5, 7))}`;
@@ -154,6 +156,7 @@ function MatrixTab(props: {
   const [onlyEligible, setOnlyEligible] = useState(true);
   const [onlyMarked, setOnlyMarked] = useState(false);
   const [editing, setEditing] = useState<PotentialCell | null>(null);
+  const narrow = useNarrow();
 
   const at = useMemo(() => new Map(data.cells.map((c) => [`${c.soldier_id}|${c.category_id}`, c])), [data.cells]);
   const rank = useMemo(() => new Map(data.snapshot.map((s) => [s.soldier_id, s.rank_name])), [data.snapshot]);
@@ -215,8 +218,69 @@ function MatrixTab(props: {
         <FormControlLabel control={<Switch checked={onlyMarked} onChange={(e) => setOnlyMarked(e.target.checked)} />} label="רק חלקיים ומתוקנים" />
       </Stack>
       <Typography variant="body2" color="text.secondary">
-        1 = זמין לכל המחזור · ריק = לא זכאי · שבר = חלק המחזור שבו זמין. מסגרת כתומה = תוקן ידנית. מעבר עם העכבר מראה את הסיבה; לחיצה על תא פותחת תיקון.
+        {narrow
+          ? "ירוק = זמין לכל המחזור · כתום = לחלק מהמחזור (השבר) · מסגרת כתומה = תוקן ידנית. לחיצה על קטגוריה פותחת תיקון."
+          : "1 = זמין לכל המחזור · ריק = לא זכאי · שבר = חלק המחזור שבו זמין. מסגרת כתומה = תוקן ידנית. מעבר עם העכבר מראה את הסיבה; לחיצה על תא פותחת תיקון."}
       </Typography>
+      {narrow ? (
+        <>
+          <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "#efedff" }}>
+            <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              סה״כ פוטנציאל
+            </Typography>
+            <Stack direction="row" sx={{ gap: 0.75, flexWrap: "wrap" }}>
+              {summary.map((x) => (
+                <Chip key={x.category_id} size="small" sx={{ bgcolor: "background.paper" }} label={`${categories.find((c) => c.id === x.category_id)?.name ?? ""} · ${x.total}`} />
+              ))}
+            </Stack>
+          </Paper>
+          <CardList>
+            {rows.map(({ s, info }) => {
+              const cells = categories.map((c) => ({ c, cell: at.get(`${s.soldier_id}|${c.id}`) })).filter((x) => x.cell) as { c: NamedRef; cell: PotentialCell }[];
+              const open = cells.filter((x) => effective(x.cell) > 0 || x.cell.override_value !== null);
+              const closed = cells.filter((x) => !(effective(x.cell) > 0 || x.cell.override_value !== null));
+              return (
+                <RowCard
+                  key={s.soldier_id}
+                  title={info?.full_name ?? "—"}
+                  sub={`${info?.gaf_name ?? ""} · ${rank.get(s.soldier_id) ?? ""}`}
+                  lines={[
+                    <Stack key="o" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }}>
+                      {open.length === 0 && "לא זכאי לאף קטגוריה"}
+                      {open.map(({ c, cell }) => {
+                        const v = effective(cell);
+                        return (
+                          <Chip
+                            key={c.id}
+                            size="small"
+                            label={`${c.name} ${cellText(v) || "0"}`}
+                            title={cellTitle(cell)}
+                            onClick={props.locked ? undefined : () => setEditing(cell)}
+                            sx={{
+                              bgcolor: v === 1 ? "#e5f4e4" : v > 0 ? "#f9eeda" : undefined,
+                              border: cell.override_value !== null ? "2px solid #e8700f" : undefined,
+                            }}
+                          />
+                        );
+                      })}
+                    </Stack>,
+                    closed.length > 0 && (
+                      <Stack key="c" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.5, alignItems: "center" }}>
+                        <Typography component="span" variant="caption" color="text.secondary">
+                          לא זכאי:
+                        </Typography>
+                        {closed.map(({ c, cell }) => (
+                          <Chip key={c.id} size="small" variant="outlined" label={c.name} title={cellTitle(cell)} onClick={props.locked ? undefined : () => setEditing(cell)} />
+                        ))}
+                      </Stack>
+                    ),
+                  ]}
+                />
+              );
+            })}
+          </CardList>
+        </>
+      ) : (
       <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: "70vh" }}>
         <Table size="small" stickyHeader>
           <TableHead>
@@ -260,6 +324,7 @@ function MatrixTab(props: {
           </TableBody>
         </Table>
       </TableContainer>
+      )}
       <Typography variant="caption" color="text.secondary">
         {rows.length} חיילים מוצגים מתוך {data.snapshot.length} במחזור.
       </Typography>
@@ -300,7 +365,7 @@ function HeatTab({ daily, categories }: { daily: DailyAvailability[] | null; cat
         <Table size="small" sx={{ "& td, & th": { px: 0.75 } }}>
           <TableHead>
             <TableRow>
-              <TableCell>קטגוריה</TableCell>
+              <TableCell sx={{ position: "sticky", insetInlineStart: 0, bgcolor: "background.paper", zIndex: 2 }}>קטגוריה</TableCell>
               {weeks.map((w) => (
                 <TableCell key={w} sx={{ textAlign: "center", fontSize: 12, whiteSpace: "nowrap" }}>
                   {short(w)}
@@ -313,7 +378,7 @@ function HeatTab({ daily, categories }: { daily: DailyAvailability[] | null; cat
               const all = ws.map((w) => w.min);
               return (
                 <TableRow key={c.id}>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{c.name}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap", position: "sticky", insetInlineStart: 0, bgcolor: "background.paper", zIndex: 1, fontWeight: 600 }}>{c.name}</TableCell>
                   {ws.map((w) => (
                     <TableCell
                       key={w.week_start}
