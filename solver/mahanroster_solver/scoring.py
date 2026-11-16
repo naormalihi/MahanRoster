@@ -1,11 +1,13 @@
 """Duty scoring: day units, multipliers and load-factor normalization.
 
-P = W_task × M per day unit.
+P = W_task × M for the whole duty – the weight is the points of the duty, however
+many days it lasts.
 
-* A duty is split into 24-hour units from its start; a remainder shorter than
-  24 hours is one more unit. Each unit is scored by the day it starts on.
-* Normalized points = P / F, where F is the soldier's load factor on the day
-  each unit starts.
+* M is the highest multiplier on any of the duty's days, applied once. The duty
+  is split into 24-hour units (a remainder is one more unit) only to find its
+  days and to share P equally between them.
+* Normalized points = P / F, where F is the soldier's load factor on the day the
+  duty starts.
 
 With user-defined multipliers (settings.multipliers, from the database), M is
 the highest multiplier whose conditions all hold for the unit, at least 1:
@@ -130,24 +132,30 @@ def multiplier_applies(
 def unit_points(
     task: TaskType, starts_at: datetime, ends_at: datetime, settings: Settings, holidays: set[date]
 ) -> list[tuple[date, float]]:
-    """(day, raw points) for every day unit of a duty."""
+    """(day, raw points) for every day unit of a duty.
+
+    The weight is the points of the whole duty, however long it is: W × M, where M is the
+    highest multiplier on any of its days (once, not per day). Every 24-hour unit carries an
+    equal share, so a duty split between soldiers splits its points by the days each held it.
+    The day of every unit is the duty's start – the load factor on that day applies.
+    """
+    units = day_units(starts_at, ends_at)
     if settings.multipliers is not None:
-        return [
-            (
-                u.date(),
-                task.weight
-                * max(
-                    [1.0]
-                    + [m.value for m in settings.multipliers if multiplier_applies(m, u.date(), task, starts_at, ends_at, settings)]
-                ),
-            )
-            for u in day_units(starts_at, ends_at)
-        ]
-    night = settings.night_multiplier if is_night_duty(starts_at, ends_at, settings) else 1.0
-    return [
-        (u.date(), task.weight * unit_day_multiplier(u.date(), task, settings, holidays) * night)
-        for u in day_units(starts_at, ends_at)
-    ]
+        mult = max(
+            [1.0]
+            + [
+                m.value
+                for u in units
+                for m in settings.multipliers
+                if multiplier_applies(m, u.date(), task, starts_at, ends_at, settings)
+            ]
+        )
+    else:
+        night = settings.night_multiplier if is_night_duty(starts_at, ends_at, settings) else 1.0
+        mult = max(unit_day_multiplier(u.date(), task, settings, holidays) for u in units) * night
+    share = task.weight * mult / len(units)
+    first = units[0].date()
+    return [(first, share) for _ in units]
 
 
 def raw_points(task: TaskType, starts_at: datetime, ends_at: datetime, settings: Settings, holidays: set[date]) -> float:
@@ -161,7 +169,5 @@ def normalized_points(
 
 
 def weekend_units(starts_at: datetime, ends_at: datetime, settings: Settings, holidays: set[date]) -> int:
-    """Number of units that start on a weekend day or a holiday (for weekend balancing)."""
-    return sum(
-        1 for u in day_units(starts_at, ends_at) if is_weekend_day(u.date(), settings) or u.date() in holidays
-    )
+    """1 when the duty touches a weekend day or a holiday (for weekend balancing), else 0."""
+    return int(any(is_weekend_day(u.date(), settings) or u.date() in holidays for u in day_units(starts_at, ends_at)))

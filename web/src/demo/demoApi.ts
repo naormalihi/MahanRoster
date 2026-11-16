@@ -787,8 +787,8 @@ export class DemoApi implements Api {
     for (const k of slots) {
       const t = tasks.get(k.task_type_id);
       const pool = this.soldierList.filter((s) => s.is_active && (!t || t.service_restriction === "any" || t.service_restriction === s.service_type));
-      const days = Math.max(1, Math.round((Date.parse(k.ends_at) - Date.parse(k.starts_at)) / 86_400_000));
-      const pts = Math.round((t?.weight ?? 1) * days * (k.is_surprise ? this.scoring.surprise_multiplier : 1) * 100) / 100;
+      // the weight is the points of the whole duty, however many days it lasts
+      const pts = Math.round((t?.weight ?? 1) * (k.is_surprise ? this.scoring.surprise_multiplier : 1) * 100) / 100;
       const pick = [...pool].sort((a, b) => (load.get(a.id) ?? 0) - (load.get(b.id) ?? 0) || a.id.localeCompare(b.id)).slice(0, 2);
       pick.forEach((s, i) => {
         const role: DraftRole = i === 0 ? "performer" : "reserve";

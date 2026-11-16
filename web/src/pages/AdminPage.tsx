@@ -270,7 +270,7 @@ export function TaskDialog(props: {
               value={t.weight}
               onChange={(e) => set("weight", Number(e.target.value))}
               slotProps={{ htmlInput: { step: 0.25, min: 0.25, max: 99 } }}
-              helperText={weightChanged ? "חל על שיבוצים חדשים בלבד. ניקוד שכבר נצבר לא משתנה" : "נקודות ליחידת 24 שעות"}
+              helperText={weightChanged ? "חל על שיבוצים חדשים בלבד. ניקוד שכבר נצבר לא משתנה" : "הניקוד של התורנות כולה – לא תלוי במספר הימים"}
               fullWidth
             />
           </Stack>
@@ -1266,7 +1266,7 @@ function ScoringTab() {
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            הניקוד של תורנות הוא המשקל שלה לכל יחידת 24 שעות, כפול המקדם הגבוה מבין המקדמים שחלים על היום. מקדמים לא מצטברים זה על זה. שינוי
+            הניקוד של תורנות הוא המשקל שלה – לתורנות כולה, לא תלוי במספר הימים – כפול המקדם הגבוה מבין המקדמים שחלים על אחד מימיה (פעם אחת). מקדמים לא מצטברים זה על זה, ומקדם שהתורנות כבר כוללת (שבת, חגים) לא חל עליה. שינוי
             חל על השיבוץ הבא; ניקוד שכבר נצבר לא משתנה.
           </Typography>
           {narrow ? (
