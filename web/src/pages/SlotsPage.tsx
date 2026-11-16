@@ -42,6 +42,7 @@ import {
 import { HOLIDAY_TYPES, type TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
 import { shortDayLabel, spanLabel, TZ } from "../lib/dates";
+import { useNarrow } from "../components/CardList";
 
 const tsFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 const dowFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "short" });
@@ -134,6 +135,7 @@ function ImportCard(props: {
   onTasksChanged: () => Promise<TaskType[]>;
 }) {
   const { api } = useAuth();
+  const narrow = useNarrow();
   const { refs, cycle } = props;
   const [file, setFile] = useState<string>("");
   const [rows, setRows] = useState<BaseRow[] | null>(null);
@@ -379,21 +381,37 @@ function ImportCard(props: {
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>שורה</TableCell>
+                    {!narrow && <TableCell>שורה</TableCell>}
                     <TableCell>מועד</TableCell>
-                    <TableCell>בקובץ</TableCell>
+                    {!narrow && <TableCell>בקובץ</TableCell>}
                     <TableCell>סוג תורנות</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {result.slots.map((s) => (
                     <TableRow key={s.line}>
-                      <TableCell>{s.line}</TableCell>
-                      <TableCell sx={{ whiteSpace: "nowrap" }} dir="ltr">
-                        {span(s.starts_at, s.ends_at)}
-                      </TableCell>
-                      <TableCell>{s.duty}</TableCell>
-                      <TableCell>
+                      {!narrow && <TableCell>{s.line}</TableCell>}
+                      {narrow ? (
+                        <TableCell sx={{ whiteSpace: "nowrap", verticalAlign: "top" }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {shortDayLabel(s.starts_at)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {spanLabel(s.starts_at, s.ends_at)}
+                          </Typography>
+                        </TableCell>
+                      ) : (
+                        <TableCell sx={{ whiteSpace: "nowrap" }} dir="ltr">
+                          {span(s.starts_at, s.ends_at)}
+                        </TableCell>
+                      )}
+                      {!narrow && <TableCell>{s.duty}</TableCell>}
+                      <TableCell sx={narrow ? { verticalAlign: "top" } : undefined}>
+                        {narrow && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                            שורה {s.line} · בקובץ: {s.duty}
+                          </Typography>
+                        )}
                         {taskName.get(s.task_type_id)}
                         {s.weekendSwitched && <Chip size="small" label="שבת" sx={{ mr: 0.5 }} />}
                         {s.gender && <Chip size="small" label={s.gender === "male" ? "בנים" : "בנות"} sx={{ mr: 0.5 }} />}
