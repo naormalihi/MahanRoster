@@ -1,6 +1,6 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
-import { EmptyState } from "../components/EmptyState";
+import { EmptyState, greeting } from "../components/EmptyState";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { isStaff, type BoardRow } from "../lib/api";
@@ -45,9 +45,10 @@ export function HomePage() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h1">שלום{me?.username ? `, ${me.username}` : ""}</Typography>
+        <Typography variant="h1">תמונת מצב</Typography>
         <Typography variant="body2" color="text.secondary">
-          מה ממתין לך היום
+          {greeting()}
+          {me?.username ? `, ${me.username}` : ""} · מה ממתין לך היום
         </Typography>
       </Box>
 
@@ -136,8 +137,8 @@ export function HomePage() {
 
       <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
         {[
-          { to: "/soldiers", label: "חיילים", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי חיילים" },
-          { to: "/board", label: "לוח מפורסם", hint: "מה שכל היחידה רואה" },
+          { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי חיילים" },
+          { to: "/board", label: "לוח התורנויות", hint: "מה שכל היחידה רואה" },
           { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ומועד סגירת אילוצים" },
           { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים" },
         ]

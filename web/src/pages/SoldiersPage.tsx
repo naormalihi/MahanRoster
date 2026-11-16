@@ -788,7 +788,7 @@ export function SoldiersPage() {
         sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}
       >
         <Typography variant="h1" sx={{ flex: 1 }}>
-          חיילים
+          כוח אדם
         </Typography>
         <Button
           variant="contained"

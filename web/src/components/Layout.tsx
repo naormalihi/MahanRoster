@@ -48,11 +48,11 @@ const ROLE_LABEL: Record<string, string> = {
 
 /** Four areas instead of a link per screen; the cycle steps live inside "מחזור". */
 const STAFF_LINKS = [
-  { to: "/", label: "בית", match: (p: string) => p === "/" },
-  { to: "/dashboard", label: "מחוונים", match: (p: string) => p === "/dashboard" },
-  { to: "/cycle", label: "מחזור", match: (p: string) => p.startsWith("/cycle") },
-  { to: "/soldiers", label: "חיילים", match: (p: string) => p.startsWith("/soldiers") },
-  { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
+  { to: "/", label: "תמונת מצב", match: (p: string) => p === "/" },
+  { to: "/cycle", label: "תכנון ושיבוץ", match: (p: string) => p.startsWith("/cycle") },
+  { to: "/soldiers", label: "כוח אדם", match: (p: string) => p.startsWith("/soldiers") },
+  { to: "/board", label: "לוח התורנויות", match: (p: string) => p === "/board" },
+  { to: "/dashboard", label: "נתוני היחידה", match: (p: string) => p === "/dashboard" },
   { to: "/admin", label: "הגדרות", match: (p: string) => p === "/admin" },
 ];
 
@@ -60,7 +60,7 @@ const STAFF_LINKS = [
 const SOLDIER_LINKS = [
   { to: "/", label: "התורנויות שלי", match: (p: string) => p === "/" },
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
-  { to: "/board", label: "לוח מפורסם", match: (p: string) => p === "/board" },
+  { to: "/board", label: "לוח התורנויות", match: (p: string) => p === "/board" },
 ];
 
 /** The cycle every step works on, chosen here once. */
