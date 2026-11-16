@@ -137,7 +137,7 @@ export function RequestsPage() {
   const formUrgent = form && form.kind === "exemption" && form.from && (!entryOpen(form.from, opts.cycles) || (form.to && !entryOpen(form.to, opts.cycles)));
 
   return (
-    <Stack spacing={2} sx={{ maxWidth: 720 }}>
+    <Stack spacing={2} sx={{ maxWidth: 1040, mx: "auto", width: "100%" }}>
       <Box>
         <Typography variant="h1">הבקשות שלי</Typography>
         <Typography variant="body2" color="text.secondary">
@@ -164,6 +164,8 @@ export function RequestsPage() {
       ) : null}
       {error && <Alert severity="error">{error}</Alert>}
 
+      {/* on a wide screen: exemptions across, date blocks and absences side by side under them */}
+      <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1fr) minmax(0, 1fr)" }, "& > :first-of-type": { gridColumn: { md: "1 / -1" } } }}>
       <Section
         title="פטורים"
         hint='בקשה עוברת לנע"ת. את האסמכתא מציגים לו – המערכת לא שומרת מסמכים או פרטים רפואיים.'
@@ -252,6 +254,7 @@ export function RequestsPage() {
           />
         ))}
       </Section>
+      </Box>
 
       {form && (
         <Dialog open onClose={() => setForm(null)} fullWidth maxWidth="xs">

@@ -131,7 +131,7 @@ export function MyPage() {
   const toggle = (id: string) => setOpen(open === id ? null : id);
 
   return (
-    <Stack spacing={2} sx={{ maxWidth: 720 }}>
+    <Stack spacing={2} sx={{ maxWidth: 1040, mx: "auto", width: "100%" }}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
         <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ width: 48, height: 48, flexShrink: 0 }} />
         <Box>
@@ -144,6 +144,9 @@ export function MyPage() {
         </Box>
       </Stack>
 
+      {/* on a wide screen: the duties on the main side, the score and the settings beside them */}
+      <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 3fr) minmax(0, 2fr)" } }}>
+      <Stack spacing={2} sx={{ minWidth: 0 }}>
       {next ? (
         <Paper sx={{ p: 2, borderInlineStart: 4, borderColor: "primary.main" }}>
           <Typography variant="subtitle2" color="text.secondary">
@@ -154,12 +157,6 @@ export function MyPage() {
       ) : (
         <EmptyState pose="sleep" title="אין לך תורנויות קרובות" text="כשיתפרסם לוח חדש, התורנויות שלך יופיעו כאן ותקבל התראה." />
       )}
-
-      {scores[0] && <ScoreCard s={scores[0]} />}
-
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <PushControl />
-      </Paper>
 
       {upcoming.length > 1 && (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -189,6 +186,14 @@ export function MyPage() {
         </Accordion>
       )}
 
+      </Stack>
+      <Stack spacing={2} sx={{ minWidth: 0 }}>
+      {scores[0] && <ScoreCard s={scores[0]} />}
+
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <PushControl />
+      </Paper>
+
       {scores.length > 1 && (
         <Accordion variant="outlined" disableGutters>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -203,6 +208,9 @@ export function MyPage() {
           </AccordionDetails>
         </Accordion>
       )}
+
+      </Stack>
+      </Box>
 
       <Typography variant="caption" color="text.secondary">
         פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". שאלה על שיבוץ או החלפה? פנה לנע"ת התורנויות או למפקד הגף.
