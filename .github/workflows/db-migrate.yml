@@ -47,3 +47,11 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: supabase/apply_migrations.sh
+      # the audit log was cut down (migration 080); give the freed space back once it is large
+      - name: Compact the audit log when bloated
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          sleep 5  # let the statistics catch up with the delete
+          big=$(psql "$DATABASE_URL" -At -X -c "select n_dead_tup > n_live_tup and pg_total_relation_size(relid) > 50 * 1024 * 1024 from pg_stat_user_tables where schemaname = 'public' and relname = 'audit_log'")
+          if [ "$big" = "t" ]; then echo "compacting audit_log"; psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "vacuum full analyze public.audit_log"; else echo "audit_log is compact"; fi
