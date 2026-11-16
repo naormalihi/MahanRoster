@@ -1491,6 +1491,9 @@ def test_assign_published_staffs_a_waiting_duty(conn):
         _as_coord(conn, "select public.unassign_published(%s, 'לא יכול')", p)
         assert conn.execute("select status, manual_reason from assignments where id = %s", (p,)).fetchone() == ("dropped", "לא יכול")
         assert conn.execute("select paired_assignment_id from assignments where id = %s", (r,)).fetchone()[0] is None
+        # the engine is not to propose him for this duty again
+        ex = conn.execute("select public.build_solver_input(%s, 'stability')", (cycle,)).fetchone()[0]["excluded"]
+        assert {"slot_id": str(k), "soldier_id": str(a)} in ex
         p2 = _as_coord(conn, "select public.assign_published(%s, 'performer', %s, null)", k, c)[0][0]
         assert conn.execute("select status from assignments where id = %s", (p2,)).fetchone()[0] == "assigned"
         raise psycopg.Rollback()

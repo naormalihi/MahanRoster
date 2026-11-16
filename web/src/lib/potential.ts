@@ -54,6 +54,7 @@ export const REASON_LABEL: Record<string, string> = {
   exemption: "פטור מאושר",
   absence: "היעדרות",
   date_block: "חסימת תאריך",
+  removed: "הוסר מהתורנות הזו",
   personal_constraint: "אילוץ אישי",
   penalty_other: "משבצת קנס של חייל אחר",
   busy: "משובץ בתורנות סמוכה (כולל מנוחה)",

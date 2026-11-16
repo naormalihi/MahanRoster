@@ -1,7 +1,7 @@
 from datetime import date
 
 from mahanroster_solver.eligibility import EligibilityIndex
-from mahanroster_solver.models import Absence, DateBlock, Exemption, PersonalConstraint, TaskType
+from mahanroster_solver.models import Absence, DateBlock, SlotExclusion, Exemption, PersonalConstraint, TaskType
 
 from .helpers import DAYDUTY, GUARD, dt, problem, slot, soldier
 
@@ -186,3 +186,9 @@ def test_qualifying_duty_also_open_to_listed_population_within_rank_range():
     assert "rank" in reasons(colonel, k, tasks=(day,))
     assert "not_qualifying" in reasons(captain, k, tasks=(day,))
     assert reasons(parent, k, tasks=(day,)) == []
+
+
+def test_removed_from_this_duty_only():
+    k, other = slot("k", "guard", *MON), slot("m", "guard", "2027-01-06T08:00", "2027-01-07T08:00")
+    assert "removed" in reasons(soldier("A"), k, excluded=[SlotExclusion("k", "A")])
+    assert "removed" not in reasons(soldier("A"), other, excluded=[SlotExclusion("k", "A")])

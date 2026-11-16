@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.9.1",
+    date: "2026-11-16",
+    items: ["חייל שירד מתורנות (הוסר עם סיבה, הוחלף בעתודה שהופעלה או שוחרר בפטור) – המנוע לא מציע אותו שוב לאותה תורנות"],
+  },
+  {
     version: "2.9.0",
     date: "2026-11-16",
     items: [
