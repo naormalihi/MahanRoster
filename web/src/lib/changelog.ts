@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.8.4",
+    date: "2026-11-16",
+    items: ["לוח השיבוץ: התפריט \"פרטי… / החלפה או הסרה\" נפתח ליד השם שנלחץ, ולא בפינת המסך"],
+  },
+  {
     version: "2.8.3",
     date: "2026-11-16",
     items: [

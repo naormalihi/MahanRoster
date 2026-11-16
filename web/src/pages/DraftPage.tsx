@@ -291,7 +291,9 @@ function BoardView({
   onOpenSoldier: (id: string) => void;
 }) {
   const [editing, setEditing] = useState<{ slot: SlotRow; role: Role; current: DraftAssignment | null } | null>(null);
-  const [menu, setMenu] = useState<{ el: HTMLElement; a: DraftAssignment; slot: SlotRow } | null>(null);
+  // where the chip was when clicked: the chips re-render when the menu opens, so the element itself
+  // would be gone and the menu would jump to the corner of the screen
+  const [menu, setMenu] = useState<{ at: { top: number; left: number }; a: DraftAssignment; slot: SlotRow } | null>(null);
   const views = useMemo(() => bySlot(ctx.slots, ctx.assignments), [ctx.slots, ctx.assignments]);
   const name = (id: string) => ctx.soldiers.get(id)?.full_name ?? "";
   const terms = q.trim().split(/\s+/).filter(Boolean);
@@ -334,7 +336,10 @@ function BoardView({
           variant={a.role === "performer" ? "filled" : "outlined"}
           color={a.source === "manual" ? "secondary" : "default"}
           label={`${a.role === "reserve" ? "עתודה: " : ""}${s?.full_name ?? "?"}`}
-          onClick={(e) => setMenu({ el: e.currentTarget, a, slot })}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu({ at: { top: r.bottom, left: r.left + r.width / 2 }, a, slot });
+          }}
           sx={{ maxWidth: "100%" }}
         />
       </Tooltip>
@@ -437,7 +442,13 @@ function BoardView({
           </Stack>
         </Box>
       ))}
-      <Menu open={!!menu} anchorEl={menu?.el} onClose={() => setMenu(null)}>
+      <Menu
+        open={!!menu}
+        anchorReference="anchorPosition"
+        anchorPosition={menu?.at}
+        transformOrigin={{ vertical: "top", horizontal: "center" }}
+        onClose={() => setMenu(null)}
+      >
         <MenuItem
           onClick={() => {
             onOpenSoldier(menu!.a.soldier_id);
