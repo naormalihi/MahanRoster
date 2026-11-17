@@ -57,5 +57,8 @@ Irreversible. Run `reset_dynamic_data.sql` in Supabase › SQL Editor before a r
 It deletes cycles, soldiers, duty types and gafim with everything that hangs off them, after
 copying those tables to schema `reset_backup`. System settings stay: settings and multipliers,
 populations, day types, ranks, load roles, duty categories, exemption and absence types, holidays,
-the unit, users (their soldier/gaf link is cleared) and the audit log. The header of the script
-lists every table. When sure: `drop schema reset_backup cascade;`
+the unit, the accounts of נע"ת, commanders and viewers (their soldier/gaf link is cleared) and the
+audit log. Soldiers' accounts are deleted (each soldier gets a new invite code), and so is the unit
+key check (the first roster load sets the key again). The reset leaves one record in the audit log
+with the rows removed per table. The header of the script lists every table. When sure:
+`drop schema reset_backup cascade;`

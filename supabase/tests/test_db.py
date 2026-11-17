@@ -928,13 +928,23 @@ def test_delete_task_type_only_when_unused(conn):
 def test_reset_dynamic_data_keeps_system_settings(conn):
     sql = (ROOT / "supabase/reset_dynamic_data.sql").read_text(encoding="utf-8")
     body = sql.split("begin;", 1)[1].rsplit("commit;", 1)[0]
-    kept = ("app_users", "settings", "populations", "ranks", "load_roles", "exemption_types", "absence_types",
+    kept = ("populations", "ranks", "load_roles", "exemption_types", "absence_types",
             "day_types", "calendar_days", "duty_categories", "task_types", "task_type_aliases", "exemption_type_duties",
             "weight_history")
     count = lambda t: conn.execute(f"select count(*) from {t}").fetchone()[0]
     with conn.transaction():
         conn.execute("update app_users set soldier_id = (select id from soldiers limit 1) where id = %s", (COORD,))
         conn.execute("insert into weight_history (multiplier_key, value, effective_from) values ('weekend_multiplier', 2, current_date)")
+        # a soldier's account (goes) next to the staff accounts (stay); a unit key check (goes)
+        sid = conn.execute("select id from soldiers order by id desc limit 1").fetchone()[0]
+        su = conn.execute("select app.create_auth_user('reset.soldier@users.invalid', 'x-long-password')").fetchone()[0]
+        conn.execute("delete from app_users where soldier_id = %s", (sid,))
+        conn.execute("insert into app_users (id, username, soldier_id) values (%s, 'reset.soldier', %s)", (su, sid))
+        conn.execute("insert into user_roles (user_id, role) values (%s, 'soldier')", (su,))
+        conn.execute("insert into soldier_invites (soldier_id, code_hash, expires_at) values (%s, 'x', now() + interval '1 day') on conflict do nothing", (sid,))
+        conn.execute("insert into settings (key, value) values ('unit_key_check', '\"abc\"') on conflict (key) do update set value = excluded.value")
+        staff = count("app_users") - 1
+        settings = count("settings")
         before = {t: count(t) for t in kept}
         soldiers, multipliers = count("soldiers"), count("weight_history where task_type_id is null")
         assert soldiers > 0 and count("task_types") > 0
@@ -947,6 +957,11 @@ def test_reset_dynamic_data_keeps_system_settings(conn):
         assert count("weight_history where task_type_id is null") == multipliers
         assert count("reset_backup.soldiers") == soldiers
         assert count("app_users where soldier_id is not null") == 0
+        assert count("app_users") == staff and count(f"auth.users where id = '{su}'") == 0
+        assert count("soldier_invites") == 0 and count("reset_backup.soldier_invites") >= 1
+        assert count("settings") == settings - 1 and count("settings where key = 'unit_key_check'") == 0
+        log = conn.execute("select after from audit_log where action = 'reset_dynamic_data' order by at desc limit 1").fetchone()[0]
+        assert log["removed"]["soldiers"] == soldiers and log["removed"]["soldier_accounts"] == 1
         raise psycopg.Rollback()
 
 
