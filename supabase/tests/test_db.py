@@ -2105,3 +2105,27 @@ def test_coordinator_creates_another_coordinator(conn):
     with session_as(conn, COORD) as c:
         with pytest.raises(psycopg.Error):  # still no other roles
             c.execute("select public.create_user('x.admin', 'temp-pass-123', 'soldier', null)")
+
+
+def test_notify_tick_queues_reminders_and_counts_waiting(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() - interval '5 days' where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        sid = conn.execute("select id from soldiers where is_active order by id desc limit 1").fetchone()[0]
+        uid = conn.execute("select app.create_auth_user('tick.soldier@users.invalid', 'x-long-password')").fetchone()[0]
+        conn.execute("delete from app_users where soldier_id = %s", (sid,))
+        conn.execute("insert into app_users (id, username, soldier_id) values (%s, 'tick.soldier', %s)", (uid, sid))
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '20 hours', now() + interval '44 hours') returning id", (cycle, tid)).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason) "
+                     "select %s, id, gaf_id, 'performer', 'assigned', 'manual', 'בדיקה' from soldiers where id = %s", (k, sid))
+        first = conn.execute("select app.notify_tick()").fetchone()[0]
+        assert first["reminders"] >= 1
+        assert conn.execute("select count(*) from notifications where recipient_user_id = %s and type = 'duty_reminder'", (uid,)).fetchone()[0] == 1
+        assert conn.execute("select app.notify_tick()").fetchone()[0]["reminders"] == 0  # once only
+        # anything not pushed yet, for someone with a phone subscribed, is counted as waiting
+        conn.execute("insert into push_subscriptions (user_id, endpoint, p256dh, auth) values (%s, 'https://push.invalid/x', 'k', 'a')", (uid,))
+        conn.execute("update notifications set created_at = now() - interval '5 minutes' where recipient_user_id = %s", (uid,))
+        assert conn.execute("select app.notify_tick()").fetchone()[0]["waiting"] >= 1
+        raise psycopg.Rollback()
