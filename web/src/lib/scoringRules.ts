@@ -14,7 +14,6 @@ export interface ScoringExample {
   /** the calculation as shown, e.g. "(4 + 6) × 1.5" */
   calc: string;
   result: number;
-  note: string;
 }
 
 /** 1.5 → "1.5", 4 → "4", 2.25 → "2.25" */
@@ -29,57 +28,22 @@ export function exampleTask(rules: ScoringRules) {
   return list.length ? list[Math.floor((list.length - 1) / 2)] : null;
 }
 
+/** Three examples on one task: a regular day, a holiday (the highest addition), and a holiday call-up. */
 export function buildExamples(rules: ScoringRules): ScoringExample[] {
   const t = exampleTask(rules);
   if (!t) return [];
   const w = t.weight;
   const s = rules.surprise_multiplier;
-  const h = rules.surprise_notice_hours;
-  const adds = rules.additions.slice().sort((a, b) => b.value - a.value);
-  const top = adds[0];
-  const out: ScoringExample[] = [
-    { title: `${t.name} ביום רגיל`, calc: num(w), result: round(w), note: "רק המשקל של התורנות." },
+  const top = rules.additions.slice().sort((a, b) => b.value - a.value)[0];
+  if (!top) {
+    return [
+      { title: `${t.name} ביום רגיל`, calc: num(w), result: round(w) },
+      { title: `${t.name} בהקפצה`, calc: `${num(w)} × ${num(s)}`, result: round(w * s) },
+    ];
+  }
+  return [
+    { title: `${t.name} ביום רגיל`, calc: num(w), result: round(w) },
+    { title: `${t.name} ב${top.name}`, calc: `${num(w)} + ${num(top.value)}`, result: round(w + top.value) },
+    { title: `${t.name} ב${top.name}, בהקפצה`, calc: `(${num(w)} + ${num(top.value)}) × ${num(s)}`, result: round((w + top.value) * s) },
   ];
-  if (top) {
-    out.push({
-      title: `${t.name} ב${top.name}`,
-      calc: `${num(w)} + ${num(top.value)}`,
-      result: round(w + top.value),
-      note: `התוספת של ${top.name} מתווספת למשקל.`,
-    });
-  }
-  if (adds.length > 1) {
-    const second = adds[1];
-    out.push({
-      title: `${t.name} כשחלים גם ${top.name} וגם ${second.name}`,
-      calc: `${num(w)} + ${num(top.value)}`,
-      result: round(w + top.value),
-      note: `נספרת רק התוספת הגבוהה (${num(top.value)}), פעם אחת – לא ${num(top.value)} + ${num(second.value)}.`,
-    });
-  }
-  out.push({
-    title: `${t.name} בהקפצה`,
-    calc: `${num(w)} × ${num(s)}`,
-    result: round(w * s),
-    note: `שובצת פחות מ-${h} שעות לפני תחילת התורנות, אחרי שהשיבוץ כבר פורסם.`,
-  });
-  if (top) {
-    out.push({
-      title: `${t.name} ב${top.name}, בהקפצה`,
-      calc: `(${num(w)} + ${num(top.value)}) × ${num(s)}`,
-      result: round((w + top.value) * s),
-      note: "קודם מחברים את התוספת, ואז מכפילים בהקפצה.",
-    });
-  }
-  return out;
-}
-
-/** The tasks grouped by category, for the weights table. */
-export function tasksByCategory(rules: ScoringRules): [string, ScoringRules["tasks"]][] {
-  const m = new Map<string, ScoringRules["tasks"]>();
-  for (const t of rules.tasks) {
-    const k = t.category ?? "אחר";
-    m.set(k, [...(m.get(k) ?? []), t]);
-  }
-  return [...m.entries()];
 }

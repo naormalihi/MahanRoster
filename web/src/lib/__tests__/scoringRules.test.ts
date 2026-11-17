@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildExamples, exampleTask, num, tasksByCategory, type ScoringRules } from "../scoringRules";
+import { buildExamples, exampleTask, num, type ScoringRules } from "../scoringRules";
 
 const rules: ScoringRules = {
   tasks: [
@@ -30,23 +30,15 @@ describe("scoring rules", () => {
     expect(exampleTask({ ...rules, tasks: [] })).toBeNull();
   });
 
-  it("adds the highest addition once and multiplies a call-up last", () => {
-    const ex = buildExamples(rules);
-    expect(ex.map((e) => [e.calc, e.result])).toEqual([
+  it("adds the highest addition and multiplies a call-up last", () => {
+    expect(buildExamples(rules).map((e) => [e.calc, e.result])).toEqual([
       ["4", 4],
       ["4 + 6", 10],
-      ["4 + 6", 10],
-      ["4 × 1.5", 6],
       ["(4 + 6) × 1.5", 15],
     ]);
-    expect(ex[2].note).toContain("לא 6 + 3");
   });
 
-  it("skips the addition examples when there are none", () => {
+  it("without additions: a regular day and a call-up", () => {
     expect(buildExamples({ ...rules, additions: [] }).map((e) => e.calc)).toEqual(["4", "4 × 1.5"]);
-  });
-
-  it("groups tasks by category", () => {
-    expect(tasksByCategory(rules).map(([k, ts]) => [k, ts.length])).toEqual([["שמירות", 1], ["משק", 2], ["אחר", 1]]);
   });
 });
