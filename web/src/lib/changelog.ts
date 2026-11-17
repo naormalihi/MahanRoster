@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.13.1",
+    date: "2026-11-17",
+    items: ["מפקד גף: מסך השיבוץ נפתח שוב (נפל על חיילים מגפים אחרים, שהסיבות שלהם בפוטנציאל מוסתרות ממנו)"],
+  },
+  {
     version: "2.13.0",
     date: "2026-11-17",
     items: [
