@@ -1,5 +1,6 @@
 import CheckIcon from "@mui/icons-material/Check";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import HelpIcon from "@mui/icons-material/HelpOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
@@ -27,7 +28,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@mui/material";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
 import { NotificationBell } from "./NotificationBell";
@@ -37,6 +38,8 @@ import { useReturnCounter } from "../lib/refreshOnReturn";
 import { stageLabel } from "../lib/cycles";
 import { APP_VERSION, BUILD_DATE, BUILD_SHA, CHANGELOG } from "../lib/changelog";
 import { Mascot } from "./Mascot";
+import { OwlTour } from "./OwlTour";
+import { markTourSeen, TOUR, tourKind, tourSeen } from "../lib/tour";
 
 const ROLE_LABEL: Record<string, string> = {
   coordinator: "נע\"ת תורנויות",
@@ -208,6 +211,16 @@ export function Layout({ children }: { children: ReactNode }) {
   const compact = useMediaQuery("(max-width:1099.95px)");
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
+  const kind = tourKind(me);
+  const [tour, setTour] = useState(false);
+  // the first time this user opens the app on this device
+  useEffect(() => {
+    if (me && kind && !me.mustChangePassword && !tourSeen(me.userId)) setTour(true);
+  }, [me, kind]);
+  const closeTour = () => {
+    setTour(false);
+    if (me) markTourSeen(me.userId);
+  };
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
   const links = staff
     ? STAFF_LINKS
@@ -257,6 +270,11 @@ export function Layout({ children }: { children: ReactNode }) {
             </Typography>
           )}
           {isSoldier(me) && <NotificationBell />}
+          {kind && !compact && (
+            <IconButton color="inherit" aria-label="סיור היכרות" title="סיור היכרות" onClick={() => setTour(true)}>
+              <HelpIcon />
+            </IconButton>
+          )}
           {!(compact && links.length) && (
             <Button color="inherit" startIcon={<LogoutIcon />} onClick={signOut}>
               יציאה
@@ -264,6 +282,7 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
         </Toolbar>
       </AppBar>
+      {kind && <OwlTour open={tour} steps={TOUR[kind]} onClose={closeTour} />}
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
           <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -290,6 +309,17 @@ export function Layout({ children }: { children: ReactNode }) {
           </List>
           <Divider />
           <List>
+            {kind && (
+              <ListItemButton
+                onClick={() => {
+                  setOpen(false);
+                  setTour(true);
+                }}
+              >
+                <HelpIcon fontSize="small" sx={{ ml: 1.5 }} />
+                <ListItemText primary="סיור היכרות עם תורנצ׳יק" />
+              </ListItemButton>
+            )}
             <ListItemButton onClick={signOut}>
               <LogoutIcon fontSize="small" sx={{ ml: 1.5 }} />
               <ListItemText primary="יציאה" />
