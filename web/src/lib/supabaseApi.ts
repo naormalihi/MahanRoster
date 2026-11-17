@@ -555,6 +555,8 @@ export class SupabaseApi implements Api {
       ...r,
       value: Number(r.value),
       override_value: r.override_value === null ? null : Number(r.override_value),
+      // a gaf commander gets no reasons for soldiers of other gafs (null): no reasons to show
+      reasons: r.reasons ?? [],
     }));
   }
 
