@@ -2,12 +2,14 @@ name: notify
 
 # Pushes queued notifications to the soldiers' phones (Web Push), and queues the day-before
 # reminders. Woken by the database when notifications are queued (workflow_dispatch through
-# pg_net, like the solve workflow), and every 15 minutes. Uses the SUPABASE_DB_URL secret;
+# pg_net, like the solve workflow); the database's own clock (pg_cron, migration 084) queues
+# the reminders every 15 minutes. The schedule below is only a fallback: GitHub runs frequent
+# schedules a few times a day at best. Uses the SUPABASE_DB_URL secret;
 # the VAPID private key is read from Supabase Vault (made once by the push-setup workflow).
 on:
   workflow_dispatch:
   schedule:
-    - cron: "7,22,37,52 * * * *"
+    - cron: "7 */2 * * *"
 
 concurrency:
   group: notify

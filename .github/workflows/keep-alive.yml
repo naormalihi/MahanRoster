@@ -18,7 +18,9 @@ jobs:
           KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "secrets not set – skipping"; exit 0; fi
-          code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/rest/v1/settings?select=key&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          case "$URL" in https://*.supabase.co) ;; *) echo "::error::SUPABASE_URL should look like https://<project-ref>.supabase.co (no path, no trailing slash)"; exit 1;; esac
+          # curl's own error (a host it cannot reach) is shown instead of failing silently
+          code=$(curl -sS -o /dev/null -w "%{http_code}" "$URL/rest/v1/settings?select=key&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY") || { echo "::error::curl could not reach $URL (exit $?)"; exit 1; }
           echo "HTTP $code"
           # 401/403 are fine: the request reached the database, which is all we need
           case "$code" in 2??|401|403) exit 0;; *) exit 1;; esac
