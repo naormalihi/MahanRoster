@@ -123,7 +123,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
             <Typography variant="body2" color="text.secondary">
               {role === "unit_commander"
                 ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא \"נתוני היחידה\" – כולל כל שינוי הגדרות שנע\"ת עשה בחודש האחרון."
-                : "מפקד גף רואה את כל נתוני היחידה (מחזור, אילוצים, פוטנציאל, טיוטה, חיילים ולוח) לקריאה בלבד, ולא יכול לשנות דבר."}
+                : "מפקד גף רואה לקריאה בלבד את פרטי החיילים של הגף שלו – כולל ת\"ש, פטורים והיעדרויות – ואת הלוח, הטיוטה והפוטנציאל של כל היחידה בלי פרטים אישיים. הגף נקבע לפי החייל שמשויך אליו, ולכן כדאי לבחור אותו כאן."}
             </Typography>
             )}
             <SoldierPicker soldiers={props.soldiers} value={soldier} onChange={setSoldier} autoFocus />
@@ -216,6 +216,9 @@ export function UsersTab() {
             const self = u.user_id === me?.userId;
             const commander = u.roles.some((r) => r.role === "gaf_commander");
             const roles = u.roles.map((r) => <Chip key={r.id} size="small" label={ROLE_NAME[r.role] ?? r.role} color={r.role === "coordinator" ? "primary" : "default"} />);
+            // a gaf commander sees personal records of his own gaf only: without a gaf, of none
+            if (u.roles.some((r) => r.role === "gaf_commander" && !r.gaf_id) && !u.soldier_id)
+              roles.push(<Chip key="nogaf" size="small" color="warning" variant="outlined" label="לא משויך לגף – לא רואה פרטים אישיים" />);
             const login = u.last_login_at ? new Date(u.last_login_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }) : "לא נכנס";
             const status = u.is_locked ? (
               <Chip size="small" color="error" label="נעול" />
