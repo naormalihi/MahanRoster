@@ -1,5 +1,8 @@
+import CheckIcon from "@mui/icons-material/Check";
 import CopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
+import PrintIcon from "@mui/icons-material/PrintOutlined";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import {
   Alert,
   Box,
@@ -8,6 +11,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   MenuItem,
   Stack,
   Table,
@@ -16,10 +20,12 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useState } from "react";
 import { useAuth } from "../lib/auth";
+import { printHtml, whatsappText, whatsappUrl } from "../lib/invites";
 
 interface Person {
   id: string;
@@ -38,6 +44,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState<Set<string>>(new Set());
   const eligible = props.soldiers.filter((s) => !props.hasAccount(s.id));
   const skipped = props.soldiers.length - eligible.length;
   const byId = new Map(props.soldiers.map((s) => [s.id, s]));
@@ -56,6 +63,26 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
   }
 
   const rows = (codes ?? []).map((c) => ({ ...byId.get(c.soldier_id)!, code: c.code }));
+  const origin = window.location.origin;
+  const expires = new Date(Date.now() + days * 86_400_000).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+
+  // handed out: remembered on the server so the soldiers screen tells who still waits for a code
+  function markSent(ids: string[]) {
+    setSent((s) => new Set([...s, ...ids]));
+    api!.markInvitesSent(ids).catch(() => undefined);
+  }
+
+  async function printSheet() {
+    const QR = await import("qrcode");
+    const qr = new Map<string, string>();
+    for (const r of rows) qr.set(r.code, await QR.toDataURL(`${origin}/?join=1&code=${encodeURIComponent(r.code)}`, { margin: 1, width: 240 }));
+    const w = window.open("", "_blank");
+    if (!w) return setError("הדפדפן חסם את חלון ההדפסה – אפשר חלונות קופצים לאתר ונסה שוב");
+    w.document.write(printHtml(rows, qr, origin, expires));
+    w.document.close();
+    setTimeout(() => w.print(), 600);
+    markSent(rows.map((r) => r.id));
+  }
   const text = rows.map((r) => `${r.full_name} (${r.gaf_name}): ${r.code}`).join("\n");
 
   async function download() {
@@ -94,8 +121,13 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
         ) : (
           <Stack spacing={2}>
             <Alert severity="warning">
-              הקודים מוצגים <b>פעם אחת בלבד</b> – המערכת שומרת רק טביעה שלהם. הורד את הרשימה או העתק אותה לפני הסגירה.
+              הקודים מוצגים <b>פעם אחת בלבד</b> – המערכת שומרת רק טביעה שלהם. שלח, הדפס או הורד אותם לפני הסגירה.
             </Alert>
+            <Typography variant="body2" color="text.secondary">
+              כפתור הוואטסאפ פותח הודעה מוכנה עם הקוד וקישור שממלא אותו – בוחרים את החייל באנשי הקשר. ההדפסה מוציאה דף לכל גף עם כרטיס וקוד QR לכל
+              חייל. מה שנשלח או הודפס מסומן במסך החיילים.
+            </Typography>
+            {error && <Alert severity="error">{error}</Alert>}
             <Typography variant="body2">
               כתובת ההצטרפות: <Box component="span" dir="ltr">{join}</Box>
             </Typography>
@@ -105,6 +137,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
                   <TableCell>שם</TableCell>
                   <TableCell>גף</TableCell>
                   <TableCell>קוד</TableCell>
+                  <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -114,6 +147,21 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
                     <TableCell>{r.gaf_name}</TableCell>
                     <TableCell dir="ltr" sx={{ fontFamily: "monospace", fontWeight: 700, textAlign: "start", whiteSpace: "nowrap" }}>
                       {r.code}
+                    </TableCell>
+                    <TableCell padding="none" sx={{ whiteSpace: "nowrap" }}>
+                      <Tooltip title={sent.has(r.id) ? "נשלח – שליחה שוב" : `שליחה ל${r.full_name} בוואטסאפ`}>
+                        <IconButton
+                          component="a"
+                          href={whatsappUrl(whatsappText(r, origin))}
+                          target="_blank"
+                          rel="noopener"
+                          onClick={() => markSent([r.id])}
+                          aria-label={`שליחת הקוד ל${r.full_name} בוואטסאפ`}
+                          sx={{ color: sent.has(r.id) ? "success.main" : "#25D366" }}
+                        >
+                          {sent.has(r.id) ? <CheckIcon /> : <WhatsAppIcon />}
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -140,6 +188,9 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
               }}
             >
               {copied ? "הועתק" : "העתקה"}
+            </Button>
+            <Button startIcon={<PrintIcon />} onClick={printSheet}>
+              הדפסה לפי גף
             </Button>
             <Button startIcon={<DownloadIcon />} onClick={download}>
               הורדת קובץ

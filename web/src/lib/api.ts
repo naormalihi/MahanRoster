@@ -253,6 +253,8 @@ export interface Api {
   // version 2.1 – soldier accounts
   /** One-time join codes for the soldiers (active, no account yet); each code is returned once. */
   createSoldierInvites(soldierIds: string[], days: number): Promise<{ soldier_id: string; code: string }[]>;
+  /** the newest codes of these soldiers were handed out (WhatsApp, print) */
+  markInvitesSent(soldierIds: string[]): Promise<void>;
   revokeSoldierInvites(soldierIds: string[]): Promise<number>;
   soldierAccounts(): Promise<SoldierAccount[]>;
   /** The join screen, before signing in: returns the username. */

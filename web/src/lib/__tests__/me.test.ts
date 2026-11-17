@@ -7,7 +7,11 @@ describe("soldier accounts", () => {
     expect(accountLabel(undefined, "2026-11-15").text).toBe("—");
     expect(accountLabel({ ...base, username: "avi.k", is_locked: false }, "2026-11-15")).toEqual({ text: "avi.k", tone: "success" });
     expect(accountLabel({ ...base, invite_state: "open", invite_expires_at: "2026-12-15T10:00:00Z" }, "2026-11-15")).toEqual({
-      text: "הוזמן · עד 15/12",
+      text: "הוזמן · לא נשלח · עד 15/12",
+      tone: "warning",
+    });
+    expect(accountLabel({ ...base, invite_state: "open", invite_expires_at: "2026-12-15T10:00:00Z", invite_sent_at: "2026-11-15T09:00:00Z" }, "2026-11-15")).toEqual({
+      text: "נשלח · עד 15/12",
       tone: "info",
     });
     expect(accountLabel({ ...base, invite_state: "open", invite_expires_at: "2026-11-01T10:00:00Z" }, "2026-11-15").text).toBe("הקוד פג");
