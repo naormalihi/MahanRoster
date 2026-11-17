@@ -149,7 +149,24 @@ export class SupabaseApi implements Api {
           "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, range_valid_until, parent_status, home_nightly, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
         ),
     ) as unknown as (Omit<ExistingSoldier, "gaf_name" | "rank_name"> & { gaf: { name: string }; rank: { name: string } | null })[];
-    return rows.map(({ gaf, rank, ...s }) => ({ ...s, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
+    const full = rows.map(({ gaf, rank, ...s }) => ({ ...s, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
+    // a gaf commander reads the details of his own gaf only; everyone else comes by name
+    // (draft, board, potential), with no personal details
+    const seen = new Set(full.map((s) => s.id));
+    const dir = check(await this.sb.rpc("soldier_directory")) as {
+      id: string; full_name: string; service_type: string; gender: string; is_active: boolean; gaf_name: string | null; rank_name: string | null;
+    }[];
+    const others = dir
+      .filter((d) => !seen.has(d.id))
+      .map(
+        (d) =>
+          ({
+            id: d.id, soldier_key: "", full_name: d.full_name, service_type: d.service_type, gender: d.gender, is_active: d.is_active,
+            gaf_name: d.gaf_name ?? "", rank_name: d.rank_name ?? "", enlistment_date: null, release_date: null,
+            career_start_date: null, range_valid_until: null, parent_status: false, home_nightly: false,
+          }) as unknown as ExistingSoldier,
+      );
+    return [...full, ...others];
   }
 
   async gafim(): Promise<NamedRef[]> {

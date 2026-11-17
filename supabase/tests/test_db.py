@@ -2129,3 +2129,34 @@ def test_notify_tick_queues_reminders_and_counts_waiting(conn):
         conn.execute("update notifications set created_at = now() - interval '5 minutes' where recipient_user_id = %s", (uid,))
         assert conn.execute("select app.notify_tick()").fetchone()[0]["waiting"] >= 1
         raise psycopg.Rollback()
+
+
+def test_gaf_commander_sees_personal_records_of_his_own_gaf_only(conn):
+    cycle = conn.cycle_id
+    g1, g2 = [r[0] for r in conn.execute(
+        "select gaf_id from soldiers where is_active group by gaf_id having count(*) > 0 order by gaf_id limit 2").fetchall()]
+    mine = conn.execute("select id from soldiers where gaf_id = %s and is_active order by id limit 1", (g1,)).fetchone()[0]
+    other = conn.execute("select id from soldiers where gaf_id = %s and is_active order by id limit 1", (g2,)).fetchone()[0]
+    uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.scope", "temp-pass-123", mine)[0][0]
+    try:
+        with conn.transaction():
+            for sid in (mine, other):
+                conn.execute("insert into absences (soldier_id, absence_type_id, starts_at, ends_at) "
+                             "select %s, id, now(), now() + interval '1 day' from absence_types limit 1", (sid,))
+            with session_as(conn, uid) as c:
+                gafs = {r[0] for r in c.execute("select distinct gaf_id from soldiers").fetchall()}
+                assert gafs == {g1}  # the soldiers table: his gaf only
+                assert c.execute("select count(*) from absences where soldier_id = %s", (mine,)).fetchone()[0] == 1
+                assert c.execute("select count(*) from absences where soldier_id = %s", (other,)).fetchone()[0] == 0
+                # every name, for the draft and the board – without personal details
+                names = {r[0] for r in c.execute("select id from public.soldier_directory()").fetchall()}
+                assert {mine, other} <= names
+                # potential: figures for all, reasons only for his own
+                rows = c.execute("select soldier_id, reasons from public.potential_matrix(%s)", (cycle,)).fetchall()
+                assert any(s == other for s, _ in rows)
+                assert all(r is None for s, r in rows if s == other)
+                assert c.execute("select count(*) from notifications where recipient_user_id <> %s", (uid,)).fetchone()[0] == 0
+                assert c.execute("select count(*) from roster_imports").fetchone()[0] == 0
+            raise psycopg.Rollback()
+    finally:
+        conn.execute("delete from auth.users where id = %s", (uid,))
