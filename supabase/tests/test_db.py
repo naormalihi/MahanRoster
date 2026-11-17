@@ -2171,3 +2171,34 @@ def test_mark_invites_sent(conn):
         assert c.execute("select public.mark_invites_sent(array[%s]::uuid[])", (sid,)).fetchone()[0] == 1
         assert row() == ("open", True)
         assert c.execute("select public.mark_invites_sent(array[%s]::uuid[])", (sid,)).fetchone()[0] == 0  # already sent
+
+
+def test_soldier_phone_is_checked_scoped_and_masked_in_the_audit(conn):
+    sid, gaf = conn.execute("select id, gaf_id from soldiers where is_active order by id limit 1").fetchone()
+    other = conn.execute("select id from soldiers where is_active and gaf_id <> %s order by id limit 1", (gaf,)).fetchone()[0]
+    with pytest.raises(psycopg.Error, match="check"):
+        with conn.transaction():
+            conn.execute("update soldiers set phone = '0501234567' where id = %s", (sid,))
+    _as_coord(conn, "update soldiers set phone = '972501234567' where id = %s returning id", sid)
+    _as_coord(conn, "update soldiers set phone = '972501234599' where id = %s returning id", other)
+    conn.commit()
+    try:
+        before, after = conn.execute(
+            "select before ->> 'phone', after ->> 'phone' from audit_log where entity_type = 'soldiers' and entity_id = %s order by id desc limit 1",
+            (str(sid),)).fetchone()
+        assert before is None and after == "•••67"
+        assert not conn.execute("select count(*) from audit_log where after::text like '%%501234567%%' or before::text like '%%501234567%%'").fetchone()[0]
+        # a gaf commander reads the phones of his own gaf only; the directory never carries them
+        mate = conn.execute(
+            "select id from soldiers s where gaf_id = %s and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id desc limit 1",
+            (gaf,)).fetchone()[0]
+        cmd_id = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.phone", "temp-pass-123", mate)[0][0]
+        conn.commit()
+        with session_as(conn, cmd_id) as c:
+            phones = dict(c.execute("select id, phone from soldiers where phone is not null").fetchall())
+            assert phones == {sid: "972501234567"}
+            cols = [d.name for d in c.execute("select * from public.soldier_directory() limit 1").description]
+            assert "phone" not in cols
+    finally:
+        conn.execute("update soldiers set phone = null where id in (%s, %s)", (sid, other))
+        conn.commit()

@@ -35,6 +35,8 @@ export interface SoldierDetail {
   home_nightly_override_until: string | null;
   /** הת"ש 3–7: nights a week he must sleep at home */
   tash_level: number | null;
+  /** mobile number, 9725XXXXXXXX */
+  phone?: string | null;
   /** set when a new soldier first enters a cycle; his training period runs from it */
   unit_join_date?: string | null;
   /** a new soldier's opening score (his group's mean) */
@@ -60,6 +62,7 @@ export type SoldierPatch = Partial<
     | "home_nightly_override_reason"
     | "home_nightly_override_until"
     | "tash_level"
+    | "phone"
     | "is_active"
   >
 >;

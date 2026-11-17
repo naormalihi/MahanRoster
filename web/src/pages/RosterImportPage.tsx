@@ -56,6 +56,8 @@ import {
   type SoldierRecord,
 } from "../lib/roster";
 
+import { formatPhone } from "../lib/phone";
+
 const SERVICE_LABEL = { mandatory: "חובה", career: "קבע" } as const;
 
 function show(v: unknown): string {
@@ -65,6 +67,7 @@ function show(v: unknown): string {
   if (v === "mandatory" || v === "career") return SERVICE_LABEL[v];
   if (v === "male") return "זכר";
   if (v === "female") return "נקבה";
+  if (typeof v === "string" && /^9725\d{8}$/.test(v)) return formatPhone(v);
   return String(v);
 }
 
@@ -73,7 +76,7 @@ function downloadTemplate() {
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) => f.label),
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) =>
       ({ personalNumber: "1234567", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "סמל",
-         gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא" } as Record<string, string>)[f.key] ?? ""),
+         gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא", phone: "050-1234567" } as Record<string, string>)[f.key] ?? ""),
   ]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "כוח אדם");

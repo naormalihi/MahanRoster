@@ -9,6 +9,8 @@ export interface InviteRow {
   full_name: string;
   gaf_name: string;
   code: string;
+  /** 9725XXXXXXXX: WhatsApp opens his chat; without it, the contact picker */
+  phone?: string | null;
 }
 
 /** The join form, with the code filled in. */
@@ -28,7 +30,8 @@ export function whatsappText(row: InviteRow, origin: string): string {
 }
 
 /** wa.me with the text and no number: WhatsApp opens the contact picker (the system keeps no phone numbers). */
-export const whatsappUrl = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
+export const whatsappUrl = (text: string, phone?: string | null) =>
+  `https://wa.me/${phone && /^9725\d{8}$/.test(phone) ? phone : ""}?text=${encodeURIComponent(text)}`;
 
 /** One group per gaf, soldiers by name. */
 export function byGaf(rows: InviteRow[]): { gaf: string; rows: InviteRow[] }[] {

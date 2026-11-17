@@ -17,6 +17,8 @@ describe("handing out join codes", () => {
     expect(t).toContain("ABCDE-FGH23");
     expect(t).toContain("https://x.dev/?join=1&code=ABCDE-FGH23");
     expect(whatsappUrl("א ב")).toBe("https://wa.me/?text=%D7%90%20%D7%91");
+    expect(whatsappUrl("א", "972501234567")).toBe("https://wa.me/972501234567?text=%D7%90");
+    expect(whatsappUrl("א", "0501234567")).toBe("https://wa.me/?text=%D7%90"); // not stored form: picker
   });
   it("groups by gaf and sorts by name", () => {
     expect(byGaf(rows).map((g) => [g.gaf, g.rows.map((r) => r.id)])).toEqual([

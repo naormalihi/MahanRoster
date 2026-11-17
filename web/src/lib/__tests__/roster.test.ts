@@ -64,10 +64,37 @@ describe("gaf column holding the framework path", () => {
   });
 });
 
+describe("phone column", () => {
+  const base = { "מספר אישי": "1234567", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה", "גף": "גף א" };
+  it("is detected, normalized, and a bad number stops the row", () => {
+    const m = detectMapping([...Object.keys(base), "נייד"]);
+    expect(m.phone).toBe("נייד");
+    const r = parseRows(
+      [
+        { ...base, "נייד": "050-1234567" },
+        { ...base, "מספר אישי": "1234568", "נייד": 521234567 },
+        { ...base, "מספר אישי": "1234569", "נייד": "" },
+        { ...base, "מספר אישי": "1234570", "נייד": "03-1234567" },
+      ],
+      m,
+    );
+    expect(r.rows.map((x) => x.phone)).toEqual(["972501234567", "972521234567", null]);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].message).toContain("טלפון");
+  });
+  it("an empty cell keeps the stored number", () => {
+    const m = detectMapping([...Object.keys(base), "טלפון"]);
+    const [row] = parseRows([{ ...base, "טלפון": "" }], m).rows;
+    const rec = toRecord(row, "k1");
+    const plan = planImport([rec], [{ ...rec, phone: "972501234567", id: "x", is_active: true }], ["גף א"], ["סמל"]);
+    expect(plan.unchanged).toBe(1);
+  });
+});
+
 describe("plan", () => {
   const rec = (key: string, extra = {}) => ({
     ...toRecord({ line: 2, personalNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,
-      enlistmentDate: null, releaseDate: null, careerStartDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null }, key),
+      enlistmentDate: null, releaseDate: null, careerStartDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null, phone: null }, key),
     ...extra,
   });
   const existing = (key: string, extra = {}): ExistingSoldier => ({ ...rec(key), id: "id-" + key, is_active: true, gender: "male", ...extra });
