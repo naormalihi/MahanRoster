@@ -2143,10 +2143,12 @@ def test_gaf_commander_sees_personal_records_of_his_own_gaf_only(conn):
             for sid in (mine, other):
                 conn.execute("insert into absences (soldier_id, absence_type_id, starts_at, ends_at) "
                              "select %s, id, now(), now() + interval '1 day' from absence_types limit 1", (sid,))
+            # the generated unit may already hold absences of his (it depends on today's date)
+            all_mine = conn.execute("select count(*) from absences where soldier_id = %s", (mine,)).fetchone()[0]
             with session_as(conn, uid) as c:
                 gafs = {r[0] for r in c.execute("select distinct gaf_id from soldiers").fetchall()}
                 assert gafs == {g1}  # the soldiers table: his gaf only
-                assert c.execute("select count(*) from absences where soldier_id = %s", (mine,)).fetchone()[0] == 1
+                assert c.execute("select count(*) from absences where soldier_id = %s", (mine,)).fetchone()[0] == all_mine >= 1
                 assert c.execute("select count(*) from absences where soldier_id = %s", (other,)).fetchone()[0] == 0
                 # every name, for the draft and the board – without personal details
                 names = {r[0] for r in c.execute("select id from public.soldier_directory()").fetchall()}
