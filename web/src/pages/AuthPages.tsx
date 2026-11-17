@@ -105,7 +105,8 @@ export function LoginPage() {
  */
 function JoinPage({ onBack }: { onBack: () => void }) {
   const { api, refresh } = useAuth();
-  const [code, setCode] = useState("");
+  // the link in the WhatsApp message and the QR on the printed card carry the code
+  const [code, setCode] = useState(() => new URLSearchParams(window.location.search).get("code") ?? "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [again, setAgain] = useState("");

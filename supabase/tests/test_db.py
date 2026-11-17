@@ -2160,3 +2160,14 @@ def test_gaf_commander_sees_personal_records_of_his_own_gaf_only(conn):
             raise psycopg.Rollback()
     finally:
         conn.execute("delete from auth.users where id = %s", (uid,))
+
+
+def test_mark_invites_sent(conn):
+    with session_as(conn, COORD) as c:
+        sid = c.execute("select id from soldiers s where is_active and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 1").fetchone()[0]
+        c.execute("select * from public.create_soldier_invites(array[%s]::uuid[], 30)", (sid,))
+        row = lambda: c.execute("select invite_state, invite_sent_at is not null from public.soldier_account_status() where soldier_id = %s", (sid,)).fetchone()  # noqa: E731
+        assert row() == ("open", False)
+        assert c.execute("select public.mark_invites_sent(array[%s]::uuid[])", (sid,)).fetchone()[0] == 1
+        assert row() == ("open", True)
+        assert c.execute("select public.mark_invites_sent(array[%s]::uuid[])", (sid,)).fetchone()[0] == 0  # already sent

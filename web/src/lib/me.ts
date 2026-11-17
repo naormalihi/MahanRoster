@@ -11,6 +11,8 @@ export interface SoldierAccount {
   invited_at: string | null;
   invite_expires_at: string | null;
   invite_state: InviteState | null;
+  /** when נע"ת marked the newest code as handed out (WhatsApp, print) */
+  invite_sent_at?: string | null;
 }
 
 export interface MyDuty {
@@ -46,8 +48,10 @@ export interface MyScore {
 /** How a soldier's account stands, in a few words. */
 export function accountLabel(a: SoldierAccount | undefined, today: string): { text: string; tone: "success" | "info" | "warning" | "default" } {
   if (a?.username) return { text: a.is_locked ? `${a.username} · נעול` : a.username, tone: a.is_locked ? "warning" : "success" };
-  if (a?.invite_state === "open" && a.invite_expires_at && a.invite_expires_at.slice(0, 10) >= today)
-    return { text: `הוזמן · עד ${a.invite_expires_at.slice(5, 10).split("-").reverse().join("/")}`, tone: "info" };
+  if (a?.invite_state === "open" && a.invite_expires_at && a.invite_expires_at.slice(0, 10) >= today) {
+    const until = a.invite_expires_at.slice(5, 10).split("-").reverse().join("/");
+    return a.invite_sent_at ? { text: `נשלח · עד ${until}`, tone: "info" } : { text: `הוזמן · לא נשלח · עד ${until}`, tone: "warning" };
+  }
   if (a?.invite_state === "expired" || (a?.invite_state === "open" && a.invite_expires_at)) return { text: "הקוד פג", tone: "warning" };
   return { text: "—", tone: "default" };
 }

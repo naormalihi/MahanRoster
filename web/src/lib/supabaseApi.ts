@@ -858,6 +858,10 @@ export class SupabaseApi implements Api {
     return Number(check(await this.sb.rpc("unpublish_cycle", { p_cycle: cycleId })));
   }
 
+  async markInvitesSent(soldierIds: string[]) {
+    check(await this.sb.rpc("mark_invites_sent", { p_soldiers: soldierIds }));
+  }
+
   async createSoldierInvites(soldierIds: string[], days: number) {
     return check(await this.sb.rpc("create_soldier_invites", { p_soldiers: soldierIds, p_days: days })) as { soldier_id: string; code: string }[];
   }

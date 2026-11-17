@@ -115,7 +115,7 @@ export class DemoApi implements Api {
   private user: { name: string; roles: Role[]; mustChange: boolean; aal2: boolean } | null = null;
   // version 2.1: soldier accounts (username → soldier) and open invite codes (code → soldier, expiry)
   private accounts = new Map<string, string>();
-  private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean }>();
+  private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean; sent?: string }>();
   // stage 2.5: the demo soldier's notifications
   private notes: AppNotification[] = [
     { id: "n1", type: "reserve_activated", title: "העתודה שלך הופעלה – אתה מבצע את התורנות", body: "קצין תורן – חול, ג׳ 05/01 08:00", url: "/",
@@ -1102,6 +1102,11 @@ export class DemoApi implements Api {
     if (u) Object.assign(u, { soldier_id: soldierId, soldier_name: this.soldierList.find((x) => x.id === soldierId)?.full_name ?? null });
   }
 
+  async markInvitesSent(soldierIds: string[]) {
+    await delay(100);
+    for (const i of this.invites.values()) if (soldierIds.includes(i.soldier_id) && !i.used && !i.sent) i.sent = new Date().toISOString();
+  }
+
   async createSoldierInvites(soldierIds: string[], days: number) {
     await delay();
     const taken = new Set(this.accounts.values());
@@ -1134,6 +1139,7 @@ export class DemoApi implements Api {
         invited_at: inv?.created ?? null,
         invite_expires_at: inv?.expires ?? null,
         invite_state: inv ? (inv.used ? ("used" as const) : ("open" as const)) : null,
+        invite_sent_at: inv?.sent ?? null,
       };
     });
   }
