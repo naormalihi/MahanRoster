@@ -2288,3 +2288,19 @@ def test_swaps_handover_and_mutual_without_approval(conn):
         conn.execute("reset role")
         assert conn.execute("select soldier_id from assignments where id = %s and status = 'assigned'", (a_now,)).fetchone()[0] == a_sid
         raise psycopg.Rollback()
+
+
+def test_scoring_rules_for_soldiers_without_unit_data(conn):
+    uid, _ = _soldier_account(conn, "rules.reader")
+    conn.commit()
+    with session_as(conn, uid, aal="aal1") as c:
+        r = c.execute("select public.scoring_rules()").fetchone()[0]
+        assert r["tasks"] and all(set(t) == {"name", "weight", "includes_holidays", "category"} for t in r["tasks"])
+        assert r["surprise_notice_hours"] >= 1 and float(r["surprise_multiplier"]) >= 1 and r["window_months"] >= 1
+        assert all(set(a) == {"name", "value"} for a in r["additions"])
+        names = {t["name"] for t in r["tasks"]}
+        hidden = {n for (n,) in conn.execute("select name from task_types where is_special or not is_active").fetchall()}
+        assert not names & hidden
+    with session_as(conn, OUTSIDER) as c:
+        with pytest.raises(psycopg.Error, match="not allowed"):
+            c.execute("select public.scoring_rules()")

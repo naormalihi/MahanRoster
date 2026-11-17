@@ -19,6 +19,7 @@ import { SoldiersPage } from "./pages/SoldiersPage";
 
 // Excel parsing is heavy and only נע"ת needs it (the cycle steps load lazily inside the workspace).
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const ScoringPage = lazy(() => import("./pages/ScoringPage").then((m) => ({ default: m.ScoringPage })));
 const RosterImportPage = lazy(() => import("./pages/RosterImportPage").then((m) => ({ default: m.RosterImportPage })));
 
 function Gate() {
@@ -55,6 +56,7 @@ function Gate() {
           <Route path="/" element={isUnitCommander(me) ? <DashboardPage /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
           {reader && <Route path="/dashboard" element={<DashboardPage />} />}
           <Route path="/board" element={<BoardPage />} />
+          <Route path="/scoring" element={lazyEl(<ScoringPage />)} />
           {isSoldier(me) && <Route path="/requests" element={<RequestsPage />} />}
           {reader && (
             <>

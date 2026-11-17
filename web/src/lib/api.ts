@@ -1,4 +1,5 @@
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
+import type { ScoringRules } from "./scoringRules";
 /**
  * The app's only door to data. Two implementations: Supabase (real) and Demo
  * (in-memory fictitious unit, for previews and screenshots without a backend).
@@ -270,6 +271,8 @@ export interface Api {
   mySwaps(): Promise<MySwap[]>;
   /** for נע"ת and commanders: the swaps of the last weeks */
   swapLog(): Promise<SwapLogRow[]>;
+  /** the scoring rules for "איך מחושב הניקוד" – every signed-in user, soldiers too */
+  scoringRules(): Promise<ScoringRules>;
   // stage 2.2 – the soldier's own constraints
   myInputOptions(): Promise<InputOptions>;
   myRequests(): Promise<MyRequests>;
