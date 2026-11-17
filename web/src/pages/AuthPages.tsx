@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { passwordProblems } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Mascot, type MascotPose } from "../components/Mascot";
+import { PasswordField } from "../components/PasswordField";
 
 function Card({ title, subtitle, pose = "wave", children }: { title: string; subtitle?: string; pose?: MascotPose; children: ReactNode }) {
   return (
@@ -76,9 +77,8 @@ export function LoginPage() {
             required
             slotProps={{ htmlInput: { dir: "ltr", autoCapitalize: "none" } }}
           />
-          <TextField
+          <PasswordField
             label="סיסמה"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
@@ -156,9 +156,8 @@ function JoinPage({ onBack }: { onBack: () => void }) {
             required
             slotProps={{ htmlInput: { dir: "ltr", autoCapitalize: "none" } }}
           />
-          <TextField
+          <PasswordField
             label="סיסמה"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             error={!!problem}
@@ -167,9 +166,8 @@ function JoinPage({ onBack }: { onBack: () => void }) {
             required
             slotProps={{ htmlInput: { dir: "ltr" } }}
           />
-          <TextField
+          <PasswordField
             label="הסיסמה שוב"
-            type="password"
             value={again}
             onChange={(e) => setAgain(e.target.value)}
             autoComplete="new-password"
@@ -279,9 +277,8 @@ export function ChangePasswordPage() {
     <Card pose="point" title="החלפת סיסמה" subtitle="קיבלת סיסמה זמנית. בחר סיסמה חדשה כדי להמשיך.">
       <form onSubmit={submit}>
         <Stack spacing={2}>
-          <TextField
+          <PasswordField
             label="סיסמה חדשה"
-            type="password"
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             autoComplete="new-password"
@@ -290,9 +287,8 @@ export function ChangePasswordPage() {
             required
             slotProps={{ htmlInput: { dir: "ltr" } }}
           />
-          <TextField
+          <PasswordField
             label="אימות סיסמה"
-            type="password"
             value={pw2}
             onChange={(e) => setPw2(e.target.value)}
             autoComplete="new-password"
