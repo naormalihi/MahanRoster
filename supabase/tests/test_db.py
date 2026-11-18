@@ -710,7 +710,9 @@ def test_candidates_match_the_engine_and_manual_changes(conn):
     p = models.load_problem(json.dumps(doc))
     idx = EligibilityIndex(p)
     soldiers = {s.id: s for s in p.soldiers}
-    ignore = {"busy", "penalty_other"}  # other-cycle duties: SQL reports them as conflicts instead
+    # other-cycle duties: SQL reports them as conflicts instead; a soldier taken off the duty
+    # ("removed") is kept out by the engine only – by hand he may be put back on purpose
+    ignore = {"busy", "penalty_other", "removed"}
     for k in p.slots[::15]:
         rows = _as_coord(conn, "select soldier_id, reasons from public.slot_candidates(%s)", k.id)
         assert len(rows) == len(p.soldiers)
