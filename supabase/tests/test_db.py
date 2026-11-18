@@ -2295,8 +2295,8 @@ def test_scoring_rules_for_soldiers_without_unit_data(conn):
     conn.commit()
     with session_as(conn, uid, aal="aal1") as c:
         r = c.execute("select public.scoring_rules()").fetchone()[0]
-        assert r["tasks"] and all(set(t) == {"name", "weight", "includes_holidays", "category"} for t in r["tasks"])
-        assert r["surprise_notice_hours"] >= 1 and float(r["surprise_multiplier"]) >= 1 and r["window_months"] >= 1
+        assert r["tasks"] and all(set(t) == {"name", "weight", "includes_holidays", "weekend_type", "category"} for t in r["tasks"])
+        assert r["surprise_notice_hours"] >= 1 and float(r["surprise_multiplier"]) >= 1 and r["window_months"] >= 1 and r["credit_min_days"] >= 1
         assert all(set(a) == {"name", "value"} for a in r["additions"])
         names = {t["name"] for t in r["tasks"]}
         hidden = {n for (n,) in conn.execute("select name from task_types where is_special or not is_active").fetchall()}

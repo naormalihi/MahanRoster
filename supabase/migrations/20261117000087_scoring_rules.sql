@@ -12,7 +12,7 @@ begin
     'tasks', coalesce((
       select jsonb_agg(jsonb_build_object(
                'name', t.name, 'weight', t.weight,
-               'includes_holidays', t.includes_holidays, 'category', dc.name)
+               'includes_holidays', t.includes_holidays, 'weekend_type', t.is_weekend_type, 'category', dc.name)
              order by dc.name nulls last, t.weight desc, t.name)
       from task_types t left join duty_categories dc on dc.id = t.category_id
       where t.is_active and not t.is_special), '[]'::jsonb),
@@ -22,7 +22,8 @@ begin
     'surprise_multiplier', coalesce((app.setting('surprise_multiplier') #>> '{}')::numeric, 1.5),
     'surprise_notice_hours', coalesce((app.setting('surprise_notice_hours') #>> '{}')::int, 72),
     'window_months', coalesce((app.setting('score_window_months') #>> '{}')::int, 6),
-    'fairness_tolerance_pct', coalesce((app.setting('fairness_tolerance_pct') #>> '{}')::numeric, 20)
+    'fairness_tolerance_pct', coalesce((app.setting('fairness_tolerance_pct') #>> '{}')::numeric, 20),
+    'credit_min_days', coalesce((app.setting('credit_absence_min_days') #>> '{}')::int, 7)
   );
 end $$;
 

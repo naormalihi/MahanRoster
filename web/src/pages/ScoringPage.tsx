@@ -6,7 +6,7 @@ import { isSoldier } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { dayLabel } from "../lib/dates";
 import type { MyDuty } from "../lib/me";
-import { buildExamples, num, type ScoringRules } from "../lib/scoringRules";
+import { additionsByValue, buildExamples, num, taskNote, type ScoringRules } from "../lib/scoringRules";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -19,11 +19,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** The formula as three blocks: (weight + addition) × call-up. */
+/** The formula: [weight + day addition] × call-up. The framed group stands for the brackets. */
 function Formula({ r }: { r: ScoringRules }) {
   const block = (label: ReactNode, color: string) => (
-    <Box sx={{ border: 2, borderColor: color, borderRadius: 2, px: { xs: 1, sm: 1.5 }, py: 0.75, flexShrink: 1 }}>
-      <Typography sx={{ fontWeight: 800, fontSize: { xs: 14, sm: 16 }, textAlign: "center" }}>{label}</Typography>
+    <Box sx={{ border: 2, borderColor: color, borderRadius: 2, px: { xs: 1, sm: 1.5 }, py: 0.75, bgcolor: "background.paper", flexShrink: 1 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: { xs: 14, sm: 16 }, textAlign: "center", whiteSpace: "nowrap" }}>{label}</Typography>
     </Box>
   );
   const op = (t: string) => (
@@ -32,19 +32,18 @@ function Formula({ r }: { r: ScoringRules }) {
     </Typography>
   );
   return (
-    <Stack direction="row" sx={{ alignItems: "center", gap: { xs: 0.5, sm: 1 }, justifyContent: "center", my: 0.5 }}>
-      {/* in an RTL row the opening bracket sits on the right, so it is drawn as ")" */}
-      {op(")")}
-      {block("משקל", "primary.main")}
-      {op("+")}
-      {block("תוספת חג", "secondary.main")}
-      {op("(")}
+    <Stack direction="row" sx={{ alignItems: "center", gap: { xs: 0.75, sm: 1.25 }, justifyContent: "center", my: 0.5 }}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: { xs: 0.5, sm: 1 }, bgcolor: "action.hover", borderRadius: 3, px: { xs: 0.75, sm: 1.25 }, py: 0.75 }}>
+        {block("משקל", "primary.main")}
+        {op("+")}
+        {block("תוספת יום", "secondary.main")}
+      </Stack>
       {op("×")}
       {block(
         <>
           הקפצה{" "}
           <Box component="span" dir="ltr" sx={{ unicodeBidi: "isolate" }}>
-            ×{num(r.surprise_multiplier)}
+            {num(r.surprise_multiplier)}
           </Box>
         </>,
         "warning.main",
@@ -100,10 +99,10 @@ export function ScoringPage() {
       <Section title="הנוסחה">
         <Formula r={rules} />
         <Stack spacing={0.5} sx={{ mt: 1.25 }}>
-          <Line b="משקל">לפי סוג התורנות.</Line>
-          <Line b="תוספת חג">בחג או ביום מיוחד. אם חלות כמה – רק הגבוהה.</Line>
+          <Line b="משקל">של התורנות כולה, גם אם היא נמשכת כמה ימים.</Line>
+          <Line b="תוספת יום">סוף שבוע, חג, ערב חג או חול המועד. אם חלות כמה – רק הגבוהה, פעם אחת.</Line>
           <Line b="הקפצה">
-            שיבוץ אחרי הפרסום, פחות מ-{rules.surprise_notice_hours} שעות לפני התורנות.
+            פי {num(rules.surprise_multiplier)} למי ששובץ אחרי הפרסום, פחות מ-{rules.surprise_notice_hours} שעות לפני התורנות.
           </Line>
         </Stack>
       </Section>
@@ -126,17 +125,32 @@ export function ScoringPage() {
       )}
 
       <Section title="המספרים">
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.75 }}>
+          משקל לכל תורנות
+        </Typography>
         <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
-          {rules.tasks.map((t) => (
-            <Chip key={t.name} variant="outlined" label={`${t.name} · ${num(t.weight)}`} />
-          ))}
+          {rules.tasks
+            .slice()
+            .sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name, "he"))
+            .map((t) => {
+              const note = taskNote(t);
+              return <Chip key={t.name} variant="outlined" label={`${t.name} · ${num(t.weight)}${note ? ` (${note})` : ""}`} />;
+            })}
         </Stack>
         {rules.additions.length > 0 && (
-          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1.25 }}>
-            {rules.additions.map((a) => (
-              <Chip key={a.name} variant="outlined" color="secondary" label={`${a.name} +${num(a.value)}`} />
-            ))}
-          </Stack>
+          <>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1.75, mb: 0.75 }}>
+              תוספת יום
+            </Typography>
+            <Stack spacing={0.75}>
+              {additionsByValue(rules).map((g) => (
+                <Stack key={g.value} direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
+                  <Chip size="small" color="secondary" label={<span dir="ltr">+{num(g.value)}</span>} sx={{ fontWeight: 700, minWidth: 44 }} />
+                  <Typography variant="body2">{g.names.join(" · ")}</Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </>
         )}
       </Section>
 
@@ -144,8 +158,8 @@ export function ScoringPage() {
         <Stack spacing={0.5}>
           <Line b="משווים נכון">רק מול מי שיכולים לעשות אותן תורנויות.</Line>
           <Line b="יש זיכרון">נספרות גם הנקודות של {rules.window_months} החודשים האחרונים.</Line>
-          <Line b="היעדרות לא מבחירה">קורס או מחלה ארוכים מזכים – לא חוזרים לערימה.</Line>
-          <Line b="חגים וסופי שבוע">מתחלקים בתורות. מי שעשה חג – אחרון לבא.</Line>
+          <Line b="היעדרות לא מבחירה">קורס או מחלה של {rules.credit_min_days ?? 7} ימים ומעלה, או פטור מלא, מזכים – לא חוזרים לערימה.</Line>
+          <Line b="חגים וסופי שבוע">מתחלקים בתורות. מי שעשה תורנות בחג בשנה האחרונה – אחרון לחג הבא.</Line>
         </Stack>
       </Section>
 
