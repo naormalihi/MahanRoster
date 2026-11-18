@@ -139,7 +139,7 @@ export class DemoApi implements Api {
   private boardPeople = new Map<string, SlotPerson[]>();
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
-  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.3, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90 };
+  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.3, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24 };
   // the unit's additions: weekend +3; eves of the big holidays +6, the other holiday days +3
   private multipliers: ScoreMultiplier[] = [
     { id: "m_we", name: "סוף שבוע", value: 3, day_types: [], holidays: [], holiday_kinds: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
@@ -1206,7 +1206,8 @@ export class DemoApi implements Api {
     this.demoDutyList ??= [
       { assignment_id: "demo-d1", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "שמירות חובה", starts_at: at(4, 8), ends_at: at(4, 20),
         role: "performer", status: "assigned", points: 1, explanation: "הניקוד שלך הנמוך בקבוצה", report_at: null, report_place: "שער ראשי",
-        briefing_at: null, briefing_place: null, equipment: null },
+        briefing_at: at(3, 13), briefing_place: "גף אבטחה פיזית", equipment: null,
+        contact_name: "שני משיח", contact_phone: "052-0000000", briefing_note: "לא מאושרות החלפות בעת ביצוע התורנות!" },
       { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער | ש.ג קבע", starts_at: at(11, 20), ends_at: at(12, 8),
         role: "reserve", status: "reserve_idle", points: 0, explanation: "עתודה לפי תור", report_at: null, report_place: null,
         briefing_at: null, briefing_place: null, equipment: null },

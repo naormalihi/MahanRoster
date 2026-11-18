@@ -153,7 +153,11 @@ export function dutiesIcs(rows: BoardRow[], name: string, now = new Date()): { i
     const details = [
       reserve ? "תפקיד: עתודה" : "תפקיד: מבצע",
       r.report_at ? `התייצבות: ${timeLabel(r.report_at)}${r.report_place ? `, ${r.report_place}` : ""}` : "",
-      r.briefing_at ? `תדריך: ${dayKey(r.briefing_at)} ${timeLabel(r.briefing_at)}${r.briefing_place ? `, ${r.briefing_place}` : ""}` : "",
+      r.briefing_at
+        ? `תדריך: ${dayKey(r.briefing_at)} ${timeLabel(r.briefing_at)}${r.briefing_place ? `, ${r.briefing_place}` : ""}`
+        : r.briefing_by_call
+          ? "תדריך: לפי הזימון"
+          : "",
       r.instructions ?? "",
     ].filter(Boolean);
     lines.push(

@@ -84,6 +84,8 @@ export interface BoardRow {
   replaced?: string[];
   /** a special call-up: the points entered for it */
   special_points?: number | null;
+  /** the duty's briefing is by call (no fixed time) */
+  briefing_by_call?: boolean;
 }
 
 /** The people of one published duty, for the actions on it (staff). */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_MULTIPLIER, describeMultiplier, israeliHolidays, mergeHolidays, multiplierProblems, scoringProblems, taskTypeProblems, type TaskTypeInput } from "../catalog";
+import { briefingLabel, briefingProblems, cleanBriefing, EMPTY_MULTIPLIER, describeMultiplier, israeliHolidays, mergeHolidays, multiplierProblems, scoringProblems, taskTypeProblems, type TaskTypeInput } from "../catalog";
 
 const base: TaskTypeInput = {
   code: "new_duty",
@@ -35,9 +35,18 @@ describe("catalog validation", () => {
     expect(taskTypeProblems({ ...base, default_start_time: "08:00" }, others)).toHaveLength(1);
   });
   it("scoring settings", () => {
-    const ok = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90 };
+    const ok = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24 };
     expect(scoringProblems(ok)).toEqual([]);
-    expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [], surprise_multiplier: 0.5, surprise_notice_hours: 0, exemption_deadline_days: 0, fairness_tolerance_pct: 0, grace_days: -1 })).toHaveLength(7);
+    expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [], surprise_multiplier: 0.5, surprise_notice_hours: 0, exemption_deadline_days: 0, fairness_tolerance_pct: 0, grace_days: -1, briefing_reminder_hours: 1 })).toHaveLength(8);
+  });
+  it("briefing: label, problems, clean", () => {
+    expect(briefingLabel({ kind: "briefing", rule: "weekday", weekday: 2, time: "13:00", place: "גף אבטחה פיזית" })).toBe("תדריך שלישי שלפני 13:00 · גף אבטחה פיזית");
+    expect(briefingLabel({ kind: "report", rule: "same_day", time: "08:30" })).toBe("התייצבות ביום התורנות 08:30");
+    expect(briefingLabel({ kind: "by_call" })).toBe("תדריך לפי הזימון");
+    expect(briefingProblems({ kind: "briefing", rule: "same_day", time: "9" })).toHaveLength(1);
+    expect(briefingProblems({ kind: "by_call" })).toEqual([]);
+    expect(cleanBriefing({ kind: "by_call", rule: "weekday", weekday: 3, time: "10:00", place: "  ", note: " לא " })).toEqual({ kind: "by_call", note: "לא" });
+    expect(cleanBriefing({ kind: "briefing", rule: "weekday", time: "13:00" })).toEqual({ kind: "briefing", rule: "weekday", time: "13:00", weekday: 2 });
   });
   it("a multiplier needs a name, a value 1–10 and at least one condition", () => {
     const all = [{ ...EMPTY_MULTIPLIER, id: "m1", name: "לילה", time_window: "22:00-06:00" }];

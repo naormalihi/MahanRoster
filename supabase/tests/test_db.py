@@ -2321,4 +2321,103 @@ def test_scoring_rules_for_soldiers_without_unit_data(conn):
         assert adds["בדיקה · יום מיוחד"] == 4.5 and "כבויה" not in adds
         assert float(r["surprise_multiplier"]) == 1.7 and r["surprise_notice_hours"] == 48
         assert r["credit_absences"]
+
+
+def test_briefing_time_from_the_catalog_rule(conn):
+    bt = lambda b, start: conn.execute(
+        "select to_char(app.briefing_time(%s, %s::timestamp at time zone app.tz()) at time zone app.tz(), 'YYYY-MM-DD HH24:MI')",
+        (Jsonb(b), start)).fetchone()[0]
+    tue = {"kind": "briefing", "rule": "weekday", "weekday": 2, "time": "13:00"}
+    assert bt(tue, "2026-11-25 08:00") == "2026-11-24 13:00"      # Wednesday: the Tuesday before
+    assert bt(tue, "2026-11-24 14:00") == "2026-11-24 13:00"      # Tuesday afternoon: that day
+    assert bt(tue, "2026-11-24 08:00") == "2026-11-17 13:00"      # not after the start: a week before
+    assert bt({"kind": "report", "rule": "day_before", "time": "09:00"}, "2026-11-25 08:00") == "2026-11-24 09:00"
+    assert bt({"kind": "report", "rule": "same_day", "time": "08:30"}, "2026-11-26 08:00") == "2026-11-26 08:30"
+    assert conn.execute("select app.briefing_time(%s, now())", (Jsonb({"kind": "by_call"}),)).fetchone()[0] is None
+    with pytest.raises(psycopg.errors.CheckViolation):
+        with conn.transaction():
+            conn.execute("update task_types set briefing = %s where id = (select id from task_types limit 1)",
+                         (Jsonb({"kind": "briefing", "rule": "weekday", "time": "13:00"}),))  # no weekday
+
+
+def test_briefing_reminder_before_an_early_briefing_and_in_the_day_before_reminder(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() - interval '5 days' where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        conn.execute("update task_types set briefing = %s where id = %s", (Jsonb({
+            "kind": "briefing", "rule": "same_day", "time": "11:00", "place": "טלפוני",
+            "contact_name": "אופיר", "contact_phone": "052-0000000", "note": "לא מאושרות החלפות"}), tid))
+        sid = conn.execute("select id from soldiers where is_active order by id desc limit 1").fetchone()[0]
+        uid = conn.execute("select app.create_auth_user('brief.soldier@users.invalid', 'x-long-password')").fetchone()[0]
+        conn.execute("delete from app_users where soldier_id = %s", (sid,))
+        conn.execute("insert into app_users (id, username, soldier_id) values (%s, 'brief.soldier', %s)", (uid, sid))
+
+        def duty(start_h, briefing_h=None):
+            k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at, briefing_at, briefing_place) values "
+                             "(%s, %s, now() + make_interval(hours => %s), now() + make_interval(hours => %s + 24), "
+                             " now() + make_interval(hours => %s), case when %s::int is not null then 'חדר תדריכים' end) returning id",
+                             (cycle, tid, start_h, start_h, briefing_h, briefing_h)).fetchone()[0]
+            a = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, created_at) "
+                             "select %s, id, gaf_id, 'performer', 'assigned', 'manual', 'בדיקה', now() - interval '3 days' "
+                             "from soldiers where id = %s returning id", (k, sid)).fetchone()[0]
+            return k, a
+
+        body = lambda typ, a: conn.execute("select payload->>'body' from notifications where type = %s and payload->>'assignment_id' = %s",
+                                           (typ, str(a))).fetchone()
+        early_k, early = duty(70, 20)      # a briefing 50 hours before the start, 20 hours from now
+        near_k, near = duty(20)            # the catalog's briefing on the day itself
+        conn.execute("delete from notifications where recipient_user_id = %s", (uid,))
+        conn.execute("select app.queue_reminders()")
+        b = body("briefing_reminder", early)[0]
+        assert "תדריך" in b and "חדר תדריכים" in b and "אופיר 052-0000000" in b
+        assert body("duty_reminder", early) is None                      # the duty itself is 3 days away
+        d = body("duty_reminder", near)[0]
+        assert "תדריך" in d and "טלפוני" in d and "לא מאושרות החלפות" in d  # merged into the day-before reminder
+        assert body("briefing_reminder", near) is None
+        assert conn.execute("select app.queue_reminders()").fetchone()[0] == 0   # once only
+
+        # got the duty after the reminder's time: no reminder (the assignment message said it)
+        late_k, late = duty(96, 22)
+        conn.execute("update assignments set created_at = now() - interval '1 hour' where id = %s", (late,))
+        conn.execute("select app.queue_reminders()")
+        assert body("briefing_reminder", late) is None
+
+        # the soldier sees the catalog's briefing with the contact; the board without it
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        row = conn.execute("select briefing_place, contact_name, contact_phone, briefing_note, briefing_at is not null "
+                           "from public.my_duties() where assignment_id = %s", (near,)).fetchone()
+        assert row == ("טלפוני", "אופיר", "052-0000000", "לא מאושרות החלפות", True)
+        conn.execute("reset role")
+        raise psycopg.Rollback()
+
+
+def test_poster_fills_the_catalog_briefings(conn):
+    sql = (ROOT / "supabase/migrations/20261118000090_duty_briefings.sql").read_text(encoding="utf-8")
+    poster = sql[sql.index("do $$\ndeclare\n  no_swaps"):]
+    with conn.transaction():
+        cat = lambda n: conn.execute("insert into duty_categories (name) values (%s) on conflict do nothing returning id", (n,)).fetchone()
+        for n in ("שמירות חובה", "מפקד שער", "קצין תורן", 'רס"ר'):
+            cat(n)
+        rows = [("p_mitbach", "מטבח – שבת", None, "any"), ("p_rasar", 'רס"ר הקלת ת"ש', 'רס"ר', "mandatory"),
+                ("p_shekem", 'רס"ר', None, "mandatory"), ("p_haganak", 'קצין הגנ"ק', "קצין תורן", "any"),
+                ("p_katzin", "קצין תורן – חול", "קצין תורן", "any"), ("p_mamlachat", "ממלכת יום", None, "any"),
+                ("p_shag", 'ש"ג – חול', "שמירות חובה", "mandatory"), ("p_shaar", "מפקד שער | ש.ג קבע", "מפקד שער", "any"),
+                ("p_keva", "שמירת קבע", None, "career"), ("p_toran", "מפקד תורן", None, "any"),
+                ("p_other", "תורנות אחרת", None, "mandatory")]
+        for code, name, c, svc in rows:
+            conn.execute("update task_types set name = name || ' (קודם)' where name = %s", (name,))
+            conn.execute("insert into task_types (code, name, weight, service_restriction, category_id) "
+                         "values (%s, %s, 1, %s, (select id from duty_categories where name = %s))", (code, name, svc, c))
+        conn.execute("update task_types set briefing = %s where code = 'p_other'", (Jsonb({"kind": "by_call"}),))
+        conn.execute("update task_types set briefing = null where code like 'p\\_%%' and code <> 'p_other'")
+        conn.execute(poster)
+        got = dict(conn.execute("select code, briefing->>'kind' || ' ' || coalesce(briefing->>'time', '') || ' ' || coalesce(briefing->>'place', '') "
+                                "from task_types where code like 'p\\_%%'").fetchall())
+        assert got == {
+            "p_mitbach": 'report 08:30 חד"א חוגרים', "p_rasar": 'report 09:00 מש"ק תורנים', "p_shekem": 'report 08:30 שק"ם',
+            "p_haganak": "report 09:00 גף הגנה קרקעית", "p_katzin": 'briefing 09:00 גף רס"ר', "p_mamlachat": "briefing 11:00 טלפוני",
+            "p_shag": "briefing 13:00 גף אבטחה פיזית", "p_shaar": "briefing 09:30 גף אבטחה פיזית", "p_keva": "briefing 09:30 גף אבטחה פיזית",
+            "p_toran": "by_call  ", "p_other": "by_call  "}   # a type already filled is kept
         raise psycopg.Rollback()

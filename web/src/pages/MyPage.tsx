@@ -32,8 +32,10 @@ function DutyRow({ d, open, onToggle, onSwap }: { d: MyDuty; open: boolean; onTo
     d.report_at && `התייצבות: ${dayLabel(d.report_at)} ${timeLabel(d.report_at)}${d.report_place ? `, ${d.report_place}` : ""}`,
     !d.report_at && d.report_place && `התייצבות: ${d.report_place}`,
     d.briefing_at && `תדריך: ${dayLabel(d.briefing_at)} ${timeLabel(d.briefing_at)}${d.briefing_place ? `, ${d.briefing_place}` : ""}`,
+    !d.briefing_at && d.briefing_by_call && `תדריך: לפי הזימון${d.briefing_place ? `, ${d.briefing_place}` : ""}`,
     d.equipment && `ציוד: ${d.equipment}`,
   ].filter(Boolean) as string[];
+  const tel = d.contact_phone?.replace(/[^\d+]/g, "");
   return (
     <Box
       role="button"
@@ -63,6 +65,24 @@ function DutyRow({ d, open, onToggle, onSwap }: { d: MyDuty; open: boolean; onTo
               {t}
             </Typography>
           ))}
+          {(d.contact_name || d.contact_phone) && (
+            <Typography variant="body2">
+              איש קשר: {d.contact_name}{" "}
+              {d.contact_phone &&
+                (tel ? (
+                  <Link href={`tel:${tel}`} onClick={(e) => e.stopPropagation()} dir="ltr">
+                    {d.contact_phone}
+                  </Link>
+                ) : (
+                  d.contact_phone
+                ))}
+            </Typography>
+          )}
+          {d.briefing_note && (
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {d.briefing_note}
+            </Typography>
+          )}
           <Typography variant="body2" color="text.secondary">
             <b>למה שובצתי:</b> {d.explanation ?? "שובץ ידנית על ידי נע\"ת התורנויות."}
           </Typography>
