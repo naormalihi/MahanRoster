@@ -315,6 +315,8 @@ export class DemoApi implements Api {
     return this.gafList;
   }
 
+  async setMyTheme(): Promise<void> {}
+
   async ranks() {
     return this.rankList;
   }

@@ -14,6 +14,8 @@ import {
   Stack,
   TextField,
   Typography,
+  alpha,
+  type Theme,
 } from "@mui/material";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../lib/auth";
@@ -237,7 +239,7 @@ export function RequestsPage() {
         const blocksUsed = g.blocks.filter((b) => b.mine).length;
         return (
           <Paper key={c?.id ?? "none"} variant="outlined" sx={{ overflow: "hidden", opacity: c && !c.open ? 0.92 : 1 }}>
-            <Box sx={{ px: 2, py: 1.5, bgcolor: c ? (c.open ? "rgba(26,20,102,0.05)" : "action.hover") : "rgba(232,112,15,0.08)", borderBottom: 1, borderColor: "divider" }}>
+            <Box sx={{ px: 2, py: 1.5, bgcolor: c ? (c.open ? (t: Theme) => alpha(t.palette.primary.main, 0.07) : "action.hover") : "rgba(232,112,15,0.08)", borderBottom: 1, borderColor: "divider" }}>
               <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
                 <Typography variant="h3" sx={{ flex: 1, minWidth: 180 }}>
                   {c ? c.name : "בלי מחזור"}

@@ -40,6 +40,7 @@ import { APP_VERSION, BUILD_DATE, BUILD_SHA, CHANGELOG } from "../lib/changelog"
 import { Mascot } from "./Mascot";
 import { OwlTour } from "./OwlTour";
 import { markTourSeen, TOUR, tourKind, tourSeen } from "../lib/tour";
+import { ThemeMenuButton, ThemeSync, ThemeToggleRow } from "./ThemePicker";
 
 const ROLE_LABEL: Record<string, string> = {
   coordinator: "נע\"ת תורנויות",
@@ -277,6 +278,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <HelpIcon />
             </IconButton>
           )}
+          {!(compact && links.length) && <ThemeMenuButton />}
           {!(compact && links.length) && (
             <Button color="inherit" startIcon={<LogoutIcon />} onClick={signOut}>
               יציאה
@@ -284,6 +286,7 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
         </Toolbar>
       </AppBar>
+      <ThemeSync />
       {kind && <OwlTour open={tour} steps={TOUR[kind]} onClose={closeTour} />}
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
@@ -327,6 +330,8 @@ export function Layout({ children }: { children: ReactNode }) {
               <ListItemText primary="יציאה" />
             </ListItemButton>
           </List>
+          <Divider />
+          <ThemeToggleRow />
           <Box sx={{ flex: 1 }} />
           <VersionFooter />
         </Box>
