@@ -2436,3 +2436,18 @@ def test_neutral_rank_names_keep_the_military_name_as_alias(conn):
         conn.execute(sql)  # again: nothing left to rename, nothing breaks
         assert conn.execute("select count(*) from ranks where name = 'חובה 3'").fetchone()[0] == 1
         raise psycopg.Rollback()
+
+
+def test_a_user_keeps_his_look_with_the_account(conn):
+    with conn.transaction():
+        uid = conn.execute("select app.create_auth_user('theme.user@users.invalid', 'x-long-password')").fetchone()[0]
+        conn.execute("insert into app_users (id, username) values (%s, 'theme.user')", (uid,))
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        conn.execute("select public.set_my_theme('dark')")
+        assert conn.execute("select ui_theme from app_users where id = %s", (uid,)).fetchone()[0] == "dark"
+        with pytest.raises(psycopg.errors.InvalidParameterValue):
+            with conn.transaction():
+                conn.execute("select public.set_my_theme('pink')")
+        conn.execute("reset role")
+        raise psycopg.Rollback()

@@ -38,6 +38,8 @@ export interface Me {
   username: string;
   roles: Role[];
   mustChangePassword: boolean;
+  /** the look saved with the account (light / dark / auto), if any */
+  uiTheme?: string | null;
 }
 
 export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinator") || me.roles.includes("deputy"));
@@ -141,6 +143,8 @@ export interface Api {
   soldiers(): Promise<ExistingSoldier[]>;
   gafim(): Promise<NamedRef[]>;
   ranks(): Promise<RankItem[]>;
+  /** keep the chosen look with the account */
+  setMyTheme(choice: "auto" | "light" | "dark"): Promise<void>;
   unitKeyCheck(): Promise<string | null>;
   setUnitKeyCheck(value: string): Promise<void>;
   /** A forgotten unit key: moves the approved soldiers to keys made with the new one, and stores its fingerprint. */

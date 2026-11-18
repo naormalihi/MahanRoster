@@ -27,6 +27,9 @@ import {
   TextField,
   Typography,
   Chip,
+  alpha,
+  type Theme,
+  useTheme,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NamedRef } from "../lib/api";
@@ -182,7 +185,7 @@ function MatrixTab(props: {
       textAlign: "center" as const,
       cursor: "pointer",
       fontVariantNumeric: "tabular-nums",
-      bgcolor: v === 1 ? "#e5f4e4" : v > 0 ? "#f9eeda" : undefined,
+      bgcolor: (t: Theme) => (v === 1 ? alpha(t.palette.success.main, 0.16) : v > 0 ? alpha(t.palette.warning.main, 0.18) : undefined),
       outline: c.override_value !== null ? "2px solid #e8700f" : undefined,
       outlineOffset: -3,
       "&:hover": { bgcolor: "action.hover" },
@@ -224,7 +227,7 @@ function MatrixTab(props: {
       </Typography>
       {narrow ? (
         <>
-          <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "#efedff" }}>
+          <Paper variant="outlined" sx={{ p: 1.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.1) }}>
             <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
               סה״כ פוטנציאל
             </Typography>
@@ -257,7 +260,7 @@ function MatrixTab(props: {
                             title={cellTitle(cell)}
                             onClick={props.locked ? undefined : () => setEditing(cell)}
                             sx={{
-                              bgcolor: v === 1 ? "#e5f4e4" : v > 0 ? "#f9eeda" : undefined,
+                              bgcolor: (t) => (v === 1 ? alpha(t.palette.success.main, 0.16) : v > 0 ? alpha(t.palette.warning.main, 0.18) : undefined),
                               border: cell.override_value !== null ? "2px solid #e8700f" : undefined,
                             }}
                           />
@@ -295,11 +298,11 @@ function MatrixTab(props: {
               ))}
             </TableRow>
             <TableRow>
-              <TableCell colSpan={3} sx={{ top: 37, fontWeight: 700, bgcolor: "#efedff" }}>
+              <TableCell colSpan={3} sx={{ top: 37, fontWeight: 700, bgcolor: (t) => alpha(t.palette.primary.main, 0.1) }}>
                 סה״כ פוטנציאל
               </TableCell>
               {summary.map((s) => (
-                <TableCell key={s.category_id} sx={{ top: 37, textAlign: "center", fontWeight: 700, bgcolor: "#efedff" }} title={`${s.full} מלאים · ${s.partial} חלקיים · ${s.overrides} תיקונים`}>
+                <TableCell key={s.category_id} sx={{ top: 37, textAlign: "center", fontWeight: 700, bgcolor: (t) => alpha(t.palette.primary.main, 0.1) }} title={`${s.full} מלאים · ${s.partial} חלקיים · ${s.overrides} תיקונים`}>
                   {s.total}
                 </TableCell>
               ))}
@@ -354,7 +357,9 @@ function HeatTab({ daily, categories }: { daily: DailyAvailability[] | null; cat
   if (!daily) return <Loading />;
   const rows = categories.map((c) => ({ c, weeks: weekly(daily, c.id) })).filter((r) => r.weeks.length);
   const weeks = rows[0]?.weeks.map((w) => w.week_start) ?? [];
-  const color = (t: number) => `hsl(${Math.round(t * 120)}, 60%, ${88 - t * 8}%)`;
+  const dark = useTheme().palette.mode === "dark";
+  // red (weak) to green; deep shades on a dark background so the white numbers stay readable
+  const color = (t: number) => `hsl(${Math.round(t * 120)}, ${dark ? 45 : 60}%, ${dark ? 22 + t * 6 : 88 - t * 8}%)`;
   return (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">

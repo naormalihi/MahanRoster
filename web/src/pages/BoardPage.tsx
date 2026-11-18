@@ -32,6 +32,7 @@ import {
   Typography,
   useMediaQuery,
   type Theme,
+  alpha,
 } from "@mui/material";
 import { createContext, Fragment, useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -290,11 +291,11 @@ function DayCell({ d, s, inMonth, isSel, today, onPick, tall }: { d: string; s?:
         borderColor: "divider",
         cursor: "pointer",
         opacity: inMonth ? 1 : 0.4,
-        bgcolor: isSel ? "rgba(26,20,102,0.07)" : isWeekend(d) ? "rgba(232,112,15,0.035)" : "background.paper",
+        bgcolor: isSel ? (t: Theme) => alpha(t.palette.primary.main, 0.1) : isWeekend(d) ? "rgba(232,112,15,0.035)" : "background.paper",
         outline: isSel ? "2px solid" : "none",
         outlineColor: "primary.main",
         outlineOffset: -2,
-        "&:hover": { bgcolor: "rgba(26,20,102,0.05)" },
+        "&:hover": { bgcolor: (t: Theme) => alpha(t.palette.primary.main, 0.07) },
       }}
     >
       <Stack direction="row" sx={{ alignItems: "center", gap: 0.5 }}>

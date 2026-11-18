@@ -1,4 +1,4 @@
-import { Box, Button, Paper, Stack, Typography } from "@mui/material";
+import { Box, Button, Paper, Stack, Typography, alpha } from "@mui/material";
 import type { ReactNode } from "react";
 import { Mascot, type MascotPose } from "./Mascot";
 
@@ -21,7 +21,7 @@ export function EmptyState({
 }) {
   const sm = size === "sm";
   return (
-    <Paper variant="outlined" sx={{ p: sm ? 1.5 : { xs: 2.5, sm: 3 }, borderStyle: "dashed", bgcolor: "rgba(255,244,228,0.35)" }}>
+    <Paper variant="outlined" sx={{ p: sm ? 1.5 : { xs: 2.5, sm: 3 }, borderStyle: "dashed", bgcolor: (t) => alpha(t.palette.secondary.main, t.palette.mode === "dark" ? 0.06 : 0.05) }}>
       <Stack direction={sm ? "row" : "column"} spacing={sm ? 1.5 : 1} sx={{ alignItems: "center", textAlign: sm ? "start" : "center" }}>
         <Mascot pose={pose} height={sm ? 72 : 130} />
         <Box sx={{ flex: sm ? 1 : undefined, minWidth: 0 }}>

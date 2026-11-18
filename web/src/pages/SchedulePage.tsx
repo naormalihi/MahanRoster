@@ -81,7 +81,7 @@ function SetupHelp() {
           </li>
           <li>
             ב-Supabase: SQL Editor, להריץ (עם הטוקן במקום ה-X):
-            <Box component="pre" dir="ltr" sx={{ bgcolor: "grey.100", p: 1, borderRadius: 1, fontSize: 12, overflowX: "auto", my: 0.5 }}>
+            <Box component="pre" dir="ltr" sx={{ bgcolor: "action.hover", p: 1, borderRadius: 1, fontSize: 12, overflowX: "auto", my: 0.5 }}>
               select vault.create_secret('XXXX', 'github_dispatch_token');
             </Box>
           </li>

@@ -86,7 +86,7 @@ export class SupabaseApi implements Api {
     const { data } = await this.sb.auth.getUser();
     if (!data.user) return null;
     const uid = data.user.id;
-    const user = maybe(await this.sb.from("app_users").select("username, must_change_password").eq("id", uid).maybeSingle());
+    const user = maybe(await this.sb.from("app_users").select("username, must_change_password, ui_theme").eq("id", uid).maybeSingle());
     if (!user) return null;
     const now = Date.now();
     const roles = check(await this.sb.from("user_roles").select("role, valid_from, valid_to").eq("user_id", uid)) as {
@@ -97,7 +97,7 @@ export class SupabaseApi implements Api {
     const active = roles
       .filter((r) => (!r.valid_from || Date.parse(r.valid_from) <= now) && (!r.valid_to || Date.parse(r.valid_to) > now))
       .map((r) => r.role);
-    return { userId: uid, username: user.username, roles: active, mustChangePassword: user.must_change_password };
+    return { userId: uid, username: user.username, roles: active, mustChangePassword: user.must_change_password, uiTheme: user.ui_theme };
   }
 
   async mfaState(): Promise<MfaState> {
@@ -173,6 +173,10 @@ export class SupabaseApi implements Api {
 
   async gafim(): Promise<NamedRef[]> {
     return check(await this.sb.from("org_units").select("id, name").eq("kind", "gaf").is("active_to", null).order("name"));
+  }
+
+  async setMyTheme(choice: "auto" | "light" | "dark"): Promise<void> {
+    check(await this.sb.rpc("set_my_theme", { p_theme: choice }));
   }
 
   async ranks(): Promise<RankItem[]> {
