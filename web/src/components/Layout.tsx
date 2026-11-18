@@ -332,9 +332,9 @@ export function Layout({ children }: { children: ReactNode }) {
         </Box>
       </Drawer>
       <Box sx={{ display: "none", "@media print": { display: "flex" }, alignItems: "center", gap: 2, px: 1, pt: 1, pb: 2, borderBottom: "2px solid #e8700f" }}>
-        <Box component="img" src="/brand/emblem.png" alt="סמל יחידת מה״ן" sx={{ height: 70 }} />
+        <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ height: 56, width: 56 }} />
         <Box>
-          <Typography sx={{ fontWeight: 700, fontSize: 18 }}>יחידת מה״ן – תורנויות</Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: 18 }}>תורנצ׳יק – תורנויות</Typography>
           <Typography variant="body2">הודפס ב-{new Date().toLocaleDateString("he-IL")}</Typography>
         </Box>
       </Box>

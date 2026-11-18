@@ -3,11 +3,11 @@
  * against the soldiers already in the system. Pure functions – easy to test.
  */
 
-import { normalizePersonalNumber } from "./hmac";
+import { normalizeIdNumber } from "./hmac";
 import { normalizePhone } from "./phone";
 
 export type FieldKey =
-  | "personalNumber"
+  | "idNumber"
   | "fullName"
   | "firstName"
   | "lastName"
@@ -25,7 +25,7 @@ export type FieldKey =
   | "phone";
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms: string[] }[] = [
-  { key: "personalNumber", label: "מספר אישי", required: true, synonyms: ["מספר אישי", "מ\"א", "מא", "מס' אישי", "מס אישי"] },
+  { key: "idNumber", label: "ת.ז", required: true, synonyms: ["ת.ז", "ת\"ז", "תז", "ת.ז.", "תעודת זהות", "מספר זהות", "מס' זהות", "מס זהות"] },
   { key: "fullName", label: "שם מלא", required: false, synonyms: ["שם מלא", "שם"] },
   { key: "firstName", label: "שם פרטי", required: false, synonyms: ["שם פרטי"] },
   { key: "lastName", label: "שם משפחה", required: false, synonyms: ["שם משפחה"] },
@@ -61,8 +61,13 @@ export function detectMapping(headers: string[]): Mapping {
   return mapping;
 }
 
-export function mappingProblems(m: Mapping): string[] {
+/** The old identity column: the system no longer takes personal numbers. */
+const PERSONAL_NUMBER_HEADERS = ["מספר אישי", "מ\"א", "מא", "מס' אישי", "מס אישי"];
+
+export function mappingProblems(m: Mapping, headers: string[] = []): string[] {
   const out: string[] = [];
+  if (!m.idNumber && headers.some((h) => PERSONAL_NUMBER_HEADERS.some((p) => clean(h) === clean(p))))
+    out.push("בקובץ יש עמודת מספר אישי – המערכת מזהה חיילים לפי ת.ז. החלף את העמודה בעמודת ת.ז");
   for (const f of FIELDS) if (f.required && !m[f.key]) out.push(`חסרה עמודה: ${f.label}`);
   if (!m.fullName && !(m.firstName && m.lastName)) out.push("חסרה עמודת שם (שם מלא, או שם פרטי ושם משפחה)");
   if (!m.gaf && !m.framework) out.push("חסרה עמודת גף (גף, או מסגרת שהגף מופיע בה)");
@@ -80,7 +85,7 @@ export function gafFromFramework(framework: string): string | null {
 
 export interface RosterRow {
   line: number;
-  personalNumber: string;
+  idNumber: string;
   fullName: string;
   serviceType: "mandatory" | "career";
   gaf: string;
@@ -174,13 +179,13 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
   records.forEach((r, i) => {
     const line = i + 2; // header is line 1
     const get = (k: FieldKey) => (m[k] ? r[m[k] as string] : undefined);
-    const pn = normalizePersonalNumber(get("personalNumber"));
+    const pn = normalizeIdNumber(get("idNumber"));
     if (!pn) {
-      if (Object.values(r).some((v) => String(v ?? "").trim() !== "")) errors.push({ line, message: "מספר אישי חסר או לא תקין" });
+      if (Object.values(r).some((v) => String(v ?? "").trim() !== "")) errors.push({ line, message: "ת.ז חסרה או לא תקינה (ספרת ביקורת)" });
       return;
     }
     if (seen.has(pn)) {
-      errors.push({ line, message: `מספר אישי כפול (גם בשורה ${seen.get(pn)})` });
+      errors.push({ line, message: `ת.ז כפולה (גם בשורה ${seen.get(pn)})` });
       return;
     }
     seen.set(pn, line);
@@ -213,7 +218,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
     }
     rows.push({
       line,
-      personalNumber: pn,
+      idNumber: pn,
       fullName: name,
       serviceType: svc!,
       gaf: gafName!,

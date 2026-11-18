@@ -1,8 +1,8 @@
 /**
- * Soldier identity without personal numbers.
+ * Soldier identity without ID numbers.
  *
- * The personal number (מ"א) never leaves the browser. It is turned into
- * soldier_key = HMAC-SHA256(unit key, personal number) here, and only the key
+ * The ID number (ת.ז) never leaves the browser. It is turned into
+ * soldier_key = HMAC-SHA256(unit key, ID number) here, and only the key
  * is sent to the server. The unit key is a passphrase held by נע"ת התורנויות;
  * it is never sent. After it is confirmed it stays in this tab (sessionStorage) until sign-out
  * or the tab closes, so it is typed once per working session.
@@ -37,11 +37,22 @@ export function forgetUnitKey() {
 const enc = new TextEncoder();
 const KEY_CHECK_INPUT = "mahanroster-unit-key-check";
 
-/** Digits only, 5–9 of them (leading zeros kept). Returns null when it is not a personal number. */
-export function normalizePersonalNumber(raw: unknown): string | null {
+/**
+ * An Israeli ID number (ת.ז): 5–9 digits, padded with leading zeros to 9, with a valid
+ * check digit. Returns null when it is not an ID number (a typo fails the check digit).
+ */
+export function normalizeIdNumber(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;
   const digits = String(raw).replace(/[\s-]/g, "");
-  return /^\d{5,9}$/.test(digits) ? digits : null;
+  if (!/^\d{5,9}$/.test(digits)) return null;
+  const id = digits.padStart(9, "0");
+  if (/^0+$/.test(id)) return null;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    const d = Number(id[i]) * ((i % 2) + 1);
+    sum += d > 9 ? d - 9 : d;
+  }
+  return sum % 10 === 0 ? id : null;
 }
 
 async function hmacHex(secret: string, message: string): Promise<string> {
@@ -50,8 +61,8 @@ async function hmacHex(secret: string, message: string): Promise<string> {
   return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function soldierKey(unitKey: string, personalNumber: string): Promise<string> {
-  return hmacHex(unitKey, personalNumber);
+export function soldierKey(unitKey: string, idNumber: string): Promise<string> {
+  return hmacHex(unitKey, idNumber);
 }
 
 /**

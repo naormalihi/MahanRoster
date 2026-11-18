@@ -22,12 +22,6 @@ function Card({ title, subtitle, pose = "wave", children }: { title: string; sub
             </Box>
           </Stack>
           {children}
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "center", pt: 0.5 }}>
-            <Box component="img" src="/brand/emblem-mark.png" alt="" sx={{ height: 26 }} />
-            <Typography variant="caption" color="text.secondary">
-              יחידת מה״ן
-            </Typography>
-          </Stack>
         </Stack>
       </Paper>
     </Box>
@@ -60,7 +54,7 @@ export function LoginPage() {
   if (joining) return <JoinPage onBack={() => setJoining(false)} />;
 
   return (
-    <Card title="תורנצ׳יק" subtitle="מערכת התורנויות של יחידת מה״ן">
+    <Card title="תורנצ׳יק" subtitle="מערכת התורנויות">
       <form onSubmit={submit}>
         <Stack spacing={2}>
           {api?.demo && (

@@ -1,25 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { approvePlan, changeKey, detectMapping, mappingProblems, parseRows, planImport, serviceOf, toRecord, type ExistingSoldier } from "../roster";
 
-const headers = ["מ\"א", "שם פרטי", "שם משפחה", "סוג שירות", "גף", "דרגה", "מין", "תאריך גיוס", "תאריך שחרור", "תוקף מטווח", "משרת הורה"];
+const headers = ["ת\"ז", "שם פרטי", "שם משפחה", "סוג שירות", "גף", "דרגה", "מין", "תאריך גיוס", "תאריך שחרור", "תוקף מטווח", "משרת הורה"];
 
 describe("mapping", () => {
   it("detects Hebrew headers and their variants", () => {
     const m = detectMapping(headers);
-    expect(m.personalNumber).toBe("מ\"א");
+    expect(m.idNumber).toBe("ת\"ז");
     expect(m.firstName).toBe("שם פרטי");
     expect(m.rank).toBe("דרגה");
     expect(mappingProblems(m)).toEqual([]);
   });
   it("reports missing required columns", () => {
-    expect(mappingProblems(detectMapping(["שם מלא"]))).toContain("חסרה עמודה: מספר אישי");
+    expect(mappingProblems(detectMapping(["שם מלא"]))).toContain("חסרה עמודה: ת.ז");
+    expect(mappingProblems(detectMapping(["מספר אישי", "שם מלא"]), ["מספר אישי", "שם מלא"])[0]).toMatch(/מזהה חיילים לפי ת.ז/);
   });
 });
 
 describe("parsing", () => {
   const m = detectMapping(headers);
   const row = (o: Partial<Record<string, unknown>>) => ({
-    "מ\"א": "1234567", "שם פרטי": "נועה", "שם משפחה": "כהן", "סוג שירות": "חובה", "גף": "גף מבצעים", "דרגה": "סמל",
+    "ת\"ז": "123456782", "שם פרטי": "נועה", "שם משפחה": "כהן", "סוג שירות": "חובה", "גף": "גף מבצעים", "דרגה": "סמל",
     "מין": "נ", "תאריך גיוס": new Date(2025, 2, 1), "תאריך שחרור": "01/09/2027", "תוקף מטווח": "", "משרת הורה": "", ...o,
   });
 
@@ -27,28 +28,29 @@ describe("parsing", () => {
     const { rows, errors } = parseRows([row({})], m);
     expect(errors).toEqual([]);
     expect(rows[0]).toMatchObject({
-      personalNumber: "1234567", fullName: "נועה כהן", serviceType: "mandatory", gender: "female",
+      idNumber: "123456782", fullName: "נועה כהן", serviceType: "mandatory", gender: "female",
       enlistmentDate: "2025-03-01", releaseDate: "2027-09-01", rangeValidUntil: null, parent: false,
     });
   });
   it("flags duplicates, bad values and skips empty lines", () => {
     const { rows, errors } = parseRows(
-      [row({}), row({}), row({ "מ\"א": "7654321", "סוג שירות": "מילואים" }), row({ "מ\"א": "1111111", "תאריך גיוס": "32/13/2025" }),
+      [row({}), row({}), row({ "ת\"ז": "765432109", "סוג שירות": "מילואים" }), row({ "ת\"ז": "111111118", "תאריך גיוס": "32/13/2025" }),
        Object.fromEntries(headers.map((h) => [h, ""]))],
       m,
     );
     expect(rows).toHaveLength(1);
     expect(errors.map((e) => e.line)).toEqual([3, 4, 5]);
-    expect(errors[0].message).toContain("כפול");
+    expect(errors[0].message).toContain("כפולה");
+    expect(parseRows([row({ "ת\"ז": "123456789" })], m).errors[0].message).toContain("ספרת ביקורת");
   });
 });
 
 describe("ת\"ש 7 column", () => {
   it("reads it when the column exists, keeps the stored value when it does not", () => {
-    const base = { "מספר אישי": "1234567", "שם מלא": "א ב", "דרגה": "סמל", "גף": "גף א", "סוג שירות": "חובה" };
+    const base = { "ת.ז": "123456782", "שם מלא": "א ב", "דרגה": "סמל", "גף": "גף א", "סוג שירות": "חובה" };
     const m = detectMapping([...Object.keys(base), "ת\"ש"]);
     expect(m.homeNightly).toBe("ת\"ש");
-    const rows = parseRows([{ ...base, "ת\"ש": "7" }, { ...base, "מספר אישי": "1234568", "ת\"ש": "" }], m).rows;
+    const rows = parseRows([{ ...base, "ת\"ש": "7" }, { ...base, "ת.ז": "123456790", "ת\"ש": "" }], m).rows;
     expect(rows.map((r) => r.homeNightly)).toEqual([true, false]);
     const without = parseRows([base], detectMapping(Object.keys(base))).rows;
     expect(without[0].homeNightly).toBeNull();
@@ -57,24 +59,24 @@ describe("ת\"ש 7 column", () => {
 
 describe("gaf column holding the framework path", () => {
   it("extracts the gaf", () => {
-    const base = { "מספר אישי": "1234567", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה" };
+    const base = { "ת.ז": "123456782", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה" };
     const m = detectMapping([...Object.keys(base), "גף"]);
-    const rows = parseRows([{ ...base, "גף": "מה\"ן - מלמסים/גף ענן/צוות תשתיות - מלמסים" }, { ...base, "מספר אישי": "1234568", "גף": "גף טכני" }], m).rows;
+    const rows = parseRows([{ ...base, "גף": "מה\"ן - מלמסים/גף ענן/צוות תשתיות - מלמסים" }, { ...base, "ת.ז": "123456790", "גף": "גף טכני" }], m).rows;
     expect(rows.map((r) => r.gaf)).toEqual(["גף ענן", "גף טכני"]);
   });
 });
 
 describe("phone column", () => {
-  const base = { "מספר אישי": "1234567", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה", "גף": "גף א" };
+  const base = { "ת.ז": "123456782", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה", "גף": "גף א" };
   it("is detected, normalized, and a bad number stops the row", () => {
     const m = detectMapping([...Object.keys(base), "נייד"]);
     expect(m.phone).toBe("נייד");
     const r = parseRows(
       [
         { ...base, "נייד": "050-1234567" },
-        { ...base, "מספר אישי": "1234568", "נייד": 521234567 },
-        { ...base, "מספר אישי": "1234569", "נייד": "" },
-        { ...base, "מספר אישי": "1234570", "נייד": "03-1234567" },
+        { ...base, "ת.ז": "123456790", "נייד": 521234567 },
+        { ...base, "ת.ז": "123456808", "נייד": "" },
+        { ...base, "ת.ז": "123456907", "נייד": "03-1234567" },
       ],
       m,
     );
@@ -93,7 +95,7 @@ describe("phone column", () => {
 
 describe("plan", () => {
   const rec = (key: string, extra = {}) => ({
-    ...toRecord({ line: 2, personalNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,
+    ...toRecord({ line: 2, idNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,
       enlistmentDate: null, releaseDate: null, careerStartDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null, phone: null }, key),
     ...extra,
   });
@@ -129,7 +131,7 @@ describe("plan", () => {
 });
 
 describe("HR export layout", () => {
-  const hr = ["מספר אישי", "מין", "דרגה מחושבת", "שם פרטי", "שם משפחה", "מסגרת", "תאריך תום שירות (תש\"ש)", "נמצא במשרת הורה"];
+  const hr = ["ת.ז", "מין", "דרגה מחושבת", "שם פרטי", "שם משפחה", "מסגרת", "תאריך תום שירות (תש\"ש)", "נמצא במשרת הורה"];
   const m = detectMapping(hr);
 
   it("maps computed rank, end-of-service date, parent and framework", () => {
@@ -142,12 +144,12 @@ describe("HR export layout", () => {
   });
 
   it("takes the gaf from the framework and the service type from the rank", () => {
-    const base = { "מספר אישי": "9104891", "מין": "זכר", "שם פרטי": "ליאור", "שם משפחה": "סגל", "תאריך תום שירות (תש\"ש)": "", "נמצא במשרת הורה": "" };
+    const base = { "ת.ז": "910489103", "מין": "זכר", "שם פרטי": "ליאור", "שם משפחה": "סגל", "תאריך תום שירות (תש\"ש)": "", "נמצא במשרת הורה": "" };
     const { rows, errors } = parseRows(
       [
         { ...base, "דרגה מחושבת": "סמ\"ר", "מסגרת": "מה\"ן - מלמסים/גף ענן/צוות DevOps - מלמסים" },
-        { ...base, "מספר אישי": "9311538", "דרגה מחושבת": "רס\"ר", "מסגרת": "מה\"ן - מלמסים/גף בדיקות - מלמסים", "נמצא במשרת הורה": "YES" },
-        { ...base, "מספר אישי": "9129838", "דרגה מחושבת": "קמ\"א", "מסגרת": "מה\"ן - מלמסים" },
+        { ...base, "ת.ז": "931153803", "דרגה מחושבת": "רס\"ר", "מסגרת": "מה\"ן - מלמסים/גף בדיקות - מלמסים", "נמצא במשרת הורה": "YES" },
+        { ...base, "ת.ז": "912983806", "דרגה מחושבת": "קמ\"א", "מסגרת": "מה\"ן - מלמסים" },
       ],
       m,
     );

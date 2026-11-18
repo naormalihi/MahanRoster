@@ -75,7 +75,7 @@ function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) => f.label),
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) =>
-      ({ personalNumber: "1234567", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "סמל",
+      ({ idNumber: "123456782", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "סמל",
          gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא", phone: "050-1234567" } as Record<string, string>)[f.key] ?? ""),
   ]);
   const wb = XLSX.utils.book_new();
@@ -221,7 +221,7 @@ export function RosterImportPage() {
     setMapping(detectMapping(hdrs));
   }
 
-  const mapProblems = useMemo(() => mappingProblems(mapping), [mapping]);
+  const mapProblems = useMemo(() => mappingProblems(mapping, headers), [mapping, headers]);
 
   async function buildPreview(matching = rekey) {
     setBusy(true);
@@ -229,7 +229,7 @@ export function RosterImportPage() {
     try {
       const result = parseRows(records, mapping);
       setParsed(result);
-      const incoming = await Promise.all(result.rows.map(async (r) => toRecord(r, await soldierKey(unitKey, r.personalNumber))));
+      const incoming = await Promise.all(result.rows.map(async (r) => toRecord(r, await soldierKey(unitKey, r.idNumber))));
       if (matching) {
         const existing = await api!.soldiers();
         const rows = matchForRekey(incoming, existing);
@@ -301,7 +301,7 @@ export function RosterImportPage() {
               <Typography variant="h2">מפתח היחידה</Typography>
             </Stack>
             <Typography variant="body2">
-              המספרים האישיים לא יוצאים מהמחשב הזה. הדפדפן הופך כל מספר אישי למזהה מוצפן בעזרת מפתח היחידה, ורק המזהה נשלח לשרת.
+              מספרי הת.ז לא יוצאים מהמחשב הזה. הדפדפן הופך כל ת.ז למזהה מוצפן בעזרת מפתח היחידה, ורק המזהה נשלח לשרת.
               המפתח לא נשלח לשרת. אחרי שהוזן הוא נשמר בלשונית הזו עד היציאה מהמערכת או סגירת הלשונית.
             </Typography>
             {rekey && (
