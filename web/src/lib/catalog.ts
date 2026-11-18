@@ -4,6 +4,64 @@ import { HebrewCalendar } from "@hebcal/core";
 
 export type ServiceRestriction = "any" | "mandatory" | "career";
 
+/** What the base's poster says for a duty: when and where to come before it, and whom to call. */
+export interface Briefing {
+  /** briefing = תדריך, report = התייצבות, by_call = תדריך לפי הזימון (no fixed time) */
+  kind: "briefing" | "report" | "by_call";
+  /** same_day = on the day the duty starts, day_before, weekday = the last such weekday before the start */
+  rule?: "same_day" | "day_before" | "weekday";
+  /** 0 = Sunday … 6 */
+  weekday?: number;
+  time?: string; // HH:MM
+  place?: string;
+  contact_name?: string;
+  contact_phone?: string;
+  note?: string;
+}
+
+export const BRIEFING_KIND_LABEL: Record<Briefing["kind"], string> = { briefing: "תדריך", report: "התייצבות", by_call: "תדריך לפי הזימון" };
+const DAY_NAME = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+/** "תדריך שלישי שלפני 13:00 · גף אבטחה פיזית" */
+export function briefingLabel(b: Briefing | null | undefined): string {
+  if (!b) return "";
+  if (b.kind === "by_call") return [BRIEFING_KIND_LABEL.by_call, b.place].filter(Boolean).join(" · ");
+  const when = b.rule === "day_before" ? "יום לפני" : b.rule === "weekday" ? `${DAY_NAME[b.weekday ?? 0]} שלפני` : "ביום התורנות";
+  return [`${BRIEFING_KIND_LABEL[b.kind]} ${when} ${b.time ?? ""}`.trim(), b.place].filter(Boolean).join(" · ");
+}
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function briefingProblems(b: Briefing | null | undefined): string[] {
+  if (!b) return [];
+  const p: string[] = [];
+  if (b.kind !== "by_call") {
+    if (!b.time || !TIME_RE.test(b.time)) p.push("שעת התדריך / ההתייצבות בתבנית 13:00");
+    if (b.rule === "weekday" && !(Number.isInteger(b.weekday) && b.weekday! >= 0 && b.weekday! <= 6)) p.push("בחר יום בשבוע לתדריך");
+  }
+  if ((b.place ?? "").length > 120) p.push("מיקום התדריך – עד 120 תווים");
+  if ((b.contact_name ?? "").length > 80) p.push("שם איש הקשר – עד 80 תווים");
+  if ((b.contact_phone ?? "").length > 30) p.push("טלפון איש הקשר – עד 30 תווים");
+  if ((b.note ?? "").length > 300) p.push("ההערה לחייל – עד 300 תווים");
+  return p;
+}
+
+/** Only the fields the kind and rule use, trimmed; empty texts dropped. */
+export function cleanBriefing(b: Briefing | null | undefined): Briefing | null {
+  if (!b) return null;
+  const out: Briefing = { kind: b.kind };
+  if (b.kind !== "by_call") {
+    out.rule = b.rule ?? "same_day";
+    out.time = b.time;
+    if (out.rule === "weekday") out.weekday = b.weekday ?? 2;
+  }
+  for (const k of ["place", "contact_name", "contact_phone", "note"] as const) {
+    const v = (b[k] ?? "").trim();
+    if (v) out[k] = v;
+  }
+  return out;
+}
+
 export interface TaskType {
   id: string;
   /** internal id for imports and the engine; generated, not shown */
@@ -33,6 +91,8 @@ export interface TaskType {
   /** hours by start weekday ("0" = Sunday … "6", "after_holiday"), "HH:MM-HH:MM"; overrides the defaults */
   weekday_hours: Record<string, string> | null;
   color: string | null;
+  /** תדריך / התייצבות before the duty, from the base's poster; null = none */
+  briefing?: Briefing | null;
   is_active: boolean;
 }
 
@@ -66,6 +126,7 @@ export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" |
   if (!!t.default_start_time !== !!t.default_end_time) p.push("שעת התחלה וסיום – שתיהן או אף אחת");
   if (t.weekday_hours && Object.values(t.weekday_hours).some((w) => !/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d(\+1)?$/.test(w)))
     p.push("שעות לפי יום בתבנית 08:00-17:00 (או 06:00-08:00+1 לסיום למחרת)");
+  p.push(...briefingProblems(t.briefing));
   return p;
 }
 
@@ -82,9 +143,10 @@ export interface ScoringSettings {
   exemption_deadline_days: number; // a new cycle's constraints close this many days before it starts
   fairness_tolerance_pct: number; // the load screen flags a soldier further than this % from his peers' mean
   grace_days: number; // a new soldier's training period: no duties for this many days from his first cycle
+  briefing_reminder_hours: number; // the reminder of a briefing goes this many hours before it
 }
 
-export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "surprise_notice_hours", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days"] as const;
+export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "surprise_notice_hours", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days", "briefing_reminder_hours"] as const;
 
 export const ISO_DAY_LABEL: Record<number, string> = { 7: "ראשון", 1: "שני", 2: "שלישי", 3: "רביעי", 4: "חמישי", 5: "שישי", 6: "שבת" };
 export const ISO_WEEK = [7, 1, 2, 3, 4, 5, 6];
@@ -99,6 +161,8 @@ export function scoringProblems(s: ScoringSettings): string[] {
   if (!Number.isInteger(s.surprise_notice_hours) || s.surprise_notice_hours < 1 || s.surprise_notice_hours > 336)
     p.push("סף הקפצה – בין 1 ל-336 שעות");
   if (!(s.fairness_tolerance_pct >= 1) || s.fairness_tolerance_pct > 100) p.push("טווח הוגנות – בין 1% ל-100%");
+  if (!Number.isInteger(s.briefing_reminder_hours) || s.briefing_reminder_hours < 2 || s.briefing_reminder_hours > 72)
+    p.push("תזכורת תדריך – בין 2 ל-72 שעות לפני");
   if (!Number.isInteger(s.grace_days) || s.grace_days < 0 || s.grace_days > 365) p.push("תקופת הכשרה – בין 0 ל-365 ימים");
   if (!Number.isInteger(s.exemption_deadline_days) || s.exemption_deadline_days < 1 || s.exemption_deadline_days > 180)
     p.push("סגירת אילוצים – בין 1 ל-180 יום לפני המחזור");

@@ -351,6 +351,7 @@ export class SupabaseApi implements Api {
       exemption_deadline_days: v.exemption_deadline_days == null ? 40 : Number(v.exemption_deadline_days),
       fairness_tolerance_pct: v.fairness_tolerance_pct == null ? 20 : Number(v.fairness_tolerance_pct),
       grace_days: v.grace_days == null ? 90 : Number(v.grace_days),
+      briefing_reminder_hours: v.briefing_reminder_hours == null ? 24 : Number(v.briefing_reminder_hours),
     };
   }
 

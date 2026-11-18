@@ -73,6 +73,9 @@ import {
   type ServiceRestriction,
   type TaskType,
   type TaskTypeInput,
+  type Briefing,
+  briefingLabel,
+  cleanBriefing,
 } from "../lib/catalog";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
@@ -124,6 +127,92 @@ const WEEKDAY_KEYS: { key: string; label: string }[] = [
   { key: "6", label: "שבת" },
   { key: "after_holiday", label: "אחרי חג" },
 ];
+
+/** תדריך והתייצבות: what the base's poster says for this duty. Off = none. */
+function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: Briefing | null) => void }) {
+  const b = props.value;
+  const set = (patch: Partial<Briefing>) => props.onChange({ ...(b ?? { kind: "briefing", rule: "same_day", time: "09:00" }), ...patch });
+  return (
+    <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, p: 1.5 }}>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={!!b}
+            onChange={(e) => props.onChange(e.target.checked ? { kind: "briefing", rule: "same_day", time: "09:00" } : null)}
+          />
+        }
+        label={
+          <span>
+            תדריך והתייצבות
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block" }}>
+              מוצג לחייל ב"התורנויות שלי" ובלוח, ונשלחת לו תזכורת לפני. שעה ומקום שנכתבו בתורנות עצמה גוברים.
+            </Typography>
+          </span>
+        }
+      />
+      {b && (
+        <Stack spacing={2} sx={{ mt: 1.5 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField select label="סוג" value={b.kind} onChange={(e) => set({ kind: e.target.value as Briefing["kind"] })} fullWidth>
+              <MenuItem value="briefing">תדריך</MenuItem>
+              <MenuItem value="report">התייצבות</MenuItem>
+              <MenuItem value="by_call">תדריך לפי הזימון</MenuItem>
+            </TextField>
+            {b.kind !== "by_call" && (
+              <>
+                <TextField
+                  select
+                  label="מתי"
+                  value={b.rule === "weekday" ? `w${b.weekday ?? 2}` : (b.rule ?? "same_day")}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    set(v.startsWith("w") ? { rule: "weekday", weekday: Number(v.slice(1)) } : { rule: v as Briefing["rule"] });
+                  }}
+                  fullWidth
+                >
+                  <MenuItem value="same_day">ביום התורנות</MenuItem>
+                  <MenuItem value="day_before">יום לפני התורנות</MenuItem>
+                  {WEEKDAY_KEYS.filter((d) => d.key !== "after_holiday").map((d) => (
+                    <MenuItem key={d.key} value={`w${d.key}`}>
+                      ביום {d.label} שלפני
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  type="time"
+                  label="שעה"
+                  value={b.time ?? ""}
+                  onChange={(e) => set({ time: e.target.value })}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  fullWidth
+                />
+              </>
+            )}
+          </Stack>
+          <TextField label="מיקום" value={b.place ?? ""} onChange={(e) => set({ place: e.target.value })} placeholder="גף אבטחה פיזית / טלפוני" fullWidth />
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField label="איש קשר" value={b.contact_name ?? ""} onChange={(e) => set({ contact_name: e.target.value })} fullWidth />
+            <TextField
+              label="טלפון"
+              type="tel"
+              value={b.contact_phone ?? ""}
+              onChange={(e) => set({ contact_phone: e.target.value })}
+              helperText="מוצג רק לחייל המשובץ"
+              fullWidth
+            />
+          </Stack>
+          <TextField
+            label="הערה לחייל"
+            value={b.note ?? ""}
+            onChange={(e) => set({ note: e.target.value })}
+            placeholder="לא מאושרות החלפות בעת ביצוע התורנות!"
+            fullWidth
+          />
+        </Stack>
+      )}
+    </Box>
+  );
+}
 
 /** Optional hours per start weekday, e.g. מפקד תורן: Sunday 06:00 → 08:00 next day, Thursday 08:00 → 18:00. */
 function WeekdayHours(props: { value: Record<string, string> | null; onChange: (v: Record<string, string> | null) => void }) {
@@ -207,7 +296,7 @@ export function TaskDialog(props: {
     setBusy(true);
     setError(null);
     try {
-      await api!.saveTaskType(props.task?.id ?? null, { ...t, name: t.name.trim(), code: t.code || newTaskCode() });
+      await api!.saveTaskType(props.task?.id ?? null, { ...t, name: t.name.trim(), code: t.code || newTaskCode(), briefing: cleanBriefing(t.briefing) });
       props.onSaved();
     } catch (e) {
       setError((e as Error).message);
@@ -302,6 +391,7 @@ export function TaskDialog(props: {
             />
           </Stack>
           <WeekdayHours value={t.weekday_hours} onChange={(v) => set("weekday_hours", v)} />
+          <BriefingBox value={t.briefing} onChange={(v) => set("briefing", v)} />
 
           <Typography variant="subtitle2" sx={{ pt: 1 }}>
             מי יכול לבצע
@@ -470,6 +560,7 @@ function CatalogTab() {
     <>
       {t.is_weekend_type && <Chip size="small" label="שבת" />}
       {t.includes_holidays && <Chip size="small" label="כולל חג" />}
+      {t.briefing && <Chip size="small" variant="outlined" label={briefingLabel(t.briefing)} />}
       {t.qualifying_duty && <Chip size="small" color="primary" variant="outlined" label="מזכה" />}
       {t.requires_weapon && <Chip size="small" variant="outlined" label="נשק" />}
       {t.shachar_only ? <Chip size="small" color="primary" label='רק שח"ר' /> : t.shachar_compatible && <Chip size="small" variant="outlined" label='שח"ר' />}
@@ -1413,6 +1504,20 @@ function ScoringTab() {
                 (s.grace_days >= 30 ? `≈ ${Math.round(s.grace_days / 30)} חודשים. ` : "") +
                 "חייל חדש לא משובץ לתורנויות בימים הראשונים שלו ביחידה, מתחילת המחזור הראשון שלו, ומקבל עליהם זיכוי. 0 = בלי תקופת הכשרה. חל מהחישוב הבא של הפוטנציאל."
               }
+              sx={{ maxWidth: 320 }}
+            />
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              תזכורת לתדריך
+            </Typography>
+            <TextField
+              type="number"
+              label="שעות לפני התדריך"
+              value={s.briefing_reminder_hours}
+              onChange={(e) => setS({ ...s, briefing_reminder_hours: Math.round(Number(e.target.value)) })}
+              slotProps={{ htmlInput: { min: 2, max: 72, step: 1 } }}
+              helperText="תדריך או התייצבות שקודמים לתורנות ביותר מ-12 שעות מקבלים תזכורת נפרדת, כמה שעות לפניהם. קרובים יותר – כתובים בתזכורת של יום לפני התורנות."
               sx={{ maxWidth: 320 }}
             />
           </Box>

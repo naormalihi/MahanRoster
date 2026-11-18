@@ -69,7 +69,7 @@ function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime
   const openSlot = useContext(OpenSlot);
   const performers = people(r.performers, r.performer_gafim ?? (r.gafim.length === 1 ? r.performers.map(() => r.gafim[0]) : undefined));
   const reserves = people(r.reserves, r.reserve_gafim);
-  const details = !!(r.instructions || r.report_at || r.briefing_at);
+  const details = !!(r.instructions || r.report_at || r.briefing_at || r.briefing_by_call);
   const hit = (n: string) => (query && n.includes(query) ? { bgcolor: "#ffe58a", color: "#000", borderRadius: 0.5, px: 0.4 } : null);
 
   return (
@@ -162,7 +162,7 @@ function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime
       {details && (
         <Collapse in={open} onClick={(e) => e.stopPropagation()}>
           <Box sx={{ mt: 0.75, p: 1.25, borderRadius: 1, bgcolor: "action.hover", fontSize: 13 }}>
-            {(r.report_at || r.briefing_at) && (
+            {(r.report_at || r.briefing_at || r.briefing_by_call) && (
               <Stack direction="row" spacing={1} sx={{ mb: r.instructions ? 0.75 : 0, flexWrap: "wrap", gap: 0.5 }}>
                 {r.report_at && <Chip size="small" variant="outlined" label={`התייצבות ${timeLabel(r.report_at)}${r.report_place ? ` · ${r.report_place}` : ""}`} />}
                 {r.briefing_at && (
@@ -171,6 +171,9 @@ function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime
                     variant="outlined"
                     label={`תדריך ${dayKey(r.briefing_at) === dayKey(r.starts_at) ? "" : `${dateFmt.format(new Date(r.briefing_at))} `}${timeLabel(r.briefing_at)}${r.briefing_place ? ` · ${r.briefing_place}` : ""}`}
                   />
+                )}
+                {!r.briefing_at && r.briefing_by_call && (
+                  <Chip size="small" variant="outlined" label={`תדריך לפי הזימון${r.briefing_place ? ` · ${r.briefing_place}` : ""}`} />
                 )}
               </Stack>
             )}

@@ -31,6 +31,12 @@ export interface MyDuty {
   briefing_at: string | null;
   briefing_place: string | null;
   equipment: string | null;
+  /** the briefing is by call (מפקד תורן), no fixed time */
+  briefing_by_call?: boolean;
+  /** from the duty's catalog: whom to call, and a note to the soldier */
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  briefing_note?: string | null;
 }
 
 export interface MyScore {
