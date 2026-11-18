@@ -10,7 +10,7 @@
 import type { MyDuty } from "../lib/me";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role, SlotPeople, SlotPerson } from "../lib/api";
-import { DAY_TYPE_LABEL, israeliHolidays, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
+import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
   absenceSpan,
   addDaysIso,
@@ -52,13 +52,13 @@ const FIRST = ["נועה", "איתי", "מאיה", "יונתן", "שירה", "ע
 const LAST = ["כהן", "לוי", "מזרחי", "פרץ", "ביטון", "אברהם", "פרידמן", "שושן", "אזולאי", "דהן", "חדד", "גבאי"];
 
 const TASKS: { name: string; category: string; color: string; start: number; hours: number; perf: number; res: number; days: number[] }[] = [
-  { name: "ש\"ג – חול", category: "שמירה", color: "#3b6ea8", start: 8, hours: 24, perf: 2, res: 2, days: [0, 1, 2, 3, 4] },
-  { name: "מגדלים", category: "שמירה", color: "#5a4fa0", start: 20, hours: 12, perf: 2, res: 2, days: [0, 1, 2, 3, 4] },
-  { name: "קצין תורן – חול", category: "קצין תורן", color: "#2f7d5b", start: 8, hours: 24, perf: 1, res: 1, days: [0, 1, 2, 3, 4] },
-  { name: "מפקד שער", category: "מפקד שער", color: "#9a6a1f", start: 8, hours: 24, perf: 1, res: 1, days: [0, 1, 2, 3, 4] },
-  { name: "ש\"ג – שבת", category: "שמירה", color: "#3b6ea8", start: 8, hours: 48, perf: 2, res: 2, days: [5] },
-  { name: "קצין תורן – שבת", category: "קצין תורן", color: "#2f7d5b", start: 8, hours: 48, perf: 1, res: 1, days: [5] },
-  { name: "מטבח – שבת", category: "משימות", color: "#a04f5e", start: 12, hours: 44, perf: 2, res: 1, days: [5] },
+  { name: "שמירות חובה", category: "שמירה", color: "#3b6ea8", start: 8, hours: 24, perf: 2, res: 2, days: [0, 1, 2, 3, 4] },
+  { name: "ממלכת יום", category: "שמירה", color: "#5a4fa0", start: 8, hours: 9, perf: 2, res: 2, days: [0, 1, 2, 3, 4] },
+  { name: "קצין תורן", category: "קצין תורן", color: "#2f7d5b", start: 8, hours: 24, perf: 1, res: 1, days: [0, 1, 2, 3, 4] },
+  { name: "מפקד שער | ש.ג קבע", category: "מפקד שער", color: "#9a6a1f", start: 8, hours: 24, perf: 1, res: 1, days: [0, 1, 2, 3, 4] },
+  { name: "שמירות חובה", category: "שמירה", color: "#3b6ea8", start: 8, hours: 48, perf: 2, res: 2, days: [5] },
+  { name: "קצין הגנ\"ק", category: "קצין תורן", color: "#2f7d5b", start: 8, hours: 48, perf: 1, res: 1, days: [5] },
+  { name: "מטבח", category: "משימות", color: "#a04f5e", start: 12, hours: 44, perf: 2, res: 1, days: [5] },
 ];
 
 function rng(seed: number) {
@@ -68,7 +68,7 @@ function rng(seed: number) {
   };
 }
 
-const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד שער", "ממלכת", "שמירות חובה", "משימות חיליות", "רס\"ר", "מפקד תורן"].map((name, i) => ({ id: `c${i}`, name }));
+const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד שער", "ממלכת", "שמירות חובה", "משימות חיליות", "רס\"ר", "מפקד תורן", "מטבח"].map((name, i) => ({ id: `c${i}`, name }));
 const POPULATIONS: Population[] = [
   { code: "mandatory", name: "חובה" },
   { code: "career", name: "קבע" },
@@ -81,16 +81,19 @@ const tt = (code: string, name: string, cat: number, weight: number, o: Partial<
   allowed_rank_ids: null, gender: null,
   default_start_time: "08:00", default_end_time: "08:00", weekday_hours: null, color: null, is_active: true, ...o,
 }) as TaskType;
+// the unit's duty catalog (names, weights and what a weight covers) – a catalog, not personal data
 const DEMO_TASKS: TaskType[] = [
-  tt("hagnash", "הגנ\"ש – חול", 0, 1, { includes_holidays: true, allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#2f7d5b" }),
-  tt("katzin_toran", "קצין תורן – חול", 1, 1, { allowed_rank_ids: ["r7", "r8", "r9"], color: "#3b6ea8" }),
-  tt("katzin_toran_shabbat", "קצין תורן – שבת", 1, 3, { allowed_rank_ids: ["r7", "r8", "r9"], is_weekend_type: true, color: "#3b6ea8" }),
-  tt("mamlachat_yom", "ממלכ\"ת יום – חול", 3, 0.75, { qualifying_duty: true, shachar_compatible: true, default_end_time: "17:00", color: "#6a7ab0" }),
-  tt("mamlachat_layla", "ממלכ\"ת לילה – חול", 3, 1, { allowed_rank_ids: ["r10"], min_rest_hours: 12, default_start_time: "20:00", color: "#4a5a8a" }),
+  tt("hagnash", "הגנ\"ש", 0, 9, { includes_holidays: true, is_weekend_type: true, allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#2f7d5b" }),
+  tt("katzin_toran", "קצין תורן", 1, 1, { allowed_rank_ids: ["r7", "r8", "r9"], color: "#3b6ea8" }),
+  tt("katzin_toran_shabbat", "קצין הגנ\"ק", 1, 2.6, { allowed_rank_ids: ["r7", "r8", "r9"], is_weekend_type: true, color: "#3b6ea8" }),
+  tt("mamlachat_yom", "ממלכת יום", 3, 1, { qualifying_duty: true, shachar_compatible: true, default_end_time: "17:00", color: "#6a7ab0" }),
   tt("shmirot_chova", "שמירות חובה", 4, 1, { service_restriction: "mandatory", allowed_rank_ids: ["r0", "r1", "r2", "r3"], requires_weapon: true, min_rest_hours: 24, default_start_time: "13:00", default_end_time: "13:00", color: "#9a6a1f" }),
-  tt("mefaked_shaar", "מפקד שער – חול", 2, 1, { allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#9a6a1f" }),
-  tt("mesimot_chayliyot", "משימות חיליות", 5, 1, { allowed_rank_ids: ["r7", "r8", "r9", "r10"], requires_weapon: true, min_rest_hours: 24, default_start_time: "10:00", default_end_time: "10:00", color: "#7a3e9d" }),
-  tt("rasar", "רס\"ר – חול", 6, 0.75, { service_restriction: "mandatory", allowed_rank_ids: ["r0", "r1", "r2", "r3"], default_end_time: "17:00", color: "#a04f5e" }),
+  tt("mefaked_shaar", "מפקד שער | ש.ג קבע", 2, 2.6, { allowed_rank_ids: ["r4", "r5", "r6", "r7", "r8", "r9"], requires_weapon: true, color: "#9a6a1f" }),
+  tt("mesimot_chayliyot", "אמ\"ת", 5, 13, { includes_holidays: true, is_weekend_type: true, allowed_rank_ids: ["r7", "r8", "r9", "r10"], requires_weapon: true, min_rest_hours: 24, default_start_time: "10:00", default_end_time: "10:00", color: "#7a3e9d" }),
+  tt("rasar", "רס\"ר", 6, 7, { service_restriction: "mandatory", allowed_rank_ids: ["r0", "r1", "r2", "r3"], default_end_time: "17:00", color: "#a04f5e" }),
+  tt("rasar_tash", "רס\"ר הקלת ת\"ש", 6, 5, { service_restriction: "mandatory", allowed_rank_ids: ["r0", "r1", "r2", "r3"], tash_rule: "home", color: "#a04f5e" }),
+  tt("mitbach", "מטבח", 8, 4, { color: "#b0603a" }),
+  tt("mitbach_pesach", "הכשרת מטבח לפסח", 8, 1, { color: "#b0603a" }),
   tt("mefaked_toran", "מפקד תורן", 7, 1, {
     allowed_rank_ids: ["r10"], min_rest_hours: 24, color: "#8a3b2e",
     weekday_hours: { "0": "06:00-08:00+1", "1": "08:00-08:00", "2": "08:00-08:00", "3": "08:00-08:00", "4": "08:00-18:00", after_holiday: "06:00-08:00+1" },
@@ -100,7 +103,7 @@ const DEMO_TASKS: TaskType[] = [
 const EXEMPTION_TYPES: ExemptionType[] = [
   { id: "e_full", name: "פטור מלא", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_part", name: "פטור חלקי", qualifies_day_only: false, allows_partial_restriction: true },
-  { id: "e_qual", name: "פטור מזכה – ממלכ\"ת יום בלבד", qualifies_day_only: true, allows_partial_restriction: true },
+  { id: "e_qual", name: "פטור מזכה – ממלכת יום בלבד", qualifies_day_only: true, allows_partial_restriction: true },
   { id: "e_med", name: "רפואי", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_kaps", name: "קפ\"ס", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_shachar", name: "שח\"ר", qualifies_day_only: false, allows_partial_restriction: true },
@@ -120,7 +123,7 @@ export class DemoApi implements Api {
   private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean; sent?: string }>();
   // stage 2.5: the demo soldier's notifications
   private notes: AppNotification[] = [
-    { id: "n1", type: "reserve_activated", title: "העתודה שלך הופעלה – אתה מבצע את התורנות", body: "קצין תורן – חול, ג׳ 05/01 08:00", url: "/",
+    { id: "n1", type: "reserve_activated", title: "העתודה שלך הופעלה – אתה מבצע את התורנות", body: "קצין תורן, ג׳ 05/01 08:00", url: "/",
       requires_ack: true, read_at: null, acked_at: null, created_at: new Date(Date.now() - 20 * 60_000).toISOString() },
     { id: "n2", type: "exemption_decided", title: "בקשת הפטור אושרה", body: "פטור מלא, 10/08–20/08", url: "/requests",
       requires_ack: false, read_at: null, acked_at: null, created_at: new Date(Date.now() - 5 * 3600_000).toISOString() },
@@ -136,12 +139,21 @@ export class DemoApi implements Api {
   private boardPeople = new Map<string, SlotPerson[]>();
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
-  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90 };
+  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.3, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90 };
+  // the unit's additions: weekend +3; eves of the big holidays +6, the other holiday days +3
   private multipliers: ScoreMultiplier[] = [
-    { id: "m1", name: "סוף שבוע", value: 1.5, day_types: [], holidays: [], holiday_kinds: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
-    { id: "m4", name: "ראש השנה, יום כיפור ופסח", value: 6, day_types: ["major_holiday", "major_holiday_eve"], holidays: [], holiday_kinds: [], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
-    { id: "m2", name: "חג וערב חג", value: 2, day_types: ["holiday", "holiday_eve", "major_holiday", "major_holiday_eve"], holidays: [], holiday_kinds: [], weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
-    { id: "m3", name: "לילה", value: 1.25, day_types: [], holidays: [], holiday_kinds: [], weekdays: [], time_window: "22:00-06:00", date_from: null, date_to: null, skip_shabbat_types: false, is_active: true },
+    { id: "m_we", name: "סוף שבוע", value: 3, day_types: [], holidays: [], holiday_kinds: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
+    ...(
+      [
+        ["rosh_hashana", "eve", 6], ["rosh_hashana", "day", 3], ["yom_kippur", "eve", 6], ["yom_kippur", "day", 3],
+        ["sukkot", "eve", 6], ["sukkot", "day", 3], ["sukkot", "chol_hamoed", 3], ["pesach", "eve", 6], ["pesach", "day", 3],
+        ["pesach", "chol_hamoed", 3], ["shavuot", "eve", 3], ["shavuot", "day", 3], ["independence", "day", 3],
+        ["hanukkah", "day", 3], ["purim", "day", 3], ["fast", "eve", 3], ["fast", "day", 3], ["minor", "day", 3],
+      ] as [HolidayKey, HolidayKind, number][]
+    ).map(([h, k, value]) => ({
+      id: `m_${h}_${k}`, name: `${HOLIDAY_NAME[h]} · ${HOLIDAY_KIND_NAME[k]}`, value, day_types: [], holidays: [h], holiday_kinds: [k],
+      weekdays: [], time_window: null, date_from: null, date_to: null, skip_shabbat_types: false, is_active: true, holiday_cell: true,
+    })),
   ];
   private dayTypeList: DayTypeRef[] = Object.entries(DAY_TYPE_LABEL).map(([code, name]) => ({ code, name }));
   private cycleList: Cycle[] = [
@@ -1004,7 +1016,7 @@ export class DemoApi implements Api {
       .map((s, i) => ({
         soldier_id: s.id,
         reasons: i % 5 === 0 ? ["rank"] : i % 7 === 0 ? ["absence"] : [],
-        conflicts: i % 11 === 0 ? [{ slot_id: "x", task: "קצין תורן – חול", role: "performer" as DraftRole, starts_at: new Date().toISOString(), ends_at: new Date().toISOString() }] : [],
+        conflicts: i % 11 === 0 ? [{ slot_id: "x", task: "קצין תורן", role: "performer" as DraftRole, starts_at: new Date().toISOString(), ends_at: new Date().toISOString() }] : [],
         cycle_points: mine.filter((a) => a.soldier_id === s.id).reduce((n, a) => n + a.normalized_points, 0),
         cycle_duties: mine.filter((a) => a.soldier_id === s.id).length,
         in_slot: mine.find((a) => a.slot_id === slotId && a.soldier_id === s.id)?.role ?? null,
@@ -1195,7 +1207,7 @@ export class DemoApi implements Api {
       { assignment_id: "demo-d1", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "שמירות חובה", starts_at: at(4, 8), ends_at: at(4, 20),
         role: "performer", status: "assigned", points: 1, explanation: "הניקוד שלך הנמוך בקבוצה", report_at: null, report_place: "שער ראשי",
         briefing_at: null, briefing_place: null, equipment: null },
-      { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער – חול", starts_at: at(11, 20), ends_at: at(12, 8),
+      { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער | ש.ג קבע", starts_at: at(11, 20), ends_at: at(12, 8),
         role: "reserve", status: "reserve_idle", points: 0, explanation: "עתודה לפי תור", report_at: null, report_place: null,
         briefing_at: null, briefing_place: null, equipment: null },
     ];
@@ -1279,7 +1291,7 @@ export class DemoApi implements Api {
         take_task: null, take_starts_at: null, reason: null, created_at: at(-1), decided_at: at(-0.9) },
       { id: "demo-l2", kind: "mutual", status: "approved", requester: n(12), target: n(20), give_task: "שמירות חובה", give_starts_at: at(3),
         take_task: "שמירות חובה", take_starts_at: at(9), reason: null, created_at: at(-2), decided_at: at(-1.8) },
-      { id: "demo-l3", kind: "handover", status: "rejected", requester: n(30), target: n(31), give_task: "קצין תורן – שבת", give_starts_at: at(8),
+      { id: "demo-l3", kind: "handover", status: "rejected", requester: n(30), target: n(31), give_task: "קצין הגנ\"ק", give_starts_at: at(8),
         take_task: null, take_starts_at: null, reason: null, created_at: at(-0.5), decided_at: at(-0.4) },
     ];
   }
@@ -1401,7 +1413,7 @@ export class DemoApi implements Api {
       accounts: { soldiers: active.length, with_account: this.accounts.size + 1 },
       settings_changes: [
         { at: new Date(Date.now() - 2 * 86_400_000).toISOString(), action: "update", entity: "score_multipliers", name: "סוף שבוע", by: "naat" },
-        { at: new Date(Date.now() - 9 * 86_400_000).toISOString(), action: "update", entity: "task_types", name: "קצין תורן – חול", by: "naat" },
+        { at: new Date(Date.now() - 9 * 86_400_000).toISOString(), action: "update", entity: "task_types", name: "קצין תורן", by: "naat" },
         { at: new Date(Date.now() - 20 * 86_400_000).toISOString(), action: "insert", entity: "calendar_days", name: "2027-04-22", by: "naat" },
       ],
     };
@@ -1428,6 +1440,23 @@ export class DemoApi implements Api {
   async savePushSubscription() {}
 
   async deletePushSubscription() {}
+
+  async scoringRules() {
+    await delay();
+    const cat = new Map(CATEGORIES.map((c) => [c.id, c.name]));
+    return {
+      tasks: this.tasks
+        .filter((t) => !t.is_special && t.is_active !== false)
+        .map((t) => ({ name: t.name, weight: t.weight, includes_holidays: !!t.includes_holidays, weekend_type: !!t.is_weekend_type, category: (t.category_id && cat.get(t.category_id)) || null })),
+      additions: this.multipliers.filter((m) => m.is_active && m.value > 0).map((m) => ({ name: m.name, value: m.value })).sort((a, b) => b.value - a.value),
+      surprise_multiplier: this.scoring.surprise_multiplier,
+      surprise_notice_hours: this.scoring.surprise_notice_hours,
+      window_months: 6,
+      fairness_tolerance_pct: this.scoring.fairness_tolerance_pct,
+      credit_min_days: 7,
+      credit_absences: ["מחלה", "קורס"],
+    };
+  }
 
   async myScores() {
     await delay();

@@ -1,6 +1,7 @@
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Paper,
@@ -13,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useState, type ReactNode } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { stageLabel, type CycleStatus } from "../lib/cycles";
@@ -80,7 +82,10 @@ export function DashboardPage() {
 
   return (
     <Stack spacing={2}>
-      <Box>
+      <Box sx={{ position: "relative" }}>
+        <Button component={RouterLink} to="/scoring" size="small" sx={{ float: "inline-end" }}>
+          איך מחושב הניקוד?
+        </Button>
         <Typography variant="h1">נתוני היחידה</Typography>
         <Typography variant="body2" color="text.secondary">
           {d.cycle ? `המחזור בתוקף: ${d.cycle.name} (${fmt(d.cycle.start_date)}–${fmt(d.cycle.end_date)})` : "עוד אין מחזור שפורסם"}

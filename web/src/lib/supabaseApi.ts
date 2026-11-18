@@ -1,4 +1,5 @@
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
+import type { ScoringRules } from "./scoringRules";
 import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
@@ -966,6 +967,19 @@ export class SupabaseApi implements Api {
 
   async deletePushSubscription(endpoint: string) {
     maybe(await this.sb.rpc("delete_push_subscription", { p_endpoint: endpoint }));
+  }
+
+  async scoringRules(): Promise<ScoringRules> {
+    const { data, error } = await this.sb.rpc("scoring_rules");
+    if (error) throw error;
+    const r = data as ScoringRules;
+    return {
+      ...r,
+      tasks: r.tasks.map((t) => ({ ...t, weight: Number(t.weight) })),
+      additions: r.additions.map((a) => ({ ...a, value: Number(a.value) })).filter((a) => a.value > 0),
+      surprise_multiplier: Number(r.surprise_multiplier),
+      fairness_tolerance_pct: Number(r.fairness_tolerance_pct),
+    };
   }
 
   async myScores(): Promise<MyScore[]> {

@@ -9,11 +9,13 @@ import {
   Chip,
   CircularProgress,
   Collapse,
+  Link,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { EmptyState, ErrorState, greeting } from "../components/EmptyState";
 import { PushControl } from "../components/NotificationBell";
@@ -95,9 +97,14 @@ function ScoreCard({ s }: { s: MyScore }) {
   const diff = s.points - mean;
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="subtitle2" color="text.secondary">
-        הניקוד שלי · {s.cycle_name}
-      </Typography>
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+        <Typography variant="subtitle2" color="text.secondary">
+          הניקוד שלי · {s.cycle_name}
+        </Typography>
+        <Link component={RouterLink} to="/scoring" variant="body2">
+          איך מחושב?
+        </Link>
+      </Stack>
       <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mt: 0.5 }}>
         <Typography variant="h2">{s.points.toFixed(1)}</Typography>
         <Typography variant="body2" color="text.secondary">

@@ -65,6 +65,7 @@ const SOLDIER_LINKS = [
   { to: "/", label: "התורנויות שלי", match: (p: string) => p === "/" },
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
   { to: "/board", label: "לוח התורנויות", match: (p: string) => p === "/board" },
+  { to: "/scoring", label: "איך מחושב הניקוד", match: (p: string) => p === "/scoring" },
 ];
 
 /** The cycle every step works on, chosen here once. */
