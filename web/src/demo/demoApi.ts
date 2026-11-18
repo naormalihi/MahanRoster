@@ -7,6 +7,8 @@
  *                       new.user – a viewer who must change the password first
  */
 
+import type { MyDuty } from "../lib/me";
+import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role, SlotPeople, SlotPerson } from "../lib/api";
 import { DAY_TYPE_LABEL, israeliHolidays, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
@@ -1181,7 +1183,105 @@ export class DemoApi implements Api {
         });
       }
     }
+    // the demo soldier gets two duties ahead, so swaps can be tried
+    if (this.user?.name === "chayal" && !out.some((d) => Date.parse(d.starts_at) > Date.now())) out.push(...this.demoDuties());
     return out.sort((x, y) => x.starts_at.localeCompare(y.starts_at));
+  }
+
+  private demoDutyList: MyDuty[] | null = null;
+  private demoDuties(): MyDuty[] {
+    const at = (days: number, h: number) => new Date(Date.now() + days * 86400_000).toISOString().slice(0, 11) + `${String(h).padStart(2, "0")}:00:00+02:00`;
+    this.demoDutyList ??= [
+      { assignment_id: "demo-d1", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "שמירות חובה", starts_at: at(4, 8), ends_at: at(4, 20),
+        role: "performer", status: "assigned", points: 1, explanation: "הניקוד שלך הנמוך בקבוצה", report_at: null, report_place: "שער ראשי",
+        briefing_at: null, briefing_place: null, equipment: null },
+      { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער – חול", starts_at: at(11, 20), ends_at: at(12, 8),
+        role: "reserve", status: "reserve_idle", points: 0, explanation: "עתודה לפי תור", report_at: null, report_place: null,
+        briefing_at: null, briefing_place: null, equipment: null },
+    ];
+    return this.demoDutyList.filter((d) => d.status === "assigned" || d.status === "reserve_idle");
+  }
+
+  private swaps: MySwap[] = [];
+  private swapsSeeded = false;
+  private seedSwaps() {
+    if (this.swapsSeeded) return;
+    this.swapsSeeded = true;
+    const at = (days: number) => new Date(Date.now() + days * 86400_000).toISOString();
+    this.swaps.push({
+      id: "demo-sw1", kind: "mutual", status: "pending_peer", mine: false, other_name: this.soldierList[5]?.full_name ?? "חייל",
+      give_task: "מטבח", give_starts_at: at(6), give_ends_at: at(6.5), take_task: "שמירות חובה", take_starts_at: at(4), take_ends_at: at(4.5),
+      reason: null, created_at: new Date().toISOString(), expired: false,
+    });
+  }
+
+  async swapOptions(assignmentId: string): Promise<SwapOptions> {
+    await delay();
+    const d = this.demoDuties().find((x) => x.assignment_id === assignmentId);
+    if (!d) throw new Error("זו לא תורנות שלך");
+    const others = this.soldierList.filter((x) => x.id !== this.mySoldier()).slice(10, 22);
+    return {
+      handover: others.slice(0, 8).map((x) => ({ soldier_id: x.id, name: x.full_name })).sort((a, b) => a.name.localeCompare(b.name, "he")),
+      mutual: others.slice(8).map((x, i) => {
+        const t = new Date(Date.parse(d.starts_at) + (i + 1) * 2 * 86400_000);
+        return { soldier_id: x.id, name: x.full_name, assignment_id: `demo-x${i}`, task: d.task_name, starts_at: t.toISOString(),
+                 ends_at: new Date(t.getTime() + 12 * 3600_000).toISOString() };
+      }),
+    };
+  }
+
+  async requestSwap(assignmentId: string, targetSoldierId: string, counterAssignmentId: string | null = null) {
+    await delay();
+    this.seedSwaps();
+    const d = this.demoDuties().find((x) => x.assignment_id === assignmentId)!;
+    if (this.swaps.some((w) => w.mine && w.status === "pending_peer" && w.give_starts_at === d.starts_at)) throw new Error("כבר יש בקשת החלפה פתוחה על התורנות הזו");
+    const opts = await this.swapOptions(assignmentId);
+    const m = opts.mutual.find((x) => x.assignment_id === counterAssignmentId);
+    const id = crypto.randomUUID();
+    this.swaps.unshift({
+      id, kind: counterAssignmentId ? "mutual" : "handover", status: "pending_peer", mine: true,
+      other_name: this.soldierList.find((x) => x.id === targetSoldierId)?.full_name ?? "",
+      give_task: d.task_name, give_starts_at: d.starts_at, give_ends_at: d.ends_at,
+      take_task: m?.task ?? null, take_starts_at: m?.starts_at ?? null, take_ends_at: m?.ends_at ?? null,
+      reason: null, created_at: new Date().toISOString(), expired: false,
+    });
+    return id;
+  }
+
+  async answerSwap(requestId: string, accept: boolean) {
+    await delay();
+    const w = this.swaps.find((x) => x.id === requestId);
+    if (!w || w.mine || w.status !== "pending_peer") throw new Error("הבקשה לא נמצאה");
+    w.status = accept ? "approved" : "rejected";
+    return { status: w.status };
+  }
+
+  async cancelSwap(requestId: string) {
+    await delay();
+    const w = this.swaps.find((x) => x.id === requestId);
+    if (!w || !w.mine || w.status !== "pending_peer") throw new Error("הבקשה לא נמצאה");
+    w.status = "cancelled";
+  }
+
+  async mySwaps() {
+    await delay();
+    if (!this.user?.roles.includes("soldier")) return [];
+    this.seedSwaps();
+    return this.swaps.map((w) => ({ ...w }));
+  }
+
+  async swapLog(): Promise<SwapLogRow[]> {
+    await delay();
+    const at = (days: number) => new Date(Date.now() + days * 86400_000).toISOString();
+    const n = (i: number) => this.soldierList[i]?.full_name ?? "חייל";
+    return [
+      { id: "demo-l1", kind: "handover", status: "approved", requester: n(3), target: n(7), give_task: "מטבח", give_starts_at: at(5),
+        take_task: null, take_starts_at: null, reason: null, created_at: at(-1), decided_at: at(-0.9) },
+      { id: "demo-l2", kind: "mutual", status: "approved", requester: n(12), target: n(20), give_task: "שמירות חובה", give_starts_at: at(3),
+        take_task: "שמירות חובה", take_starts_at: at(9), reason: null, created_at: at(-2), decided_at: at(-1.8) },
+      { id: "demo-l3", kind: "handover", status: "rejected", requester: n(30), target: n(31), give_task: "קצין תורן – שבת", give_starts_at: at(8),
+        take_task: null, take_starts_at: null, reason: null, created_at: at(-0.5), decided_at: at(-0.4) },
+    ];
   }
 
   async myInputOptions() {

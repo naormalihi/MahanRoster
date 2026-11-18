@@ -269,7 +269,8 @@ export function Layout({ children }: { children: ReactNode }) {
               {who}
             </Typography>
           )}
-          {isSoldier(me) && <NotificationBell />}
+          {/* soldiers, and נע"ת for the swaps soldiers made */}
+          {(isSoldier(me) || staff) && <NotificationBell />}
           {kind && !compact && (
             <IconButton color="inherit" aria-label="סיור היכרות" title="סיור היכרות" onClick={() => setTour(true)}>
               <HelpIcon />

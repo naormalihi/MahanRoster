@@ -1,3 +1,4 @@
+import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
@@ -881,6 +882,30 @@ export class SupabaseApi implements Api {
 
   async myDuties(): Promise<MyDuty[]> {
     return (check(await this.sb.rpc("my_duties")) as MyDuty[]).map((d) => ({ ...d, points: Number(d.points) }));
+  }
+
+  async swapOptions(assignmentId: string): Promise<SwapOptions> {
+    return check(await this.sb.rpc("swap_options", { p_assignment: assignmentId })) as SwapOptions;
+  }
+
+  async requestSwap(assignmentId: string, targetSoldierId: string, counterAssignmentId: string | null = null): Promise<string> {
+    return check(await this.sb.rpc("request_swap", { p_assignment: assignmentId, p_target: targetSoldierId, p_counter: counterAssignmentId })) as string;
+  }
+
+  async answerSwap(requestId: string, accept: boolean) {
+    return check(await this.sb.rpc("answer_swap", { p_request: requestId, p_accept: accept })) as { status: string; reason?: string };
+  }
+
+  async cancelSwap(requestId: string) {
+    maybe(await this.sb.rpc("cancel_swap", { p_request: requestId }));
+  }
+
+  async mySwaps(): Promise<MySwap[]> {
+    return check(await this.sb.rpc("my_swaps")) as MySwap[];
+  }
+
+  async swapLog(): Promise<SwapLogRow[]> {
+    return check(await this.sb.rpc("swap_log")) as SwapLogRow[];
   }
 
   async myInputOptions(): Promise<InputOptions> {

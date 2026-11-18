@@ -1,3 +1,4 @@
+import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 /**
  * The app's only door to data. Two implementations: Supabase (real) and Demo
  * (in-memory fictitious unit, for previews and screenshots without a backend).
@@ -261,6 +262,14 @@ export interface Api {
   redeemInvite(code: string, username: string, password: string): Promise<string>;
   myDuties(): Promise<MyDuty[]>;
   myScores(): Promise<MyScore[]>;
+  /** swaps between soldiers: whom I can give a duty of mine to, or trade it with */
+  swapOptions(assignmentId: string): Promise<SwapOptions>;
+  requestSwap(assignmentId: string, targetSoldierId: string, counterAssignmentId?: string | null): Promise<string>;
+  answerSwap(requestId: string, accept: boolean): Promise<{ status: string; reason?: string }>;
+  cancelSwap(requestId: string): Promise<void>;
+  mySwaps(): Promise<MySwap[]>;
+  /** for נע"ת and commanders: the swaps of the last weeks */
+  swapLog(): Promise<SwapLogRow[]>;
   // stage 2.2 – the soldier's own constraints
   myInputOptions(): Promise<InputOptions>;
   myRequests(): Promise<MyRequests>;

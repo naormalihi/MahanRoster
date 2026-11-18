@@ -1,3 +1,4 @@
+import { SwapLogCard } from "../components/SwapDialog";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
 import { EmptyState, greeting } from "../components/EmptyState";
@@ -203,6 +204,7 @@ export function HomePage() {
           </Paper>
         ))}
       </Box>
+      <SwapLogCard />
     </Stack>
   );
 }

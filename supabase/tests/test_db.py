@@ -2204,3 +2204,87 @@ def test_soldier_phone_is_checked_scoped_and_masked_in_the_audit(conn):
     finally:
         conn.execute("update soldiers set phone = null where id in (%s, %s)", (sid, other))
         conn.commit()
+
+
+def test_swaps_handover_and_mutual_without_approval(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        conn.execute("update cycles set status = 'published', published_at = now() - interval '2 days' where id = %s", (cycle,))
+        conn.execute("delete from assignments where slot_id in (select id from slots where cycle_id = %s)", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s group by 1 order by count(*) desc limit 1", (cycle,)).fetchone()[0]
+        def slot(hours):
+            return conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                                "(%s, %s, now() + make_interval(hours => %s), now() + make_interval(hours => %s + 4)) returning id",
+                                (cycle, tid, hours, hours)).fetchone()[0]
+        k1, k2, k_late = slot(48), slot(240), slot(10)
+        ok = lambda k: {r[0] for r in conn.execute(
+            "select soldier_id from app.slot_candidates_for(%s) where cardinality(reasons) = 0 and jsonb_array_length(conflicts) = 0", (k,)).fetchall()}
+        taken = {r[0] for r in conn.execute("select soldier_id from app_users where soldier_id is not null").fetchall()}
+        both = sorted((ok(k1) & ok(k2) & ok(k_late)) - taken)  # soldiers with no account yet
+        assert len(both) >= 3
+        a_sid, b_sid, c_sid = both[:3]
+        users = {}
+        for name, sid in (("swap.a", a_sid), ("swap.b", b_sid)):
+            uid = conn.execute("select app.create_auth_user(%s, 'x-long-password')", (f"{name}@users.invalid",)).fetchone()[0]
+            conn.execute("insert into app_users (id, username, soldier_id) values (%s, %s, %s)", (uid, name, sid))
+            conn.execute("insert into user_roles (user_id, role) values (%s, 'soldier')", (uid,))
+            users[sid] = uid
+        put = lambda k, sid: conn.execute(
+            "insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) "
+            "select %s, id, gaf_id, 'performer', 'assigned', 'manual', 'בדיקה', 1, 1 from soldiers where id = %s returning id", (k, sid)).fetchone()[0]
+        a1, a2, late = put(k1, a_sid), put(k2, a_sid), put(k_late, a_sid)
+        conn.execute("set local role authenticated")
+        _claims(conn, users[a_sid], aal="aal1")
+        opts = conn.execute("select public.swap_options(%s)", (a1,)).fetchone()[0]
+        names = {o["soldier_id"] for o in opts["handover"]}
+        assert str(b_sid) in names and str(c_sid) not in names  # c has no account
+        with pytest.raises(psycopg.Error, match="24"):
+            with conn.transaction():
+                conn.execute("select public.swap_options(%s)", (late,))
+        with pytest.raises(psycopg.Error, match="אין חשבון"):
+            with conn.transaction():
+                conn.execute("select public.request_swap(%s, %s)", (a1, c_sid))
+        req = conn.execute("select public.request_swap(%s, %s)", (a1, b_sid)).fetchone()[0]
+        with pytest.raises(psycopg.Error, match="כבר יש בקשת"):
+            with conn.transaction():
+                conn.execute("select public.request_swap(%s, %s)", (a1, b_sid))
+        with pytest.raises(psycopg.Error, match="לא נמצאה"):
+            with conn.transaction():
+                conn.execute("select public.answer_swap(%s, true)", (req,))  # not his to answer
+        # the other soldier accepts: done at once
+        _claims(conn, users[b_sid], aal="aal1")
+        (mine, other), = conn.execute("select mine, other_name from public.my_swaps() where id = %s", (req,)).fetchall()
+        assert mine is False and other
+        assert conn.execute("select public.answer_swap(%s, true)", (req,)).fetchone()[0]["status"] == "approved"
+        conn.execute("reset role")
+        rows = conn.execute("select soldier_id, status::text, source::text, is_surprise from assignments where slot_id = %s order by created_at", (k1,)).fetchall()
+        assert rows == [(a_sid, "swapped_out", "manual", False), (b_sid, "assigned", "swap", False)]  # 48 hours ahead, yet no call-up
+        types = dict(conn.execute("select u.soldier_id, array_agg(n.type order by n.created_at) from notifications n "
+                                  "join app_users u on u.id = n.recipient_user_id where u.soldier_id in (%s, %s) group by 1", (a_sid, b_sid)).fetchall())
+        assert types[b_sid] == ["swap_request"]  # no "added" on top of the swap
+        assert "duty_removed" not in types[a_sid] and types[a_sid][-1] == "swap_done"
+        assert conn.execute("select count(*) from notifications n join user_roles ur on ur.user_id = n.recipient_user_id "
+                            "where n.type = 'swap_done' and ur.role = 'coordinator'").fetchone()[0] >= 1
+        # mutual: B offers k1 back for A's k2
+        b1 = conn.execute("select id from assignments where slot_id = %s and soldier_id = %s and status = 'assigned'", (k1, b_sid)).fetchone()[0]
+        conn.execute("set local role authenticated")
+        _claims(conn, users[b_sid], aal="aal1")
+        offers = conn.execute("select public.swap_options(%s)", (b1,)).fetchone()[0]["mutual"]
+        assert str(a2) in {o["assignment_id"] for o in offers}
+        req2 = conn.execute("select public.request_swap(%s, %s, %s)", (b1, a_sid, a2)).fetchone()[0]
+        _claims(conn, users[a_sid], aal="aal1")
+        assert conn.execute("select public.answer_swap(%s, true)", (req2,)).fetchone()[0]["status"] == "approved"
+        conn.execute("reset role")
+        live = set(conn.execute("select slot_id, soldier_id from assignments where slot_id in (%s, %s) and status = 'assigned'", (k1, k2)).fetchall())
+        assert live == {(k1, a_sid), (k2, b_sid)}
+        # a declined request changes nothing
+        a_now = conn.execute("select id from assignments where slot_id = %s and soldier_id = %s and status = 'assigned'", (k1, a_sid)).fetchone()[0]
+        conn.execute("set local role authenticated")
+        _claims(conn, users[a_sid], aal="aal1")
+        req3 = conn.execute("select public.request_swap(%s, %s)", (a_now, b_sid)).fetchone()[0]
+        _claims(conn, users[b_sid], aal="aal1")
+        assert conn.execute("select public.answer_swap(%s, false)", (req3,)).fetchone()[0]["status"] == "rejected"
+        conn.execute("reset role")
+        assert conn.execute("select soldier_id from assignments where id = %s and status = 'assigned'", (a_now,)).fetchone()[0] == a_sid
+        raise psycopg.Rollback()
