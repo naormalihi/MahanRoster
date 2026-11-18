@@ -46,6 +46,7 @@ import { useAuth } from "../lib/auth";
 import { isStaff } from "../lib/api";
 import { accountLabel, type SoldierAccount } from "../lib/me";
 import { InviteDialog } from "../components/InviteDialog";
+import { formatPhone, normalizePhone } from "../lib/phone";
 import {
   activeLoadRole,
   activeLoadRoles,
@@ -138,8 +139,11 @@ function EditDialog(props: {
     home_nightly_override_reason: s.home_nightly_override_reason,
     home_nightly_override_until: s.home_nightly_override_until,
     tash_level: s.tash_level,
+    phone: s.phone ?? null,
     is_active: s.is_active,
   });
+  const [phoneText, setPhoneText] = useState(formatPhone(s.phone));
+  const phone = normalizePhone(phoneText);
   const [roles, setRoles] = useState<
     Omit<SoldierLoadRole, "name" | "factor">[]
   >(
@@ -155,6 +159,7 @@ function EditDialog(props: {
     setP((x) => ({ ...x, [k]: v }));
 
   const problems: string[] = [];
+  if (phone === "invalid") problems.push("מספר הטלפון לא תקין – נייד ישראלי, למשל 050-1234567");
   if (p.parent_override !== null && !p.parent_override_reason?.trim())
     problems.push("שינוי ידני של משרת הורה מחייב סיבה");
   if (roles.some((r) => !r.load_role_id || !r.valid_from))
@@ -167,6 +172,7 @@ function EditDialog(props: {
     try {
       const patch = {
         ...p,
+        phone: phone === "invalid" ? p.phone : phone,
         parent_override_reason:
           p.parent_override === null ? null : p.parent_override_reason,
         home_nightly_override_reason:
@@ -203,6 +209,16 @@ function EditDialog(props: {
       </DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2.5}>
+          <TextField
+            label="טלפון נייד"
+            value={phoneText}
+            onChange={(e) => setPhoneText(e.target.value)}
+            error={phone === "invalid"}
+            helperText={phone === "invalid" ? "נייד ישראלי, למשל 050-1234567" : "כפתור הוואטסאפ בקודי ההצטרפות יפתח ישר את הצ׳אט שלו"}
+            slotProps={{ htmlInput: { inputMode: "tel", dir: "ltr", autoComplete: "off" } }}
+            fullWidth
+          />
+          <Divider />
           <Box>
             <Typography variant="h3" gutterBottom>
               מטווח

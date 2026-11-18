@@ -4,6 +4,7 @@
  */
 
 import { normalizePersonalNumber } from "./hmac";
+import { normalizePhone } from "./phone";
 
 export type FieldKey =
   | "personalNumber"
@@ -20,7 +21,8 @@ export type FieldKey =
   | "releaseDate"
   | "rangeValidUntil"
   | "parent"
-  | "homeNightly";
+  | "homeNightly"
+  | "phone";
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms: string[] }[] = [
   { key: "personalNumber", label: "מספר אישי", required: true, synonyms: ["מספר אישי", "מ\"א", "מא", "מס' אישי", "מס אישי"] },
@@ -37,6 +39,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
   { key: "releaseDate", label: "תאריך שחרור", required: false, synonyms: ["תאריך שחרור", "שחרור", "תש\"ש", "תאריך תום שירות (תש\"ש)", "תאריך תום שירות"] },
   { key: "rangeValidUntil", label: "תוקף מטווח", required: false, synonyms: ["תוקף מטווח", "מטווח"] },
   { key: "parent", label: "משרת הורה", required: false, synonyms: ["משרת הורה", "נמצא במשרת הורה", "הורה"] },
+  { key: "phone", label: "טלפון נייד", required: false, synonyms: ["טלפון", "נייד", "טלפון נייד", "פלאפון", "מספר טלפון", "מס' טלפון", "מס טלפון", "סלולרי"] },
   { key: "homeNightly", label: "ת\"ש 7 (לינה בבית)", required: false, synonyms: ["ת\"ש 7", "תש 7", "ת\"ש", "תש", "תנאי שירות", "לינה בבית"] },
 ];
 
@@ -90,6 +93,8 @@ export interface RosterRow {
   parent: boolean;
   /** ת"ש 7; null when the file has no such column (the stored value is kept) */
   homeNightly: boolean | null;
+  /** 9725XXXXXXXX; null: no number in the file (the stored one stays) */
+  phone: string | null;
 }
 
 export interface ParseResult {
@@ -199,6 +204,8 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
     if (!svc) problems.push(`סוג שירות לא מוכר: "${get("serviceType") ?? ""}"`);
     if (!gafName) problems.push(m.gaf ? "גף חסר" : "לא נמצא גף במסגרת");
     if (!rankName) problems.push("דרגה חסרה");
+    const phone = m.phone ? normalizePhone(get("phone")) : null;
+    if (phone === "invalid") problems.push(`טלפון נייד לא תקין: "${get("phone")}"`);
     for (const [k, v] of Object.entries(dates)) if (v === "invalid") problems.push(`תאריך לא תקין (${FIELDS.find((f) => f.key === k)?.label})`);
     if (problems.length) {
       errors.push({ line, message: problems.join(", ") });
@@ -217,6 +224,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
       careerStartDate: dates.careerStartDate,
       rangeValidUntil: dates.rangeValidUntil,
       parent: truthy(get("parent")),
+      phone: phone as string | null, // "invalid" stopped the row above
       homeNightly: m.homeNightly ? truthy(get("homeNightly")) || /(^|\D)7(\D|$)/.test(String(get("homeNightly") ?? "")) : null,
     });
   });
@@ -240,6 +248,7 @@ export interface SoldierRecord {
   range_valid_until: string | null;
   parent_status: boolean;
   home_nightly: boolean | null;
+  phone: string | null;
 }
 
 export interface ExistingSoldier extends SoldierRecord {
@@ -260,6 +269,7 @@ export const RECORD_LABELS: Record<keyof SoldierRecord, string> = {
   range_valid_until: "תוקף מטווח",
   parent_status: "משרת הורה",
   home_nightly: "ת\"ש 7",
+  phone: "טלפון",
 };
 
 export interface RosterPlan {
@@ -285,6 +295,7 @@ export function toRecord(row: RosterRow, key: string): SoldierRecord {
     range_valid_until: row.rangeValidUntil,
     parent_status: row.parent,
     home_nightly: row.homeNightly,
+    phone: row.phone,
   };
 }
 

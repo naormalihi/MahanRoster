@@ -146,7 +146,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("soldiers")
         .select(
-          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, range_valid_until, parent_status, home_nightly, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
+          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, range_valid_until, parent_status, home_nightly, phone, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
         ),
     ) as unknown as (Omit<ExistingSoldier, "gaf_name" | "rank_name"> & { gaf: { name: string }; rank: { name: string } | null })[];
     const full = rows.map(({ gaf, rank, ...s }) => ({ ...s, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
@@ -163,7 +163,7 @@ export class SupabaseApi implements Api {
           ({
             id: d.id, soldier_key: "", full_name: d.full_name, service_type: d.service_type, gender: d.gender, is_active: d.is_active,
             gaf_name: d.gaf_name ?? "", rank_name: d.rank_name ?? "", enlistment_date: null, release_date: null,
-            career_start_date: null, range_valid_until: null, parent_status: false, home_nightly: false,
+            career_start_date: null, range_valid_until: null, parent_status: false, home_nightly: false, phone: null,
           }) as unknown as ExistingSoldier,
       );
     return [...full, ...others];
@@ -216,6 +216,7 @@ export class SupabaseApi implements Api {
       range_valid_until: r.range_valid_until,
       parent_status: r.parent_status,
       home_nightly: r.home_nightly ?? undefined, // no column in the file: keep / default
+      phone: r.phone ?? undefined, // an empty cell keeps the stored number
       is_active: true,
     });
     // A bulk insert sends one column list for all rows, so a value missing in one row would be sent
@@ -258,7 +259,7 @@ export class SupabaseApi implements Api {
           `id, full_name, service_type, gender, gaf_id, appointment_rank_id, appointment_rank_until, enlistment_date, release_date,
            career_start_date, range_valid_until, is_shachar, shachar_start_date, parent_status, parent_override,
            parent_override_reason, parent_override_until, second_role_signed_at, is_active,
-           home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until, tash_level, unit_join_date, opening_score,
+           home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until, tash_level, unit_join_date, opening_score, phone,
            gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name),
            soldier_load_roles(load_role_id, valid_from, valid_to, load_roles(name, factor))`,
         )

@@ -192,6 +192,7 @@ export class DemoApi implements Api {
         range_valid_until: "2027-06-30",
         parent_status: false,
         home_nightly: i === 8 || i === 21,
+        phone: i % 4 === 3 ? null : `97250555${String(i).padStart(4, "0")}`, // fictitious
         is_active: true,
       });
     }

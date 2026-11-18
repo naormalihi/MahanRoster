@@ -31,6 +31,7 @@ interface Person {
   id: string;
   full_name: string;
   gaf_name: string;
+  phone?: string | null;
 }
 
 /**
@@ -124,7 +125,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
               הקודים מוצגים <b>פעם אחת בלבד</b> – המערכת שומרת רק טביעה שלהם. שלח, הדפס או הורד אותם לפני הסגירה.
             </Alert>
             <Typography variant="body2" color="text.secondary">
-              כפתור הוואטסאפ פותח הודעה מוכנה עם הקוד וקישור שממלא אותו – בוחרים את החייל באנשי הקשר. ההדפסה מוציאה דף לכל גף עם כרטיס וקוד QR לכל
+              כפתור הוואטסאפ פותח הודעה מוכנה עם הקוד וקישור שממלא אותו – ישר בצ׳אט של החייל אם יש לו טלפון במערכת, ואחרת בוחרים אותו באנשי הקשר. ההדפסה מוציאה דף לכל גף עם כרטיס וקוד QR לכל
               חייל. מה שנשלח או הודפס מסומן במסך החיילים.
             </Typography>
             {error && <Alert severity="error">{error}</Alert>}
@@ -144,15 +145,22 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
                 {rows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{r.full_name}</TableCell>
-                    <TableCell>{r.gaf_name}</TableCell>
+                    <TableCell>
+                      {r.gaf_name}
+                      {!r.phone && (
+                        <Typography variant="caption" color="warning.main" sx={{ display: "block" }}>
+                          אין טלפון
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell dir="ltr" sx={{ fontFamily: "monospace", fontWeight: 700, textAlign: "start", whiteSpace: "nowrap" }}>
                       {r.code}
                     </TableCell>
                     <TableCell padding="none" sx={{ whiteSpace: "nowrap" }}>
-                      <Tooltip title={sent.has(r.id) ? "נשלח – שליחה שוב" : `שליחה ל${r.full_name} בוואטסאפ`}>
+                      <Tooltip title={`${sent.has(r.id) ? "נשלח – שליחה שוב" : `שליחה ל${r.full_name} בוואטסאפ`}${r.phone ? "" : " · אין טלפון: בוחרים איש קשר"}`}>
                         <IconButton
                           component="a"
-                          href={whatsappUrl(whatsappText(r, origin))}
+                          href={whatsappUrl(whatsappText(r, origin), r.phone)}
                           target="_blank"
                           rel="noopener"
                           onClick={() => markSent([r.id])}
