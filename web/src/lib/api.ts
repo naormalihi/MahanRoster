@@ -107,6 +107,12 @@ export interface NamedRef {
   name: string;
 }
 
+/** A rank: a neutral name (חובה 3), the military names it is read from in files, and whether it does duties. */
+export interface RankItem extends NamedRef {
+  aliases?: string[];
+  in_duties?: boolean;
+}
+
 export interface ApplyResult {
   added: number;
   updated: number;
@@ -134,7 +140,7 @@ export interface Api {
   nextPublished(fromIso: string): Promise<string | null>;
   soldiers(): Promise<ExistingSoldier[]>;
   gafim(): Promise<NamedRef[]>;
-  ranks(): Promise<NamedRef[]>;
+  ranks(): Promise<RankItem[]>;
   unitKeyCheck(): Promise<string | null>;
   setUnitKeyCheck(value: string): Promise<void>;
   /** A forgotten unit key: moves the approved soldiers to keys made with the new one, and stores its fingerprint. */

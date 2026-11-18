@@ -74,8 +74,20 @@ export function mappingProblems(m: Mapping, headers: string[] = []): string[] {
   return out;
 }
 
-/** Ranks that are mandatory service when the file has no service-type column. */
-export const MANDATORY_RANKS = new Set(["טוראי", "טור'", "רב\"ט", "סמל", "סמ\"ר"]);
+/** Ranks that are mandatory service when the file has no service-type column (military or neutral names). */
+export const MANDATORY_RANKS = new Set(["טוראי", "טור'", "רב\"ט", "סמל", "סמ\"ר", "חובה 1", "חובה 2", "חובה 3", "חובה 4"]);
+
+const rankKey = (s: string) => s.replace(/["'״׳`\s.-]/g, "");
+
+/**
+ * The neutral rank name for a rank written in a file: its own name or a military alias
+ * ("סמ"ר", "סמ״ר", "סמר" → "חובה 4"). Null when unknown.
+ */
+export function rankResolver(ranks: { name: string; aliases?: string[] }[]): (text: string) => string | null {
+  const map = new Map<string, string>();
+  for (const r of ranks) for (const n of [r.name, ...(r.aliases ?? [])]) if (n) map.set(rankKey(n), r.name);
+  return (text) => map.get(rankKey(text.trim())) ?? null;
+}
 
 /** "מה"ן - מלמסים/גף ענן/צוות DevOps - מלמסים" → "גף ענן" */
 export function gafFromFramework(framework: string): string | null {
@@ -157,7 +169,7 @@ const truthy = (v: unknown) => ["כן", "v", "1", "true", "x", "✓", "yes", "y"
  * Service type, by the first source the file has:
  *   1. a service-type column;
  *   2. a career start date column – career from that date on, mandatory before it or when empty;
- *   3. the rank – טוראי to סמ"ר mandatory, everyone else career.
+ *   3. the rank – חובה 1–4 (טוראי to סמ"ר) mandatory, everyone else career.
  */
 export function serviceOf(
   m: Mapping,

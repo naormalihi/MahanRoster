@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvePlan, changeKey, detectMapping, mappingProblems, parseRows, planImport, serviceOf, toRecord, type ExistingSoldier } from "../roster";
+import { approvePlan, changeKey, rankResolver, detectMapping, mappingProblems, parseRows, planImport, serviceOf, toRecord, type ExistingSoldier } from "../roster";
 
 const headers = ["ת\"ז", "שם פרטי", "שם משפחה", "סוג שירות", "גף", "דרגה", "מין", "תאריך גיוס", "תאריך שחרור", "תוקף מטווח", "משרת הורה"];
 
@@ -173,5 +173,20 @@ describe("service type", () => {
   });
   it("detects the career start date column", () => {
     expect(detectMapping(["תאריך כניסה לקבע"]).careerStartDate).toBe("תאריך כניסה לקבע");
+  });
+});
+
+describe("rank names", () => {
+  it("resolves military names and their spellings to the neutral name", () => {
+    const resolve = rankResolver([
+      { name: "חובה 4", aliases: ['סמ"ר'] },
+      { name: "אקדמאי 1", aliases: ['קמ"א'] },
+    ]);
+    expect(resolve('סמ"ר')).toBe("חובה 4");
+    expect(resolve("סמ״ר")).toBe("חובה 4");
+    expect(resolve("סמר")).toBe("חובה 4");
+    expect(resolve(" חובה 4 ")).toBe("חובה 4");
+    expect(resolve('קמ"א')).toBe("אקדמאי 1");
+    expect(resolve("אל\"ם")).toBeNull();
   });
 });

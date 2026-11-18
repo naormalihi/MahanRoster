@@ -4,7 +4,7 @@ import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, Role, SlotPeople } from "./api";
+import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, RankItem, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
 import { SCORING_KEYS, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import {
@@ -175,8 +175,8 @@ export class SupabaseApi implements Api {
     return check(await this.sb.from("org_units").select("id, name").eq("kind", "gaf").is("active_to", null).order("name"));
   }
 
-  async ranks(): Promise<NamedRef[]> {
-    return check(await this.sb.from("ranks").select("id, name").order("sort_order"));
+  async ranks(): Promise<RankItem[]> {
+    return check(await this.sb.from("ranks").select("id, name, aliases, in_duties").order("sort_order"));
   }
 
   async unitKeyCheck() {
@@ -619,7 +619,7 @@ export class SupabaseApi implements Api {
   // ----- base schedule -----
 
   async rankRefs(): Promise<RankRef[]> {
-    return check(await this.sb.from("ranks").select("id, name, sort_order").order("sort_order")) as RankRef[];
+    return check(await this.sb.from("ranks").select("id, name, sort_order, aliases").order("sort_order")) as RankRef[];
   }
 
   async taskTypeAliases(): Promise<Alias[]> {

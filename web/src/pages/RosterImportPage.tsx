@@ -54,6 +54,7 @@ import {
   type RosterPlan,
   type ExistingSoldier,
   type SoldierRecord,
+  rankResolver,
 } from "../lib/roster";
 
 import { formatPhone } from "../lib/phone";
@@ -75,7 +76,7 @@ function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) => f.label),
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) =>
-      ({ idNumber: "123456782", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "סמל",
+      ({ idNumber: "123456782", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "חובה 3",
          gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא", phone: "050-1234567" } as Record<string, string>)[f.key] ?? ""),
   ]);
   const wb = XLSX.utils.book_new();
@@ -229,7 +230,11 @@ export function RosterImportPage() {
     try {
       const result = parseRows(records, mapping);
       setParsed(result);
-      const incoming = await Promise.all(result.rows.map(async (r) => toRecord(r, await soldierKey(unitKey, r.idNumber))));
+      // a military rank in the file ("סמל") becomes its neutral name ("חובה 3")
+      const resolve = rankResolver(await api!.ranks());
+      const incoming = await Promise.all(
+        result.rows.map(async (r) => toRecord({ ...r, rank: resolve(r.rank) ?? r.rank }, await soldierKey(unitKey, r.idNumber))),
+      );
       if (matching) {
         const existing = await api!.soldiers();
         const rows = matchForRekey(incoming, existing);
@@ -455,7 +460,7 @@ export function RosterImportPage() {
             )}
             {!mapping.serviceType && !mapping.careerStartDate && (
               <Alert severity="warning">
-                אין בקובץ עמודת סוג שירות או תאריך כניסה לקבע, ולכן סוג השירות נקבע לפי הדרגה: טוראי עד סמ"ר – חובה, כל השאר – קבע.
+                אין בקובץ עמודת סוג שירות או תאריך כניסה לקבע, ולכן סוג השירות נקבע לפי הדרגה: חובה 1–4 – חובה, כל השאר – קבע.
               </Alert>
             )}
             {!mapping.gaf && mapping.framework && (

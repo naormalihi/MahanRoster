@@ -9,7 +9,7 @@
 
 import type { MyDuty } from "../lib/me";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
-import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, Role, SlotPeople, SlotPerson } from "../lib/api";
+import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, RankItem, Role, SlotPeople, SlotPerson } from "../lib/api";
 import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
   absenceSpan,
@@ -47,7 +47,12 @@ const LOAD_ROLES: LoadRoleRef[] = [
 ];
 
 const GAFIM = ["גף מבצעים", "גף טכני", "גף מודיעין", "גף לוגיסטיקה"];
-const RANKS = ["טוראי", "רב\"ט", "סמל", "סמ\"ר", "רס\"ל", "רס\"ר", "רס\"מ", "סגן", "קמ\"א", "סרן", "רס\"ן", "סא\"ל"];
+// neutral names, read from the military ones in files (index order kept for the demo rules)
+const RANK_ALIASES: [string, string][] = [["חובה 1", "טוראי"], ["חובה 2", "רב\"ט"], ["חובה 3", "סמל"], ["חובה 4", "סמ\"ר"],
+  ["מקצועי 1", "רס\"ל"], ["מקצועי 2", "רס\"ר"], ["מקצועי 3", "רס\"מ"], ["מוביל 2", "סגן"], ["אקדמאי 1", "קמ\"א"],
+  ["מוביל 3", "סרן"], ["בכיר 1", "רס\"ן"], ["בכיר 2", "סא\"ל"]];
+const RANKS = RANK_ALIASES.map(([n]) => n);
+const NOT_IN_DUTIES = new Set(["מקצועי 2", "מקצועי 3", "בכיר 2"]);
 const FIRST = ["נועה", "איתי", "מאיה", "יונתן", "שירה", "עומר", "תמר", "אורי", "הילה", "דניאל", "רוני", "אלון", "ליה", "גיא", "עדי", "נדב"];
 const LAST = ["כהן", "לוי", "מזרחי", "פרץ", "ביטון", "אברהם", "פרידמן", "שושן", "אזולאי", "דהן", "חדד", "גבאי"];
 
@@ -72,8 +77,8 @@ const CATEGORIES: NamedRef[] = ["הגנ\"ש", "קצין תורן", "מפקד ש�
 const POPULATIONS: Population[] = [
   { code: "mandatory", name: "חובה" },
   { code: "career", name: "קבע" },
-  { code: "officer", name: "קצינים" },
-  { code: "major", name: "רס\"ן ומעלה" },
+  { code: "officer", name: "מובילים" },
+  { code: "major", name: "בכירים" },
 ];
 const tt = (code: string, name: string, cat: number, weight: number, o: Partial<TaskTypeInput> = {}): TaskType => ({
   id: `t_${code}`, code, name, category_id: `c${cat}`, weight, min_rest_hours: 0, service_restriction: "any",
@@ -132,7 +137,7 @@ export class DemoApi implements Api {
   ];
   private soldierList: ExistingSoldier[] = [];
   private gafList: NamedRef[] = GAFIM.map((name, i) => ({ id: `g${i}`, name }));
-  private rankList: NamedRef[] = RANKS.map((name, i) => ({ id: `r${i}`, name }));
+  private rankList: RankItem[] = RANK_ALIASES.map(([name, alias], i) => ({ id: `r${i}`, name, aliases: [alias], in_duties: !NOT_IN_DUTIES.has(name) }));
   private keyCheck: string | null = null;
   private boardRows: BoardRow[] = [];
   // the people of a demo board duty, made on first use (the demo board is not built from assignments)
@@ -715,7 +720,7 @@ export class DemoApi implements Api {
   // ----- base schedule -----
 
   async rankRefs(): Promise<RankRef[]> {
-    return this.rankList.map((r, i) => ({ ...r, sort_order: r.name === "קמ\"א" ? i : i + 1 }));
+    return this.rankList.map((r, i) => ({ ...r, sort_order: r.name === "אקדמאי 1" ? i : i + 1 }));
   }
 
   async taskTypeAliases() {

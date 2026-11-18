@@ -2421,3 +2421,18 @@ def test_poster_fills_the_catalog_briefings(conn):
             "p_shag": "briefing 13:00 גף אבטחה פיזית", "p_shaar": "briefing 09:30 גף אבטחה פיזית", "p_keva": "briefing 09:30 גף אבטחה פיזית",
             "p_toran": "by_call  ", "p_other": "by_call  "}   # a type already filled is kept
         raise psycopg.Rollback()
+
+
+def test_neutral_rank_names_keep_the_military_name_as_alias(conn):
+    sql = (ROOT / "supabase/migrations/20261118000091_neutral_rank_names.sql").read_text(encoding="utf-8")
+    with conn.transaction():
+        before = conn.execute("select id from ranks where name = 'סמל'").fetchone()[0]
+        conn.execute(sql)
+        row = conn.execute("select name, short_name, aliases, in_duties from ranks where id = %s", (before,)).fetchone()
+        assert row[0] == "חובה 3" and row[1] == "חובה 3" and "סמל" in row[2] and row[3] is True
+        names = dict(conn.execute("select name, in_duties from ranks where sort_order < 50").fetchall())
+        assert names["מקצועי 2"] is False and names["בכיר 1"] is True and names["בכיר 2"] is False
+        assert not set(names) & {"טוראי", "סגן", "סרן", 'רס"ן'}
+        conn.execute(sql)  # again: nothing left to rename, nothing breaks
+        assert conn.execute("select count(*) from ranks where name = 'חובה 3'").fetchone()[0] == 1
+        raise psycopg.Rollback()

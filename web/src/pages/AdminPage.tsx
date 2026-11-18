@@ -34,7 +34,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { NamedRef } from "../lib/api";
+import type { NamedRef, RankItem } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { LoadRoleRef } from "../lib/soldiers";
 import { UsersTab } from "./UsersTab";
@@ -260,7 +260,7 @@ export function TaskDialog(props: {
   initialName?: string;
   all: TaskType[];
   categories: NamedRef[];
-  ranks: NamedRef[];
+  ranks: RankItem[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -328,7 +328,9 @@ export function TaskDialog(props: {
         <Checkbox size="small" checked={!t.allowed_rank_ids} sx={{ p: 0.5, ml: 1 }} />
         כל הדרגות
       </MenuItem>
-      {props.ranks.map((r) => (
+      {props.ranks
+        .filter((r) => r.in_duties !== false || t.allowed_rank_ids?.includes(r.id))
+        .map((r) => (
         <MenuItem key={r.id} value={r.id}>
           <Checkbox size="small" checked={!!t.allowed_rank_ids?.includes(r.id)} sx={{ p: 0.5, ml: 1 }} />
           {r.name}
@@ -520,7 +522,7 @@ function CatalogTab() {
   const narrow = useNarrow();
   const [tasks, setTasks] = useState<TaskType[] | null>(null);
   const [categories, setCategories] = useState<NamedRef[]>([]);
-  const [ranks, setRanks] = useState<NamedRef[]>([]);
+  const [ranks, setRanks] = useState<RankItem[]>([]);
   const [editing, setEditing] = useState<TaskType | "new" | null>(null);
   const [editCats, setEditCats] = useState(false);
   const [showInactive, setShowInactive] = useState(false);

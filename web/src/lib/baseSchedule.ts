@@ -53,6 +53,8 @@ export interface RankRef {
   id: string;
   name: string;
   sort_order: number;
+  /** military names read from files ("סמל", "רס"ן") */
+  aliases?: string[];
 }
 
 export interface ParsedRanks {
@@ -69,7 +71,7 @@ export function parseRanks(text: unknown, ranks: RankRef[]): ParsedRanks {
   const homeNightly = tash.test(norm(raw));
   if (!raw || norm(raw).includes("כללהדרגות")) return { rankIds: null, unknown: [], homeNightly };
   const military = ranks.filter((r) => r.sort_order < 50);
-  const byName = new Map(military.map((r) => [norm(r.name).replace(/"/g, ""), r]));
+  const byName = new Map(military.flatMap((r) => [r.name, ...(r.aliases ?? [])].map((n) => [norm(n).replace(/"/g, ""), r] as const)));
   const find = (t: string) => byName.get(norm(t).replace(/"/g, ""));
   const ids = new Set<string>();
   const unknown: string[] = [];
