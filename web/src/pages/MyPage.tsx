@@ -1,9 +1,11 @@
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import SwapIcon from "@mui/icons-material/SwapHoriz";
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Collapse,
@@ -17,11 +19,13 @@ import { EmptyState, ErrorState, greeting } from "../components/EmptyState";
 import { PushControl } from "../components/NotificationBell";
 import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
 import { splitDuties, type MyDuty, type MyScore } from "../lib/me";
+import { canAskSwap, type MySwap } from "../lib/swaps";
+import { SwapDialog, SwapsCard } from "../components/SwapDialog";
 
 const ROLE: Record<MyDuty["role"], string> = { performer: "מבצע", reserve: "עתודה" };
 
 /** One duty: when, what, as what; tap to see where to report and why he got it. */
-function DutyRow({ d, open, onToggle }: { d: MyDuty; open: boolean; onToggle: () => void }) {
+function DutyRow({ d, open, onToggle, onSwap }: { d: MyDuty; open: boolean; onToggle: () => void; onSwap?: (d: MyDuty) => void }) {
   const details = [
     d.report_at && `התייצבות: ${dayLabel(d.report_at)} ${timeLabel(d.report_at)}${d.report_place ? `, ${d.report_place}` : ""}`,
     !d.report_at && d.report_place && `התייצבות: ${d.report_place}`,
@@ -60,9 +64,23 @@ function DutyRow({ d, open, onToggle }: { d: MyDuty; open: boolean; onToggle: ()
           <Typography variant="body2" color="text.secondary">
             <b>למה שובצתי:</b> {d.explanation ?? "שובץ ידנית על ידי נע\"ת התורנויות."}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {d.cycle_name}
-          </Typography>
+          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+            <Typography variant="caption" color="text.secondary">
+              {d.cycle_name}
+            </Typography>
+            {onSwap && canAskSwap(d, Date.now()) && (
+              <Button
+                size="small"
+                startIcon={<SwapIcon />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSwap(d);
+                }}
+              >
+                בקשת החלפה
+              </Button>
+            )}
+          </Stack>
         </Stack>
       </Collapse>
     </Box>
@@ -109,6 +127,10 @@ export function MyPage() {
   const [scores, setScores] = useState<MyScore[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [swaps, setSwaps] = useState<MySwap[]>([]);
+  const [swapping, setSwapping] = useState<MyDuty | null>(null);
+  const [tick, setTick] = useState(0);
+  const reload = () => setTick((t) => t + 1);
 
   useEffect(() => {
     Promise.all([api!.myDuties(), api!.myScores()])
@@ -117,7 +139,8 @@ export function MyPage() {
         setScores(s);
       })
       .catch((e) => setError((e as Error).message));
-  }, [api]);
+    api!.mySwaps().then(setSwaps, () => setSwaps([]));
+  }, [api, tick]);
 
   if (error) return <ErrorState text={error} onRetry={() => window.location.reload()} />;
   if (!duties)
@@ -147,12 +170,13 @@ export function MyPage() {
       {/* on a wide screen: the duties on the main side, the score and the settings beside them */}
       <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 3fr) minmax(0, 2fr)" } }}>
       <Stack spacing={2} sx={{ minWidth: 0 }}>
+      <SwapsCard swaps={swaps} onChange={reload} />
       {next ? (
         <Paper sx={{ p: 2, borderInlineStart: 4, borderColor: "primary.main" }}>
           <Typography variant="subtitle2" color="text.secondary">
             התורנות הבאה · {dayLabel(next.starts_at)}
           </Typography>
-          <DutyRow d={next} open onToggle={() => undefined} />
+          <DutyRow d={next} open onToggle={() => undefined} onSwap={setSwapping} />
         </Paper>
       ) : (
         <EmptyState pose="sleep" title="אין לך תורנויות קרובות" text="כשיתפרסם לוח חדש, התורנויות שלך יופיעו כאן ותקבל התראה." />
@@ -165,7 +189,7 @@ export function MyPage() {
           </Typography>
           <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
             {upcoming.slice(1).map((d) => (
-              <DutyRow key={d.assignment_id} d={d} open={open === d.assignment_id} onToggle={() => toggle(d.assignment_id)} />
+              <DutyRow key={d.assignment_id} d={d} open={open === d.assignment_id} onToggle={() => toggle(d.assignment_id)} onSwap={setSwapping} />
             ))}
           </Stack>
         </Paper>
@@ -213,8 +237,18 @@ export function MyPage() {
       </Box>
 
       <Typography variant="caption" color="text.secondary">
-        פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". שאלה על שיבוץ או החלפה? פנה לנע"ת התורנויות או למפקד הגף.
+        פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". החלפה – בלחיצה על התורנות, עד 24 שעות לפניה; אחר כך פונים לנע"ת התורנויות.
       </Typography>
+      {swapping && (
+        <SwapDialog
+          duty={swapping}
+          onClose={() => setSwapping(null)}
+          onSent={() => {
+            setSwapping(null);
+            reload();
+          }}
+        />
+      )}
     </Stack>
   );
 }
