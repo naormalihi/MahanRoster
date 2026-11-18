@@ -1448,12 +1448,13 @@ export class DemoApi implements Api {
       tasks: this.tasks
         .filter((t) => !t.is_special && t.is_active !== false)
         .map((t) => ({ name: t.name, weight: t.weight, includes_holidays: !!t.includes_holidays, weekend_type: !!t.is_weekend_type, category: (t.category_id && cat.get(t.category_id)) || null })),
-      additions: this.multipliers.filter((m) => m.is_active).map((m) => ({ name: m.name, value: m.value })).sort((a, b) => b.value - a.value),
+      additions: this.multipliers.filter((m) => m.is_active && m.value > 0).map((m) => ({ name: m.name, value: m.value })).sort((a, b) => b.value - a.value),
       surprise_multiplier: this.scoring.surprise_multiplier,
       surprise_notice_hours: this.scoring.surprise_notice_hours,
       window_months: 6,
       fairness_tolerance_pct: this.scoring.fairness_tolerance_pct,
       credit_min_days: 7,
+      credit_absences: ["מחלה", "קורס"],
     };
   }
 

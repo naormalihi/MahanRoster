@@ -976,7 +976,7 @@ export class SupabaseApi implements Api {
     return {
       ...r,
       tasks: r.tasks.map((t) => ({ ...t, weight: Number(t.weight) })),
-      additions: r.additions.map((a) => ({ ...a, value: Number(a.value) })),
+      additions: r.additions.map((a) => ({ ...a, value: Number(a.value) })).filter((a) => a.value > 0),
       surprise_multiplier: Number(r.surprise_multiplier),
       fairness_tolerance_pct: Number(r.fairness_tolerance_pct),
     };

@@ -6,7 +6,7 @@ import { isSoldier } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { dayLabel } from "../lib/dates";
 import type { MyDuty } from "../lib/me";
-import { additionsByValue, buildExamples, num, taskNote, type ScoringRules } from "../lib/scoringRules";
+import { additionsByValue, buildExamples, num, orList, taskNote, type ScoringRules } from "../lib/scoringRules";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -100,7 +100,7 @@ export function ScoringPage() {
         <Formula r={rules} />
         <Stack spacing={0.5} sx={{ mt: 1.25 }}>
           <Line b="משקל">של התורנות כולה, גם אם היא נמשכת כמה ימים.</Line>
-          <Line b="תוספת יום">סוף שבוע, חג, ערב חג או חול המועד. אם חלות כמה – רק הגבוהה, פעם אחת.</Line>
+          <Line b="תוספת יום">לפי היום שבו התורנות נופלת (הרשימה למטה). אם חלות כמה – רק הגבוהה, פעם אחת.</Line>
           <Line b="הקפצה">
             פי {num(rules.surprise_multiplier)} למי ששובץ אחרי הפרסום, פחות מ-{rules.surprise_notice_hours} שעות לפני התורנות.
           </Line>
@@ -158,7 +158,9 @@ export function ScoringPage() {
         <Stack spacing={0.5}>
           <Line b="משווים נכון">רק מול מי שיכולים לעשות אותן תורנויות.</Line>
           <Line b="יש זיכרון">נספרות גם הנקודות של {rules.window_months} החודשים האחרונים.</Line>
-          <Line b="היעדרות לא מבחירה">קורס או מחלה של {rules.credit_min_days ?? 7} ימים ומעלה, או פטור מלא, מזכים – לא חוזרים לערימה.</Line>
+          <Line b="היעדרות לא מבחירה">
+            {rules.credit_absences?.length ? `${orList(rules.credit_absences)} של ${rules.credit_min_days ?? 7} ימים ומעלה, או פטור מלא, מזכים` : "פטור מלא מזכה"} – לא חוזרים לערימה.
+          </Line>
           <Line b="חגים וסופי שבוע">מתחלקים בתורות. מי שעשה תורנות בחג בשנה האחרונה – אחרון לחג הבא.</Line>
         </Stack>
       </Section>

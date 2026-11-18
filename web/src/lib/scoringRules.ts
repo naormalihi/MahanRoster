@@ -9,6 +9,13 @@ export interface ScoringRules {
   fairness_tolerance_pct: number;
   /** a long absence not by choice counts from this many days */
   credit_min_days?: number;
+  /** the absence types credited as "not by choice" (קורס, מחלה…), as named in the settings */
+  credit_absences?: string[];
+}
+
+/** "קורס, מחלה או מילואים" */
+export function orList(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} או ${names[names.length - 1]}`;
 }
 
 export interface ScoringExample {

@@ -2296,7 +2296,7 @@ def test_scoring_rules_for_soldiers_without_unit_data(conn):
     with session_as(conn, uid, aal="aal1") as c:
         r = c.execute("select public.scoring_rules()").fetchone()[0]
         assert r["tasks"] and all(set(t) == {"name", "weight", "includes_holidays", "weekend_type", "category"} for t in r["tasks"])
-        assert r["surprise_notice_hours"] >= 1 and float(r["surprise_multiplier"]) >= 1 and r["window_months"] >= 1 and r["credit_min_days"] >= 1
+        assert r["surprise_notice_hours"] >= 1 and float(r["surprise_multiplier"]) >= 1 and r["window_months"] >= 1 and r["credit_min_days"] >= 1 and isinstance(r["credit_absences"], list)
         assert all(set(a) == {"name", "value"} for a in r["additions"])
         names = {t["name"] for t in r["tasks"]}
         hidden = {n for (n,) in conn.execute("select name from task_types where is_special or not is_active").fetchall()}
@@ -2304,3 +2304,21 @@ def test_scoring_rules_for_soldiers_without_unit_data(conn):
     with session_as(conn, OUTSIDER) as c:
         with pytest.raises(psycopg.Error, match="not allowed"):
             c.execute("select public.scoring_rules()")
+    # whatever the settings screen changes shows up here at once – nothing is written into the page
+    with conn.transaction():
+        tid, tname = conn.execute("select id, name from task_types where is_active and not is_special order by name limit 1").fetchone()
+        conn.execute("update task_types set weight = 7.5 where id = %s", (tid,))
+        conn.execute("insert into score_multipliers (name, value, weekdays) values ('בדיקה · יום מיוחד', 4.5, '{3}')")
+        conn.execute("insert into score_multipliers (name, value, weekdays, is_active) values ('כבויה', 2, '{3}', false)")
+        conn.execute("update settings set value = '1.7' where key = 'surprise_multiplier'")
+        conn.execute("update settings set value = '48' where key = 'surprise_notice_hours'")
+        conn.execute("update absence_types set credits_load = true where name = (select min(name) from absence_types)")
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        r = conn.execute("select public.scoring_rules()").fetchone()[0]
+        assert {t["name"]: float(t["weight"]) for t in r["tasks"]}[tname] == 7.5
+        adds = {a["name"]: float(a["value"]) for a in r["additions"]}
+        assert adds["בדיקה · יום מיוחד"] == 4.5 and "כבויה" not in adds
+        assert float(r["surprise_multiplier"]) == 1.7 and r["surprise_notice_hours"] == 48
+        assert r["credit_absences"]
+        raise psycopg.Rollback()

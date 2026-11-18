@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { additionLabel, additionsByValue, buildExamples, exampleTask, num, taskNote, type ScoringRules } from "../scoringRules";
+import { orList, additionLabel, additionsByValue, buildExamples, exampleTask, num, taskNote, type ScoringRules } from "../scoringRules";
 
 // the unit's catalog as it is (weights and additions), names included
 const rules: ScoringRules = {
@@ -64,6 +64,11 @@ describe("scoring rules", () => {
       ["מטבח בערב ראש השנה", "4 + 6", 10],
       ["מטבח בערב ראש השנה, בהקפצה", "(4 + 6) × 1.3", 13],
     ]);
+  });
+
+  it("lists names with \"או\"", () => {
+    expect(orList(["קורס"])).toBe("קורס");
+    expect(orList(["מחלה", "קורס", "מילואים"])).toBe("מחלה, קורס או מילואים");
   });
 
   it("without additions: a regular day and a call-up", () => {
