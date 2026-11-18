@@ -236,7 +236,7 @@ function EditDialog(props: {
               דרגת מינוי
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              במקום הדרגה המחושבת ({s.rank_name || "—"}), למשל סרן במינוי רס"ן.
+              במקום הדרגה המחושבת ({s.rank_name || "—"}), למשל מוביל 3 במינוי בכיר 1.
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField

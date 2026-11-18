@@ -25,6 +25,17 @@ const TASKS = [
 ];
 
 describe("ranks column", () => {
+  it("reads military rank names as the neutral names' aliases", () => {
+    const neutral = [
+      { id: "a", name: "חובה 3", sort_order: 3, aliases: ["סמל"] },
+      { id: "b", name: "חובה 4", sort_order: 4, aliases: ['סמ"ר'] },
+      { id: "c", name: "מקצועי 1", sort_order: 5, aliases: ['רס"ל'] },
+      { id: "d", name: "בכיר 1", sort_order: 13, aliases: ['רס"ן'] },
+    ];
+    expect(parseRanks('סמל - רס"ל', neutral).rankIds?.sort()).toEqual(["a", "b", "c"]);
+    expect(parseRanks('רס"ן', neutral).rankIds).toEqual(["d"]);
+    expect(parseRanks("בכיר 1", neutral).rankIds).toEqual(["d"]);
+  });
   it("all ranks / empty = no restriction", () => {
     expect(parseRanks("כלל הדרגות", RANKS).rankIds).toBeNull();
     expect(parseRanks("", RANKS).rankIds).toBeNull();
