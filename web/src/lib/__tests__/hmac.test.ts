@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePersonalNumber, soldierKey, unitKeyCheck, unitKeyProblems } from "../hmac";
+import { normalizeIdNumber, soldierKey, unitKeyCheck, unitKeyProblems } from "../hmac";
 
 describe("soldier key", () => {
   it("is HMAC-SHA256 hex (RFC 4231 test case 2)", async () => {
@@ -17,13 +17,15 @@ describe("soldier key", () => {
     const k = "unit-key-0123456789";
     expect(await unitKeyCheck(k)).not.toBe(await soldierKey(k, "1234567"));
   });
-  it("normalizes personal numbers", () => {
-    expect(normalizePersonalNumber(" 123-4567 ")).toBe("1234567");
-    expect(normalizePersonalNumber(1234567)).toBe("1234567");
-    expect(normalizePersonalNumber("0123456")).toBe("0123456");
-    expect(normalizePersonalNumber("12a4567")).toBeNull();
-    expect(normalizePersonalNumber("123")).toBeNull();
-    expect(normalizePersonalNumber(null)).toBeNull();
+  it("normalizes ID numbers with the check digit", () => {
+    expect(normalizeIdNumber(" 12345-6782 ")).toBe("123456782");
+    expect(normalizeIdNumber(123456782)).toBe("123456782");
+    expect(normalizeIdNumber("18")).toBeNull(); // too short
+    expect(normalizeIdNumber("00018")).toBe("000000018"); // leading zeros
+    expect(normalizeIdNumber("123456789")).toBeNull(); // check digit
+    expect(normalizeIdNumber("000000000")).toBeNull();
+    expect(normalizeIdNumber("12a456782")).toBeNull();
+    expect(normalizeIdNumber(null)).toBeNull();
   });
   it("rejects short unit keys", () => {
     expect(unitKeyProblems("short")).not.toBeNull();
