@@ -2593,3 +2593,54 @@ def test_add_soldier_by_hand_newcomer_rules(conn):
         acts = {a for (a,) in conn.execute("select action from audit_log where entity_id = %s", (str(sid),)).fetchall()}
         assert {"add_soldier", "remove_from_unit", "reactivate_soldier"} <= acts
         raise psycopg.Rollback()
+
+
+def test_a_released_soldier_cannot_use_the_system(conn):
+    uid, sid = _soldier_account(conn, "released.one")
+    conn.commit()
+
+    def owner(q):  # app.* functions are not granted to users; ask as the owner, same claims
+        conn.execute("reset role")
+        v = conn.execute(q).fetchone()[0]
+        conn.execute("set local role authenticated")
+        return v
+
+    mine = lambda: owner("select app.my_soldier()")
+    board = lambda: owner("select app.can_view_board()")
+    with conn.transaction():
+        conn.execute("update soldiers set release_date = (now() at time zone app.tz())::date where id = %s", (sid,))
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        # the last day of his service still counts
+        assert conn.execute("select public.my_access()").fetchone()[0] is None
+        assert mine() == sid
+        conn.execute("reset role")
+        conn.execute("update soldiers set release_date = (now() at time zone app.tz())::date - 1 where id = %s", (sid,))
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        assert conn.execute("select public.my_access()").fetchone()[0] == "released"
+        assert mine() is None
+        assert board() is False
+        assert conn.execute("select count(*) from public.my_duties()").fetchone()[0] == 0
+        conn.execute("reset role")
+        # a staff role on the same account keeps working
+        conn.execute("insert into user_roles (user_id, role) values (%s, 'viewer')", (uid,))
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        assert conn.execute("select public.my_access()").fetchone()[0] is None
+        assert board() is True
+        assert mine() is None
+        conn.execute("reset role")
+        raise psycopg.Rollback()
+    with conn.transaction():
+        conn.execute("update soldiers set is_active = false where id = %s", (sid,))  # taken out of the unit
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        assert conn.execute("select public.my_access()").fetchone()[0] == "released"
+        conn.execute("reset role")
+        conn.execute("update app_users set is_locked = true where id = %s", (uid,))
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        assert conn.execute("select public.my_access()").fetchone()[0] == "locked"
+        conn.execute("reset role")
+        raise psycopg.Rollback()
