@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { canRead, getApi, type Api, type Me, type MfaState } from "./api";
 import { forgetUnitKey } from "./hmac";
+import { clearOffline, isOfflineError, readOffline } from "./offline";
 
 /**
  * Where the signed-in user stands:
@@ -14,6 +15,8 @@ interface AuthValue {
   stage: AuthStage;
   mfa: MfaState | null;
   error: string | null;
+  /** opened without reception: "me" is the copy kept on the device, actions are off */
+  offline: boolean;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -26,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mfa, setMfa] = useState<MfaState | null>(null);
   const [stage, setStage] = useState<AuthStage>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
 
   const refresh = useCallback(async () => {
     let a = api;
@@ -38,7 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     if (!api) setApi(a);
-    const who = await a.me();
+    let who: Me | null;
+    try {
+      who = await a.me();
+    } catch (e) {
+      const copy = isOfflineError(e) ? readOffline() : null;
+      if (!copy) throw e;
+      setMe(copy.me);
+      setOffline(true);
+      return setStage("ready");
+    }
+    setOffline(false);
     setMe(who);
     if (!who) return setStage("signedOut");
     // Staff and commanders must pass a second factor; everyone else may if they set one up.
@@ -51,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     forgetUnitKey();
+    clearOffline();
     await api?.signOut();
     setMe(null);
     setStage("signedOut");
@@ -60,7 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().catch(() => setStage("signedOut"));
   }, [refresh]);
 
-  return <Ctx.Provider value={{ api, me, stage, mfa, error, refresh, signOut }}>{children}</Ctx.Provider>;
+  // reception back after opening without it: load for real
+  useEffect(() => {
+    if (!offline) return;
+    const back = () => void refresh().catch(() => undefined);
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, [offline, refresh]);
+
+  return <Ctx.Provider value={{ api, me, stage, mfa, error, offline, refresh, signOut }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {

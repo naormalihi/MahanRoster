@@ -44,11 +44,13 @@ export function EmptyState({
 
 /** A screen that could not load: the confused owl, what happened, and a retry. */
 export function ErrorState({ text, onRetry }: { text: string; onRetry?: () => void }) {
+  // no reception is not an error of the app: say so, and where the duties still are
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
   return (
     <EmptyState
-      pose="confused"
-      title="משהו לא הסתדר"
-      text={text}
+      pose={offline ? "sleep" : "confused"}
+      title={offline ? "אין חיבור" : "משהו לא הסתדר"}
+      text={offline ? 'המסך הזה צריך חיבור לאינטרנט. "התורנויות שלי" זמינות גם בלי קליטה.' : text}
       action={
         onRetry && (
           <Button variant="contained" size="small" onClick={onRetry}>

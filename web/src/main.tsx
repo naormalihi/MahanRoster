@@ -9,6 +9,11 @@ window.addEventListener("vite:preloadError", (e) => {
   (window as unknown as { __appUpdate?: () => void }).__appUpdate?.();
 });
 
+// the service worker: push, and opening "my duties" without reception (built site only)
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js").catch(() => undefined));
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppTheme>

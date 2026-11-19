@@ -25,6 +25,8 @@ import { needsAck, splitDuties, type MyDuty, type MyScore } from "../lib/me";
 import { canAskSwap, type MySwap } from "../lib/swaps";
 import { ContactCard } from "../components/ContactCard";
 import { SwapDialog, SwapsCard } from "../components/SwapDialog";
+import CloudOffIcon from "@mui/icons-material/CloudOffOutlined";
+import { isOfflineError, OfflineError, readOffline, saveOffline, savedLabel } from "../lib/offline";
 
 const ROLE: Record<MyDuty["role"], string> = { performer: "מבצע", reserve: "עתודה" };
 
@@ -166,7 +168,9 @@ function ScoreCard({ s }: { s: MyScore }) {
 
 /** The soldier's own screen (version 2.1): his next duty, his score, and all his duties. */
 export function MyPage() {
-  const { api, me } = useAuth();
+  const { api, me, offline } = useAuth();
+  // no reception: the copy kept on the device, from this time; actions are off until it is back
+  const [stale, setStale] = useState<string | null>(null);
   const [duties, setDuties] = useState<MyDuty[] | null>(null);
   const [ackError, setAckError] = useState<string | null>(null);
   // "ראיתי": marked here at once, then on the server
@@ -184,14 +188,32 @@ export function MyPage() {
   const reload = () => setTick((t) => t + 1);
 
   useEffect(() => {
+    const fromCopy = (e: unknown) => {
+      const copy = isOfflineError(e) && me ? readOffline(me.userId) : null;
+      if (!copy) return setError(isOfflineError(e) ? "אין חיבור לאינטרנט, ואין במכשיר עותק של התורנויות שלך." : (e as Error).message);
+      setDuties(copy.duties);
+      setStale(copy.savedAt);
+    };
+    if (offline) return fromCopy(new OfflineError());
     Promise.all([api!.myDuties(), api!.myScores()])
       .then(([d, s]) => {
         setDuties(d);
         setScores(s);
+        setStale(null);
+        setError(null);
+        if (me) saveOffline(me, d);
       })
-      .catch((e) => setError((e as Error).message));
+      .catch(fromCopy);
     api!.mySwaps().then(setSwaps, () => setSwaps([]));
-  }, [api, tick]);
+  }, [api, me, offline, tick]);
+
+  // reception back while a copy is shown: load again
+  useEffect(() => {
+    if (!stale) return;
+    const back = () => setTick((t) => t + 1);
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, [stale]);
 
   if (error) return <ErrorState text={error} onRetry={() => window.location.reload()} />;
   if (!duties)
@@ -221,8 +243,13 @@ export function MyPage() {
       {/* on a wide screen: the duties on the main side, the score and the settings beside them */}
       <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 3fr) minmax(0, 2fr)" } }}>
       <Stack spacing={2} sx={{ minWidth: 0 }}>
-      <SwapsCard swaps={swaps} onChange={reload} />
-      {(() => {
+      {stale && (
+        <Alert severity="warning" icon={<CloudOffIcon />}>
+          <b>אין חיבור</b> – מוצג מצב מ-{savedLabel(stale)}. אישור, בקשה או החלפה – כשהחיבור יחזור.
+        </Alert>
+      )}
+      {!stale && <SwapsCard swaps={swaps} onChange={reload} />}
+      {!stale && (() => {
         const waiting = (duties ?? []).filter((d) => needsAck(d, Date.now()));
         if (waiting.length < 2) return null;
         return (
@@ -248,7 +275,7 @@ export function MyPage() {
           <Typography variant="subtitle2" color="text.secondary">
             התורנות הבאה · {dayLabel(next.starts_at)}
           </Typography>
-          <DutyRow d={next} open onToggle={() => undefined} onSwap={setSwapping} onAck={ack} />
+          <DutyRow d={next} open onToggle={() => undefined} onSwap={stale ? undefined : setSwapping} onAck={stale ? undefined : ack} />
         </Paper>
       ) : (
         <EmptyState pose="sleep" title="אין לך תורנויות קרובות" text="כשיתפרסם לוח חדש, התורנויות שלך יופיעו כאן ותקבל התראה." />
@@ -261,7 +288,7 @@ export function MyPage() {
           </Typography>
           <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
             {upcoming.slice(1).map((d) => (
-              <DutyRow key={d.assignment_id} d={d} open={open === d.assignment_id} onToggle={() => toggle(d.assignment_id)} onSwap={setSwapping} onAck={ack} />
+              <DutyRow key={d.assignment_id} d={d} open={open === d.assignment_id} onToggle={() => toggle(d.assignment_id)} onSwap={stale ? undefined : setSwapping} onAck={stale ? undefined : ack} />
             ))}
           </Stack>
         </Paper>

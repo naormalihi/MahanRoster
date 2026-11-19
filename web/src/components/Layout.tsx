@@ -404,8 +404,30 @@ export function Layout({ children }: { children: ReactNode }) {
       </Box>
       {/* back to the app after a while: the screen loads its data again */}
       <Container key={returned} maxWidth="lg" sx={{ py: 3, px: { xs: 2, sm: 3 } }}>
+        <OfflineStrip />
         {children}
       </Container>
+    </Box>
+  );
+}
+
+/** Without reception, a line above every screen; "my duties" show the copy kept on the device. */
+function OfflineStrip() {
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine !== false);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+  if (online) return null;
+  return (
+    <Box role="status" sx={{ mb: 2, px: 1.5, py: 0.75, borderRadius: 1, bgcolor: "warning.main", color: "warning.contrastText", fontWeight: 600, fontSize: 14, "@media print": { display: "none" } }}>
+      אין חיבור לאינטרנט – פעולות יחכו לחיבור.
     </Box>
   );
 }
