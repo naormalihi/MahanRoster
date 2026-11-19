@@ -23,6 +23,7 @@ import { PushControl } from "../components/NotificationBell";
 import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
 import { needsAck, splitDuties, type MyDuty, type MyScore } from "../lib/me";
 import { canAskSwap, type MySwap } from "../lib/swaps";
+import { ContactCard } from "../components/ContactCard";
 import { SwapDialog, SwapsCard } from "../components/SwapDialog";
 
 const ROLE: Record<MyDuty["role"], string> = { performer: "מבצע", reserve: "עתודה" };
@@ -310,6 +311,7 @@ export function MyPage() {
       <Typography variant="caption" color="text.secondary">
         פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". החלפה – בלחיצה על התורנות, עד 24 שעות לפניה; אחר כך פונים לנע"ת התורנויות.
       </Typography>
+      <ContactCard />
       {swapping && (
         <SwapDialog
           duty={swapping}

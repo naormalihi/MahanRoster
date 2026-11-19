@@ -1,5 +1,6 @@
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { DutyMessage } from "./dutyMessage";
+import type { ContactEntry, MyContact } from "./contacts";
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 /**
@@ -161,6 +162,10 @@ export interface Api {
   /** keep the chosen look with the account */
   setMyTheme(choice: "auto" | "light" | "dark"): Promise<void>;
   setMyRequestAlerts(on: boolean): Promise<void>;
+  /** "למי לפנות": up to two of נע"ת / מ"מ and the commander of my gaf, as נע"ת chose */
+  myContacts(): Promise<MyContact[]>;
+  soldierContactsList(): Promise<ContactEntry[]>;
+  setSoldierContacts(list: { user_id: string; display_name: string; phone: string | null }[]): Promise<void>;
   unitKeyCheck(): Promise<string | null>;
   /** one soldier by hand (the ת.ז already hashed); an existing one is reported, not duplicated */
   addSoldier(row: AddSoldierRow): Promise<AddSoldierResult>;

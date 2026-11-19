@@ -2785,4 +2785,47 @@ def test_new_exemption_request_alerts_staff_grouped(conn):
         assert pp["title"] == "עוד 3 בקשות פטור ממתינות" and pp["cycle_id"] == str(cyc)
         assert conn.execute("select count(*) from notifications where type = 'exemption_pending' and recipient_user_id in (%s, %s)",
                             (cmd, cmd2)).fetchone()[0] == 0
+
+
+def test_soldier_contacts_show_only_the_chosen(conn):
+    uid, sid = _soldier_account(conn, "contacts.me")
+    with conn.transaction():
+        gaf = conn.execute("select gaf_id from soldiers where id = %s", (sid,)).fetchone()[0]
+        other = conn.execute("select id from org_units where kind = 'gaf' and id <> %s limit 1", (gaf,)).fetchone()[0]
+        cmds = []
+        for n, g in (("ct.cmd", gaf), ("ct.cmd2", other)):
+            u = conn.execute("select app.create_auth_user(%s, 'x-long-password')", (n + "@users.invalid",)).fetchone()[0]
+            conn.execute("insert into app_users (id, username) values (%s, %s)", (u, n))
+            conn.execute("insert into user_roles (user_id, role, gaf_id) values (%s, 'gaf_commander', %s)", (u, g))
+            cmds.append(u)
+        conn.execute("set local role authenticated")
+        # nothing chosen: nothing shown
+        _claims(conn, uid, aal="aal1")
+        assert conn.execute("select count(*) from public.my_contacts()").fetchone()[0] == 0
+        # a soldier cannot set the list; נע"ת can
+        with pytest.raises(psycopg.Error):
+            with conn.transaction():
+                conn.execute("select public.set_soldier_contacts('[]')")
+        _claims(conn, COORD)
+        with pytest.raises(psycopg.Error, match="לא תקין"):
+            with conn.transaction():
+                conn.execute("select public.set_soldier_contacts(%s)", (json.dumps([{"user_id": str(COORD), "display_name": "נעת", "phone": "123"}]),))
+        with pytest.raises(psycopg.Error, match="פעיל"):
+            with conn.transaction():
+                conn.execute("select public.set_soldier_contacts(%s)", (json.dumps([{"user_id": str(uid), "display_name": "חייל"}]),))
+        n = conn.execute("select public.set_soldier_contacts(%s)", (json.dumps([
+            {"user_id": str(COORD), "display_name": "נע\"ת לדוגמה", "phone": "050-000-0001"},
+            {"user_id": str(DEPUTY_ACTIVE), "display_name": "מ\"מ לדוגמה"},
+            {"user_id": str(cmds[0]), "display_name": "מפקד גף א", "phone": "0500000003"},
+            {"user_id": str(cmds[1]), "display_name": "מפקד גף ב", "phone": "0500000004"},
+        ]),)).fetchone()[0]
+        assert n == 4
+        # the soldier: נע"ת, מ"מ and his own gaf's commander – not the other gaf's
+        _claims(conn, uid, aal="aal1")
+        rows = conn.execute("select display_name, role_label, phone, kind from public.my_contacts()").fetchall()
+        assert rows == [("נע\"ת לדוגמה", "נע\"ת התורנויות", "972500000001", "staff"),
+                        ("מ\"מ לדוגמה", "ממלא מקום נע\"ת", None, "staff"),
+                        ("מפקד גף א", "מפקד הגף", "972500000003", "gaf")]
+        # the list itself is staff only
+        assert conn.execute("select count(*) from public.soldier_contacts_list()").fetchone()[0] == 0
         raise psycopg.Rollback()

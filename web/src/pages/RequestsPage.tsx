@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../lib/auth";
 import { STATUS_LABEL, type RequestStatus } from "../lib/cycles";
 import { dayKey, dayLabel } from "../lib/dates";
+import { ContactCard } from "../components/ContactCard";
 import { entryOpen, requestsByCycle, type InputCycle, type InputOptions, type MyRequests } from "../lib/me";
 
 const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "default"> = {
@@ -279,6 +280,7 @@ export function RequestsPage() {
           </Paper>
         );
       })}
+      {groups.some((g) => g.cycle && !g.cycle.open) && <ContactCard note='המועד נסגר? חסימה, היעדרות או פטור דחוף – דרך נע"ת.' />}
 
       {form && (
         <Dialog open onClose={() => setForm(null)} fullWidth maxWidth="xs">
@@ -326,7 +328,7 @@ export function RequestsPage() {
                 </Alert>
               )}
               {formUrgent && <Alert severity="warning">התאריכים אחרי מועד סגירת האילוצים – הבקשה תסומן דחופה.</Alert>}
-              {formClosed && <Alert severity="warning">איסוף האילוצים לתאריכים האלה נסגר – פנה לנע"ת.</Alert>}
+              {formClosed && <Alert severity="warning">איסוף האילוצים לתאריכים האלה נסגר – פנה לנע"ת (פרטי הקשר בתחתית המסך).</Alert>}
               {formError && <Alert severity="error">{formError}</Alert>}
             </Stack>
           </DialogContent>
