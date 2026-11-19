@@ -37,6 +37,8 @@ import { useCycle } from "../lib/cycleContext";
 import { dayKey, dayLabel, timeLabel } from "../lib/dates";
 import { announceBoardChange, SlotActionsDialog } from "../components/SlotActions";
 import { AssignDialog } from "./DraftPage";
+import { NoAccountStrip } from "../components/NoAccountDialog";
+import { isStaff } from "../lib/api";
 import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import MoreIcon from "@mui/icons-material/MoreHoriz";
@@ -249,7 +251,7 @@ const performs = (a: DraftAssignment) => a.role === "performer" || a.status === 
 
 export function OperatePage() {
   const narrow = useNarrow();
-  const { api } = useAuth();
+  const { api, me } = useAuth();
   const { cycle, cycleId } = useCycle();
   const [tasks, setTasks] = useState<TaskType[]>([]);
   const [soldiers, setSoldiers] = useState<Map<string, ExistingSoldier>>(new Map());
@@ -363,6 +365,7 @@ export function OperatePage() {
 
   return (
     <Stack spacing={2}>
+      {cycleId && cycle?.status === "published" && isStaff(me) && <NoAccountStrip cycleId={cycleId} />}
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={2}>
           <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>

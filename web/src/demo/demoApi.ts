@@ -8,9 +8,10 @@
  */
 
 import type { AddSoldierResult, AddSoldierRow } from "../lib/addSoldier";
+import type { DutyMessage } from "../lib/dutyMessage";
 import type { MyDuty, UnackedDuty } from "../lib/me";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
-import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, RankItem, Role, SlotPeople, SlotPerson } from "../lib/api";
+import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople, SlotPerson } from "../lib/api";
 import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
   absenceSpan,
@@ -1551,13 +1552,72 @@ export class DemoApi implements Api {
       if (t < now || t > now + hours * 3600_000) continue;
       r.performers.forEach((name, i) => {
         const s = this.soldierList.find((x) => x.full_name === name);
-        const id = `${r.slot_id}-${i}`;
+        const id = `bp|${r.slot_id}|p${i}`;
         if (!s || this.acked.has(id) || (s.full_name.length + i) % 3 !== 0) return; // a few, fictitious
         out.push({ assignment_id: id, soldier_id: s.id, full_name: s.full_name, gaf_name: s.gaf_name, has_account: s.full_name.length % 2 === 0,
                    phone: s.phone ?? null, task_name: r.task_name, role: "performer", starts_at: r.starts_at, ends_at: r.ends_at, reminded: t - now < 48 * 3600_000 });
       });
     }
     return out.slice(0, 8);
+  }
+
+  private demoMessaged = new Set<string>();
+
+  async dutyMessage(q: { soldierId?: string; assignmentId?: string; cycleId?: string }): Promise<DutyMessage> {
+    await delay();
+    const now = Date.now();
+    const found: { row: BoardRow; p: SlotPerson }[] = [];
+    let name = q.soldierId ? this.soldierList.find((s) => s.id === q.soldierId)?.full_name : undefined;
+    for (const row of this.boardRows) {
+      for (const p of this.peopleOf(row)) {
+        if (q.assignmentId ? p.id === q.assignmentId : p.name === name && Date.parse(row.ends_at) > now && p.status !== "dropped") found.push({ row, p });
+      }
+    }
+    if (q.assignmentId && !found.length) {
+      // an assignment of a cycle's own slots (operations), not of the demo board
+      const a = this.draft.find((x) => x.id === q.assignmentId);
+      const k = a && [...this.slotsByCycle.values()].flat().find((x) => x.id === a.slot_id);
+      if (a && k) {
+        const row = { slot_id: k.id, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "", starts_at: k.starts_at, ends_at: k.ends_at } as BoardRow;
+        found.push({ row, p: { id: a.id, name: this.soldierList.find((x) => x.id === a.soldier_id)?.full_name ?? "", role: a.role, status: a.status, replaced_id: null } });
+      }
+    }
+    if (q.assignmentId) name = found[0]?.p.name;
+    const s = this.soldierList.find((x) => x.full_name === name);
+    if (!s) throw new Error("החייל לא נמצא");
+    const has_account = [...this.accounts.values()].includes(s.id);
+    const code = has_account ? null : (await this.createSoldierInvites([s.id], 30))[0]?.code ?? null;
+    this.demoMessaged.add(s.id);
+    return {
+      soldier_id: s.id,
+      full_name: s.full_name,
+      phone: s.phone ?? null,
+      has_account,
+      code,
+      duties: found
+        .sort((a, b) => a.row.starts_at.localeCompare(b.row.starts_at))
+        .map(({ row, p }) => ({ assignment_id: p.id, task_name: row.task_name, role: p.role, starts_at: row.starts_at, ends_at: row.ends_at,
+                               brief: row.task_name.includes("מטבח") ? "התייצבות באותו יום 07:30, חדר האוכל" : null })),
+    };
+  }
+
+  async noAccountDuties(_cycleId: string): Promise<NoAccountRow[]> {
+    await delay();
+    const now = Date.now();
+    const linked = new Set(this.accounts.values());
+    const by = new Map<string, NoAccountRow>();
+    for (const row of this.boardRows) {
+      if (Date.parse(row.ends_at) <= now) continue;
+      for (const p of this.peopleOf(row)) {
+        const s = this.soldierList.find((x) => x.full_name === p.name);
+        if (!s || linked.has(s.id) || p.status === "dropped") continue;
+        const r = by.get(s.id) ?? { soldier_id: s.id, full_name: s.full_name, gaf_name: s.gaf_name, phone: s.phone ?? null, duties: 0, first_at: row.starts_at, sent: this.demoMessaged.has(s.id) };
+        r.duties++;
+        if (row.starts_at < r.first_at) r.first_at = row.starts_at;
+        by.set(s.id, r);
+      }
+    }
+    return [...by.values()].sort((a, b) => (a.gaf_name ?? "").localeCompare(b.gaf_name ?? "", "he") || a.full_name.localeCompare(b.full_name, "he"));
   }
 
   async myScores() {

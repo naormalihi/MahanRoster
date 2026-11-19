@@ -54,6 +54,8 @@ import type { Cycle } from "../lib/cycles";
 import { TZ, dayKey } from "../lib/dates";
 import { fairRows, shortGroupName, verdicts, type FairRow } from "../lib/fairness";
 import { SlotActionsDialog } from "../components/SlotActions";
+import { NoAccountDialog } from "../components/NoAccountDialog";
+import { isStaff } from "../lib/api";
 import {
   ROLE_LABEL,
   byProfile,
@@ -1149,6 +1151,19 @@ function DraftBody(props: {
   const [onlyOut, setOnlyOut] = useState(false);
   const [soldier, setSoldier] = useState<string | null>(null);
   const [idleOpen, setIdleOpen] = useState(false);
+  // published: soldiers with duties and no account – they get no notification, so a WhatsApp each
+  const { api, me } = useAuth();
+  const [noAccount, setNoAccount] = useState<{ total: number; left: number } | null>(null);
+  const [noAccountOpen, setNoAccountOpen] = useState(false);
+  const cycleIdForMsg = ctx.cycle.id;
+  const canMessage = props.ctx.operate && isStaff(me);
+  useEffect(() => {
+    if (!canMessage || noAccountOpen) return;
+    api!.noAccountDuties(cycleIdForMsg).then(
+      (r) => setNoAccount({ total: r.length, left: r.filter((x) => !x.sent).length }),
+      () => setNoAccount(null),
+    );
+  }, [api, canMessage, cycleIdForMsg, noAccountOpen]);
   const idleCount = fair.idle.reduce((n, g) => n + g.ids.length, 0);
   const manual = ctx.assignments.filter((a) => a.source === "manual").length;
   const gaps = props.missing + props.missingR;
@@ -1227,6 +1242,14 @@ function DraftBody(props: {
               : undefined
           }
         />
+        {noAccount && noAccount.total > 0 && (
+          <Tile
+            tone={noAccount.left ? "warning" : "success"}
+            title="בלי חשבון – וואטסאפ"
+            value={noAccount.left ? `${noAccount.left} לא נשלחו` : "✓ נשלח לכולם"}
+            onClick={() => setNoAccountOpen(true)}
+          />
+        )}
         {!props.published && (
           <Box sx={{ display: "flex", alignItems: "center", flex: "1 0 auto", justifyContent: "flex-end" }}>
             <Button variant="contained" startIcon={<PublishIcon />} onClick={props.onPublish}>
@@ -1257,6 +1280,7 @@ function DraftBody(props: {
         <LoadTab ctx={ctx} fair={fair} q={q} onlyOut={onlyOut} setOnlyOut={setOnlyOut} onOpen={setSoldier} />
       )}
 
+      {noAccountOpen && <NoAccountDialog cycleId={cycleIdForMsg} onClose={() => setNoAccountOpen(false)} />}
       {idleOpen && (
         <IdleDialog
           fair={fair}
@@ -1291,7 +1315,7 @@ function DraftBody(props: {
 }
 
 export function DraftPage() {
-  const { api } = useAuth();
+  const { api, me } = useAuth();
   const canEdit = useCanEdit();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle } = useCycle();
@@ -1306,6 +1330,7 @@ export function DraftPage() {
   const [publishing, setPublishing] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  const [messaging, setMessaging] = useState(false);
 
   useEffect(() => {
     api!.scoringSettings().then((x) => setTolerance(x.fairness_tolerance_pct), () => undefined);
@@ -1361,7 +1386,19 @@ export function DraftPage() {
 
   return (
     <Stack spacing={2}>
-      <PublishedDialog open={celebrate} onClose={() => setCelebrate(false)} />
+      <PublishedDialog
+        open={celebrate}
+        onClose={() => setCelebrate(false)}
+        onMessage={
+          isStaff(me)
+            ? () => {
+                setCelebrate(false);
+                setMessaging(true);
+              }
+            : undefined
+        }
+      />
+      {messaging && cycle && <NoAccountDialog cycleId={cycle.id} onClose={() => setMessaging(false)} />}
       {msg && (
         <Alert severity={msg.ok ? "success" : "error"} onClose={() => setMsg(null)}>
           {msg.text}
@@ -1413,7 +1450,7 @@ export function DraftPage() {
 }
 
 /** Once, right after publishing: Turanchik cheers, and what happens next. */
-export function PublishedDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function PublishedDialog({ open, onClose, onMessage }: { open: boolean; onClose: () => void; onMessage?: () => void }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogContent sx={{ textAlign: "center", pt: 3 }}>
@@ -1425,7 +1462,12 @@ export function PublishedDialog({ open, onClose }: { open: boolean; onClose: () 
           הוא מופיע עכשיו ב&quot;לוח התורנויות&quot; לכל מי שיש לו גישה, והחיילים עם חשבון אישי קיבלו התראה. משלב זה שינויים נעשים בתפעול.
         </Typography>
       </DialogContent>
-      <DialogActions sx={{ justifyContent: "center", pb: 2 }}>
+      <DialogActions sx={{ justifyContent: "center", pb: 2, flexWrap: "wrap", gap: 1 }}>
+        {onMessage && (
+          <Button variant="outlined" color="success" onClick={onMessage}>
+            וואטסאפ למי שאין לו חשבון
+          </Button>
+        )}
         <Button variant="contained" onClick={onClose}>
           מעולה
         </Button>

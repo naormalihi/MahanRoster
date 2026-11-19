@@ -19,7 +19,8 @@ import {
   useTheme,
 } from "@mui/material";
 import { useEffect, useState } from "react";
-import type { SlotPeople, SlotPerson } from "../lib/api";
+import { isStaff, type SlotPeople, type SlotPerson } from "../lib/api";
+import { DutyWhatsAppButton } from "./DutyWhatsApp";
 import { useAuth } from "../lib/auth";
 import { dayLabel, timeLabel } from "../lib/dates";
 
@@ -117,7 +118,8 @@ export function ActivateDialog(props: {
  * board and from the operations screen.
  */
 export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: string; onClose: () => void; onChanged: () => void }) {
-  const { api } = useAuth();
+  const { api, me } = useAuth();
+  const staff = isStaff(me);
   const phone = useMediaQuery(useTheme().breakpoints.down("sm"));
   const [data, setData] = useState<SlotPeople | null | undefined>(undefined);
   const [activating, setActivating] = useState<SlotPerson | null>(null);
@@ -245,6 +247,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
                       <Chip size="small" color="warning" variant="outlined" label={`עתודה שהופעלה${p.replaced_id ? ` · במקום ${byId.get(p.replaced_id)?.name ?? ""}` : ""}`} />
                     )}
                     <Box sx={{ flex: 1 }} />
+                    {data.slot.published && !ended && staff && <DutyWhatsAppButton compact query={{ assignmentId: p.id }} name={p.name} onError={setError} />}
                     {p.status === "reserve_activated" && !started && (
                       <Button size="small" startIcon={<UndoIcon />} onClick={() => undo(p)} disabled={busy}>
                         ביטול הפעלה
@@ -276,6 +279,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
                   <Stack key={p.id} direction="row" spacing={1} sx={{ alignItems: "center", py: 0.25 }}>
                     <Typography>{p.name}</Typography>
                     <Box sx={{ flex: 1 }} />
+                    {data.slot.published && !ended && staff && <DutyWhatsAppButton compact query={{ assignmentId: p.id }} name={p.name} onError={setError} />}
                     {data.slot.published && !ended && openPerformers.length > 0 && (
                       <Button size="small" variant="contained" color="warning" startIcon={<BoltIcon />} onClick={() => setActivating(p)}>
                         הפעלת עתודה

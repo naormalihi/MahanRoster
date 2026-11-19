@@ -2688,4 +2688,51 @@ def test_a_released_soldier_cannot_use_the_system(conn):
         _claims(conn, uid, aal="aal1")
         assert conn.execute("select public.my_access()").fetchone()[0] == "locked"
         conn.execute("reset role")
+
+
+def test_duty_message_for_soldier_without_account(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() - interval '1 hour' where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        conn.execute("update task_types set briefing = %s where id = %s",
+                     ('{"kind": "report", "rule": "same_day", "time": "07:30", "place": "שער ראשי"}', tid))
+        slot = lambda h: conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                                      "(%s, %s, now() + make_interval(hours => %s), now() + make_interval(hours => %s + 8)) returning id",
+                                      (cycle, tid, h, h)).fetchone()[0]
+        s1, s2 = slot(30), slot(100)
+        free = conn.execute("select id from soldiers s where is_active and not exists "
+                            "(select 1 from app_users u where u.soldier_id = s.id) order by id limit 1").fetchone()[0]
+        put = lambda k, role: conn.execute(
+            "insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) "
+            "select %s, id, gaf_id, %s, %s, 'manual', 'בדיקה', 1, 1 from soldiers where id = %s returning id",
+            (k, role, 'assigned' if role == 'performer' else 'reserve_idle', free)).fetchone()[0]
+        a1, a2 = put(s1, 'performer'), put(s2, 'reserve')
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        # after publishing: he is on the list, not yet sent
+        rows = {r[0]: r for r in conn.execute("select soldier_id, duties, sent from public.no_account_duties(%s)", (cycle,)).fetchall()}
+        assert rows[free][1] >= 2 and rows[free][2] is False
+        # one message for the cycle: both duties, the briefing line, and a code
+        m = conn.execute("select public.duty_message(%s, null, %s)", (free, cycle)).fetchone()[0]
+        ids = [d["assignment_id"] for d in m["duties"]]
+        assert str(a1) in ids and str(a2) in ids and m["has_account"] is False
+        assert len(m["code"]) == 11 and m["code"][5] == "-"
+        d1 = next(d for d in m["duties"] if d["assignment_id"] == str(a1))
+        assert d1["role"] == "performer" and d1["brief"].startswith("התייצבות") and "שער ראשי" in d1["brief"]
+        # the code works (its hash), and the list now says sent
+        code = m["code"]
+        conn.execute("reset role")
+        assert conn.execute("select count(*) from soldier_invites where soldier_id = %s and used_at is null and revoked_at is null "
+                            "and code_hash = app.invite_hash(%s)", (free, code)).fetchone()[0] == 1
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        assert conn.execute("select sent from public.no_account_duties(%s) where soldier_id = %s", (cycle, free)).fetchone()[0] is True
+        # one duty: only that one; a second message replaces the code
+        m2 = conn.execute("select public.duty_message(null, %s)", (a2,)).fetchone()[0]
+        assert [d["assignment_id"] for d in m2["duties"]] == [str(a2)] and m2["duties"][0]["role"] == "reserve"
+        assert m2["code"] != code
+        conn.execute("reset role")
+        assert conn.execute("select count(*) from soldier_invites where soldier_id = %s and used_at is null and revoked_at is null",
+                            (free,)).fetchone()[0] == 1
         raise psycopg.Rollback()
