@@ -5,6 +5,7 @@ import { EmptyState, greeting } from "../components/EmptyState";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { isStaff, type BoardRow } from "../lib/api";
+import { mfaResetters } from "../lib/users";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
@@ -53,6 +54,13 @@ export function HomePage() {
       .catch(() => setOrphans([]));
   }, [api, staff, cycles]);
 
+  // a single נע"ת who loses his phone has no one to reset his two-step login
+  const [resetters, setResetters] = useState<number | null>(null);
+  useEffect(() => {
+    if (!staff) return;
+    api!.listUsers().then((u) => setResetters(mfaResetters(u).length), () => setResetters(null));
+  }, [api, staff]);
+
   useEffect(() => {
     const now = new Date();
     api!.board(now.toISOString(), addDays(now, 7).toISOString()).then(setWeek).catch(() => setWeek([]));
@@ -95,6 +103,19 @@ export function HomePage() {
             ))}
             {orphans.length > 6 && <li>ועוד {orphans.length - 6}</li>}
           </Box>
+        </Alert>
+      )}
+
+      {resetters !== null && resetters <= 1 && (
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" component={RouterLink} to="/admin?tab=users">
+              משתמשים
+            </Button>
+          }
+        >
+          כדאי למנות נע״ת או מ״מ נוסף: אם תחליף טלפון, הוא יוכל לאפס לך את האימות הדו-שלבי.
         </Alert>
       )}
 

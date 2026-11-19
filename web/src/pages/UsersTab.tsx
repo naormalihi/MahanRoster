@@ -1,6 +1,7 @@
 import AddIcon from "@mui/icons-material/PersonAddAlt1Outlined";
 import CopyIcon from "@mui/icons-material/ContentCopyOutlined";
 import KeyIcon from "@mui/icons-material/KeyOutlined";
+import PhonelinkIcon from "@mui/icons-material/PhonelinkLockOutlined";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
@@ -160,6 +161,8 @@ export function UsersTab() {
   const [reset, setReset] = useState<{ user: AppUser; password: string; done: boolean } | null>(null);
   const [linking, setLinking] = useState<{ user: AppUser; soldier: string | null } | null>(null);
   const [deleting, setDeleting] = useState<AppUser | null>(null);
+  const [mfaReset, setMfaReset] = useState<AppUser | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -193,6 +196,11 @@ export function UsersTab() {
         </Button>
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
+      {notice && (
+        <Alert severity="success" onClose={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      )}
       {(users ?? [])
         .filter((u) => !u.is_locked && u.roles.some((r) => r.role === "viewer"))
         .map((u) => (
@@ -241,6 +249,14 @@ export function UsersTab() {
                   <Tooltip title="סיסמה זמנית חדשה">
                     <IconButton size="small" aria-label="סיסמה זמנית חדשה" onClick={() => setReset({ user: u, password: tempPassword(), done: false })}>
                       <KeyIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {/* a new phone: another נע"ת or מ"מ removes the two-step login; he sets it up again when he signs in */}
+                {!self && u.has_mfa && (
+                  <Tooltip title="איפוס אימות דו-שלבי (טלפון חדש)">
+                    <IconButton size="small" aria-label="איפוס אימות דו-שלבי" onClick={() => setMfaReset(u)}>
+                      <PhonelinkIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 )}
@@ -327,6 +343,37 @@ export function UsersTab() {
         })()
       )}
 
+      {mfaReset && (
+        <Dialog open onClose={() => setMfaReset(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>איפוס אימות דו-שלבי</DialogTitle>
+          <DialogContent dividers>
+            <Typography>
+              לאפס את האימות הדו-שלבי של <b>{mfaReset.username}</b>
+              {mfaReset.soldier_name ? ` (${mfaReset.soldier_name})` : ""}?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              מתאים כשהוא החליף טלפון או מחק את אפליקציית האימות. הוא יוצא מכל המכשירים, ובכניסה הבאה – עם הסיסמה שלו – יסרוק קוד QR חדש.
+              ודא קודם, בטלפון או פנים מול פנים, שזה באמת הוא שביקש. האיפוס נרשם ביומן ושאר הסגל מקבל עדכון.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setMfaReset(null)}>ביטול</Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                const u = mfaReset;
+                setMfaReset(null);
+                void act(async () => {
+                  await api!.resetUserMfa(u.user_id);
+                  setNotice(`האימות של ${u.username} אופס. בכניסה הבאה הוא יגדיר אותו מחדש.`);
+                });
+              }}
+            >
+              איפוס
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       {deleting && (
         <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
           <DialogTitle>מחיקת משתמש</DialogTitle>
