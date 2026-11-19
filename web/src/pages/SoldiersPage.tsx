@@ -46,6 +46,8 @@ import { useAuth } from "../lib/auth";
 import { isStaff } from "../lib/api";
 import { accountLabel, type SoldierAccount } from "../lib/me";
 import { InviteDialog } from "../components/InviteDialog";
+import { AddSoldierDialog } from "../components/AddSoldierDialog";
+import PersonAddIcon from "@mui/icons-material/PersonAddAlt1Outlined";
 import { formatPhone, normalizePhone } from "../lib/phone";
 import {
   activeLoadRole,
@@ -125,6 +127,24 @@ function EditDialog(props: {
   const { api } = useAuth();
   const s = props.soldier;
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
+  // taking him out of the unit: the day, and how many of his duties that drops
+  const [leaving, setLeaving] = useState<{ from: string; duties: number } | null>(null);
+  async function startLeaving(from = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jerusalem" })) {
+    const duties = await api!.futureDuties(s.id, from).catch(() => 0);
+    setLeaving({ from, duties });
+  }
+  async function leave() {
+    if (!leaving) return;
+    setBusy(true);
+    try {
+      await api!.removeFromUnit(s.id, leaving.from);
+      props.onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const [p, setP] = useState<Required<SoldierPatch>>({
     range_valid_until: s.range_valid_until,
     appointment_rank_id: s.appointment_rank_id,
@@ -438,15 +458,44 @@ function EditDialog(props: {
             </Stack>
           </Box>
           <Divider />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={p.is_active}
-                onChange={(e) => set("is_active", e.target.checked)}
-              />
-            }
-            label="פעיל ביחידה"
-          />
+          {s.is_active ? (
+            <Box>
+              {!leaving ? (
+                <Button color="error" variant="outlined" size="small" onClick={() => void startLeaving()}>
+                  הוצאה מהיחידה
+                </Button>
+              ) : (
+                <Alert severity="warning" icon={false}>
+                  <Stack spacing={1.5}>
+                    <Typography variant="body2">
+                      מתאריך היציאה החייל לא פעיל.
+                      {leaving.duties > 0
+                        ? ` יש לו ${leaving.duties} תורנויות מאותו יום – הן יורדות ממנו ויסומנו כמשבצות שצריך לאייש (הוא יקבל עדכון).`
+                        : " אין לו תורנויות מאותו יום."}
+                    </Typography>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
+                      <TextField
+                        type="date"
+                        size="small"
+                        label="תאריך יציאה"
+                        value={leaving.from}
+                        onChange={(e) => void startLeaving(e.target.value)}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                      <Button color="error" variant="contained" size="small" disabled={busy} onClick={() => void leave()}>
+                        הוצאה
+                      </Button>
+                      <Button size="small" onClick={() => setLeaving(null)}>
+                        ביטול
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Alert>
+              )}
+            </Box>
+          ) : (
+            <FormControlLabel control={<Switch checked={p.is_active} onChange={(e) => set("is_active", e.target.checked)} />} label="להחזיר ליחידה" />
+          )}
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
@@ -510,6 +559,8 @@ export function SoldiersPage() {
   const staffUser = isStaff(me);
   const [accounts, setAccounts] = useState<Map<string, SoldierAccount>>(new Map());
   const [inviting, setInviting] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<{ id: string; name: string } | null>(null);
   const loadAccounts = useCallback(async () => {
     if (!staffUser) return;
     const a = await api!.soldierAccounts().catch(() => [] as SoldierAccount[]);
@@ -815,6 +866,11 @@ export function SoldiersPage() {
         <Typography variant="h1" sx={{ flex: 1 }}>
           כוח אדם
         </Typography>
+        {staffUser && (
+          <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={() => setAdding(true)}>
+            הוספת חייל
+          </Button>
+        )}
         <Button
           variant="contained"
           startIcon={<UploadIcon />}
@@ -824,6 +880,26 @@ export function SoldiersPage() {
           טעינת כוח אדם
         </Button>
       </Stack>
+      {added && (
+        <Alert
+          severity="success"
+          onClose={() => setAdded(null)}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => {
+                setSelected(new Set([added.id]));
+                setInviting(true);
+              }}
+            >
+              קוד הצטרפות
+            </Button>
+          }
+        >
+          {added.name} נוסף לכוח האדם.
+        </Alert>
+      )}
       {rows && (
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
           {/* each count is a filter; a second click (or "פעילים") clears it */}
@@ -1463,6 +1539,16 @@ export function SoldiersPage() {
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
+            await load();
+          }}
+        />
+      )}
+      {adding && (
+        <AddSoldierDialog
+          onClose={() => setAdding(false)}
+          onAdded={async (id, name) => {
+            setAdding(false);
+            setAdded({ id, name });
             await load();
           }}
         />

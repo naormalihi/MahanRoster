@@ -50,7 +50,7 @@ export const REASON_LABEL: Record<string, string> = {
   weapon_range: "מטווח לא בתוקף ביום התורנות",
   not_enlisted: "לפני תאריך הגיוס",
   released: "אחרי תאריך השחרור",
-  grace: "תקופת הכשרה לחייל חדש",
+  grace: "חדש ביחידה (תקופת חסד)",
   exemption: "פטור מאושר",
   absence: "היעדרות",
   date_block: "חסימת תאריך",

@@ -2048,7 +2048,7 @@ def test_call_up_by_notice(conn):
         conn.execute("update cycles set status = 'published', published_at = now() - interval '10 days' where id = %s", (cycle,))
         tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
         m = float(conn.execute("select coalesce((app.setting('surprise_multiplier') #>> '{}')::numeric, 1)").fetchone()[0])
-        a, b, c = [r[0] for r in conn.execute("select id from soldiers where is_active order by id desc limit 3").fetchall()]
+        a, b, c = [r[0] for r in conn.execute("select id from soldiers where is_active and (unit_join_date is null or unit_join_date < current_date - 400) order by id desc limit 3").fetchall()]
 
         def slot(hours):
             return conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
@@ -2544,4 +2544,52 @@ def test_coordinator_does_not_decide_his_own_exemption(conn):
                 conn.execute("update exemptions set status = 'approved', proof_checked_at = now() where id = %s", (ex,))
         _claims(conn, DEPUTY_ACTIVE)
         conn.execute("update exemptions set status = 'approved', proof_checked_at = now() where id = %s", (ex,))
+        raise psycopg.Rollback()
+
+
+def test_add_soldier_by_hand_newcomer_rules(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        if not conn.execute("select 1 from roster_imports where kind = 'roster' and status = 'applied'").fetchone():
+            conn.execute("insert into roster_imports (kind, status, summary, created_at) values ('roster', 'applied', '{}', now() - interval '1 day')")
+        gaf, rank = conn.execute("select gaf_id, computed_rank_id from soldiers where is_active and service_type = 'mandatory' limit 1").fetchone()
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        key = "ab" * 32
+        row = {"soldier_key": key, "full_name": "חייל ידני", "service_type": "mandatory", "gaf_id": str(gaf), "rank_id": str(rank),
+               "unit_join_date": str(start)}
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        r = conn.execute("select public.add_soldier(%s)", (json.dumps(row),)).fetchone()[0]
+        assert r["status"] == "added"
+        sid = r["id"]
+        again = conn.execute("select public.add_soldier(%s)", (json.dumps(row),)).fetchone()[0]
+        assert again["status"] == "exists" and again["id"] == sid and again["name"] == "חייל ידני"
+        conn.execute("reset role")
+        # in the cycle under way at once, with an opening score; a grace reason for the engine and the picker
+        assert conn.execute("select count(*) from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s", (cycle, sid)).fetchone()[0] == 1
+        assert conn.execute("select opening_score_at is not null from soldiers where id = %s", (sid,)).fetchone()[0]
+        assert conn.execute("select value #>> '{}' from settings where key = 'grace_days'").fetchone()[0] == "90"
+        slot, sday = conn.execute("select id, starts_at::date from slots where cycle_id = %s and starts_at >= %s::date and starts_at < %s::date + 60 "
+                                  "and fixed_points is null and not is_penalty_slot order by starts_at limit 1", (cycle, start, start)).fetchone()
+        reasons = conn.execute("select reasons from app.slot_candidates_for(%s, %s)", (slot, sid)).fetchone()[0]
+        assert "grace" in reasons
+        # assigned by hand in the grace period: a call-up, far ahead or not
+        conn.execute("update cycles set status = 'published', published_at = now() - interval '1 day' where id = %s", (cycle,))
+        aid = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) "
+                           "values (%s, %s, %s, 'performer', 'assigned', 'manual', 'בדיקה', 4, 4) returning id", (slot, sid, gaf)).fetchone()[0]
+        assert conn.execute("select is_surprise from assignments where id = %s", (aid,)).fetchone()[0]
+        # out of the unit: his duties from that day are dropped, not deleted
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        assert conn.execute("select public.future_duties(%s, %s)", (sid, sday)).fetchone()[0] == 1
+        assert conn.execute("select public.remove_from_unit(%s, %s)", (sid, sday)).fetchone()[0] == 1
+        back = conn.execute("select public.add_soldier(%s)", (json.dumps(row),)).fetchone()[0]
+        assert back["status"] == "inactive"
+        conn.execute("select public.reactivate_soldier(%s)", (sid,))
+        conn.execute("reset role")
+        assert conn.execute("select status::text from assignments where id = %s", (aid,)).fetchone()[0] == "dropped"
+        assert conn.execute("select is_active from soldiers where id = %s", (sid,)).fetchone()[0]
+        acts = {a for (a,) in conn.execute("select action from audit_log where entity_id = %s", (str(sid),)).fetchall()}
+        assert {"add_soldier", "remove_from_unit", "reactivate_soldier"} <= acts
         raise psycopg.Rollback()
