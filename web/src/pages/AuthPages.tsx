@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { Mascot, type MascotPose } from "../components/Mascot";
 import { PasswordField } from "../components/PasswordField";
 import { ThemeToggle } from "../components/ThemePicker";
+import { takeSignInNotice } from "../lib/signInNotice";
 
 function Card({ title, subtitle, pose = "wave", children }: { title: string; subtitle?: string; pose?: MascotPose; children: ReactNode }) {
   return (
@@ -38,7 +39,7 @@ export function LoginPage() {
   const [joining, setJoining] = useState(() => new URLSearchParams(window.location.search).has("join"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(takeSignInNotice);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {

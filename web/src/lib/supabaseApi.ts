@@ -32,6 +32,7 @@ import type { ScheduleJob } from "./schedule";
 import type { DailyAvailability, PotentialCell, SnapshotSoldier } from "./potential";
 import type { ExistingSoldier, RosterPlan, SoldierRecord } from "./roster";
 import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "./soldiers";
+import { setSignInNotice } from "./signInNotice";
 
 /** The server's "permission denied" (a reader reaching a staff action), in words. */
 export const READ_ONLY_TEXT = 'צפייה בלבד – הפעולה הזו שמורה לנע"ת התורנויות.';
@@ -76,7 +77,21 @@ export class SupabaseApi implements Api {
   async signIn(username: string, password: string) {
     const { error } = await this.sb.auth.signInWithPassword({ email: usernameToEmail(username), password });
     if (error) throw new Error(error.status === 400 ? "שם משתמש או סיסמה שגויים" : error.message);
+    const blocked = await this.accessBlocked();
+    if (blocked) {
+      await this.sb.auth.signOut();
+      throw new Error(blocked);
+    }
     await this.sb.rpc("touch_last_login");
+  }
+
+  /** Why this account may not use the system now (service ended, locked), or null. */
+  private async accessBlocked(): Promise<string | null> {
+    const { data, error } = await this.sb.rpc("my_access");
+    if (error) return null; // the database answers for itself anyway
+    if (data === "released") return "השירות שלך הסתיים, ולכן אין אפשרות להתחבר. אם זו טעות – פנה לנע״ת.";
+    if (data === "locked") return "החשבון נעול. לפתיחה – פנה לנע״ת.";
+    return null;
   }
 
   async signOut() {
@@ -89,6 +104,13 @@ export class SupabaseApi implements Api {
     const uid = data.user.id;
     const user = maybe(await this.sb.from("app_users").select("username, must_change_password, ui_theme").eq("id", uid).maybeSingle());
     if (!user) return null;
+    // a session opened before his service ended: out, with the reason on the sign-in screen
+    const blocked = await this.accessBlocked();
+    if (blocked) {
+      await this.sb.auth.signOut();
+      setSignInNotice(blocked);
+      return null;
+    }
     const now = Date.now();
     const roles = check(await this.sb.from("user_roles").select("role, valid_from, valid_to").eq("user_id", uid)) as {
       role: Role;
