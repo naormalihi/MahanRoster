@@ -1,5 +1,9 @@
 import AddIcon from "@mui/icons-material/Add";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -14,15 +18,15 @@ import {
   Stack,
   TextField,
   Typography,
-  alpha,
-  type Theme,
 } from "@mui/material";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
 import { STATUS_LABEL, type RequestStatus } from "../lib/cycles";
 import { dayKey, dayLabel } from "../lib/dates";
-import { ContactCard } from "../components/ContactCard";
-import { entryOpen, requestsByCycle, type InputCycle, type InputOptions, type MyRequests } from "../lib/me";
+import { ContactCard, ContactsDialog } from "../components/ContactCard";
+import { Mascot } from "../components/Mascot";
+import { entryOpen, type InputOptions, type MyRequests } from "../lib/me";
+import { blocksInMonth, closedNotice, cycleOf, KIND_LABEL, requestItems, type RequestItem, type RequestKind } from "../lib/requestList";
 
 const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "default"> = {
   pending: "warning",
@@ -34,65 +38,30 @@ const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "def
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 const tomorrow = () => dayKey(new Date(Date.now() + 86_400_000));
 
-/** One kind of request inside a cycle's card: its rows and the button to add one. */
-function Part(props: { title: string; note?: string; onAdd?: () => void; addLabel: string; children: ReactNode[] }) {
-  return (
-    <Box sx={{ minWidth: 0 }}>
-      <Stack direction="row" sx={{ alignItems: "center", minHeight: 32 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, flex: 1 }}>
-          {props.title}
-        </Typography>
-        {props.onAdd && (
-          <Button size="small" startIcon={<AddIcon />} onClick={props.onAdd}>
-            {props.addLabel}
-          </Button>
-        )}
-      </Stack>
-      {props.note && (
-        <Typography variant="caption" color="text.secondary">
-          {props.note}
-        </Typography>
-      )}
-      {props.children.length ? (
-        <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>{props.children}</Stack>
-      ) : (
-        <Typography variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
-          אין.
-        </Typography>
-      )}
-    </Box>
-  );
-}
+type Form = { kind: RequestKind; type: string; from: string; to: string };
 
-function Row(props: { main: ReactNode; sub?: ReactNode; chips?: ReactNode; action?: ReactNode }) {
-  return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center", py: 1 }}>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 600 }}>{props.main}</Typography>
-        {props.sub && (
-          <Typography variant="body2" color="text.secondary">
-            {props.sub}
-          </Typography>
-        )}
-      </Box>
-      {props.chips}
-      {props.action}
-    </Stack>
-  );
-}
+const ITEM_TITLE = (r: RequestItem) => (r.kind === "block" ? "חסימת תאריך" : `${KIND_LABEL[r.kind]} · ${r.type}`);
+const dates = (r: RequestItem) => (r.from === r.to ? dayLabel(r.from) : `${fmt(r.from)} – ${fmt(r.to)}`);
 
-type Form = { kind: "exemption" | "block" | "absence"; cycle: InputCycle; type: string; from: string; to: string };
+/** "מה קרה?" – the one question that picks the kind of request. */
+const CHOICES: { kind: RequestKind; label: string; hint: string }[] = [
+  { kind: "block", label: "יום שאני לא יכול", hint: "חסימת תאריך – בלי אישור" },
+  { kind: "absence", label: "אני לא ביחידה כמה ימים", hint: "היעדרות – בלי אישור" },
+  { kind: "exemption", label: "יש לי סיבה רפואית או אחרת לפטור", hint: 'בקשת פטור – נע"ת מחליט אחרי שיראה אסמכתא' },
+];
 
 /**
- * Stage 2.2: the soldier enters his own constraints – an exemption request (נע"ת decides
- * after seeing the proof), a date block (one a month) and an absence – until the cycle's
- * constraints deadline. After it, blocks and absences go through נע"ת and a request is urgent.
+ * "הבקשות שלי": one list of all the soldier's requests (the coming first, the passed ones folded),
+ * and one "בקשה חדשה" button that asks what happened. Blocks and absences take effect at once
+ * until the cycle's deadline; an exemption waits for נע"ת. After the deadline – through נע"ת.
  */
 export function RequestsPage() {
   const { api } = useAuth();
   const [opts, setOpts] = useState<InputOptions | null>(null);
   const [mine, setMine] = useState<MyRequests | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [contacts, setContacts] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -143,153 +112,141 @@ export function RequestsPage() {
     );
 
   const today = dayKey(new Date());
-  const groups = requestsByCycle(mine, opts.cycles, today);
+  const { current, past } = requestItems(mine, today);
+  const closed = closedNotice(opts.cycles, today);
   const exName = (id: string) => opts.exemption_types.find((t) => t.id === id)?.name ?? "";
   const formClosed = form && form.from && form.kind !== "exemption" && (!entryOpen(form.from, opts.cycles) || (form.to && !entryOpen(form.to, opts.cycles)));
   const formUrgent = form && form.kind === "exemption" && form.from && (!entryOpen(form.from, opts.cycles) || (form.to && !entryOpen(form.to, opts.cycles)));
-  // a new request starts inside the cycle it was opened from
-  const start = (c: InputCycle) => (c.start_date > tomorrow() ? c.start_date : tomorrow());
-  const open = (kind: Form["kind"], c: InputCycle) =>
+  const formCycle = form?.from ? cycleOf(form.from, opts.cycles) : undefined;
+  const used = form?.kind === "block" && form.from ? blocksInMonth(mine, form.from.slice(0, 7)) : 0;
+  const newForm = (kind: RequestKind) => {
+    setChoosing(false);
+    setFormError(null);
     setForm({
       kind,
-      cycle: c,
       type: kind === "exemption" ? (opts.exemption_types[0]?.id ?? "") : kind === "absence" ? (opts.absence_types[0]?.id ?? "") : "",
-      from: start(c),
-      to: kind === "block" ? "" : start(c),
+      from: tomorrow(),
+      to: kind === "block" ? "" : tomorrow(),
     });
+  };
+  const newButton = (
+    <Button variant="contained" startIcon={<AddIcon />} onClick={() => setChoosing(true)}>
+      בקשה חדשה
+    </Button>
+  );
 
-  const exemptionRows = (list: MyRequests["exemptions"]) =>
-    list.map((e) => (
-      <Row
-        key={e.id}
-        main={e.type}
-        sub={
-          <>
-            {fmt(e.start_date)} – {fmt(e.end_date)}
-            {e.decision_reason && e.status !== "approved" ? ` · ${e.decision_reason}` : ""}
-            {!e.mine ? ' · הוזן ע"י נע"ת' : ""}
-          </>
-        }
-        chips={
-          <>
-            {e.is_urgent && <Chip size="small" color="error" variant="outlined" label="דחוף" />}
-            <Chip size="small" color={STATUS_COLOR[e.status]} label={STATUS_LABEL[e.status]} />
-          </>
-        }
-        action={
-          e.mine &&
-          e.status === "pending" && (
-            <Button size="small" color="inherit" onClick={() => act(() => api!.withdrawMyExemption(e.id))}>
-              ביטול
-            </Button>
-          )
-        }
-      />
-    ));
-  const blockRows = (list: MyRequests["blocks"]) =>
-    list.map((b) => (
-      <Row
-        key={b.id}
-        main={dayLabel(b.day)}
-        sub={!b.mine ? 'הוזן ע"י נע"ת' : undefined}
-        action={
-          b.mine &&
-          b.open && (
-            <Button size="small" color="inherit" onClick={() => act(() => api!.cancelMyDateBlock(b.id))}>
-              ביטול
-            </Button>
-          )
-        }
-      />
-    ));
-  const absenceRows = (list: MyRequests["absences"]) =>
-    list.map((a) => (
-      <Row
-        key={a.id}
-        main={a.type}
-        sub={
-          <>
-            {fmt(dayKey(a.starts_at))} – {fmt(dayKey(new Date(Date.parse(a.ends_at) - 1)))}
-            {!a.mine ? ' · הוזן ע"י נע"ת' : ""}
-          </>
-        }
-        action={
-          a.mine &&
-          a.open && (
-            <Button size="small" color="inherit" onClick={() => act(() => api!.cancelMyAbsence(a.id))}>
-              ביטול
-            </Button>
-          )
-        }
-      />
-    ));
-
-  return (
-    <Stack spacing={2} sx={{ maxWidth: 1040, mx: "auto", width: "100%" }}>
-      <Box>
-        <Typography variant="h1">הבקשות שלי</Typography>
+  const row = (r: RequestItem) => (
+    <Stack key={r.key} direction="row" spacing={1} sx={{ alignItems: "center", py: 1 }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 600 }}>{ITEM_TITLE(r)}</Typography>
         <Typography variant="body2" color="text.secondary">
-          פטורים, חסימות תאריך והיעדרויות לכל מחזור – מכאן ישר למערכת. את האסמכתא לפטור מציגים לנע"ת; המערכת לא שומרת מסמכים או פרטים רפואיים.
+          {dates(r)}
+          {r.reason ? ` · ${r.reason}` : ""}
+          {r.byStaff ? ' · הוזן ע"י נע"ת' : ""}
         </Typography>
       </Box>
-      {error && <Alert severity="error">{error}</Alert>}
-      {groups.length === 0 && <Alert severity="info">עוד אין מחזור פתוח. כשנע"ת יפתח מחזור, תוכל להגיש כאן בקשות.</Alert>}
+      {r.urgent && <Chip size="small" color="error" variant="outlined" label="דחוף" />}
+      {r.status === "active" ? (
+        <Chip size="small" color="success" variant="outlined" label="בתוקף" />
+      ) : (
+        <Chip size="small" color={STATUS_COLOR[r.status]} label={STATUS_LABEL[r.status]} />
+      )}
+      {r.cancellable && (
+        <Button
+          size="small"
+          color="inherit"
+          onClick={() =>
+            act(() => (r.kind === "exemption" ? api!.withdrawMyExemption(r.id) : r.kind === "block" ? api!.cancelMyDateBlock(r.id) : api!.cancelMyAbsence(r.id)))
+          }
+        >
+          ביטול
+        </Button>
+      )}
+    </Stack>
+  );
 
-      {groups.map((g) => {
-        const c = g.cycle;
-        const blocksUsed = g.blocks.filter((b) => b.mine).length;
-        return (
-          <Paper key={c?.id ?? "none"} variant="outlined" sx={{ overflow: "hidden", opacity: c && !c.open ? 0.92 : 1 }}>
-            <Box sx={{ px: 2, py: 1.5, bgcolor: c ? (c.open ? (t: Theme) => alpha(t.palette.primary.main, 0.07) : "action.hover") : "rgba(232,112,15,0.08)", borderBottom: 1, borderColor: "divider" }}>
-              <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                <Typography variant="h3" sx={{ flex: 1, minWidth: 180 }}>
-                  {c ? c.name : "בלי מחזור"}
-                </Typography>
-                {c ? (
-                  c.open ? (
-                    <Chip size="small" color="success" label={c.deadline ? `פתוח להגשה עד ${dayLabel(c.deadline)}` : "פתוח להגשה"} />
-                  ) : (
-                    <Chip size="small" color="warning" variant="outlined" label='נסגר – דרך נע"ת' />
-                  )
-                ) : (
-                  <Chip size="small" color="warning" label="ממתין למחזור" />
-                )}
-              </Stack>
-              <Typography variant="body2" color="text.secondary">
-                {c
-                  ? `${fmt(c.start_date)} – ${fmt(c.end_date)}${c.open ? "" : ' · חסימות והיעדרויות לתקופה הזו – דרך נע"ת. בקשת פטור אפשר עדיין להגיש, והיא תסומן דחופה.'}`
-                  : 'בקשות לתאריכים שעוד אין להם מחזור. הן שמורות, ונע"ת יראה אותן כשייפתח מחזור שמכסה אותן.'}
-              </Typography>
-            </Box>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "repeat(3, minmax(0, 1fr))" }, "& > *": { p: 2 }, "& > * + *": { borderTop: { xs: 1, md: 0 }, borderInlineStart: { md: 1 }, borderColor: "divider" } }}>
-              <Part title="פטורים" addLabel="בקשת פטור" onAdd={c ? () => open("exemption", c) : undefined}>
-                {exemptionRows(g.exemptions)}
-              </Part>
-              <Part
-                title="חסימות תאריך"
-                note={c ? `${blocksUsed} בשימוש · עד ${opts.block_quota_per_month} בחודש` : undefined}
-                addLabel="חסימת יום"
-                onAdd={c && c.open ? () => open("block", c) : undefined}
-              >
-                {blockRows(g.blocks)}
-              </Part>
-              <Part title="היעדרויות" addLabel="היעדרות" onAdd={c && c.open ? () => open("absence", c) : undefined}>
-                {absenceRows(g.absences)}
-              </Part>
-            </Box>
-          </Paper>
-        );
-      })}
-      {groups.some((g) => g.cycle && !g.cycle.open) && <ContactCard note='המועד נסגר? חסימה, היעדרות או פטור דחוף – דרך נע"ת.' />}
+  return (
+    <Stack spacing={2} sx={{ maxWidth: 820, mx: "auto", width: "100%" }}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <Typography variant="h1">הבקשות שלי</Typography>
+          <Typography variant="body2" color="text.secondary">
+            את האסמכתא לפטור מציגים לנע&quot;ת – המערכת לא שומרת מסמכים או פרטים רפואיים.
+          </Typography>
+        </Box>
+        {(current.length > 0 || past.length > 0) && newButton}
+      </Stack>
+      {error && <Alert severity="error">{error}</Alert>}
+      {closed && (
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" onClick={() => setContacts(true)} sx={{ whiteSpace: "nowrap" }}>
+              למי לפנות
+            </Button>
+          }
+        >
+          המועד ל{closed.closed.name} נסגר{closed.closed.deadline ? ` ב-${fmt(dayKey(closed.closed.deadline))}` : ""}. חסימה, היעדרות או פטור דחוף לתאריכים האלה – דרך נע&quot;ת.
+          {closed.next ? ` ל${closed.next.name} אפשר להגיש כרגיל${closed.next.deadline ? ` עד ${fmt(dayKey(closed.next.deadline))}` : ""}.` : ""}
+        </Alert>
+      )}
+
+      {current.length === 0 && past.length === 0 ? (
+        <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+          <Mascot pose="sleep" height={120} sx={{ mx: "auto", mb: 1 }} />
+          <Typography sx={{ mb: 1.5 }}>אין לך בקשות פתוחות</Typography>
+          {newButton}
+        </Paper>
+      ) : (
+        <Paper variant="outlined" sx={{ px: 2, py: 0.5 }}>
+          {current.length ? (
+            <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>{current.map(row)}</Stack>
+          ) : (
+            <Typography color="text.secondary" sx={{ py: 1.5 }}>
+              אין לך בקשות פתוחות.
+            </Typography>
+          )}
+          {past.length > 0 && (
+            <Accordion disableGutters elevation={0} sx={{ "&:before": { display: "none" }, borderTop: 1, borderColor: "divider", bgcolor: "transparent" }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0 }}>
+                <Typography color="text.secondary">קודמות ({past.length})</Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ px: 0, pt: 0 }}>
+                <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />} sx={{ opacity: 0.8 }}>
+                  {past.map(row)}
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          )}
+        </Paper>
+      )}
+      {closed && <ContactCard />}
+
+      {choosing && (
+        <Dialog open onClose={() => setChoosing(false)} fullWidth maxWidth="xs">
+          <DialogTitle>מה קרה?</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={1}>
+              {CHOICES.map((c) => (
+                <Button key={c.kind} variant="outlined" onClick={() => newForm(c.kind)} sx={{ justifyContent: "flex-start", textAlign: "start", py: 1.25, display: "block" }}>
+                  <Typography sx={{ fontWeight: 700 }}>{c.label}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {c.hint}
+                  </Typography>
+                </Button>
+              ))}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setChoosing(false)}>ביטול</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+      {contacts && <ContactsDialog onClose={() => setContacts(false)} />}
 
       {form && (
         <Dialog open onClose={() => setForm(null)} fullWidth maxWidth="xs">
-          <DialogTitle>
-            {form.kind === "exemption" ? "בקשת פטור" : form.kind === "block" ? "חסימת יום" : "היעדרות"}
-            <Typography variant="body2" color="text.secondary">
-              {form.cycle.name}
-            </Typography>
-          </DialogTitle>
+          <DialogTitle>{form.kind === "exemption" ? "בקשת פטור" : form.kind === "block" ? "חסימת תאריך" : "היעדרות"}</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2}>
               {form.kind !== "block" && (
@@ -306,7 +263,7 @@ export function RequestsPage() {
                 label={form.kind === "block" ? "יום" : "מתאריך"}
                 value={form.from}
                 onChange={(e) => setForm({ ...form, from: e.target.value, to: form.to && form.to < e.target.value ? e.target.value : form.to })}
-                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: start(form.cycle), max: form.cycle.end_date } }}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: tomorrow() } }}
               />
               {form.kind !== "block" && (
                 <TextField
@@ -314,21 +271,35 @@ export function RequestsPage() {
                   label="עד תאריך (כולל)"
                   value={form.to}
                   onChange={(e) => setForm({ ...form, to: e.target.value })}
-                  slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: form.from || start(form.cycle), max: form.kind === "absence" ? form.cycle.end_date : undefined } }}
+                  slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: form.from || tomorrow() } }}
                 />
+              )}
+              {form.kind === "block" && form.from && (
+                <Typography variant="body2" color={used >= opts.block_quota_per_month ? "error" : "text.secondary"}>
+                  {used} מתוך {opts.block_quota_per_month} חסימות בחודש הזה
+                </Typography>
               )}
               {form.kind === "exemption" && (
                 <Typography variant="body2" color="text.secondary">
-                  הבקשה ממתינה עד שנע"ת יראה את האסמכתא ויחליט{exName(form.type) ? ` על "${exName(form.type)}"` : ""}.
+                  הבקשה ממתינה עד שנע&quot;ת יראה את האסמכתא ויחליט{exName(form.type) ? ` על "${exName(form.type)}"` : ""}.
                 </Typography>
               )}
-              {form.from && (form.from < form.cycle.start_date || form.from > form.cycle.end_date) && (
-                <Alert severity="info">
-                  התאריך מחוץ ל{form.cycle.name} ({fmt(form.cycle.start_date)} – {fmt(form.cycle.end_date)}).
+              {form.from && !formCycle && !formClosed && (
+                <Alert severity="info">עוד אין מחזור לתאריכים האלה – הבקשה נשמרת, ונע&quot;ת יראה אותה כשייפתח מחזור.</Alert>
+              )}
+              {formUrgent && <Alert severity="warning">מועד האילוצים לתאריכים האלה נסגר – הבקשה תסומן דחופה.</Alert>}
+              {formClosed && (
+                <Alert
+                  severity="warning"
+                  action={
+                    <Button color="inherit" size="small" onClick={() => setContacts(true)} sx={{ whiteSpace: "nowrap" }}>
+                      למי לפנות
+                    </Button>
+                  }
+                >
+                  המועד לתאריכים האלה נסגר – דרך נע&quot;ת.
                 </Alert>
               )}
-              {formUrgent && <Alert severity="warning">התאריכים אחרי מועד סגירת האילוצים – הבקשה תסומן דחופה.</Alert>}
-              {formClosed && <Alert severity="warning">איסוף האילוצים לתאריכים האלה נסגר – פנה לנע"ת (פרטי הקשר בתחתית המסך).</Alert>}
               {formError && <Alert severity="error">{formError}</Alert>}
             </Stack>
           </DialogContent>
