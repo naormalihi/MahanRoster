@@ -2736,3 +2736,53 @@ def test_duty_message_for_soldier_without_account(conn):
         assert conn.execute("select count(*) from soldier_invites where soldier_id = %s and used_at is null and revoked_at is null",
                             (free,)).fetchone()[0] == 1
         raise psycopg.Rollback()
+
+
+def test_new_exemption_request_alerts_staff_grouped(conn):
+    from datetime import date, timedelta
+
+    uid, sid = _soldier_account(conn, "req.alert")
+    etype = conn.execute("select id from exemption_types where auto_rule is null order by name limit 1").fetchone()[0]
+    far = date.today() + timedelta(days=700)
+    with conn.transaction():
+        gaf = conn.execute("select gaf_id from soldiers where id = %s", (sid,)).fetchone()[0]
+        other = conn.execute("select id from org_units where kind = 'gaf' and id <> %s limit 1", (gaf,)).fetchone()[0]
+        mk = lambda name, g: conn.execute("select app.create_auth_user(%s, 'x-long-password')", (name + "@users.invalid",)).fetchone()[0]
+        cmd, cmd2 = mk("ra.cmd", gaf), mk("ra.cmd2", other)
+        for u, n, g in ((cmd, "ra.cmd", gaf), (cmd2, "ra.cmd2", other)):
+            conn.execute("insert into app_users (id, username) values (%s, %s)", (u, n))
+            conn.execute("insert into user_roles (user_id, role, gaf_id) values (%s, 'gaf_commander', %s)", (u, g))
+        conn.execute("delete from notifications")
+        # the soldier asks twice within the hour
+        conn.execute("set local role authenticated")
+        _claims(conn, uid, aal="aal1")
+        conn.execute("select public.submit_exemption(%s, %s, %s)", (etype, far, far + timedelta(days=5)))
+        conn.execute("select public.submit_exemption(%s, %s, %s)", (etype, far + timedelta(days=30), far + timedelta(days=35)))
+        conn.execute("reset role")
+        rows = lambda u: conn.execute("select payload from notifications where recipient_user_id = %s and type = 'exemption_request'", (u,)).fetchall()
+        (p,), = rows(COORD)
+        assert p["count"] == 2 and p["title"] == "2 בקשות פטור חדשות"
+        assert len(rows(cmd)) == 1 and rows(cmd2) == []          # his gaf only
+        (pc,), = rows(cmd)
+        # read notices do not swallow the next one
+        conn.execute("update notifications set read_at = now() where recipient_user_id = %s", (COORD,))
+        # נע"ת writes one himself: nothing to him; turned off: nothing to the gaf commander
+        conn.execute("update app_users set request_alerts = false where id = %s", (cmd,))
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        conn.execute("insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, source) "
+                     "values (%s, %s, 'full', %s, %s, 'pending', 'coordinator')", (sid, etype, far + timedelta(days=60), far + timedelta(days=61)))
+        conn.execute("reset role")
+        assert len(rows(COORD)) == 1 and len(rows(cmd)) == 1
+        assert conn.execute("select count(*) from notifications where recipient_user_id = %s and type = 'exemption_request'",
+                            (DEPUTY_ACTIVE,)).fetchone()[0] >= 1
+        # 48 hours before the deadline: what still waits – once
+        cyc = conn.execute("insert into cycles (name, start_date, end_date, exemption_deadline) values ('בדיקה', %s, %s, now() + interval '30 hours') returning id",
+                           (far, far + timedelta(days=90))).fetchone()[0]
+        assert conn.execute("select app.queue_pending_reminders()").fetchone()[0] == 1
+        assert conn.execute("select app.queue_pending_reminders()").fetchone()[0] == 0
+        (pp,), = conn.execute("select payload from notifications where recipient_user_id = %s and type = 'exemption_pending'", (COORD,)).fetchall()
+        assert pp["title"] == "עוד 3 בקשות פטור ממתינות" and pp["cycle_id"] == str(cyc)
+        assert conn.execute("select count(*) from notifications where type = 'exemption_pending' and recipient_user_id in (%s, %s)",
+                            (cmd, cmd2)).fetchone()[0] == 0
+        raise psycopg.Rollback()

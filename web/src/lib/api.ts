@@ -42,6 +42,8 @@ export interface Me {
   mustChangePassword: boolean;
   /** the look saved with the account (light / dark / auto), if any */
   uiTheme?: string | null;
+  /** notices on new exemption requests (staff, gaf commanders); on unless turned off */
+  requestAlerts?: boolean;
 }
 
 export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinator") || me.roles.includes("deputy"));
@@ -158,6 +160,7 @@ export interface Api {
   ranks(): Promise<RankItem[]>;
   /** keep the chosen look with the account */
   setMyTheme(choice: "auto" | "light" | "dark"): Promise<void>;
+  setMyRequestAlerts(on: boolean): Promise<void>;
   unitKeyCheck(): Promise<string | null>;
   /** one soldier by hand (the ת.ז already hashed); an existing one is reported, not duplicated */
   addSoldier(row: AddSoldierRow): Promise<AddSoldierResult>;

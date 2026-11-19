@@ -318,6 +318,7 @@ export class DemoApi implements Api {
   }
 
   async setMyTheme(): Promise<void> {}
+  async setMyRequestAlerts(): Promise<void> {}
 
   async ranks() {
     return this.rankList;
