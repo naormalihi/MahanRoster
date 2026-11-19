@@ -11,6 +11,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.23.1",
+    date: "2026-11-19",
+    items: [
+      "מראה בכפתור אחד: ירח למעבר למצב לילה, שמש למעבר למצב יום. עד הלחיצה הראשונה – לפי הגדרת המכשיר",
+    ],
+  },
+  {
     version: "2.23.0",
     date: "2026-11-18",
     items: [
