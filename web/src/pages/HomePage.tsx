@@ -1,4 +1,5 @@
 import { MyNextDuty } from "../components/MyNextDuty";
+import { UnackedCard } from "../components/UnackedCard";
 import { SwapLogCard } from "../components/SwapDialog";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
@@ -120,6 +121,7 @@ export function HomePage() {
         </Alert>
       )}
       <MyNextDuty />
+      <UnackedCard />
 
       {cycles && !cycle && (
         <Alert severity="info" action={<Button color="inherit" component={RouterLink} to="/cycles">ניהול מחזורים</Button>}>

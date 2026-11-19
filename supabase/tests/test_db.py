@@ -2592,6 +2592,51 @@ def test_add_soldier_by_hand_newcomer_rules(conn):
         assert conn.execute("select is_active from soldiers where id = %s", (sid,)).fetchone()[0]
         acts = {a for (a,) in conn.execute("select action from audit_log where entity_id = %s", (str(sid),)).fetchall()}
         assert {"add_soldier", "remove_from_unit", "reactivate_soldier"} <= acts
+
+
+def test_duty_ack_reminder_and_escalation(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() - interval '5 days' where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        slot = lambda h: conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                                      "(%s, %s, now() + make_interval(hours => %s), now() + make_interval(hours => %s + 8)) returning id",
+                                      (cycle, tid, h, h)).fetchone()[0]
+        near, soon, far = slot(20), slot(40), slot(200)
+        free = [r[0] for r in conn.execute("select id from soldiers s where is_active and not exists "
+                                           "(select 1 from app_users u where u.soldier_id = s.id) order by id limit 2").fetchall()]
+        uid = conn.execute("select app.create_auth_user('ack.me@users.invalid', 'x-long-password')").fetchone()[0]
+        conn.execute("insert into app_users (id, username, soldier_id) values (%s, 'ack.me', %s)", (uid, free[0]))
+        conn.execute("insert into user_roles (user_id, role) values (%s, 'soldier')", (uid,))
+        gaf = conn.execute("select gaf_id from soldiers where id = %s", (free[0],)).fetchone()[0]
+        cmd = conn.execute("select app.create_auth_user('ack.cmd@users.invalid', 'x-long-password')").fetchone()[0]
+        conn.execute("insert into app_users (id, username) values (%s, 'ack.cmd')", (cmd,))
+        conn.execute("insert into user_roles (user_id, role, gaf_id) values (%s, 'gaf_commander', %s)", (cmd, gaf))
+        put = lambda k, sid: conn.execute(
+            "insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) "
+            "select %s, id, gaf_id, 'performer', 'assigned', 'manual', 'בדיקה', 1, 1 from soldiers where id = %s returning id", (k, sid)).fetchone()[0]
+        a_near, a_soon, a_far, b_near = put(near, free[0]), put(soon, free[0]), put(far, free[0]), put(near, free[1])
+        # what נע"ת sees: the four within 3 days less the far one
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        ids = {r[0] for r in conn.execute("select assignment_id from public.unacked_duties(72)").fetchall()}
+        assert {a_near, a_soon, b_near} <= ids and a_far not in ids
+        conn.execute("select public.staff_ack(%s)", (b_near,))      # spoke on the phone
+        # the soldier acknowledges one of his
+        _claims(conn, uid, aal="aal1")
+        assert conn.execute("select public.ack_duties(%s)", ([a_soon, b_near],)).fetchone()[0] == 1   # not someone else's
+        acked = dict(conn.execute("select assignment_id, acked_at is not null from public.my_duties()").fetchall())
+        assert acked[a_soon] and not acked[a_near]
+        conn.execute("reset role")
+        # the tick: a reminder to him for the near one, and his gaf commander hears about it – once
+        conn.execute("select app.queue_ack_reminders()")
+        conn.execute("select app.queue_ack_reminders()")
+        kinds = conn.execute("select n.type, count(*) from notifications n where n.recipient_user_id in (%s, %s) "
+                             "and n.type in ('ack_reminder', 'ack_escalation') group by 1 order by 1", (uid, cmd)).fetchall()
+        assert kinds == [("ack_escalation", 1), ("ack_reminder", 1)]
+        # a new time asks again
+        conn.execute("update slots set starts_at = starts_at + interval '1 hour', ends_at = ends_at + interval '1 hour' where id = %s", (soon,))
+        assert conn.execute("select acked_at from assignments where id = %s", (a_soon,)).fetchone()[0] is None
         raise psycopg.Rollback()
 
 

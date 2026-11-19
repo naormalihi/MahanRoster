@@ -3,7 +3,7 @@ import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
-import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
+import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount, UnackedDuty } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, RankItem, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
@@ -379,6 +379,8 @@ export class SupabaseApi implements Api {
       fairness_tolerance_pct: v.fairness_tolerance_pct == null ? 20 : Number(v.fairness_tolerance_pct),
       grace_days: v.grace_days == null ? 90 : Number(v.grace_days),
       briefing_reminder_hours: v.briefing_reminder_hours == null ? 24 : Number(v.briefing_reminder_hours),
+      ack_reminder_hours: v.ack_reminder_hours == null ? 48 : Number(v.ack_reminder_hours),
+      ack_escalation_hours: v.ack_escalation_hours == null ? 24 : Number(v.ack_escalation_hours),
     };
   }
 
@@ -1036,6 +1038,18 @@ export class SupabaseApi implements Api {
       surprise_multiplier: Number(r.surprise_multiplier),
       fairness_tolerance_pct: Number(r.fairness_tolerance_pct),
     };
+  }
+
+  async ackDuties(assignmentIds: string[]): Promise<number> {
+    return check(await this.sb.rpc("ack_duties", { p_ids: assignmentIds })) as number;
+  }
+
+  async staffAck(assignmentId: string) {
+    maybe(await this.sb.rpc("staff_ack", { p_assignment: assignmentId }));
+  }
+
+  async unackedDuties(hours = 72): Promise<UnackedDuty[]> {
+    return check(await this.sb.rpc("unacked_duties", { p_hours: hours })) as UnackedDuty[];
   }
 
   async myScores(): Promise<MyScore[]> {

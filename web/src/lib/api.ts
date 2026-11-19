@@ -23,7 +23,7 @@ import type {
 } from "./cycles";
 import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
-import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount } from "./me";
+import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount, UnackedDuty } from "./me";
 import type { Alias, NewSlot, RankRef, SlotDraft, SlotRow } from "./baseSchedule";
 import type { AppUser, CreatableRole } from "./users";
 import type { Candidate, DraftAssignment, Role as DraftRole } from "./draft";
@@ -282,6 +282,12 @@ export interface Api {
   redeemInvite(code: string, username: string, password: string): Promise<string>;
   myDuties(): Promise<MyDuty[]>;
   myScores(): Promise<MyScore[]>;
+  /** "ראיתי" on duties of mine; returns how many were marked */
+  ackDuties(assignmentIds: string[]): Promise<number>;
+  /** נע"ת: "spoke with him on the phone" */
+  staffAck(assignmentId: string): Promise<void>;
+  /** duties of the coming hours not acknowledged yet (a gaf commander: his gaf) */
+  unackedDuties(hours?: number): Promise<UnackedDuty[]>;
   /** swaps between soldiers: whom I can give a duty of mine to, or trade it with */
   swapOptions(assignmentId: string): Promise<SwapOptions>;
   requestSwap(assignmentId: string, targetSoldierId: string, counterAssignmentId?: string | null): Promise<string>;

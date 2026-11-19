@@ -2,6 +2,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SwapIcon from "@mui/icons-material/SwapHoriz";
 import {
   Accordion,
+  Alert,
   AccordionDetails,
   AccordionSummary,
   Box,
@@ -20,14 +21,15 @@ import { useAuth } from "../lib/auth";
 import { EmptyState, ErrorState, greeting } from "../components/EmptyState";
 import { PushControl } from "../components/NotificationBell";
 import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
-import { splitDuties, type MyDuty, type MyScore } from "../lib/me";
+import { needsAck, splitDuties, type MyDuty, type MyScore } from "../lib/me";
 import { canAskSwap, type MySwap } from "../lib/swaps";
 import { SwapDialog, SwapsCard } from "../components/SwapDialog";
 
 const ROLE: Record<MyDuty["role"], string> = { performer: "מבצע", reserve: "עתודה" };
 
 /** One duty: when, what, as what; tap to see where to report and why he got it. */
-function DutyRow({ d, open, onToggle, onSwap }: { d: MyDuty; open: boolean; onToggle: () => void; onSwap?: (d: MyDuty) => void }) {
+function DutyRow({ d, open, onToggle, onSwap, onAck }: { d: MyDuty; open: boolean; onToggle: () => void; onSwap?: (d: MyDuty) => void; onAck?: (ids: string[]) => void }) {
+  const waiting = !!onAck && needsAck(d, Date.now());
   const details = [
     d.report_at && `התייצבות: ${dayLabel(d.report_at)} ${timeLabel(d.report_at)}${d.report_place ? `, ${d.report_place}` : ""}`,
     !d.report_at && d.report_place && `התייצבות: ${d.report_place}`,
@@ -51,6 +53,20 @@ function DutyRow({ d, open, onToggle, onSwap }: { d: MyDuty; open: boolean; onTo
             {dayLabel(d.starts_at)} · {spanLabel(d.starts_at, d.ends_at)}
           </Typography>
         </Box>
+        {waiting && (
+          <Button
+            size="small"
+            variant="contained"
+            color="warning"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAck!([d.assignment_id]);
+            }}
+            sx={{ whiteSpace: "nowrap", minWidth: 0 }}
+          >
+            ראיתי ✓
+          </Button>
+        )}
         <Chip size="small" label={d.status === "reserve_activated" ? "עתודה שהופעלה" : ROLE[d.role]} color={d.role === "performer" ? "primary" : "default"} variant="outlined" />
         {d.role === "performer" && (
           <Typography variant="body2" sx={{ minWidth: 52, textAlign: "end" }}>
@@ -151,6 +167,13 @@ function ScoreCard({ s }: { s: MyScore }) {
 export function MyPage() {
   const { api, me } = useAuth();
   const [duties, setDuties] = useState<MyDuty[] | null>(null);
+  const [ackError, setAckError] = useState<string | null>(null);
+  // "ראיתי": marked here at once, then on the server
+  const ack = (ids: string[]) => {
+    const at = new Date().toISOString();
+    setDuties((ds) => ds && ds.map((d) => (ids.includes(d.assignment_id) ? { ...d, acked_at: at } : d)));
+    api!.ackDuties(ids).catch((e) => setAckError((e as Error).message));
+  };
   const [scores, setScores] = useState<MyScore[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -198,12 +221,33 @@ export function MyPage() {
       <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 3fr) minmax(0, 2fr)" } }}>
       <Stack spacing={2} sx={{ minWidth: 0 }}>
       <SwapsCard swaps={swaps} onChange={reload} />
+      {(() => {
+        const waiting = (duties ?? []).filter((d) => needsAck(d, Date.now()));
+        if (waiting.length < 2) return null;
+        return (
+          <Alert
+            severity="warning"
+            action={
+              <Button color="inherit" size="small" onClick={() => ack(waiting.map((d) => d.assignment_id))}>
+                ראיתי את כולן
+              </Button>
+            }
+          >
+            {waiting.length} תורנויות חדשות או שהשתנו – אשר שראית.
+          </Alert>
+        );
+      })()}
+      {ackError && (
+        <Alert severity="error" onClose={() => setAckError(null)}>
+          {ackError}
+        </Alert>
+      )}
       {next ? (
         <Paper sx={{ p: 2, borderInlineStart: 4, borderColor: "primary.main" }}>
           <Typography variant="subtitle2" color="text.secondary">
             התורנות הבאה · {dayLabel(next.starts_at)}
           </Typography>
-          <DutyRow d={next} open onToggle={() => undefined} onSwap={setSwapping} />
+          <DutyRow d={next} open onToggle={() => undefined} onSwap={setSwapping} onAck={ack} />
         </Paper>
       ) : (
         <EmptyState pose="sleep" title="אין לך תורנויות קרובות" text="כשיתפרסם לוח חדש, התורנויות שלך יופיעו כאן ותקבל התראה." />
@@ -216,7 +260,7 @@ export function MyPage() {
           </Typography>
           <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
             {upcoming.slice(1).map((d) => (
-              <DutyRow key={d.assignment_id} d={d} open={open === d.assignment_id} onToggle={() => toggle(d.assignment_id)} onSwap={setSwapping} />
+              <DutyRow key={d.assignment_id} d={d} open={open === d.assignment_id} onToggle={() => toggle(d.assignment_id)} onSwap={setSwapping} onAck={ack} />
             ))}
           </Stack>
         </Paper>
