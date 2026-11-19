@@ -1,3 +1,4 @@
+import { MyNextDuty } from "../components/MyNextDuty";
 import {
   Alert,
   Box,
@@ -92,6 +93,7 @@ export function DashboardPage() {
           {d.planning ? ` · בתכנון: ${d.planning.name} – ${stageLabel(d.planning.status as CycleStatus)}` : ""}
         </Typography>
       </Box>
+      <MyNextDuty />
 
       <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
         <Tile title="בקשות פטור ממתינות" value={d.requests.pending} note={d.requests.urgent ? `${d.requests.urgent} דחופות` : "אין דחופות"} />

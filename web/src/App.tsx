@@ -58,6 +58,8 @@ function Gate() {
           <Route path="/board" element={<BoardPage />} />
           <Route path="/scoring" element={lazyEl(<ScoringPage />)} />
           {isSoldier(me) && <Route path="/requests" element={<RequestsPage />} />}
+          {/* staff and commanders who do duties too: their own duties, next to the unit's home */}
+          {isSoldier(me) && <Route path="/my" element={<MyPage />} />}
           {reader && (
             <>
               <Route path="/cycle" element={ro(<CycleWorkspace step="overview" />)} />

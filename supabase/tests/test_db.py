@@ -2137,7 +2137,8 @@ def test_gaf_commander_sees_personal_records_of_his_own_gaf_only(conn):
     cycle = conn.cycle_id
     g1, g2 = [r[0] for r in conn.execute(
         "select gaf_id from soldiers where is_active group by gaf_id having count(*) > 0 order by gaf_id limit 2").fetchall()]
-    mine = conn.execute("select id from soldiers where gaf_id = %s and is_active order by id limit 1", (g1,)).fetchone()[0]
+    mine = conn.execute("select id from soldiers s where gaf_id = %s and is_active "
+                        "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 1", (g1,)).fetchone()[0]
     other = conn.execute("select id from soldiers where gaf_id = %s and is_active order by id limit 1", (g2,)).fetchone()[0]
     uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.scope", "temp-pass-123", mine)[0][0]
     try:
@@ -2481,4 +2482,66 @@ def test_reset_user_mfa(conn):
         assert conn.execute("select count(*) from audit_log where action = 'reset_mfa' and entity_id = %s", (str(DEPUTY_ACTIVE),)).fetchone()[0] == 1
         told = {r[0] for r in conn.execute("select recipient_user_id from notifications where type = 'mfa_reset'").fetchall()}
         assert COORD not in told and DEPUTY_ACTIVE not in told  # neither the one who reset nor the one reset
+        raise psycopg.Rollback()
+
+
+def test_staff_who_do_duties_are_soldiers_too(conn):
+    uid, _ = _soldier_account(conn, "promote.me")
+    conn.commit()
+    with conn.transaction():
+        free = [r[0] for r in conn.execute(
+            "select id from soldiers s where is_active and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 3").fetchall()]
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        # a new commander account linked to a soldier holds both roles
+        cmd = conn.execute("select public.create_user('both.roles', 'temp-pass-123', 'gaf_commander', %s)", (free[0],)).fetchone()[0]
+        roles = lambda u: sorted(r[0] for r in conn.execute("select role::text from user_roles where user_id = %s", (u,)).fetchall())
+        assert roles(cmd) == ["gaf_commander", "soldier"]
+        with pytest.raises(psycopg.Error, match="כבר יש חשבון"):
+            with conn.transaction():
+                conn.execute("select public.create_user('second.acct', 'temp-pass-123', 'coordinator', %s)", (free[0],))
+        # unlinking drops the soldier role; linking brings it back
+        conn.execute("select public.set_user_soldier(%s, null)", (cmd,))
+        assert roles(cmd) == ["gaf_commander"]
+        conn.execute("select public.set_user_soldier(%s, %s)", (cmd, free[1]))
+        assert roles(cmd) == ["gaf_commander", "soldier"]
+        # a soldier's own account is promoted instead of opening a second one, and demoted back
+        conn.execute("select public.grant_user_role(%s, 'coordinator')", (uid,))
+        assert roles(uid) == ["coordinator", "soldier"]
+        with pytest.raises(psycopg.Error, match="כבר יש לו"):
+            with conn.transaction():
+                conn.execute("select public.grant_user_role(%s, 'coordinator')", (uid,))
+        with pytest.raises(psycopg.Error, match="שיוך"):
+            with conn.transaction():
+                conn.execute("select public.revoke_user_role(%s, 'soldier')", (uid,))
+        conn.execute("select public.revoke_user_role(%s, 'coordinator')", (uid,))
+        assert roles(uid) == ["soldier"]
+        with pytest.raises(psycopg.Error, match="אפשר להוסיף"):
+            with conn.transaction():
+                conn.execute("select public.grant_user_role(%s, 'deputy')", (uid,))  # not offered
+        lone = conn.execute("select public.create_user('lone.role', 'temp-pass-123', 'unit_commander')").fetchone()[0]
+        with pytest.raises(psycopg.Error, match="היחיד"):
+            with conn.transaction():
+                conn.execute("select public.revoke_user_role(%s, 'unit_commander')", (lone,))
+        with pytest.raises(psycopg.Error, match="מעצמך"):
+            with conn.transaction():
+                conn.execute("select public.revoke_user_role(%s, 'coordinator')", (COORD,))
+        assert conn.execute("select count(*) from audit_log where action in ('grant_role', 'revoke_role') and entity_id = %s", (str(uid),)).fetchone()[0] == 2
+        raise psycopg.Rollback()
+
+
+def test_coordinator_does_not_decide_his_own_exemption(conn):
+    with conn.transaction():
+        sid = conn.execute("select id from soldiers s where is_active and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id desc limit 1").fetchone()[0]
+        conn.execute("update app_users set soldier_id = %s where id = %s", (sid, COORD))
+        et = conn.execute("select id from exemption_types order by name limit 1").fetchone()[0]
+        ex = conn.execute("insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, source) "
+                          "values (%s, %s, 'full', current_date, current_date + 30, 'pending', 'soldier') returning id", (sid, et)).fetchone()[0]
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        with pytest.raises(psycopg.Error, match="בקשה שלך"):
+            with conn.transaction():
+                conn.execute("update exemptions set status = 'approved', proof_checked_at = now() where id = %s", (ex,))
+        _claims(conn, DEPUTY_ACTIVE)
+        conn.execute("update exemptions set status = 'approved', proof_checked_at = now() where id = %s", (ex,))
         raise psycopg.Rollback()

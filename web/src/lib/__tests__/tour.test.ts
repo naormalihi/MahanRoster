@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markTourSeen, TOUR, tourKind, tourSeen } from "../tour";
+import { markTourSeen, TOUR, tourKind, tourSeen, tourSteps } from "../tour";
 import type { Me } from "../api";
 
 const me = (roles: Me["roles"]): Me => ({ userId: "u1", username: "x", roles, mustChangePassword: false });
@@ -19,6 +19,15 @@ describe("tour", () => {
       expect(steps).toHaveLength(3);
       expect(steps[2].install).toBe(true);
     }
+  });
+
+  it("adds a step about his own duties for staff who are soldiers too, before the install one", () => {
+    expect(tourSteps("soldier", true)).toHaveLength(3);
+    const s = tourSteps("staff", true);
+    expect(s).toHaveLength(4);
+    expect(s[2].title).toContain("שלך");
+    expect(s[3].install).toBe(true);
+    expect(tourSteps("reader", false)).toHaveLength(3);
   });
 
   it("remembers per user and survives broken storage", () => {

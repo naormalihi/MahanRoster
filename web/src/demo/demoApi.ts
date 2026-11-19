@@ -262,7 +262,7 @@ export class DemoApi implements Api {
     if (u === "naat") this.user = { name: u, roles: ["coordinator"], mustChange: false, aal2: false };
     else if (u === "board") this.user = { name: u, roles: ["viewer"], mustChange: false, aal2: true };
     else if (u === "new.user") this.user = { name: u, roles: ["viewer"], mustChange: true, aal2: true };
-    else if (u === "cmd") this.user = { name: u, roles: ["gaf_commander"], mustChange: false, aal2: false };
+    else if (u === "cmd") this.user = { name: u, roles: ["gaf_commander", "soldier"], mustChange: false, aal2: false }; // does duties too
     else if (u === "magad") this.user = { name: u, roles: ["unit_commander"], mustChange: false, aal2: true };
     else if (u === "chayal" || this.accounts.has(u)) this.user = { name: u, roles: ["soldier"], mustChange: false, aal2: true };
     else throw new Error("שם משתמש או סיסמה שגויים");
@@ -1107,6 +1107,23 @@ export class DemoApi implements Api {
     u.has_mfa = false;
   }
 
+  async grantUserRole(userId: string, role: CreatableRole) {
+    await delay();
+    const u = this.users.find((x) => x.user_id === userId);
+    if (!u) throw new Error("המשתמש לא נמצא");
+    if (u.roles.some((r) => r.role === role)) throw new Error("כבר יש לו את התפקיד הזה");
+    u.roles.push({ id: crypto.randomUUID(), role, gaf_id: null, valid_from: null, valid_to: null });
+  }
+
+  async revokeUserRole(userId: string, role: Role) {
+    await delay();
+    const u = this.users.find((x) => x.user_id === userId);
+    if (!u) throw new Error("המשתמש לא נמצא");
+    if (role === "soldier") throw new Error("תפקיד החייל נקבע לפי השיוך לחייל – מנתקים את השיוך במקום");
+    if (!u.roles.some((r) => r.role !== role)) throw new Error("זה התפקיד היחיד שלו – מחק את המשתמש במקום");
+    u.roles = u.roles.filter((r) => r.role !== role);
+  }
+
   async resetUserPassword(userId: string, password: string) {
     await delay();
     if (password.length < 10) throw new Error("סיסמה זמנית: לפחות 10 תווים");
@@ -1191,7 +1208,7 @@ export class DemoApi implements Api {
   /** The demo soldier "chayal" is the second soldier of the list. */
   private mySoldier() {
     if (!this.user) return null;
-    return this.accounts.get(this.user.name) ?? (this.user.name === "chayal" ? this.soldierList[1]?.id : null) ?? null;
+    return this.accounts.get(this.user.name) ?? (this.user.name === "chayal" ? this.soldierList[1]?.id : this.user.name === "cmd" ? this.soldierList[2]?.id : null) ?? null;
   }
 
   async myDuties() {
@@ -1211,7 +1228,7 @@ export class DemoApi implements Api {
       }
     }
     // the demo soldier gets two duties ahead, so swaps can be tried
-    if (this.user?.name === "chayal" && !out.some((d) => Date.parse(d.starts_at) > Date.now())) out.push(...this.demoDuties());
+    if ((this.user?.name === "chayal" || this.user?.name === "cmd") && !out.some((d) => Date.parse(d.starts_at) > Date.now())) out.push(...this.demoDuties());
     return out.sort((x, y) => x.starts_at.localeCompare(y.starts_at));
   }
 

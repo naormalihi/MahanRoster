@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Menu,
   Paper,
   Stack,
   Table,
@@ -34,7 +35,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/auth";
 import type { ExistingSoldier } from "../lib/roster";
-import { ROLE_NAME, tempPassword, usernameProblem, type AppUser, type CreatableRole } from "../lib/users";
+import { GRANTABLE, ROLE_NAME, tempPassword, usernameProblem, type AppUser, type CreatableRole } from "../lib/users";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | null; onChange: (id: string | null) => void; autoFocus?: boolean }) {
@@ -163,6 +164,8 @@ export function UsersTab() {
   const [deleting, setDeleting] = useState<AppUser | null>(null);
   const [mfaReset, setMfaReset] = useState<AppUser | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [granting, setGranting] = useState<{ user: AppUser; anchor: HTMLElement } | null>(null);
+  const [revoking, setRevoking] = useState<{ user: AppUser; role: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -223,7 +226,22 @@ export function UsersTab() {
           const parts = (u: AppUser) => {
             const self = u.user_id === me?.userId;
             const commander = u.roles.some((r) => r.role === "gaf_commander");
-            const roles = u.roles.map((r) => <Chip key={r.id} size="small" label={ROLE_NAME[r.role] ?? r.role} color={r.role === "coordinator" ? "primary" : "default"} />);
+            // a staff role can be taken away (not the soldier one – it follows the link to a soldier – nor your own נע"ת)
+            const removable = (role: string) => role !== "soldier" && u.roles.length > 1 && !(self && role === "coordinator");
+            const roles = u.roles.map((r) => (
+              <Chip
+                key={r.id}
+                size="small"
+                label={ROLE_NAME[r.role] ?? r.role}
+                color={r.role === "coordinator" ? "primary" : "default"}
+                onDelete={removable(r.role) ? () => setRevoking({ user: u, role: r.role }) : undefined}
+              />
+            ));
+            const grantable = GRANTABLE.filter((g) => !u.roles.some((r) => r.role === g));
+            if (grantable.length && !u.is_locked)
+              roles.push(
+                <Chip key="add" size="small" variant="outlined" icon={<AddIcon />} label="תפקיד" onClick={(e) => setGranting({ user: u, anchor: e.currentTarget })} />,
+              );
             // a gaf commander sees personal records of his own gaf only: without a gaf, of none
             if (u.roles.some((r) => r.role === "gaf_commander" && !r.gaf_id) && !u.soldier_id)
               roles.push(<Chip key="nogaf" size="small" color="warning" variant="outlined" label="לא משויך לגף – לא רואה פרטים אישיים" />);
@@ -370,6 +388,48 @@ export function UsersTab() {
               }}
             >
               איפוס
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+      <Menu anchorEl={granting?.anchor} open={!!granting} onClose={() => setGranting(null)}>
+        {granting &&
+          GRANTABLE.filter((g) => !granting.user.roles.some((r) => r.role === g)).map((g) => (
+            <MenuItem
+              key={g}
+              onClick={() => {
+                const u = granting.user;
+                setGranting(null);
+                void act(() => api!.grantUserRole(u.user_id, g));
+              }}
+            >
+              הוספת תפקיד: {ROLE_NAME[g]}
+            </MenuItem>
+          ))}
+      </Menu>
+      {revoking && (
+        <Dialog open onClose={() => setRevoking(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>הסרת תפקיד</DialogTitle>
+          <DialogContent dividers>
+            <Typography>
+              להסיר מ-<b>{revoking.user.username}</b> את התפקיד {ROLE_NAME[revoking.role as keyof typeof ROLE_NAME] ?? revoking.role}?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              החשבון נשאר, עם שאר התפקידים שלו. הפעולה נרשמת ביומן.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRevoking(null)}>ביטול</Button>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={() => {
+                const x = revoking;
+                setRevoking(null);
+                void act(() => api!.revokeUserRole(x.user.user_id, x.role as never));
+              }}
+            >
+              הסרה
             </Button>
           </DialogActions>
         </Dialog>

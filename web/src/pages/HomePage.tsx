@@ -1,3 +1,4 @@
+import { MyNextDuty } from "../components/MyNextDuty";
 import { SwapLogCard } from "../components/SwapDialog";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
@@ -118,6 +119,7 @@ export function HomePage() {
           כדאי למנות נע״ת או מ״מ נוסף: אם תחליף טלפון, הוא יוכל לאפס לך את האימות הדו-שלבי.
         </Alert>
       )}
+      <MyNextDuty />
 
       {cycles && !cycle && (
         <Alert severity="info" action={<Button color="inherit" component={RouterLink} to="/cycles">ניהול מחזורים</Button>}>

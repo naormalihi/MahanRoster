@@ -39,7 +39,7 @@ import { stageLabel } from "../lib/cycles";
 import { APP_VERSION, BUILD_DATE, BUILD_SHA, CHANGELOG } from "../lib/changelog";
 import { Mascot } from "./Mascot";
 import { OwlTour } from "./OwlTour";
-import { markTourSeen, TOUR, tourKind, tourSeen } from "../lib/tour";
+import { markTourSeen, tourKind, tourSeen, tourSteps } from "../lib/tour";
 import { ThemeSync, ThemeToggle } from "./ThemePicker";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -68,6 +68,38 @@ const SOLDIER_LINKS = [
   { to: "/board", label: "לוח התורנויות", match: (p: string) => p === "/board" },
   { to: "/scoring", label: "איך מחושב הניקוד", match: (p: string) => p === "/scoring" },
 ];
+
+/** Staff and commanders who do duties too: their own corner, next to the unit's screens. */
+const MY_LINKS = [
+  { to: "/my", label: "התורנויות שלי", match: (p: string) => p === "/my" },
+  { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
+];
+
+/** The "שלי" menu on a wide screen. */
+function MyMenu({ pathname }: { pathname: string }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const active = MY_LINKS.some((l) => l.match(pathname));
+  return (
+    <>
+      <Button
+        color="inherit"
+        onClick={(e) => setAnchor(e.currentTarget)}
+        endIcon={<ExpandMoreIcon />}
+        aria-haspopup="menu"
+        sx={active ? { bgcolor: "rgba(255,255,255,.15)" } : undefined}
+      >
+        שלי
+      </Button>
+      <Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)}>
+        {MY_LINKS.map((l) => (
+          <MenuItem key={l.to} component={NavLink} to={l.to} selected={l.match(pathname)} onClick={() => setAnchor(null)}>
+            {l.label}
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
+  );
+}
 
 /** The cycle every step works on, chosen here once. */
 function CycleSwitcher({ dark }: { dark?: boolean }) {
@@ -231,6 +263,7 @@ export function Layout({ children }: { children: ReactNode }) {
       : isSoldier(me)
         ? SOLDIER_LINKS
         : [];
+  const mine = isSoldier(me) && (staff || reader);
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", "@media print": { bgcolor: "white" } }}>
       <AppBar position="sticky" color="primary" elevation={0} sx={{ "@media print": { display: "none" } }}>
@@ -263,6 +296,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 {l.label}
               </Button>
             ))}
+          {!compact && mine && <MyMenu pathname={pathname} />}
           <Box sx={{ flex: 1 }} />
           {reader && !compact && <CycleSwitcher />}
           {api?.demo && <Chip size="small" label={compact ? "הדגמה" : "מצב הדגמה – נתונים פיקטיביים"} sx={{ bgcolor: "#f3c96b", color: "#3a2a00" }} />}
@@ -287,7 +321,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </Toolbar>
       </AppBar>
       <ThemeSync />
-      {kind && <OwlTour open={tour} steps={TOUR[kind]} onClose={closeTour} />}
+      {kind && <OwlTour open={tour} steps={tourSteps(kind, mine)} onClose={closeTour} />}
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
           <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -312,6 +346,18 @@ export function Layout({ children }: { children: ReactNode }) {
               </ListItemButton>
             ))}
           </List>
+          {mine && (
+            <>
+              <Divider />
+              <List subheader={<ListSubheader>שלי</ListSubheader>}>
+                {MY_LINKS.map((l) => (
+                  <ListItemButton key={l.to} component={NavLink} to={l.to} end selected={l.match(pathname)} onClick={() => setOpen(false)}>
+                    <ListItemText primary={l.label} />
+                  </ListItemButton>
+                ))}
+              </List>
+            </>
+          )}
           <Divider />
           <List>
             {kind && (
