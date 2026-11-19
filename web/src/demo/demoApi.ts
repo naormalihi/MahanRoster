@@ -7,8 +7,8 @@
  *                       new.user – a viewer who must change the password first
  */
 
-import type { MyDuty } from "../lib/me";
 import type { AddSoldierResult, AddSoldierRow } from "../lib/addSoldier";
+import type { MyDuty, UnackedDuty } from "../lib/me";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, RankItem, Role, SlotPeople, SlotPerson } from "../lib/api";
 import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
@@ -145,7 +145,7 @@ export class DemoApi implements Api {
   private boardPeople = new Map<string, SlotPerson[]>();
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
-  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.3, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24 };
+  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.3, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24, ack_reminder_hours: 48, ack_escalation_hours: 24 };
   // the unit's additions: weekend +3; eves of the big holidays +6, the other holiday days +3
   private multipliers: ScoreMultiplier[] = [
     { id: "m_we", name: "סוף שבוע", value: 3, day_types: [], holidays: [], holiday_kinds: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
@@ -1528,6 +1528,36 @@ export class DemoApi implements Api {
       credit_min_days: 7,
       credit_absences: ["מחלה", "קורס"],
     };
+  }
+
+  private acked = new Set<string>();
+  async ackDuties(ids: string[]) {
+    await delay();
+    ids.forEach((i) => this.acked.add(i));
+    return ids.length;
+  }
+
+  async staffAck(id: string) {
+    await delay();
+    this.acked.add(id);
+  }
+
+  async unackedDuties(hours = 72): Promise<UnackedDuty[]> {
+    await delay();
+    const now = Date.now();
+    const out: UnackedDuty[] = [];
+    for (const r of this.boardRows) {
+      const t = Date.parse(r.starts_at);
+      if (t < now || t > now + hours * 3600_000) continue;
+      r.performers.forEach((name, i) => {
+        const s = this.soldierList.find((x) => x.full_name === name);
+        const id = `${r.slot_id}-${i}`;
+        if (!s || this.acked.has(id) || (s.full_name.length + i) % 3 !== 0) return; // a few, fictitious
+        out.push({ assignment_id: id, soldier_id: s.id, full_name: s.full_name, gaf_name: s.gaf_name, has_account: s.full_name.length % 2 === 0,
+                   phone: s.phone ?? null, task_name: r.task_name, role: "performer", starts_at: r.starts_at, ends_at: r.ends_at, reminded: t - now < 48 * 3600_000 });
+      });
+    }
+    return out.slice(0, 8);
   }
 
   async myScores() {

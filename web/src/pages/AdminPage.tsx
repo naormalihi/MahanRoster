@@ -1525,6 +1525,31 @@ function ScoringTab() {
           </Box>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
+              אישור קבלת תורנות ("ראיתי")
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                type="number"
+                label="תזכורת לחייל – שעות לפני"
+                value={s.ack_reminder_hours}
+                onChange={(e) => setS({ ...s, ack_reminder_hours: Math.round(Number(e.target.value)) })}
+                slotProps={{ htmlInput: { min: 0, max: 168, step: 1 } }}
+                helperText='"עוד לא אישרת" למי שלא לחץ "ראיתי". 0 = בלי תזכורת.'
+                sx={{ maxWidth: 320 }}
+              />
+              <TextField
+                type="number"
+                label="עדכון למפקד הגף – שעות לפני"
+                value={s.ack_escalation_hours}
+                onChange={(e) => setS({ ...s, ack_escalation_hours: Math.round(Number(e.target.value)) })}
+                slotProps={{ htmlInput: { min: 0, max: 168, step: 1 } }}
+                helperText="מפקד הגף מקבל התראה על חייל שלו שעוד לא אישר. 0 = בלי עדכון."
+                sx={{ maxWidth: 320 }}
+              />
+            </Stack>
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
               סגירת אילוצים ופטורים במחזור חדש
             </Typography>
             <TextField

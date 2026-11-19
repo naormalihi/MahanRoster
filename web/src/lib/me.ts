@@ -37,6 +37,29 @@ export interface MyDuty {
   contact_name?: string | null;
   contact_phone?: string | null;
   briefing_note?: string | null;
+  /** when he pressed "ראיתי" (or נע"ת marked a phone call); null: still waiting */
+  acked_at?: string | null;
+}
+
+/** A duty of the coming days that its soldier has not acknowledged yet (נע"ת, gaf commander). */
+export interface UnackedDuty {
+  assignment_id: string;
+  soldier_id: string;
+  full_name: string;
+  gaf_name: string | null;
+  has_account: boolean;
+  phone: string | null;
+  task_name: string;
+  role: "performer" | "reserve";
+  starts_at: string;
+  ends_at: string;
+  /** "עוד לא אישרת" was already sent */
+  reminded: boolean;
+}
+
+/** A duty still waiting for the soldier's "ראיתי": live, not over, not acknowledged. */
+export function needsAck(d: Pick<MyDuty, "acked_at" | "status" | "ends_at">, now: number): boolean {
+  return !d.acked_at && ["assigned", "reserve_idle", "reserve_activated"].includes(d.status) && Date.parse(d.ends_at) > now;
 }
 
 export interface MyScore {

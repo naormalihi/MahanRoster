@@ -35,9 +35,9 @@ describe("catalog validation", () => {
     expect(taskTypeProblems({ ...base, default_start_time: "08:00" }, others)).toHaveLength(1);
   });
   it("scoring settings", () => {
-    const ok = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24 };
+    const ok = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.5, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24, ack_reminder_hours: 48, ack_escalation_hours: 24 };
     expect(scoringProblems(ok)).toEqual([]);
-    expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [], surprise_multiplier: 0.5, surprise_notice_hours: 0, exemption_deadline_days: 0, fairness_tolerance_pct: 0, grace_days: -1, briefing_reminder_hours: 1 })).toHaveLength(8);
+    expect(scoringProblems({ night_window: "22-6", weekend_weekdays: [], surprise_multiplier: 0.5, surprise_notice_hours: 0, exemption_deadline_days: 0, fairness_tolerance_pct: 0, grace_days: -1, briefing_reminder_hours: 1, ack_reminder_hours: -1, ack_escalation_hours: 200 })).toHaveLength(10);
   });
   it("briefing: label, problems, clean", () => {
     expect(briefingLabel({ kind: "briefing", rule: "weekday", weekday: 2, time: "13:00", place: "גף אבטחה פיזית" })).toBe("תדריך שלישי שלפני 13:00 · גף אבטחה פיזית");

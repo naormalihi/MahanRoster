@@ -144,9 +144,11 @@ export interface ScoringSettings {
   fairness_tolerance_pct: number; // the load screen flags a soldier further than this % from his peers' mean
   grace_days: number; // a new soldier's training period: no duties for this many days from his first cycle
   briefing_reminder_hours: number; // the reminder of a briefing goes this many hours before it
+  ack_reminder_hours: number; // "עוד לא אישרת" this many hours before the duty (0 = off)
+  ack_escalation_hours: number; // the gaf commander hears this many hours before (0 = off)
 }
 
-export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "surprise_notice_hours", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days", "briefing_reminder_hours"] as const;
+export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "surprise_notice_hours", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days", "briefing_reminder_hours", "ack_reminder_hours", "ack_escalation_hours"] as const;
 
 export const ISO_DAY_LABEL: Record<number, string> = { 7: "ראשון", 1: "שני", 2: "שלישי", 3: "רביעי", 4: "חמישי", 5: "שישי", 6: "שבת" };
 export const ISO_WEEK = [7, 1, 2, 3, 4, 5, 6];
@@ -161,6 +163,8 @@ export function scoringProblems(s: ScoringSettings): string[] {
   if (!Number.isInteger(s.surprise_notice_hours) || s.surprise_notice_hours < 1 || s.surprise_notice_hours > 336)
     p.push("סף הקפצה – בין 1 ל-336 שעות");
   if (!(s.fairness_tolerance_pct >= 1) || s.fairness_tolerance_pct > 100) p.push("טווח הוגנות – בין 1% ל-100%");
+  for (const [k, label] of [["ack_reminder_hours", "תזכורת לאישור"], ["ack_escalation_hours", "עדכון למפקד הגף"]] as const)
+    if (!Number.isInteger(s[k]) || s[k] < 0 || s[k] > 168) p.push(`${label} – בין 0 ל-168 שעות`);
   if (!Number.isInteger(s.briefing_reminder_hours) || s.briefing_reminder_hours < 2 || s.briefing_reminder_hours > 72)
     p.push("תזכורת תדריך – בין 2 ל-72 שעות לפני");
   if (!Number.isInteger(s.grace_days) || s.grace_days < 0 || s.grace_days > 365) p.push("תקופת הכשרה – בין 0 ל-365 ימים");
