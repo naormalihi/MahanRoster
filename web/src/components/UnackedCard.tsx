@@ -6,6 +6,8 @@ import { useAuth } from "../lib/auth";
 import { dayLabel, spanLabel } from "../lib/dates";
 import type { UnackedDuty } from "../lib/me";
 import { formatPhone } from "../lib/phone";
+import { Link as RouterLink } from "react-router-dom";
+import { DutyWhatsAppButton } from "./DutyWhatsApp";
 
 const HOURS = 72;
 
@@ -39,7 +41,7 @@ export function UnackedCard() {
         לא אישרו – {HOURS} השעות הקרובות
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        משובצים שעוד לא לחצו "ראיתי". מי שבלי חשבון לא יכול לאשר במערכת – כדאי להתקשר אליו.
+        משובצים שעוד לא לחצו "ראיתי". מי שבלי חשבון לא יכול לאשר במערכת – שולחים לו וואטסאפ (עם קוד הצטרפות) או מתקשרים, ומסמנים כשענה.
       </Typography>
       <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
         {rows.map((r) => {
@@ -61,7 +63,13 @@ export function UnackedCard() {
                   {r.task_name}
                   {r.role === "reserve" ? " (עתודה)" : ""} · {dayLabel(r.starts_at)} · {spanLabel(r.starts_at, r.ends_at)}
                 </Typography>
+                {staff && !r.phone && (
+                  <Typography component={RouterLink} to={`/soldiers?edit=${r.soldier_id}`} variant="caption" sx={{ color: "primary.main" }}>
+                    הוספת טלפון
+                  </Typography>
+                )}
               </Box>
+              {staff && <DutyWhatsAppButton compact query={{ assignmentId: r.assignment_id }} name={r.full_name} onError={setError} />}
               {tel && (
                 <Tooltip title={`התקשרות – ${formatPhone(r.phone)}`}>
                   <IconButton size="small" component="a" href={`tel:${tel}`} aria-label={`התקשרות ל${r.full_name}`}>

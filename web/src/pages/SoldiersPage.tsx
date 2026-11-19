@@ -40,7 +40,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import type { NamedRef } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { isStaff } from "../lib/api";
@@ -591,6 +591,15 @@ export function SoldiersPage() {
   const activeFilters = [gaf, rank, relief, exFilter, service, range].filter(Boolean).length;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SoldierDetail | null>(null);
+  // "?edit=<id>" (from "הוספת טלפון" elsewhere): open that soldier's card once the list is in
+  const [params, setParams] = useSearchParams();
+  const editParam = params.get("edit");
+  useEffect(() => {
+    if (!editParam || !rows) return;
+    const s = rows.find((x) => x.id === editParam);
+    if (s) setEditing(s);
+    setParams((p) => (p.delete("edit"), p), { replace: true });
+  }, [editParam, rows, setParams]);
   const [bulk, setBulk] = useState(false);
   // by today's date: the cycle today falls in (current) and the first one after it (next) –
   // points per soldier and who is in it

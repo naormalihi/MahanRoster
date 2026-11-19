@@ -1,4 +1,5 @@
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
+import type { DutyMessage } from "./dutyMessage";
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 /**
@@ -92,6 +93,17 @@ export interface BoardRow {
 }
 
 /** The people of one published duty, for the actions on it (staff). */
+export interface NoAccountRow {
+  soldier_id: string;
+  full_name: string;
+  gaf_name: string | null;
+  phone: string | null;
+  duties: number;
+  first_at: string;
+  /** a message went out since the cycle was published */
+  sent: boolean;
+}
+
 export interface SlotPerson {
   id: string; // assignment id
   name: string;
@@ -288,6 +300,10 @@ export interface Api {
   staffAck(assignmentId: string): Promise<void>;
   /** duties of the coming hours not acknowledged yet (a gaf commander: his gaf) */
   unackedDuties(hours?: number): Promise<UnackedDuty[]>;
+  /** the WhatsApp message about one duty (assignment) or all his coming duties in a cycle; a fresh join code if he has no account */
+  dutyMessage(q: { soldierId?: string; assignmentId?: string; cycleId?: string }): Promise<DutyMessage>;
+  /** after publishing: soldiers with duties in the cycle and no account */
+  noAccountDuties(cycleId: string): Promise<NoAccountRow[]>;
   /** swaps between soldiers: whom I can give a duty of mine to, or trade it with */
   swapOptions(assignmentId: string): Promise<SwapOptions>;
   requestSwap(assignmentId: string, targetSoldierId: string, counterAssignmentId?: string | null): Promise<string>;

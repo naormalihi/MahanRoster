@@ -1,11 +1,12 @@
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
+import type { DutyMessage } from "./dutyMessage";
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount, UnackedDuty } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, RankItem, Role, SlotPeople } from "./api";
+import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople } from "./api";
 import { usernameToEmail } from "./api";
 import { SCORING_KEYS, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import {
@@ -1050,6 +1051,16 @@ export class SupabaseApi implements Api {
 
   async unackedDuties(hours = 72): Promise<UnackedDuty[]> {
     return check(await this.sb.rpc("unacked_duties", { p_hours: hours })) as UnackedDuty[];
+  }
+
+  async dutyMessage(q: { soldierId?: string; assignmentId?: string; cycleId?: string }): Promise<DutyMessage> {
+    return check(
+      await this.sb.rpc("duty_message", { p_soldier: q.soldierId ?? null, p_assignment: q.assignmentId ?? null, p_cycle: q.cycleId ?? null }),
+    ) as DutyMessage;
+  }
+
+  async noAccountDuties(cycleId: string): Promise<NoAccountRow[]> {
+    return check(await this.sb.rpc("no_account_duties", { p_cycle: cycleId })) as NoAccountRow[];
   }
 
   async myScores(): Promise<MyScore[]> {
