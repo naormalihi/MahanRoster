@@ -1,6 +1,7 @@
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { DutyMessage } from "./dutyMessage";
 import type { ContactEntry, MyContact } from "./contacts";
+import { clearOffline, isOfflineError, OfflineError } from "./offline";
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 import type { AppNotification } from "./notifications";
@@ -101,7 +102,9 @@ export class SupabaseApi implements Api {
   }
 
   async me(): Promise<Me | null> {
-    const { data } = await this.sb.auth.getUser();
+    const { data, error } = await this.sb.auth.getUser();
+    // no reception: not "signed out" – the caller may show the copy kept on the device
+    if (!data.user && error && isOfflineError(error)) throw new OfflineError();
     if (!data.user) return null;
     const uid = data.user.id;
     const user = maybe(await this.sb.from("app_users").select("username, must_change_password, ui_theme, request_alerts").eq("id", uid).maybeSingle());
@@ -110,6 +113,7 @@ export class SupabaseApi implements Api {
     const blocked = await this.accessBlocked();
     if (blocked) {
       await this.sb.auth.signOut();
+      clearOffline(); // his duties kept on the device go with him
       setSignInNotice(blocked);
       return null;
     }
