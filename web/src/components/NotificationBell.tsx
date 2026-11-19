@@ -6,12 +6,15 @@ import {
   Button,
   Divider,
   Drawer,
+  FormControlLabel,
   IconButton,
   Stack,
+  Switch,
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { ago, pushState, subscribePush, unsubscribePush, type AppNotification, type PushState } from "../lib/notifications";
 
@@ -116,6 +119,7 @@ export function NotificationBell() {
             <Button onClick={() => setOpen(false)}>סגירה</Button>
           </Stack>
           <PushControl />
+          <RequestAlertsControl />
           <Divider sx={{ my: 1.5 }} />
           {items.length === 0 && (
             <Typography variant="body2" color="text.secondary">
@@ -166,5 +170,43 @@ export function NotificationBell() {
         </Box>
       </Drawer>
     </>
+  );
+}
+
+/** נע"ת, מ"מ and gaf commanders: notices on new exemption requests – on unless turned off here. */
+function RequestAlertsControl() {
+  const { api, me } = useAuth();
+  const [on, setOn] = useState(me?.requestAlerts ?? true);
+  const [error, setError] = useState<string | null>(null);
+  if (!me || !(isStaff(me) || me.roles.includes("gaf_commander"))) return null;
+  return (
+    <Box sx={{ mt: 1 }}>
+      <FormControlLabel
+        sx={{ m: 0, width: "100%", justifyContent: "space-between" }}
+        labelPlacement="start"
+        label={<Typography variant="body2">התראה על בקשת פטור חדשה{isStaff(me) ? "" : " בגף שלי"}</Typography>}
+        control={
+          <Switch
+            checked={on}
+            onChange={async (_, v) => {
+              setOn(v);
+              setError(null);
+              try {
+                await api!.setMyRequestAlerts(v);
+                if (me) me.requestAlerts = v;
+              } catch (e) {
+                setOn(!v);
+                setError((e as Error).message);
+              }
+            }}
+          />
+        }
+      />
+      {error && (
+        <Typography variant="caption" color="error">
+          {error}
+        </Typography>
+      )}
+    </Box>
   );
 }
