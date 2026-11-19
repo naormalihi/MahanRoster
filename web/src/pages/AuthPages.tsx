@@ -4,13 +4,13 @@ import { passwordProblems } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Mascot, type MascotPose } from "../components/Mascot";
 import { PasswordField } from "../components/PasswordField";
-import { ThemeMenuButton } from "../components/ThemePicker";
+import { ThemeToggle } from "../components/ThemePicker";
 
 function Card({ title, subtitle, pose = "wave", children }: { title: string; subtitle?: string; pose?: MascotPose; children: ReactNode }) {
   return (
     <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", bgcolor: "background.default", px: 2, position: "relative" }}>
       <Box sx={{ position: "absolute", top: 8, left: 8, color: "text.secondary" }}>
-        <ThemeMenuButton />
+        <ThemeToggle />
       </Box>
       <Paper sx={{ p: { xs: 3, sm: 4 }, width: "100%", maxWidth: 400 }}>
         <Stack spacing={2.5}>

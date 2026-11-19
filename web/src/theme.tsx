@@ -10,11 +10,6 @@ const rtlCache = createCache({ key: "muirtl", stylisPlugins: [prefixer, rtlPlugi
 
 /** The look the user chose: light, dark, or as the device is set. */
 export type ThemeChoice = "auto" | "light" | "dark";
-export const THEME_CHOICES: { value: ThemeChoice; label: string }[] = [
-  { value: "light", label: "בהיר" },
-  { value: "dark", label: "כהה" },
-  { value: "auto", label: "לפי המכשיר" },
-];
 
 const STORAGE_KEY = "mr.theme";
 const NAVY = "#1a1466";
