@@ -308,6 +308,8 @@ export interface Api {
   /** A gaf-commander account with a temporary password, linked to a soldier record. */
   createUser(username: string, password: string, soldierId: string | null, role?: CreatableRole): Promise<string>;
   resetUserPassword(userId: string, password: string): Promise<void>;
+  /** removes a user's two-step login and signs him out; he sets it up again on his next sign-in */
+  resetUserMfa(userId: string): Promise<void>;
   setUserLocked(userId: string, locked: boolean): Promise<void>;
   /** Deletes a gaf commander's account; one whose name is on records is closed and hidden instead. */
   deleteUser(userId: string): Promise<"deleted" | "closed">;

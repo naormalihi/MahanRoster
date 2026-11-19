@@ -846,6 +846,10 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("create_user", { p_username: username, p_password: password, p_role: role, p_soldier: soldierId })) as string;
   }
 
+  async resetUserMfa(userId: string) {
+    maybe(await this.sb.rpc("reset_user_mfa", { p_user: userId }));
+  }
+
   async resetUserPassword(userId: string, password: string) {
     maybe(await this.sb.rpc("reset_user_password", { p_user: userId, p_password: password }));
   }

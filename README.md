@@ -61,3 +61,19 @@ pg_restore --no-owner --no-privileges --clean --if-exists -d "$DATABASE_URL" db.
 
 לשחזור טבלה אחת: `pg_restore -l db.dump` מציג את התוכן, ו-`-t <table>` משחזר רק אותה.
 
+
+## איפוס אימות דו-שלבי
+
+הדרך הרגילה: נע"ת או מ"מ אחר, במסך הגדרות › משתמשים, לוחץ על "איפוס אימות דו-שלבי" ליד המשתמש. אי אפשר לאפס את האימות של עצמך.
+
+כשאין מי שיאפס (נע"ת יחיד שהחליף טלפון): ב-Supabase › SQL Editor, עם שם המשתמש במקום `USERNAME`:
+
+```sql
+with u as (select id from public.app_users where username = 'USERNAME' and deleted_at is null)
+, f as (delete from auth.mfa_factors where user_id in (select id from u))
+, s as (delete from auth.sessions where user_id in (select id from u))
+insert into public.audit_log (action, entity_type, entity_id, after)
+select 'reset_mfa', 'app_users', id::text, '{"via": "sql editor"}'::jsonb from u;
+```
+
+בכניסה הבאה המשתמש נכנס עם הסיסמה שלו ומגדיר את האימות מחדש (סורק QR). כדי שזה לא יקרה, כדאי שיהיו לפחות שני משתמשים בתפקיד נע"ת או מ"מ – תמונת המצב מזכירה את זה כשיש רק אחד.

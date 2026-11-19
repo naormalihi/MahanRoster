@@ -18,6 +18,23 @@ export interface AppUser {
   must_change_password: boolean;
   last_login_at: string | null;
   roles: UserRoleRow[];
+  /** two-step login set up (a verified authenticator) */
+  has_mfa?: boolean;
+}
+
+/** Users who can reset another user's two-step login: נע"ת and מ"מ, active, not locked. */
+export function mfaResetters(users: AppUser[], now = new Date()): AppUser[] {
+  const t = now.getTime();
+  return users.filter(
+    (u) =>
+      !u.is_locked &&
+      u.roles.some(
+        (r) =>
+          (r.role === "coordinator" || r.role === "deputy") &&
+          (!r.valid_from || Date.parse(r.valid_from) <= t) &&
+          (!r.valid_to || Date.parse(r.valid_to) > t),
+      ),
+  );
 }
 
 export const ROLE_NAME: Record<Role, string> = {

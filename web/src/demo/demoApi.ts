@@ -1080,7 +1080,8 @@ export class DemoApi implements Api {
   }
 
   private users: AppUser[] = [
-    { user_id: "u-naat", username: "naat", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: new Date().toISOString(), roles: [{ id: "r1", role: "coordinator", gaf_id: null, valid_from: null, valid_to: null }] },
+    { user_id: "naat", username: "naat", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: new Date().toISOString(), roles: [{ id: "r1", role: "coordinator", gaf_id: null, valid_from: null, valid_to: null }], has_mfa: true },
+    { user_id: "u-mm", username: "mm.demo", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: null, roles: [{ id: "r3", role: "deputy", gaf_id: null, valid_from: null, valid_to: null }], has_mfa: true },
     { user_id: "u-board", username: "board", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: null, roles: [{ id: "r2", role: "viewer", gaf_id: null, valid_from: null, valid_to: null }] },
   ];
 
@@ -1097,6 +1098,13 @@ export class DemoApi implements Api {
     const id = crypto.randomUUID();
     this.users.push({ user_id: id, username, soldier_id: soldierId, soldier_name: s?.full_name ?? null, is_locked: false, must_change_password: true, last_login_at: null, roles: [{ id: crypto.randomUUID(), role, gaf_id: null, valid_from: null, valid_to: null }] });
     return id;
+  }
+
+  async resetUserMfa(userId: string) {
+    await delay();
+    const u = this.users.find((x) => x.user_id === userId);
+    if (!u?.has_mfa) throw new Error("למשתמש הזה אין אימות דו-שלבי");
+    u.has_mfa = false;
   }
 
   async resetUserPassword(userId: string, password: string) {

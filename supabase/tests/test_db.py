@@ -2453,3 +2453,32 @@ def test_a_user_keeps_his_look_with_the_account(conn):
                 conn.execute("select public.set_my_theme('pink')")
         conn.execute("reset role")
         raise psycopg.Rollback()
+
+
+def test_reset_user_mfa(conn):
+    with conn.transaction():
+        conn.execute("insert into auth.mfa_factors (user_id) values (%s)", (DEPUTY_ACTIVE,))
+        sid = conn.execute("insert into auth.sessions (user_id, aal) values (%s, 'aal2') returning id", (DEPUTY_ACTIVE,)).fetchone()[0]
+        conn.execute("insert into auth.refresh_tokens (token, user_id, session_id) values ('t', %s, %s)", (str(DEPUTY_ACTIVE), sid))
+        conn.execute("set local role authenticated")
+        _claims(conn, COORD)
+        has = dict(conn.execute("select user_id, has_mfa from public.list_users()").fetchall())
+        assert has[DEPUTY_ACTIVE] is True and has[COORD] is False
+        with pytest.raises(psycopg.Error, match="עצמך"):
+            with conn.transaction():
+                conn.execute("select public.reset_user_mfa(%s)", (COORD,))
+        conn.execute("select public.reset_user_mfa(%s)", (DEPUTY_ACTIVE,))
+        with pytest.raises(psycopg.Error, match="אין אימות"):
+            with conn.transaction():
+                conn.execute("select public.reset_user_mfa(%s)", (DEPUTY_ACTIVE,))
+        _claims(conn, VIEWER)  # a reader cannot
+        with pytest.raises(psycopg.Error, match="רק נע"):
+            with conn.transaction():
+                conn.execute("select public.reset_user_mfa(%s)", (COORD,))
+        conn.execute("reset role")
+        for t in ("auth.mfa_factors", "auth.sessions", "auth.refresh_tokens"):
+            assert conn.execute(f"select count(*) from {t} where user_id::text = %s", (str(DEPUTY_ACTIVE),)).fetchone()[0] == 0
+        assert conn.execute("select count(*) from audit_log where action = 'reset_mfa' and entity_id = %s", (str(DEPUTY_ACTIVE),)).fetchone()[0] == 1
+        told = {r[0] for r in conn.execute("select recipient_user_id from notifications where type = 'mfa_reset'").fetchall()}
+        assert COORD not in told and DEPUTY_ACTIVE not in told  # neither the one who reset nor the one reset
+        raise psycopg.Rollback()

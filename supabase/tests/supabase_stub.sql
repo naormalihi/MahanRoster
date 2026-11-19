@@ -63,3 +63,27 @@ create table if not exists auth.identities (
   updated_at timestamptz,
   unique (provider_id, provider)
 );
+-- the parts of Supabase Auth's MFA and session tables the app touches (reset_user_mfa)
+create table if not exists auth.mfa_factors (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  friendly_name text,
+  factor_type text not null default 'totp',
+  status text not null default 'verified',
+  secret text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists auth.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  aal text,
+  created_at timestamptz default now()
+);
+create table if not exists auth.refresh_tokens (
+  id bigserial primary key,
+  token text,
+  user_id text,
+  revoked boolean default false,
+  session_id uuid references auth.sessions(id) on delete cascade
+);
