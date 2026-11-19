@@ -8,6 +8,7 @@
  */
 
 import type { MyDuty } from "../lib/me";
+import type { AddSoldierResult, AddSoldierRow } from "../lib/addSoldier";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, RankItem, Role, SlotPeople, SlotPerson } from "../lib/api";
 import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
@@ -1122,6 +1123,44 @@ export class DemoApi implements Api {
     if (role === "soldier") throw new Error("תפקיד החייל נקבע לפי השיוך לחייל – מנתקים את השיוך במקום");
     if (!u.roles.some((r) => r.role !== role)) throw new Error("זה התפקיד היחיד שלו – מחק את המשתמש במקום");
     u.roles = u.roles.filter((r) => r.role !== role);
+  }
+
+  async addSoldier(row: AddSoldierRow): Promise<AddSoldierResult> {
+    await delay(300);
+    const ex = this.soldierList.find((s) => s.soldier_key === row.soldier_key);
+    if (ex) return { status: ex.is_active ? "exists" : "inactive", id: ex.id, name: ex.full_name, gaf: ex.gaf_name };
+    const id = crypto.randomUUID();
+    const gaf = (await this.gafim()).find((g) => g.id === row.gaf_id)?.name ?? "";
+    const rank = (await this.ranks()).find((r) => r.id === row.rank_id)?.name ?? "";
+    this.soldierList.push({
+      id, soldier_key: row.soldier_key, full_name: row.full_name, service_type: row.service_type as "mandatory" | "career",
+      gender: (row.gender as "male" | "female" | null) ?? null, gaf_name: gaf, rank_name: rank, enlistment_date: row.enlistment_date,
+      release_date: row.release_date, career_start_date: row.career_start_date, range_valid_until: row.range_valid_until,
+      parent_status: row.parent_status, home_nightly: row.home_nightly, phone: row.phone, is_active: true,
+    });
+    this.extraOf(id).unit_join_date = row.unit_join_date;
+    return { status: "added", id };
+  }
+
+  async reactivateSoldier(soldierId: string, joinDate: string) {
+    await delay();
+    const s = this.soldierList.find((x) => x.id === soldierId);
+    if (!s || s.is_active) throw new Error("החייל לא נמצא או שהוא כבר פעיל");
+    s.is_active = true;
+    this.extraOf(soldierId).unit_join_date = joinDate;
+  }
+
+  async removeFromUnit(soldierId: string, _fromDay: string) {
+    await delay();
+    const s = this.soldierList.find((x) => x.id === soldierId);
+    if (!s || !s.is_active) throw new Error("החייל לא נמצא או שהוא כבר לא פעיל");
+    s.is_active = false;
+    return 0;
+  }
+
+  async futureDuties(_soldierId: string, _fromDay: string) {
+    await delay();
+    return 2;
   }
 
   async resetUserPassword(userId: string, password: string) {

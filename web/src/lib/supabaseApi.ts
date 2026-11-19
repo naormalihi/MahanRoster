@@ -1,3 +1,4 @@
+import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 import type { AppNotification } from "./notifications";
@@ -856,6 +857,22 @@ export class SupabaseApi implements Api {
 
   async revokeUserRole(userId: string, role: Role) {
     maybe(await this.sb.rpc("revoke_user_role", { p_user: userId, p_role: role }));
+  }
+
+  async addSoldier(row: AddSoldierRow): Promise<AddSoldierResult> {
+    return check(await this.sb.rpc("add_soldier", { p: row })) as AddSoldierResult;
+  }
+
+  async reactivateSoldier(soldierId: string, joinDate: string) {
+    maybe(await this.sb.rpc("reactivate_soldier", { p_soldier: soldierId, p_join: joinDate }));
+  }
+
+  async removeFromUnit(soldierId: string, fromDay: string): Promise<number> {
+    return check(await this.sb.rpc("remove_from_unit", { p_soldier: soldierId, p_from: fromDay })) as number;
+  }
+
+  async futureDuties(soldierId: string, fromDay: string): Promise<number> {
+    return check(await this.sb.rpc("future_duties", { p_soldier: soldierId, p_from: fromDay })) as number;
   }
 
   async resetUserPassword(userId: string, password: string) {

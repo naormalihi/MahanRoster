@@ -188,6 +188,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
               {shown.slice(0, 150).map((c) => {
                 const s = ctx.soldiers.get(c.soldier_id);
                 const bad = c.reasons.length > 0;
+                const newcomer = c.reasons.includes("grace");
                 const clash = overlapOf(c);
                 return (
                   <ListItemButton key={c.soldier_id} selected={chosen?.soldier_id === c.soldier_id} onClick={() => setChosen(c)} disabled={!!c.in_slot || clash.length > 0}>
@@ -199,7 +200,8 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
                             {s?.gaf_name} · {s?.rank_name}
                           </Typography>
                           {c.in_slot && <Chip size="small" label={`כבר ${ROLE_LABEL[c.in_slot]}`} />}
-                          {bad && <Chip size="small" color="error" variant="outlined" label="לא זכאי" />}
+                          {newcomer && <Chip size="small" color="info" variant="outlined" label="חדש ביחידה" />}
+                          {bad && !(newcomer && c.reasons.length === 1) && <Chip size="small" color="error" variant="outlined" label="לא זכאי" />}
                           {clash.length > 0 ? (
                             <Chip size="small" color="error" label="משובץ באותו זמן" />
                           ) : (
@@ -228,7 +230,12 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
           )}
           {warn && (
             <Alert severity="warning">
-              {chosen!.reasons.length > 0 && <div>לא זכאי: {reasonText(chosen!.reasons)}.</div>}
+              {chosen!.reasons.includes("grace") && (
+                <div>
+                  <b>חדש ביחידה, בתקופת החסד:</b> המנוע לא משבץ אותו. שיבוץ ידני עכשיו ייחשב הקפצה – הוא יקבל ניקוד הקפצה כפיצוי.
+                </div>
+              )}
+              {chosen!.reasons.some((x) => x !== "grace") && <div>לא זכאי: {reasonText(chosen!.reasons.filter((x) => x !== "grace"))}.</div>}
               {chosen!.conflicts.length > 0 && <div>בלי מספיק מנוחה מתורנות אחרת.</div>}
               אפשר לשבץ בכל זאת – {props.published ? "עם סיבה, שנשמרת ביומן" : "הנימוק נשמר ביומן"}.
             </Alert>

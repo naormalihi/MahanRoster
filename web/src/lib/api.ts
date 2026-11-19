@@ -1,3 +1,4 @@
+import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 /**
@@ -146,6 +147,12 @@ export interface Api {
   /** keep the chosen look with the account */
   setMyTheme(choice: "auto" | "light" | "dark"): Promise<void>;
   unitKeyCheck(): Promise<string | null>;
+  /** one soldier by hand (the ת.ז already hashed); an existing one is reported, not duplicated */
+  addSoldier(row: AddSoldierRow): Promise<AddSoldierResult>;
+  reactivateSoldier(soldierId: string, joinDate: string): Promise<void>;
+  /** inactive from a day; his live duties from it are dropped (slots to fill). Returns how many. */
+  removeFromUnit(soldierId: string, fromDay: string): Promise<number>;
+  futureDuties(soldierId: string, fromDay: string): Promise<number>;
   setUnitKeyCheck(value: string): Promise<void>;
   /** A forgotten unit key: moves the approved soldiers to keys made with the new one, and stores its fingerprint. */
   rekeySoldiers(pairs: { id: string; key: string }[], check: string): Promise<number>;
