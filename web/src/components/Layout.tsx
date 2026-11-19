@@ -40,6 +40,8 @@ import { APP_VERSION, BUILD_DATE, BUILD_SHA, CHANGELOG } from "../lib/changelog"
 import { Mascot } from "./Mascot";
 import { OwlTour } from "./OwlTour";
 import { markTourSeen, tourKind, tourSeen, tourSteps } from "../lib/tour";
+import ContactIcon from "@mui/icons-material/ContactPhoneOutlined";
+import { ContactsDialog } from "./ContactCard";
 import { ThemeSync, ThemeToggle } from "./ThemePicker";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -247,6 +249,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const kind = tourKind(me);
   const [tour, setTour] = useState(false);
+  const [contacts, setContacts] = useState(false);
   // the first time this user opens the app on this device
   useEffect(() => {
     if (me && kind && !me.mustChangePassword && !tourSeen(me.userId)) setTour(true);
@@ -322,6 +325,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </AppBar>
       <ThemeSync />
       {kind && <OwlTour open={tour} steps={tourSteps(kind, mine)} onClose={closeTour} />}
+      {contacts && <ContactsDialog onClose={() => setContacts(false)} />}
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
           <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -360,6 +364,17 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
           <Divider />
           <List>
+            {isSoldier(me) && (
+              <ListItemButton
+                onClick={() => {
+                  setOpen(false);
+                  setContacts(true);
+                }}
+              >
+                <ContactIcon fontSize="small" sx={{ ml: 1.5 }} />
+                <ListItemText primary="למי לפנות" />
+              </ListItemButton>
+            )}
             {kind && (
               <ListItemButton
                 onClick={() => {

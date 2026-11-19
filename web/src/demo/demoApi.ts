@@ -1,3 +1,4 @@
+import type { ContactEntry, MyContact } from "../lib/contacts";
 /**
  * Demo backend: a fictitious unit in memory. Lets the app run, be reviewed and
  * be screenshotted with no Supabase project. Nothing here is real.
@@ -319,6 +320,33 @@ export class DemoApi implements Api {
 
   async setMyTheme(): Promise<void> {}
   async setMyRequestAlerts(): Promise<void> {}
+
+  // "למי לפנות" – fictitious names and numbers
+  private contacts: ContactEntry[] = [
+    { user_id: "naat", display_name: "נועה דמו", phone: "972500000001", card_phone: null, role: "coordinator" },
+    { user_id: "u-mm", display_name: "עידו דמו", phone: null, card_phone: null, role: "deputy" },
+  ];
+
+  async myContacts(): Promise<MyContact[]> {
+    await delay();
+    return this.contacts
+      .filter((c) => c.role === "coordinator" || c.role === "deputy")
+      .slice(0, 2)
+      .map((c) => ({ display_name: c.display_name, role_label: c.role === "coordinator" ? 'נע"ת התורנויות' : 'ממלא מקום נע"ת', phone: c.phone ?? c.card_phone ?? null, kind: "staff" as const }));
+  }
+
+  async soldierContactsList(): Promise<ContactEntry[]> {
+    await delay();
+    return this.contacts.map((c) => ({ ...c }));
+  }
+
+  async setSoldierContacts(list: { user_id: string; display_name: string; phone: string | null }[]) {
+    await delay(200);
+    this.contacts = list.map((c) => {
+      const u = this.users.find((x) => x.user_id === c.user_id);
+      return { ...c, card_phone: null, role: u?.roles[0]?.role ?? null };
+    });
+  }
 
   async ranks() {
     return this.rankList;

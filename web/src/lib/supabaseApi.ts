@@ -1,5 +1,6 @@
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { DutyMessage } from "./dutyMessage";
+import type { ContactEntry, MyContact } from "./contacts";
 import type { MySwap, SwapLogRow, SwapOptions } from "./swaps";
 import type { ScoringRules } from "./scoringRules";
 import type { AppNotification } from "./notifications";
@@ -205,6 +206,18 @@ export class SupabaseApi implements Api {
 
   async setMyRequestAlerts(on: boolean): Promise<void> {
     check(await this.sb.rpc("set_my_request_alerts", { p_on: on }));
+  }
+
+  async myContacts(): Promise<MyContact[]> {
+    return check(await this.sb.rpc("my_contacts")) as MyContact[];
+  }
+
+  async soldierContactsList(): Promise<ContactEntry[]> {
+    return check(await this.sb.rpc("soldier_contacts_list")) as ContactEntry[];
+  }
+
+  async setSoldierContacts(list: { user_id: string; display_name: string; phone: string | null }[]) {
+    check(await this.sb.rpc("set_soldier_contacts", { p: list }));
   }
 
   async ranks(): Promise<RankItem[]> {

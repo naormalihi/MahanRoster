@@ -63,6 +63,13 @@ export function HomePage() {
     api!.listUsers().then((u) => setResetters(mfaResetters(u).length), () => setResetters(null));
   }, [api, staff]);
 
+  // soldiers see "למי לפנות" only once נע"ת chose someone
+  const [contacts, setContacts] = useState<number | null>(null);
+  useEffect(() => {
+    if (!staff) return;
+    api!.soldierContactsList().then((c) => setContacts(c.length), () => setContacts(null));
+  }, [api, staff]);
+
   useEffect(() => {
     const now = new Date();
     api!.board(now.toISOString(), addDays(now, 7).toISOString()).then(setWeek).catch(() => setWeek([]));
@@ -122,6 +129,19 @@ export function HomePage() {
       )}
       <MyNextDuty />
       <UnackedCard />
+
+      {contacts === 0 && (
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" component={RouterLink} to="/admin?tab=contacts">
+              אנשי קשר
+            </Button>
+          }
+        >
+          עוד לא נבחרו אנשי קשר לחיילים – בלי זה החיילים לא רואים למי לפנות ואיך.
+        </Alert>
+      )}
 
       {cycles && !cycle && (
         <Alert severity="info" action={<Button color="inherit" component={RouterLink} to="/cycles">ניהול מחזורים</Button>}>

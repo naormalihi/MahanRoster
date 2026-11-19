@@ -38,6 +38,7 @@ import type { NamedRef, RankItem } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { LoadRoleRef } from "../lib/soldiers";
 import { UsersTab } from "./UsersTab";
+import { ContactsTab } from "./ContactsTab";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
 import { PagerBar } from "../components/PagerBar";
 import {
@@ -1993,6 +1994,7 @@ const TABS = [
   { key: "scoring", label: "מקדמי ניקוד", about: "מקדמים, ימי חג והקלות" },
   { key: "calendar", label: "לוח חגים", about: "חגים וימים מיוחדים בכל שנה" },
   { key: "users", label: "משתמשים", about: "חשבונות והרשאות" },
+  { key: "contacts", label: "אנשי קשר לחיילים", about: "למי חיילים פונים" },
 ] as const;
 
 export function AdminPage() {
@@ -2021,6 +2023,7 @@ export function AdminPage() {
       {tab === "calendar" && <CalendarTab />}
       {tab === "aliases" && <AliasesTab />}
       {tab === "users" && <UsersTab />}
+      {tab === "contacts" && <ContactsTab />}
     </Stack>
   );
 }
