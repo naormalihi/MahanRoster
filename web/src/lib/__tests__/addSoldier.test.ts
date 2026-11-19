@@ -21,4 +21,9 @@ describe("add soldier form", () => {
     expect(r.phone).toBe("972501234567");
     expect(JSON.stringify(r)).not.toContain("000000018");
   });
+
+  it("שח\"ר only with mandatory service; the second-role date as given", () => {
+    expect(toRow({ ...ok, shachar: true, secondRoleSignedAt: "2026-10-01" }, "k".repeat(64))).toMatchObject({ is_shachar: true, second_role_signed_at: "2026-10-01" });
+    expect(toRow({ ...ok, serviceType: "career", shachar: true }, "k".repeat(64))).toMatchObject({ is_shachar: false, second_role_signed_at: null });
+  });
 });

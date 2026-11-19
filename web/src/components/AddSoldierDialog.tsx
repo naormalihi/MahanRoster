@@ -177,12 +177,16 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
             {f.serviceType === "mandatory" && field("releaseDate", "תאריך שחרור", { type: "date", slotProps: { inputLabel: { shrink: true } } })}
             {f.serviceType === "career" && field("careerStartDate", "כניסה לקבע", { type: "date", slotProps: { inputLabel: { shrink: true } } })}
             {field("rangeValidUntil", "תוקף מטווח", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
+            {field("secondRoleSignedAt", "חתימה על תפקיד שני (המשך קבע)", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
             {field("phone", "טלפון נייד", { slotProps: { htmlInput: { inputMode: "tel", dir: "ltr" } }, disabled: !keyOk })}
             {field("joinDate", "תאריך כניסה ליחידה *", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
           </Box>
           <Stack direction="row" sx={{ flexWrap: "wrap" }}>
             <FormControlLabel control={<Checkbox checked={f.parent} onChange={(e) => set("parent")(e.target.checked)} disabled={!keyOk} />} label="משרת הורה" />
             <FormControlLabel control={<Checkbox checked={f.homeNightly} onChange={(e) => set("homeNightly")(e.target.checked)} disabled={!keyOk} />} label='ת"ש 7 (לינה בבית)' />
+            {f.serviceType === "mandatory" && (
+              <FormControlLabel control={<Checkbox checked={f.shachar} onChange={(e) => set("shachar")(e.target.checked)} disabled={!keyOk} />} label='שח"ר' />
+            )}
           </Stack>
           <Alert severity="info" icon={false}>
             <b>חייל חדש ביחידה:</b> נכנס עם הניקוד הממוצע של הקבוצה שלו. המנוע לא ישבץ אותו אוטומטית עד {graceEnd || "תום תקופת החסד"} ({grace} יום מהכניסה).

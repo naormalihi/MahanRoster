@@ -16,6 +16,10 @@ export interface AddSoldierForm {
   rangeValidUntil: string;
   parent: boolean;
   homeNightly: boolean;
+  /** שח"ר – mandatory service only */
+  shachar: boolean;
+  /** signed for continued career service (תפקיד שני) */
+  secondRoleSignedAt: string;
   phone: string;
   /** joined the unit (today by default): the grace period counts from it */
   joinDate: string;
@@ -23,7 +27,7 @@ export interface AddSoldierForm {
 
 export const EMPTY_FORM = (today: string): AddSoldierForm => ({
   idNumber: "", firstName: "", lastName: "", rankId: "", serviceType: "", gafId: "", gender: "",
-  enlistmentDate: "", releaseDate: "", careerStartDate: "", rangeValidUntil: "", parent: false, homeNightly: false, phone: "",
+  enlistmentDate: "", releaseDate: "", careerStartDate: "", rangeValidUntil: "", parent: false, homeNightly: false, shachar: false, secondRoleSignedAt: "", phone: "",
   joinDate: today,
 });
 
@@ -60,6 +64,8 @@ export function toRow(f: AddSoldierForm, soldierKey: string) {
     home_nightly: f.homeNightly,
     phone: phone === "invalid" ? null : phone,
     unit_join_date: f.joinDate,
+    is_shachar: f.serviceType === "mandatory" && f.shachar,
+    second_role_signed_at: f.secondRoleSignedAt || null,
   };
 }
 
