@@ -310,6 +310,9 @@ export interface Api {
   resetUserPassword(userId: string, password: string): Promise<void>;
   /** removes a user's two-step login and signs him out; he sets it up again on his next sign-in */
   resetUserMfa(userId: string): Promise<void>;
+  /** a staff role for an existing account (a soldier who became a commander), or taking it away */
+  grantUserRole(userId: string, role: CreatableRole): Promise<void>;
+  revokeUserRole(userId: string, role: Role): Promise<void>;
   setUserLocked(userId: string, locked: boolean): Promise<void>;
   /** Deletes a gaf commander's account; one whose name is on records is closed and hidden instead. */
   deleteUser(userId: string): Promise<"deleted" | "closed">;

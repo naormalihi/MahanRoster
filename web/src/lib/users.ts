@@ -37,6 +37,9 @@ export function mfaResetters(users: AppUser[], now = new Date()): AppUser[] {
   );
 }
 
+/** The staff roles an existing account can be given (a soldier who became a commander keeps one account). */
+export const GRANTABLE: CreatableRole[] = ["coordinator", "gaf_commander", "unit_commander"];
+
 export const ROLE_NAME: Record<Role, string> = {
   coordinator: "נע\"ת תורנויות",
   deputy: "ממלא מקום",

@@ -91,6 +91,22 @@ export const TOUR: Record<TourKind, TourStep[]> = {
   ],
 };
 
+/** Staff or a commander who does duties too gets one more step, before the install one: "שלי". */
+const MINE: TourStep = {
+  pose: "point",
+  title: "וגם התורנויות שלך",
+  lines: [
+    "גם אתה משובץ לתורנויות. בתפריט \"שלי\" יש את \"התורנויות שלי\" ואת \"הבקשות שלי\" – כמו לכל חייל.",
+    "על הבקשות שלך מחליט נע\"ת או מ\"מ אחר, לא אתה.",
+  ],
+};
+
+export function tourSteps(kind: TourKind, alsoSoldier: boolean): TourStep[] {
+  const steps = TOUR[kind];
+  if (!alsoSoldier || kind === "soldier") return steps;
+  return [...steps.slice(0, -1), MINE, steps[steps.length - 1]];
+}
+
 const key = (userId: string) => `mahan.tour.v1.${userId}`;
 
 /** Whether the tour was finished or skipped on this device. Browser storage can throw – then the tour just shows. */
