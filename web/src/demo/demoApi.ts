@@ -1168,7 +1168,7 @@ export class DemoApi implements Api {
       release_date: row.release_date, career_start_date: row.career_start_date, range_valid_until: row.range_valid_until,
       parent_status: row.parent_status, home_nightly: row.home_nightly, phone: row.phone, is_active: true,
     });
-    Object.assign(this.extraOf(id), { unit_join_date: row.unit_join_date, is_shachar: row.is_shachar, second_role_signed_at: row.second_role_signed_at });
+    Object.assign(this.extraOf(id), { unit_join_date: row.unit_join_date, is_shachar: row.is_shachar, second_role_signed_at: row.second_role_signed_at, tash_level: row.tash_level });
     return { status: "added", id };
   }
 

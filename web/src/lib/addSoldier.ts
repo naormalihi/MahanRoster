@@ -15,7 +15,8 @@ export interface AddSoldierForm {
   careerStartDate: string;
   rangeValidUntil: string;
   parent: boolean;
-  homeNightly: boolean;
+  /** הת"ש 3–7: nights a week he must sleep at home ("" = none) */
+  tashLevel: number | "";
   /** שח"ר – mandatory service only */
   shachar: boolean;
   /** signed for continued career service (תפקיד שני) */
@@ -27,7 +28,7 @@ export interface AddSoldierForm {
 
 export const EMPTY_FORM = (today: string): AddSoldierForm => ({
   idNumber: "", firstName: "", lastName: "", rankId: "", serviceType: "", gafId: "", gender: "",
-  enlistmentDate: "", releaseDate: "", careerStartDate: "", rangeValidUntil: "", parent: false, homeNightly: false, shachar: false, secondRoleSignedAt: "", phone: "",
+  enlistmentDate: "", releaseDate: "", careerStartDate: "", rangeValidUntil: "", parent: false, tashLevel: "", shachar: false, secondRoleSignedAt: "", phone: "",
   joinDate: today,
 });
 
@@ -61,7 +62,8 @@ export function toRow(f: AddSoldierForm, soldierKey: string) {
     career_start_date: f.serviceType === "career" ? f.careerStartDate || null : null,
     range_valid_until: f.rangeValidUntil || null,
     parent_status: f.parent,
-    home_nightly: f.homeNightly,
+    home_nightly: false, // the personnel file's flag; here נע"ת sets the level, as on the card
+    tash_level: f.tashLevel === "" ? null : f.tashLevel,
     phone: phone === "invalid" ? null : phone,
     unit_join_date: f.joinDate,
     is_shachar: f.serviceType === "mandatory" && f.shachar,

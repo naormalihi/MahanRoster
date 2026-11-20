@@ -2831,16 +2831,16 @@ def test_soldier_contacts_show_only_the_chosen(conn):
         raise psycopg.Rollback()
 
 
-def test_add_soldier_keeps_shachar_and_second_role(conn):
+def test_add_soldier_keeps_shachar_second_role_and_tash(conn):
     with conn.transaction():
         gaf, rank = conn.execute("select gaf_id, computed_rank_id from soldiers where is_active and service_type = 'mandatory' limit 1").fetchone()
-        base = {"full_name": "חייל ידני", "gaf_id": str(gaf), "rank_id": str(rank), "is_shachar": True, "second_role_signed_at": "2026-10-01"}
+        base = {"full_name": "חייל ידני", "gaf_id": str(gaf), "rank_id": str(rank), "is_shachar": True, "second_role_signed_at": "2026-10-01", "tash_level": 5}
         conn.execute("set local role authenticated")
         _claims(conn, COORD)
         m = conn.execute("select public.add_soldier(%s)", (json.dumps({**base, "soldier_key": "cd" * 32, "service_type": "mandatory"}),)).fetchone()[0]
         c = conn.execute("select public.add_soldier(%s)", (json.dumps({**base, "soldier_key": "ef" * 32, "service_type": "career"}),)).fetchone()[0]
         conn.execute("reset role")
-        got = lambda sid: conn.execute("select is_shachar, second_role_signed_at::text from soldiers where id = %s", (sid,)).fetchone()
-        assert got(m["id"]) == (True, "2026-10-01")
-        assert got(c["id"]) == (False, "2026-10-01")   # שח"ר is for mandatory service only
+        got = lambda sid: conn.execute("select is_shachar, second_role_signed_at::text, tash_level from soldiers where id = %s", (sid,)).fetchone()
+        assert got(m["id"]) == (True, "2026-10-01", 5)
+        assert got(c["id"]) == (False, "2026-10-01", 5)   # שח"ר is for mandatory service only
         raise psycopg.Rollback()

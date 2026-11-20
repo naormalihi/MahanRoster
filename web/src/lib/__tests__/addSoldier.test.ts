@@ -26,4 +26,9 @@ describe("add soldier form", () => {
     expect(toRow({ ...ok, shachar: true, secondRoleSignedAt: "2026-10-01" }, "k".repeat(64))).toMatchObject({ is_shachar: true, second_role_signed_at: "2026-10-01" });
     expect(toRow({ ...ok, serviceType: "career", shachar: true }, "k".repeat(64))).toMatchObject({ is_shachar: false, second_role_signed_at: null });
   });
+
+  it("the הת\"ש level as on the card; the personnel-file flag stays off", () => {
+    expect(toRow({ ...ok, tashLevel: 7 }, "k".repeat(64))).toMatchObject({ tash_level: 7, home_nightly: false });
+    expect(toRow(ok, "k".repeat(64)).tash_level).toBeNull();
+  });
 });
