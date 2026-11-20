@@ -109,6 +109,8 @@ export function FeedbackInbox() {
   const [items, setItems] = useState<FeedbackItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FeedbackStatus | "open" | "all">("open");
+  /** ten at a time – the newest first */
+  const [limit, setLimit] = useState(10);
   const load = useCallback(() => {
     api!.feedbackList().then(setItems, (e) => setError((e as Error).message));
   }, [api]);
@@ -126,7 +128,10 @@ export function FeedbackInbox() {
     filter === "all" ? true : filter === "open" ? f.status === "new" || f.status === "in_progress" : f.status === filter,
   );
   const chip = (value: typeof filter, label: string, n: number) => (
-    <Chip key={value} label={`${label} (${n})`} color={filter === value ? "primary" : "default"} variant={filter === value ? "filled" : "outlined"} onClick={() => setFilter(value)} />
+    <Chip key={value} label={`${label} (${n})`} color={filter === value ? "primary" : "default"} variant={filter === value ? "filled" : "outlined"} onClick={() => {
+        setFilter(value);
+        setLimit(10);
+      }} />
   );
 
   return (
@@ -148,10 +153,15 @@ export function FeedbackInbox() {
         </Typography>
       ) : (
         <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-          {shown.map((f) => (
+          {shown.slice(0, limit).map((f) => (
             <Item key={`${f.id}-${f.status}-${f.handled_at ?? ""}`} f={f} onSaved={load} />
           ))}
         </Stack>
+      )}
+      {shown.length > limit && (
+        <Button size="small" onClick={() => setLimit(limit + 10)} sx={{ mt: 1 }}>
+          עוד {Math.min(10, shown.length - limit)} (מתוך {shown.length - limit} נוספות)
+        </Button>
       )}
     </Paper>
   );

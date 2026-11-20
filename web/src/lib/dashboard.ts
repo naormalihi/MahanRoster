@@ -29,3 +29,17 @@ export const ACTION_LABEL: Record<string, string> = { insert: "נוסף", update
 
 /** Points per soldier of a gaf – the load compared across gafs. */
 export const perSoldier = (g: { soldiers: number; points: number }) => (g.soldiers ? g.points / g.soldiers : 0);
+
+export type SettingsChange = UnitDashboard["settings_changes"][number];
+
+/** Changes in a row that read the same (same day, what, by whom) shown once, with how many times. */
+export function collapseRepeats(list: SettingsChange[]): (SettingsChange & { times: number })[] {
+  const out: (SettingsChange & { times: number })[] = [];
+  for (const c of list) {
+    const last = out[out.length - 1];
+    if (last && last.at.slice(0, 10) === c.at.slice(0, 10) && last.action === c.action && last.entity === c.entity && last.name === c.name && last.by === c.by)
+      last.times++;
+    else out.push({ ...c, times: 1 });
+  }
+  return out;
+}

@@ -19,7 +19,7 @@ import { Link as RouterLink } from "react-router-dom";
 import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { stageLabel, type CycleStatus } from "../lib/cycles";
-import { ACTION_LABEL, ENTITY_LABEL, perSoldier, type UnitDashboard } from "../lib/dashboard";
+import { ACTION_LABEL, collapseRepeats, ENTITY_LABEL, perSoldier, type UnitDashboard } from "../lib/dashboard";
 import { FeedbackCount } from "../components/FeedbackInbox";
 import { dayLabel, spanLabel, upcomingWeekend } from "../lib/dates";
 
@@ -44,7 +44,7 @@ function Tile({ title, value, note }: { title: string; value: ReactNode; note?: 
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, minWidth: 0 }}>
+    <Paper variant="outlined" sx={{ p: 2, minWidth: 0, height: "100%", boxSizing: "border-box" }}>
       <Typography variant="h3" sx={{ mb: 1 }}>
         {title}
       </Typography>
@@ -66,6 +66,7 @@ export function DashboardPage() {
   const [d, setD] = useState<UnitDashboard | null>(null);
   const [weekend, setWeekend] = useState<BoardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [allChanges, setAllChanges] = useState(false);
 
   useEffect(() => {
     api!.unitDashboard().then(setD).catch((e) => setError((e as Error).message));
@@ -81,6 +82,7 @@ export function DashboardPage() {
       </Box>
     );
   const maxLoad = Math.max(0.01, ...d.by_gaf.map(perSoldier));
+  const changes = collapseRepeats(d.settings_changes);
 
   return (
     <Stack spacing={2}>
@@ -108,29 +110,26 @@ export function DashboardPage() {
         <Tile title="שינויי הגדרות בחודש" value={d.settings_changes.length} note="ע״י נע״ת" />
       </Box>
 
-      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, alignItems: "start" }}>
-        <Card title='הסופ"ש הקרוב'>
-          {!weekend ? (
-            <CircularProgress size={20} />
-          ) : weekend.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              אין תורנויות מפורסמות בסופ"ש הקרוב.
-            </Typography>
-          ) : (
-            <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-              {weekend.map((r) => (
-                <Box key={r.slot_id} sx={{ py: 0.75 }}>
+      {/* two by two, each pair the same height */}
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, alignItems: "stretch" }}>
+        <Card title="העומס לפי גף">
+          <Stack spacing={1}>
+            {d.by_gaf.map((g) => (
+              <Box key={g.gaf}>
+                <Stack direction="row" sx={{ justifyContent: "space-between" }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {r.task_name} · {r.performers.length ? r.performers.join(", ") : <Chip size="small" color="error" label="לא מאויש" />}
+                    {g.gaf}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {dayLabel(r.starts_at)} · {spanLabel(r.starts_at, r.ends_at)}
-                    {r.reserves.length ? ` · עתודה: ${r.reserves.join(", ")}` : ""}
+                    {g.soldiers} חיילים · {g.duties} תורנויות · {perSoldier(g).toFixed(1)} נק׳ לחייל
                   </Typography>
+                </Stack>
+                <Box sx={{ height: 8, bgcolor: "action.hover", borderRadius: 1, mt: 0.5 }}>
+                  <Box sx={{ height: 8, width: `${(perSoldier(g) / maxLoad) * 100}%`, bgcolor: "primary.main", borderRadius: 1 }} />
                 </Box>
-              ))}
-            </Stack>
-          )}
+              </Box>
+            ))}
+          </Stack>
         </Card>
 
         <Card title="העומס לפי אוכלוסייה">
@@ -169,24 +168,28 @@ export function DashboardPage() {
           </Typography>
         </Card>
 
-        <Card title="העומס לפי גף">
-          <Stack spacing={1}>
-            {d.by_gaf.map((g) => (
-              <Box key={g.gaf}>
-                <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+        <Card title='הסופ"ש הקרוב'>
+          {!weekend ? (
+            <CircularProgress size={20} />
+          ) : weekend.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              אין תורנויות מפורסמות בסופ"ש הקרוב.
+            </Typography>
+          ) : (
+            <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+              {weekend.map((r) => (
+                <Box key={r.slot_id} sx={{ py: 0.75 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {g.gaf}
+                    {r.task_name} · {r.performers.length ? r.performers.join(", ") : <Chip size="small" color="error" label="לא מאויש" />}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {g.soldiers} חיילים · {g.duties} תורנויות · {perSoldier(g).toFixed(1)} נק׳ לחייל
+                    {dayLabel(r.starts_at)} · {spanLabel(r.starts_at, r.ends_at)}
+                    {r.reserves.length ? ` · עתודה: ${r.reserves.join(", ")}` : ""}
                   </Typography>
-                </Stack>
-                <Box sx={{ height: 8, bgcolor: "action.hover", borderRadius: 1, mt: 0.5 }}>
-                  <Box sx={{ height: 8, width: `${(perSoldier(g) / maxLoad) * 100}%`, bgcolor: "primary.main", borderRadius: 1 }} />
                 </Box>
-              </Box>
-            ))}
-          </Stack>
+              ))}
+            </Stack>
+          )}
         </Card>
 
         <Card title="שינויי הגדרות בחודש האחרון">
@@ -196,7 +199,7 @@ export function DashboardPage() {
             </Typography>
           ) : (
             <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-              {d.settings_changes.map((c, i) => (
+              {(allChanges ? changes : changes.slice(0, 10)).map((c, i) => (
                 <Stack key={i} direction="row" spacing={1} sx={{ py: 0.75, alignItems: "baseline" }}>
                   <Typography variant="caption" color="text.secondary" sx={{ minWidth: 44 }}>
                     {fmt(c.at).slice(0, 5)}
@@ -204,6 +207,7 @@ export function DashboardPage() {
                   <Typography variant="body2" sx={{ flex: 1 }}>
                     {ENTITY_LABEL[c.entity] ?? c.entity}
                     {c.name ? `: ${c.name}` : ""} – {ACTION_LABEL[c.action] ?? c.action}
+                    {c.times > 1 ? ` (×${c.times})` : ""}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {c.by}
@@ -212,8 +216,13 @@ export function DashboardPage() {
               ))}
             </Stack>
           )}
-          <Typography variant="caption" color="text.secondary">
-            מיומן הביקורת, שאי אפשר למחוק ממנו.
+          {changes.length > 10 && (
+            <Button size="small" onClick={() => setAllChanges(!allChanges)} sx={{ mt: 0.5 }}>
+              {allChanges ? "רק 10 האחרונים" : `הצג את כל ${changes.length}`}
+            </Button>
+          )}
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            מיומן הביקורת, שאי אפשר למחוק ממנו. שינויים זהים ברצף מוצגים פעם אחת.
           </Typography>
         </Card>
       </Box>
