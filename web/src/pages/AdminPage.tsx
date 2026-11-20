@@ -39,6 +39,7 @@ import { useAuth } from "../lib/auth";
 import type { LoadRoleRef } from "../lib/soldiers";
 import { UsersTab } from "./UsersTab";
 import { ContactsTab } from "./ContactsTab";
+import { FeedbackInbox } from "../components/FeedbackInbox";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
 import { PagerBar } from "../components/PagerBar";
 import {
@@ -1995,6 +1996,7 @@ const TABS = [
   { key: "calendar", label: "לוח חגים", about: "חגים וימים מיוחדים בכל שנה" },
   { key: "users", label: "משתמשים", about: "חשבונות והרשאות" },
   { key: "contacts", label: "אנשי קשר לחיילים", about: "למי חיילים פונים" },
+  { key: "feedback", label: "הצעות ומשוב", about: "מה משתמשים הציעו" },
 ] as const;
 
 export function AdminPage() {
@@ -2024,6 +2026,7 @@ export function AdminPage() {
       {tab === "aliases" && <AliasesTab />}
       {tab === "users" && <UsersTab />}
       {tab === "contacts" && <ContactsTab />}
+      {tab === "feedback" && <FeedbackInbox />}
     </Stack>
   );
 }

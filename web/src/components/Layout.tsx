@@ -29,7 +29,7 @@ import {
   DialogTitle,
 } from "@mui/material";
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link as RouterLink, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { useAuth } from "../lib/auth";
@@ -42,6 +42,9 @@ import { OwlTour } from "./OwlTour";
 import { markTourSeen, tourKind, tourSeen, tourSteps } from "../lib/tour";
 import ContactIcon from "@mui/icons-material/ContactPhoneOutlined";
 import { ContactsDialog } from "./ContactCard";
+import { FeedbackDialog } from "./FeedbackDialog";
+import IdeaIcon from "@mui/icons-material/LightbulbOutlined";
+import InboxIcon from "@mui/icons-material/InboxOutlined";
 import { ThemeSync, ThemeToggle } from "./ThemePicker";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -250,6 +253,14 @@ export function Layout({ children }: { children: ReactNode }) {
   const kind = tourKind(me);
   const [tour, setTour] = useState(false);
   const [contacts, setContacts] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  // נע"ת, מ"מ and the unit commander: how many new messages wait in "הצעות ומשוב"
+  const [newFeedback, setNewFeedback] = useState(0);
+  const seesFeedback = staff || isUnitCommander(me);
+  useEffect(() => {
+    if (!seesFeedback || !api) return;
+    api.feedbackNewCount().then(setNewFeedback, () => setNewFeedback(0));
+  }, [api, seesFeedback, open]);
   // the first time this user opens the app on this device
   useEffect(() => {
     if (me && kind && !me.mustChangePassword && !tourSeen(me.userId)) setTour(true);
@@ -315,6 +326,11 @@ export function Layout({ children }: { children: ReactNode }) {
               <HelpIcon />
             </IconButton>
           )}
+          {me && !compact && (
+            <IconButton color="inherit" aria-label="הצעה לשיפור" title="הצעה לשיפור" onClick={() => setFeedback(true)}>
+              <IdeaIcon />
+            </IconButton>
+          )}
           <ThemeToggle />
           {!(compact && links.length) && (
             <Button color="inherit" startIcon={<LogoutIcon />} onClick={signOut}>
@@ -324,7 +340,18 @@ export function Layout({ children }: { children: ReactNode }) {
         </Toolbar>
       </AppBar>
       <ThemeSync />
-      {kind && <OwlTour open={tour} steps={tourSteps(kind, mine)} onClose={closeTour} />}
+      {kind && (
+        <OwlTour
+          open={tour}
+          steps={tourSteps(kind, mine)}
+          onClose={closeTour}
+          onFeedback={() => {
+            closeTour();
+            setFeedback(true);
+          }}
+        />
+      )}
+      {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
       {contacts && <ContactsDialog onClose={() => setContacts(false)} />}
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
@@ -375,6 +402,21 @@ export function Layout({ children }: { children: ReactNode }) {
                 <ListItemText primary="למי לפנות" />
               </ListItemButton>
             )}
+            {seesFeedback && (
+              <ListItemButton component={RouterLink} to={staff ? "/admin?tab=feedback" : "/feedback"} onClick={() => setOpen(false)}>
+                <InboxIcon fontSize="small" sx={{ ml: 1.5 }} />
+                <ListItemText primary={`הצעות ומשוב${newFeedback ? ` (${newFeedback} חדשות)` : ""}`} />
+              </ListItemButton>
+            )}
+            <ListItemButton
+              onClick={() => {
+                setOpen(false);
+                setFeedback(true);
+              }}
+            >
+              <IdeaIcon fontSize="small" sx={{ ml: 1.5 }} />
+              <ListItemText primary="הצעה לשיפור" />
+            </ListItemButton>
             {kind && (
               <ListItemButton
                 onClick={() => {

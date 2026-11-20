@@ -33,7 +33,7 @@ function InstallHint() {
 }
 
 /** Three short steps from the owl. Closing in any way (skip, finish, outside click) counts as seen. */
-export function OwlTour({ open, steps, onClose }: { open: boolean; steps: TourStep[]; onClose: () => void }) {
+export function OwlTour({ open, steps, onClose, onFeedback }: { open: boolean; steps: TourStep[]; onClose: () => void; onFeedback?: () => void }) {
   const [i, setI] = useState(0);
   const step = steps[Math.min(i, steps.length - 1)];
   const last = i >= steps.length - 1;
@@ -66,6 +66,11 @@ export function OwlTour({ open, steps, onClose }: { open: boolean; steps: TourSt
         </Box>
       </DialogContent>
       <DialogActions sx={{ px: 2, pb: 2 }}>
+        {last && onFeedback && (
+          <Button onClick={onFeedback} sx={{ marginInlineEnd: "auto" }}>
+            יש לך רעיון? הצעה לשיפור
+          </Button>
+        )}
         {!last && (
           <Button color="inherit" onClick={close}>
             דלג

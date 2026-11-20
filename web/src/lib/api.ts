@@ -1,3 +1,4 @@
+import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { DutyMessage } from "./dutyMessage";
 import type { ContactEntry, MyContact } from "./contacts";
@@ -161,6 +162,12 @@ export interface Api {
   ranks(): Promise<RankItem[]>;
   /** keep the chosen look with the account */
   setMyTheme(choice: "auto" | "light" | "dark"): Promise<void>;
+  /** "הצעה לשיפור" – anyone signed in; up to 5 a day */
+  submitFeedback(d: FeedbackDraft): Promise<void>;
+  /** "הצעות ומשוב" – נע"ת, מ"מ and the unit commander */
+  feedbackList(): Promise<FeedbackItem[]>;
+  feedbackNewCount(): Promise<number>;
+  updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void>;
   setMyRequestAlerts(on: boolean): Promise<void>;
   /** "למי לפנות": up to two of נע"ת / מ"מ and the commander of my gaf, as נע"ת chose */
   myContacts(): Promise<MyContact[]>;

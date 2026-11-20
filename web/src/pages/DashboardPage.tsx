@@ -20,6 +20,7 @@ import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { stageLabel, type CycleStatus } from "../lib/cycles";
 import { ACTION_LABEL, ENTITY_LABEL, perSoldier, type UnitDashboard } from "../lib/dashboard";
+import { FeedbackCount } from "../components/FeedbackInbox";
 import { dayLabel, spanLabel, upcomingWeekend } from "../lib/dates";
 
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
@@ -94,6 +95,7 @@ export function DashboardPage() {
         </Typography>
       </Box>
       <MyNextDuty />
+      <FeedbackCount to="/feedback" />
 
       <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
         <Tile title="בקשות פטור ממתינות" value={d.requests.pending} note={d.requests.urgent ? `${d.requests.urgent} דחופות` : "אין דחופות"} />
