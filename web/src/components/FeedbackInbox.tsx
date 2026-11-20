@@ -16,12 +16,11 @@ import {
 
 const ORDER: FeedbackStatus[] = ["new", "in_progress", "done", "wont"];
 
-/** One message: read as a row; "טיפול" opens status, an internal note and a reply to the sender. */
+/** One message: read as a row; "טיפול" opens status and a reply to the sender. */
 function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
   const { api } = useAuth();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<FeedbackStatus>(f.status);
-  const [note, setNote] = useState(f.note ?? "");
   const [reply, setReply] = useState(f.reply ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +30,7 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await api!.updateFeedback(f.id, status, note.trim() || null, reply.trim() || null);
+      await api!.updateFeedback(f.id, status, null, reply.trim() || null);
       setOpen(false);
       onSaved();
     } catch (e) {
@@ -56,11 +55,9 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
         </Typography>
       </Stack>
       <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{f.body}</Typography>
-      {!open && (f.note || f.reply) && (
+      {!open && f.reply && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {f.note ? `הערה: ${f.note}` : ""}
-          {f.note && f.reply ? " · " : ""}
-          {f.reply ? `תשובה: ${f.reply}` : ""}
+          {`תשובה: ${f.reply}`}
           {f.handled_by_name ? ` (${f.handled_by_name})` : ""}
         </Typography>
       )}
@@ -77,7 +74,6 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
               </MenuItem>
             ))}
           </TextField>
-          <TextField size="small" label="הערה פנימית" value={note} onChange={(e) => setNote(e.target.value)} multiline helperText="רק מי שרואה את המסך הזה" />
           {!f.anonymous && (
             <TextField
               size="small"
