@@ -409,7 +409,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 <ListItemText primary={`הצעות ומשוב${newFeedback ? ` (${newFeedback} חדשות)` : ""}`} />
               </ListItemButton>
             )}
-            {seesFeedback && (
+            {reader && (
               <ListItemButton component={RouterLink} to="/spec" onClick={() => setOpen(false)}>
                 <SpecIcon fontSize="small" sx={{ ml: 1.5 }} />
                 <ListItemText primary="מסמך האפיון" />

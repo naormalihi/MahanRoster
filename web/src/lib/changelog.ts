@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.39.1",
+    date: "2026-11-20",
+    items: ["\"מסמך האפיון\" פתוח גם למפקדי הגפים"],
+  },
+  {
     version: "2.39.0",
     date: "2026-11-20",
     items: [

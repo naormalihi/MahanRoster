@@ -58,7 +58,7 @@ function Gate() {
           <Route path="/" element={isUnitCommander(me) ? <DashboardPage /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
           {reader && <Route path="/dashboard" element={<DashboardPage />} />}
           {(isStaff(me) || isUnitCommander(me)) && <Route path="/feedback" element={<FeedbackInbox />} />}
-          {(isStaff(me) || isUnitCommander(me)) && <Route path="/spec" element={lazyEl(<SpecPage />)} />}
+          {reader && <Route path="/spec" element={lazyEl(<SpecPage />)} />}
           <Route path="/board" element={<BoardPage />} />
           <Route path="/scoring" element={lazyEl(<ScoringPage />)} />
           {isSoldier(me) && <Route path="/requests" element={<RequestsPage />} />}

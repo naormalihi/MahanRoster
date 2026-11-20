@@ -118,7 +118,7 @@ function BlockView({ b }: { b: Block }) {
   }
 }
 
-/** "מסמך האפיון" – the full spec, for נע"ת, מ"מ and the unit commander. */
+/** "מסמך האפיון" – the full spec, for staff and commanders. */
 export function SpecPage() {
   const { api } = useAuth();
   const [doc, setDoc] = useState<SpecDocument | null | undefined>(undefined);
@@ -138,7 +138,7 @@ export function SpecPage() {
 
   if (error) return <ErrorState text="לא הצלחנו לטעון את מסמך האפיון." onRetry={load} />;
   if (doc === undefined) return <CircularProgress />;
-  if (doc === null) return <EmptyState title="מסמך האפיון" text="המסמך זמין במערכת עצמה, לסגל ולמפקד היחידה – לא בהדגמה." />;
+  if (doc === null) return <EmptyState title="מסמך האפיון" text="המסמך זמין במערכת עצמה, לסגל ולמפקדים – לא בהדגמה." />;
 
   return (
     <Box sx={{ maxWidth: 920, mx: "auto" }}>

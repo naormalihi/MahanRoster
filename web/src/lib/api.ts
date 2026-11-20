@@ -173,7 +173,7 @@ export interface Api {
   /** "הצעות ומשוב" – נע"ת, מ"מ and the unit commander */
   feedbackList(): Promise<FeedbackItem[]>;
   feedbackNewCount(): Promise<number>;
-  /** "מסמך האפיון" – נע"ת, מ"מ and the unit commander; null in the demo */
+  /** "מסמך האפיון" – staff and commanders (gaf and unit); null in the demo */
   specDocument(): Promise<SpecDocument | null>;
   updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void>;
   setMyRequestAlerts(on: boolean): Promise<void>;

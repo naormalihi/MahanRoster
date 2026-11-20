@@ -2891,10 +2891,15 @@ def test_feedback_named_and_anonymous_reach_the_inbox(conn):
         raise psycopg.Rollback()
 
 
-def test_spec_document_for_staff_only(conn):
+def test_spec_document_for_staff_and_commanders_only(conn):
     sol, _ = _soldier_account(conn, "spec.reader")
     (doc,), = _as_coord(conn, "select public.spec_document()")
     assert doc["version"] and doc["body"].startswith("# ") and "/spec/" in doc["body"]
+    gaf_cmd = _as_coord(conn, "select public.create_user('spec.gafcmd', 'temp-pass-123', 'gaf_commander', null)")[0][0]
+    with conn.transaction():
+        conn.execute("set local role authenticated")
+        _claims(conn, gaf_cmd)
+        assert conn.execute("select public.spec_document()").fetchone()[0]["body"].startswith("# ")
     with conn.transaction():
         conn.execute("set local role authenticated")
         _claims(conn, sol, aal="aal1")
