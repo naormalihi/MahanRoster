@@ -15,7 +15,7 @@ import { addDays, dayLabel, timeLabel } from "../lib/dates";
 import { nextAction, STEPS, stepStates } from "../lib/workspace";
 import { TONE_ICON, useCycleFacts } from "./CycleWorkspace";
 import { ORPHAN_KIND, orphanRequests, type Orphan } from "../lib/orphans";
-import { FeedbackCount } from "../components/FeedbackInbox";
+import { FeedbackInbox } from "../components/FeedbackInbox";
 import { dayKey } from "../lib/dates";
 
 const fmtDay = (iso: string) => iso.slice(0, 10).split("-").reverse().slice(0, 2).join("/") + "/" + iso.slice(2, 4);
@@ -130,8 +130,8 @@ export function HomePage() {
       )}
       <MyNextDuty />
       <UnackedCard />
+      <FeedbackInbox />
 
-      <FeedbackCount to="/admin?tab=feedback" />
       {contacts === 0 && (
         <Alert
           severity="info"
