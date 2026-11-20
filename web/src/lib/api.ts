@@ -145,6 +145,12 @@ export interface HolidayDuty {
   task_name: string;
 }
 
+export interface SpecDocument {
+  version: string;
+  body: string;
+  updated_at: string;
+}
+
 export interface Api {
   readonly demo: boolean;
   signIn(username: string, password: string): Promise<void>;
@@ -167,6 +173,8 @@ export interface Api {
   /** "הצעות ומשוב" – נע"ת, מ"מ and the unit commander */
   feedbackList(): Promise<FeedbackItem[]>;
   feedbackNewCount(): Promise<number>;
+  /** "מסמך האפיון" – נע"ת, מ"מ and the unit commander; null in the demo */
+  specDocument(): Promise<SpecDocument | null>;
   updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void>;
   setMyRequestAlerts(on: boolean): Promise<void>;
   /** "למי לפנות": up to two of נע"ת / מ"מ and the commander of my gaf, as נע"ת chose */

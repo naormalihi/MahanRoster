@@ -937,7 +937,7 @@ def test_reset_dynamic_data_keeps_system_settings(conn):
     with conn.transaction():
         conn.execute("update app_users set soldier_id = (select id from soldiers limit 1) where id = %s", (COORD,))
         conn.execute("insert into weight_history (multiplier_key, value, effective_from) values ('weekend_multiplier', 2, current_date)")
-        # a soldier's account (goes) next to the staff accounts (stay); a unit key check (goes)
+        # a soldier's account (goes) next to the staff accounts (stay); the unit key check is a setting (stays)
         sid = conn.execute("select id from soldiers order by id desc limit 1").fetchone()[0]
         su = conn.execute("select app.create_auth_user('reset.soldier@users.invalid', 'x-long-password')").fetchone()[0]
         conn.execute("delete from app_users where soldier_id = %s", (sid,))
@@ -961,7 +961,10 @@ def test_reset_dynamic_data_keeps_system_settings(conn):
         assert count("app_users where soldier_id is not null") == 0
         assert count("app_users") == staff and count(f"auth.users where id = '{su}'") == 0
         assert count("soldier_invites") == 0 and count("reset_backup.soldier_invites") >= 1
-        assert count("settings") == settings - 1 and count("settings where key = 'unit_key_check'") == 0
+        assert count("settings") == settings and count("settings where key = 'unit_key_check'") == 1
+        # feedback and the audit log go too; the log keeps one record – this reset
+        assert count("feedback") == 0 and count("feedback_quota") == 0
+        assert count("audit_log") == 1
         log = conn.execute("select after from audit_log where action = 'reset_dynamic_data' order by at desc limit 1").fetchone()[0]
         assert log["removed"]["soldiers"] == soldiers and log["removed"]["soldier_accounts"] == 1
         raise psycopg.Rollback()
@@ -2886,3 +2889,19 @@ def test_feedback_named_and_anonymous_reach_the_inbox(conn):
         assert p["title"] == "ההצעה שלך בוצעה – תודה!" and p["body"].startswith("הוספנו!")
         assert conn.execute("select count(*) from notifications where type = 'feedback_reply'").fetchone()[0] == 1
         raise psycopg.Rollback()
+
+
+def test_spec_document_for_staff_only(conn):
+    sol, _ = _soldier_account(conn, "spec.reader")
+    (doc,), = _as_coord(conn, "select public.spec_document()")
+    assert doc["version"] and doc["body"].startswith("# ") and "/spec/" in doc["body"]
+    with conn.transaction():
+        conn.execute("set local role authenticated")
+        _claims(conn, sol, aal="aal1")
+        with pytest.raises(psycopg.Error, match="אין הרשאה"):
+            with conn.transaction():
+                conn.execute("select public.spec_document()")
+        # the table itself is closed
+        with pytest.raises(psycopg.Error):
+            with conn.transaction():
+                conn.execute("select body from app.spec_document")
