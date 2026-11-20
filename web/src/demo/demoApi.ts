@@ -1,3 +1,4 @@
+import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "../lib/feedback";
 import type { ContactEntry, MyContact } from "../lib/contacts";
 /**
  * Demo backend: a fictitious unit in memory. Lets the app run, be reviewed and
@@ -319,6 +320,35 @@ export class DemoApi implements Api {
   }
 
   async setMyTheme(): Promise<void> {}
+
+  // "הצעות ומשוב" – fictitious examples
+  private feedback: FeedbackItem[] = [
+    { id: "fb1", created_at: new Date(Date.now() - 3600_000).toISOString(), kind: "idea", body: "יהיה נחמד לקבל תזכורת גם יום לפני התורנות, לא רק בבוקר.", sender_name: "חייל לדוגמה", anonymous: false, screen: "/my", app_version: "2.35.0", device: "phone", status: "new", note: null, reply: null, handled_by_name: null, handled_at: null },
+    { id: "fb2", created_at: new Date(Date.now() - 86400_000).toISOString(), kind: "bug", body: "במסך הבקשות התאריך קפץ לחודש הבא כשבחרתי יום.", sender_name: null, anonymous: true, screen: "/requests", app_version: "2.34.1", device: "phone", status: "in_progress", note: "לבדוק בסמסונג", reply: null, handled_by_name: "naat", handled_at: new Date().toISOString() },
+  ];
+
+  async submitFeedback(d: FeedbackDraft): Promise<void> {
+    await delay(300);
+    this.feedback.unshift({
+      id: crypto.randomUUID(), created_at: new Date().toISOString(), kind: d.kind, body: d.body.trim(), sender_name: d.anonymous ? null : (this.user?.name ?? "משתמש"),
+      anonymous: d.anonymous, screen: d.screen, app_version: d.version, device: d.device, status: "new", note: null, reply: null, handled_by_name: null, handled_at: null,
+    });
+  }
+
+  async feedbackList(): Promise<FeedbackItem[]> {
+    await delay();
+    return this.feedback.map((f) => ({ ...f }));
+  }
+
+  async feedbackNewCount(): Promise<number> {
+    return this.feedback.filter((f) => f.status === "new").length;
+  }
+
+  async updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void> {
+    await delay(200);
+    const f = this.feedback.find((x) => x.id === id);
+    if (f) Object.assign(f, { status, note, reply, handled_by_name: "naat", handled_at: new Date().toISOString() });
+  }
   async setMyRequestAlerts(): Promise<void> {}
 
   // "למי לפנות" – fictitious names and numbers

@@ -1,3 +1,4 @@
+import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { DutyMessage } from "./dutyMessage";
 import type { ContactEntry, MyContact } from "./contacts";
@@ -222,6 +223,26 @@ export class SupabaseApi implements Api {
 
   async setSoldierContacts(list: { user_id: string; display_name: string; phone: string | null }[]) {
     check(await this.sb.rpc("set_soldier_contacts", { p: list }));
+  }
+
+  async submitFeedback(d: FeedbackDraft): Promise<void> {
+    check(
+      await this.sb.rpc("submit_feedback", {
+        p_kind: d.kind, p_body: d.body, p_anonymous: d.anonymous, p_screen: d.screen, p_version: d.version, p_device: d.device,
+      }),
+    );
+  }
+
+  async feedbackList(): Promise<FeedbackItem[]> {
+    return check(await this.sb.rpc("feedback_list", { p_status: null })) as FeedbackItem[];
+  }
+
+  async feedbackNewCount(): Promise<number> {
+    return Number(check(await this.sb.rpc("feedback_new_count")) ?? 0);
+  }
+
+  async updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void> {
+    check(await this.sb.rpc("update_feedback", { p_id: id, p_status: status, p_note: note, p_reply: reply }));
   }
 
   async ranks(): Promise<RankItem[]> {

@@ -13,6 +13,7 @@ import { CycleWorkspace } from "./pages/CycleWorkspace";
 import { HomePage } from "./pages/HomePage";
 import { MyPage } from "./pages/MyPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { FeedbackInbox } from "./components/FeedbackInbox";
 import { RequestsPage } from "./pages/RequestsPage";
 import { CycleProvider } from "./lib/cycleContext";
 import { SoldiersPage } from "./pages/SoldiersPage";
@@ -55,6 +56,7 @@ function Gate() {
         <Routes>
           <Route path="/" element={isUnitCommander(me) ? <DashboardPage /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
           {reader && <Route path="/dashboard" element={<DashboardPage />} />}
+          {(isStaff(me) || isUnitCommander(me)) && <Route path="/feedback" element={<FeedbackInbox />} />}
           <Route path="/board" element={<BoardPage />} />
           <Route path="/scoring" element={lazyEl(<ScoringPage />)} />
           {isSoldier(me) && <Route path="/requests" element={<RequestsPage />} />}

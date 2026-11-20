@@ -2844,3 +2844,45 @@ def test_add_soldier_keeps_shachar_second_role_and_tash(conn):
         assert got(m["id"]) == (True, "2026-10-01", 5)
         assert got(c["id"]) == (False, "2026-10-01", 5)   # שח"ר is for mandatory service only
         raise psycopg.Rollback()
+
+
+def test_feedback_named_and_anonymous_reach_the_inbox(conn):
+    sol, _ = _soldier_account(conn, "fb.sender")
+    cmd = _as_coord(conn, "select public.create_user('fb.unitcmd', 'temp-pass-123', 'unit_commander', null)")[0][0]
+    with conn.transaction():
+        conn.execute("delete from feedback")
+        conn.execute("set local role authenticated")
+        _claims(conn, sol, aal="aal1")
+        named = conn.execute("select public.submit_feedback('idea', '  כפתור לייצוא ליומן  ', false, '/my', '2.35.0', 'phone')").fetchone()[0]
+        anon = conn.execute("select public.submit_feedback('bug', 'משהו לא נטען', true, '/requests', '2.35.0', 'desktop')").fetchone()[0]
+        # a soldier does not read the inbox
+        assert conn.execute("select count(*) from public.feedback_list()").fetchone()[0] == 0
+        assert conn.execute("select public.feedback_new_count()").fetchone()[0] == 0
+        with pytest.raises(psycopg.Error):
+            with conn.transaction():
+                conn.execute("select public.update_feedback(%s, 'done')", (named,))
+        # five a day
+        for _ in range(3):
+            conn.execute("select public.submit_feedback('note', 'עוד', false)")
+        with pytest.raises(psycopg.Error, match="עד 5"):
+            with conn.transaction():
+                conn.execute("select public.submit_feedback('note', 'שישית', false)")
+        conn.execute("reset role")
+        # nothing ties the anonymous one to him
+        assert conn.execute("select sender_user_id, sender_name from feedback where id = %s", (anon,)).fetchone() == (None, None)
+        assert conn.execute("select body, sender_user_id from feedback where id = %s", (named,)).fetchone() == ("כפתור לייצוא ליומן", sol)
+        # the unit commander reads, counts and closes; the named sender hears back
+        conn.execute("set local role authenticated")
+        _claims(conn, cmd)
+        rows = {r[0]: r for r in conn.execute("select id, anonymous, sender_name, screen, device from public.feedback_list()").fetchall()}
+        assert rows[anon][1] is True and rows[anon][2] is None and rows[anon][3] == "/requests"
+        assert rows[named][1] is False and rows[named][2] and rows[named][4] == "phone"
+        assert conn.execute("select public.feedback_new_count()").fetchone()[0] == 5
+        conn.execute("select public.update_feedback(%s, 'done', 'פנימי', 'הוספנו!')", (named,))
+        conn.execute("select public.update_feedback(%s, 'wont', null, 'לא עכשיו')", (anon,))
+        assert conn.execute("select public.feedback_new_count()").fetchone()[0] == 3
+        conn.execute("reset role")
+        (p,), = conn.execute("select payload from notifications where recipient_user_id = %s and type = 'feedback_reply'", (sol,)).fetchall()
+        assert p["title"] == "ההצעה שלך בוצעה – תודה!" and p["body"].startswith("הוספנו!")
+        assert conn.execute("select count(*) from notifications where type = 'feedback_reply'").fetchone()[0] == 1
+        raise psycopg.Rollback()
