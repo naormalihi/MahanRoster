@@ -48,6 +48,11 @@ function check<T>(res: { data: T; error: { message: string } | null }): NonNulla
   return res.data as NonNullable<T>;
 }
 
+/** For calls whose answer is not used (a function that returns nothing): only the error counts. */
+function run(res: { error: { message: string } | null }): void {
+  if (res.error) throw new Error(errorText(res.error.message));
+}
+
 /** For queries where "no row" is a valid answer (maybeSingle). */
 function maybe<T>(res: { data: T; error: { message: string } | null }): T {
   if (res.error) throw new Error(errorText(res.error.message));
@@ -206,11 +211,11 @@ export class SupabaseApi implements Api {
   }
 
   async setMyTheme(choice: "auto" | "light" | "dark"): Promise<void> {
-    check(await this.sb.rpc("set_my_theme", { p_theme: choice }));
+    run(await this.sb.rpc("set_my_theme", { p_theme: choice }));
   }
 
   async setMyRequestAlerts(on: boolean): Promise<void> {
-    check(await this.sb.rpc("set_my_request_alerts", { p_on: on }));
+    run(await this.sb.rpc("set_my_request_alerts", { p_on: on }));
   }
 
   async myContacts(): Promise<MyContact[]> {
@@ -222,7 +227,7 @@ export class SupabaseApi implements Api {
   }
 
   async setSoldierContacts(list: { user_id: string; display_name: string; phone: string | null }[]) {
-    check(await this.sb.rpc("set_soldier_contacts", { p: list }));
+    run(await this.sb.rpc("set_soldier_contacts", { p: list }));
   }
 
   async submitFeedback(d: FeedbackDraft): Promise<void> {
@@ -242,7 +247,7 @@ export class SupabaseApi implements Api {
   }
 
   async updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void> {
-    check(await this.sb.rpc("update_feedback", { p_id: id, p_status: status, p_note: note, p_reply: reply }));
+    run(await this.sb.rpc("update_feedback", { p_id: id, p_status: status, p_note: note, p_reply: reply }));
   }
 
   async ranks(): Promise<RankItem[]> {
@@ -787,7 +792,7 @@ export class SupabaseApi implements Api {
   }
 
   async updateSpecialSlot(slotId: string, name: string, points: number) {
-    check(await this.sb.rpc("update_special_slot", { p_slot: slotId, p_name: name, p_points: points }));
+    run(await this.sb.rpc("update_special_slot", { p_slot: slotId, p_name: name, p_points: points }));
   }
 
   async slotPeople(slotId: string): Promise<SlotPeople | null> {
@@ -818,7 +823,7 @@ export class SupabaseApi implements Api {
   }
 
   async deleteSlot(slotId: string, reason?: string) {
-    check(await this.sb.rpc("delete_slot", { p_slot: slotId, p_reason: reason ?? null }));
+    run(await this.sb.rpc("delete_slot", { p_slot: slotId, p_reason: reason ?? null }));
   }
 
   async deletePendingSlot(slotId: string) {
@@ -963,7 +968,7 @@ export class SupabaseApi implements Api {
   }
 
   async markInvitesSent(soldierIds: string[]) {
-    check(await this.sb.rpc("mark_invites_sent", { p_soldiers: soldierIds }));
+    run(await this.sb.rpc("mark_invites_sent", { p_soldiers: soldierIds }));
   }
 
   async createSoldierInvites(soldierIds: string[], days: number) {
