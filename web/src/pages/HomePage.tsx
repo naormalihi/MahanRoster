@@ -130,7 +130,7 @@ export function HomePage() {
       )}
       <MyNextDuty />
       <UnackedCard />
-      <FeedbackInbox />
+      <FeedbackInbox home />
 
       {contacts === 0 && (
         <Alert
