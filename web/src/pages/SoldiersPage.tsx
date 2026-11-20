@@ -57,6 +57,8 @@ import {
   effectiveParent,
   effectiveService,
   rangeState,
+  tashHelp,
+  TASH_LEVELS,
   type LoadRoleRef,
   type RangeState,
   type SoldierDetail,
@@ -362,17 +364,11 @@ function EditDialog(props: {
                       e.target.value === "" ? null : Number(e.target.value),
                     )
                   }
-                  helperText={
-                    p.tash_level
-                      ? p.tash_level === 7
-                        ? "בבית כל לילה – בלי תורנויות לילה"
-                        : `${p.tash_level} לילות בבית בשבוע – עד ${7 - p.tash_level} לילות בבסיס`
-                      : "כמה לילות בשבוע חייב לישון בבית"
-                  }
+                  helperText={tashHelp(p.tash_level)}
                   sx={{ minWidth: 220 }}
                 >
                   <MenuItem value="">אין</MenuItem>
-                  {[3, 4, 5, 6, 7].map((n) => (
+                  {TASH_LEVELS.map((n) => (
                     <MenuItem key={n} value={n}>
                       {n}
                     </MenuItem>

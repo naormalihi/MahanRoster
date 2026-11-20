@@ -20,6 +20,7 @@ import { EMPTY_FORM, formProblems, toRow, type AddSoldierForm, type AddSoldierRe
 import type { NamedRef, RankItem } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { normalizeIdNumber, rememberedUnitKey, rememberUnitKey, soldierKey, unitKeyCheck, unitKeyProblems } from "../lib/hmac";
+import { tashHelp, TASH_LEVELS } from "../lib/soldiers";
 import { PasswordField } from "./PasswordField";
 
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jerusalem" });
@@ -177,12 +178,30 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
             {f.serviceType === "mandatory" && field("releaseDate", "תאריך שחרור", { type: "date", slotProps: { inputLabel: { shrink: true } } })}
             {f.serviceType === "career" && field("careerStartDate", "כניסה לקבע", { type: "date", slotProps: { inputLabel: { shrink: true } } })}
             {field("rangeValidUntil", "תוקף מטווח", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
+            {field("secondRoleSignedAt", "חתימה על תפקיד שני (המשך קבע)", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
             {field("phone", "טלפון נייד", { slotProps: { htmlInput: { inputMode: "tel", dir: "ltr" } }, disabled: !keyOk })}
+            <TextField
+              select
+              label='זכאות הת"ש'
+              value={f.tashLevel}
+              onChange={(e) => set("tashLevel")(e.target.value === "" ? "" : Number(e.target.value))}
+              helperText={tashHelp(f.tashLevel || null)}
+              disabled={!keyOk}
+            >
+              <MenuItem value="">אין</MenuItem>
+              {TASH_LEVELS.map((n) => (
+                <MenuItem key={n} value={n}>
+                  {n}
+                </MenuItem>
+              ))}
+            </TextField>
             {field("joinDate", "תאריך כניסה ליחידה *", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
           </Box>
           <Stack direction="row" sx={{ flexWrap: "wrap" }}>
             <FormControlLabel control={<Checkbox checked={f.parent} onChange={(e) => set("parent")(e.target.checked)} disabled={!keyOk} />} label="משרת הורה" />
-            <FormControlLabel control={<Checkbox checked={f.homeNightly} onChange={(e) => set("homeNightly")(e.target.checked)} disabled={!keyOk} />} label='ת"ש 7 (לינה בבית)' />
+            {f.serviceType === "mandatory" && (
+              <FormControlLabel control={<Checkbox checked={f.shachar} onChange={(e) => set("shachar")(e.target.checked)} disabled={!keyOk} />} label='שח"ר' />
+            )}
           </Stack>
           <Alert severity="info" icon={false}>
             <b>חייל חדש ביחידה:</b> נכנס עם הניקוד הממוצע של הקבוצה שלו. המנוע לא ישבץ אותו אוטומטית עד {graceEnd || "תום תקופת החסד"} ({grace} יום מהכניסה).

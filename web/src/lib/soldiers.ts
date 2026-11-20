@@ -120,3 +120,13 @@ export function activeLoadRoles(s: Pick<SoldierDetail, "load_roles">, today = to
 export function activeLoadRole(s: Pick<SoldierDetail, "load_roles">, today = todayIso()): SoldierLoadRole | null {
   return activeLoadRoles(s, today)[0] ?? null;
 }
+
+/** The line under the הת"ש level, on the soldier card and in "הוספת חייל". */
+export const tashHelp = (level: number | null | undefined) =>
+  level
+    ? level === 7
+      ? "בבית כל לילה – בלי תורנויות לילה"
+      : `${level} לילות בבית בשבוע – עד ${7 - level} לילות בבסיס`
+    : "כמה לילות בשבוע חייב לישון בבית";
+
+export const TASH_LEVELS = [3, 4, 5, 6, 7] as const;
