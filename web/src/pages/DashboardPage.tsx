@@ -226,7 +226,7 @@ export function DashboardPage() {
         </Card>
       </Box>
 
-      <FeedbackInbox />
+      <FeedbackInbox home />
     </Stack>
   );
 }

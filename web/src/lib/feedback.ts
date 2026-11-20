@@ -75,3 +75,11 @@ export function countByStatus(items: FeedbackItem[]): Record<FeedbackStatus, num
   for (const i of items) out[i.status]++;
   return out;
 }
+
+/** "2 חדשות · 1 בטיפול" */
+export function openLabel(fresh: number, inProgress: number): string {
+  const parts = [];
+  if (fresh) parts.push(fresh === 1 ? "חדשה אחת" : `${fresh} חדשות`);
+  if (inProgress) parts.push(`${inProgress} בטיפול`);
+  return parts.join(" · ");
+}

@@ -1,10 +1,23 @@
-import { Alert, Box, Button, Chip, CircularProgress, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import { isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { dayLabel } from "../lib/dates";
 import {
   countByStatus,
+  openLabel,
   KIND_LABEL,
   MAX_REPLY,
   screenLabel,
@@ -24,7 +37,8 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
   const [reply, setReply] = useState(f.reply ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const closing = (status === "done" || status === "wont") && status !== f.status;
+  const closing =
+    (status === "done" || status === "wont") && status !== f.status;
 
   async function save() {
     setBusy(true);
@@ -41,8 +55,16 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
 
   return (
     <Box sx={{ py: 1.25 }}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 0.5, mb: 0.5 }}>
-        <Chip size="small" color={STATUS_COLOR[f.status]} label={STATUS_LABEL[f.status]} />
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 0.5, mb: 0.5 }}
+      >
+        <Chip
+          size="small"
+          color={STATUS_COLOR[f.status]}
+          label={STATUS_LABEL[f.status]}
+        />
         <Chip size="small" variant="outlined" label={KIND_LABEL[f.kind]} />
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
           {f.anonymous ? "בלי שם" : f.sender_name}
@@ -54,7 +76,9 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
           {f.app_version ? ` · ${f.app_version}` : ""}
         </Typography>
       </Stack>
-      <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{f.body}</Typography>
+      <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+        {f.body}
+      </Typography>
       {!open && f.reply && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           {`תשובה: ${f.reply}`}
@@ -66,8 +90,18 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
           טיפול
         </Button>
       ) : (
-        <Stack spacing={1.5} sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: "action.hover" }}>
-          <TextField select size="small" label="סטטוס" value={status} onChange={(e) => setStatus(e.target.value as FeedbackStatus)} sx={{ maxWidth: 220 }}>
+        <Stack
+          spacing={1.5}
+          sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: "action.hover" }}
+        >
+          <TextField
+            select
+            size="small"
+            label="סטטוס"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as FeedbackStatus)}
+            sx={{ maxWidth: 220 }}
+          >
             {ORDER.map((s) => (
               <MenuItem key={s} value={s}>
                 {STATUS_LABEL[s]}
@@ -81,12 +115,21 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
               value={reply}
               onChange={(e) => setReply(e.target.value.slice(0, MAX_REPLY))}
               multiline
-              helperText={closing ? `נשלח אליו בפעמון עם "${STATUS_LABEL[status]}"` : 'נשלחת כשמסמנים "בוצע" או "לא ייעשה"'}
+              helperText={
+                closing
+                  ? `נשלח אליו בפעמון עם "${STATUS_LABEL[status]}"`
+                  : 'נשלחת כשמסמנים "בוצע" או "לא ייעשה"'
+              }
             />
           )}
           {error && <Alert severity="error">{error}</Alert>}
           <Stack direction="row" spacing={1}>
-            <Button variant="contained" size="small" disabled={busy} onClick={() => void save()}>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={busy}
+              onClick={() => void save()}
+            >
               שמירה
             </Button>
             <Button size="small" onClick={() => setOpen(false)}>
@@ -99,9 +142,11 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
   );
 }
 
-/** "הצעות ומשוב": what users sent – the new ones first, filtered by status. */
-export function FeedbackInbox() {
-  const { api } = useAuth();
+/** "הצעות ומשוב": what users sent – the new ones first, filtered by status.
+ *  On the home screen (`home`): only what still waits – new and in progress – with no filter;
+ *  "בוצע" / "לא ייעשה" leave it at once, and with nothing open the box is not shown. */
+export function FeedbackInbox({ home = false }: { home?: boolean }) {
+  const { api, me } = useAuth();
   const [items, setItems] = useState<FeedbackItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FeedbackStatus | "open" | "all">("open");
@@ -114,35 +159,74 @@ export function FeedbackInbox() {
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!items)
-    return (
+    return home ? null : (
       <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
         <CircularProgress />
       </Box>
     );
   const counts = countByStatus(items);
   const shown = items.filter((f) =>
-    filter === "all" ? true : filter === "open" ? f.status === "new" || f.status === "in_progress" : f.status === filter,
+    filter === "all"
+      ? true
+      : filter === "open"
+        ? f.status === "new" || f.status === "in_progress"
+        : f.status === filter,
   );
+  if (home && shown.length === 0) return null;
   const chip = (value: typeof filter, label: string, n: number) => (
-    <Chip key={value} label={`${label} (${n})`} color={filter === value ? "primary" : "default"} variant={filter === value ? "filled" : "outlined"} onClick={() => {
+    <Chip
+      key={value}
+      label={`${label} (${n})`}
+      color={filter === value ? "primary" : "default"}
+      variant={filter === value ? "filled" : "outlined"}
+      onClick={() => {
         setFilter(value);
         setLimit(10);
-      }} />
+      }}
+    />
   );
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-      <Typography variant="h3">הצעות ומשוב</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        מה שמשתמשים שלחו דרך &quot;הצעה לשיפור&quot;. מי ששלח בשמו מקבל עדכון בפעמון כשמסמנים &quot;בוצע&quot; או &quot;לא ייעשה&quot;.
-      </Typography>
-      <Stack direction="row" sx={{ gap: 0.75, flexWrap: "wrap", mb: 1 }}>
-        {chip("open", "פתוחות", counts.new + counts.in_progress)}
-        {chip("new", STATUS_LABEL.new, counts.new)}
-        {chip("done", STATUS_LABEL.done, counts.done)}
-        {chip("wont", STATUS_LABEL.wont, counts.wont)}
-        {chip("all", "הכל", items.length)}
-      </Stack>
+      {home ? (
+        <Stack
+          direction="row"
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            mb: 0.5,
+          }}
+        >
+          <Typography variant="h3">
+            הצעות ומשוב – {openLabel(counts.new, counts.in_progress)}
+          </Typography>
+          <Button
+            size="small"
+            component={RouterLink}
+            to={isStaff(me) ? "/admin?tab=feedback" : "/feedback"}
+          >
+            לכל ההצעות
+          </Button>
+        </Stack>
+      ) : (
+        <>
+          <Typography variant="h3">הצעות ומשוב</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            מה שמשתמשים שלחו דרך &quot;הצעה לשיפור&quot;. מי ששלח בשמו מקבל
+            עדכון בפעמון כשמסמנים &quot;בוצע&quot; או &quot;לא ייעשה&quot;.
+          </Typography>
+        </>
+      )}
+      {!home && (
+        <Stack direction="row" sx={{ gap: 0.75, flexWrap: "wrap", mb: 1 }}>
+          {chip("open", "פתוחות", counts.new + counts.in_progress)}
+          {chip("new", STATUS_LABEL.new, counts.new)}
+          {chip("done", STATUS_LABEL.done, counts.done)}
+          {chip("wont", STATUS_LABEL.wont, counts.wont)}
+          {chip("all", "הכל", items.length)}
+        </Stack>
+      )}
       {shown.length === 0 ? (
         <Typography color="text.secondary" sx={{ py: 2 }}>
           {items.length ? "אין הודעות בסינון הזה." : "עוד לא נשלחו הצעות."}
@@ -150,13 +234,22 @@ export function FeedbackInbox() {
       ) : (
         <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
           {shown.slice(0, limit).map((f) => (
-            <Item key={`${f.id}-${f.status}-${f.handled_at ?? ""}`} f={f} onSaved={load} />
+            <Item
+              key={`${f.id}-${f.status}-${f.handled_at ?? ""}`}
+              f={f}
+              onSaved={load}
+            />
           ))}
         </Stack>
       )}
       {shown.length > limit && (
-        <Button size="small" onClick={() => setLimit(limit + 10)} sx={{ mt: 1 }}>
-          עוד {Math.min(10, shown.length - limit)} (מתוך {shown.length - limit} נוספות)
+        <Button
+          size="small"
+          onClick={() => setLimit(limit + 10)}
+          sx={{ mt: 1 }}
+        >
+          עוד {Math.min(10, shown.length - limit)} (מתוך {shown.length - limit}{" "}
+          נוספות)
         </Button>
       )}
     </Paper>
