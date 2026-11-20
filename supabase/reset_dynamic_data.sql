@@ -9,12 +9,18 @@
 --   blocks, personal constraints, score adjustments, invite codes; roster / base-schedule imports
 --   and their files; gafim (sub-units of the unit) with their name aliases;
 --   soldiers' accounts (role "soldier" only): after the reset every soldier gets a new invite code;
+--   staff accounts that were linked to a soldier (staff who do duties) keep their staff role and
+--   lose the soldier role with the link;
+--   the daily counters of "הצעה לשיפור" (feedback_quota);
 --   the unit key check: the first roster load after the reset sets the key (a new one, or the same).
 -- Kept (system settings): settings and multipliers, populations, day types, ranks, load roles,
 --   the duty catalog – duty categories, duty types, the base's names for them (aliases), their
 --   exemption links and weight history –, exemption and absence types, holidays (calendar),
 --   the unit itself, the accounts of נע"ת, commanders and viewers (their link to a soldier or gaf is
---   cleared), audit log – which gets one record of the reset, with the rows removed per table.
+--   cleared) with their look (light/dark) and push subscriptions, "אנשי קשר לחיילים" (staff –
+--   a phone taken from a soldier card falls back to none), the messages of "הצעות ומשוב" (about the
+--   app, not the unit; a sender whose account goes stays by name only), the notification schedule,
+--   audit log – which gets one record of the reset, with the rows removed per table.
 -- The catalog is set up once and serves every cycle; a base file maps onto it, so it stays.
 
 begin;
@@ -31,7 +37,9 @@ declare
     'soldier_gaf_history', 'soldier_load_roles', 'exemptions', 'absences', 'date_blocks',
     'personal_constraints', 'score_adjustments', 'roster_imports', 'blobs', 'soldier_invites',
     -- gafim
-    'gaf_aliases'];
+    'gaf_aliases',
+    -- counters
+    'feedback_quota'];
   partly text[] := array['soldiers', 'org_units', 'app_users', 'user_roles', 'settings'];
   removed jsonb := '{}';
   n bigint;
@@ -61,8 +69,11 @@ begin
   select count(*) into n from gone;
   removed := removed || jsonb_build_object('soldier_accounts', n);
 
-  -- links from what stays to what goes
+  -- links from what stays to what goes (unlinking an account also drops its soldier role,
+  -- app.sync_soldier_role – staff who did duties stay staff)
   update public.app_users set soldier_id = null where soldier_id is not null;
+  delete from public.user_roles r where r.role = 'soldier'
+     and exists (select 1 from public.user_roles o where o.user_id = r.user_id and o.role <> 'soldier');
   update public.user_roles set gaf_id = null where gaf_id is not null;
   update public.org_units set commander_user_id = null where kind = 'gaf' and commander_user_id is not null;
   -- the first roster load after the reset sets the unit key again
@@ -86,5 +97,6 @@ select (select count(*) from cycles)     as cycles_left,
        (select count(*) from task_types) as duty_types_kept,
        (select count(*) from org_units where kind <> 'unit') as gafim_left,
        (select count(*) from app_users)  as users_kept,
+       (select count(*) from user_roles where role = 'soldier') as soldier_roles_left,
        (select count(*) from reset_backup.app_users) - (select count(*) from app_users) as soldier_accounts_removed,
        (select count(*) from settings)   as settings_kept;
