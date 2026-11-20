@@ -13,7 +13,7 @@ import type { AddSoldierResult, AddSoldierRow } from "../lib/addSoldier";
 import type { DutyMessage } from "../lib/dutyMessage";
 import type { MyDuty, UnackedDuty } from "../lib/me";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
-import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople, SlotPerson } from "../lib/api";
+import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople, SlotPerson, SpecDocument } from "../lib/api";
 import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
   absenceSpan,
@@ -338,6 +338,10 @@ export class DemoApi implements Api {
   async feedbackList(): Promise<FeedbackItem[]> {
     await delay();
     return this.feedback.map((f) => ({ ...f }));
+  }
+
+  async specDocument(): Promise<SpecDocument | null> {
+    return null; // the spec is not part of the public demo
   }
 
   async feedbackNewCount(): Promise<number> {

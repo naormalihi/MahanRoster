@@ -9,7 +9,7 @@ import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount, UnackedDuty } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople } from "./api";
+import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople, SpecDocument } from "./api";
 import { usernameToEmail } from "./api";
 import { SCORING_KEYS, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import {
@@ -244,6 +244,10 @@ export class SupabaseApi implements Api {
 
   async feedbackNewCount(): Promise<number> {
     return Number(check(await this.sb.rpc("feedback_new_count")) ?? 0);
+  }
+
+  async specDocument(): Promise<SpecDocument | null> {
+    return (check(await this.sb.rpc("spec_document")) as SpecDocument | null) ?? null;
   }
 
   async updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void> {

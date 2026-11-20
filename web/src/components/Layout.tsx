@@ -45,6 +45,7 @@ import { ContactsDialog } from "./ContactCard";
 import { FeedbackDialog } from "./FeedbackDialog";
 import IdeaIcon from "@mui/icons-material/LightbulbOutlined";
 import InboxIcon from "@mui/icons-material/InboxOutlined";
+import SpecIcon from "@mui/icons-material/DescriptionOutlined";
 import { ThemeSync, ThemeToggle } from "./ThemePicker";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -406,6 +407,12 @@ export function Layout({ children }: { children: ReactNode }) {
               <ListItemButton component={RouterLink} to={staff ? "/admin?tab=feedback" : "/feedback"} onClick={() => setOpen(false)}>
                 <InboxIcon fontSize="small" sx={{ ml: 1.5 }} />
                 <ListItemText primary={`הצעות ומשוב${newFeedback ? ` (${newFeedback} חדשות)` : ""}`} />
+              </ListItemButton>
+            )}
+            {seesFeedback && (
+              <ListItemButton component={RouterLink} to="/spec" onClick={() => setOpen(false)}>
+                <SpecIcon fontSize="small" sx={{ ml: 1.5 }} />
+                <ListItemText primary="מסמך האפיון" />
               </ListItemButton>
             )}
             <ListItemButton
