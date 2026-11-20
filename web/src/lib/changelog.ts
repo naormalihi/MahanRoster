@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.34.1",
+    date: "2026-11-20",
+    items: ["תיקון: שמירת אנשי קשר לחיילים נכשלה בהודעה \"DELETE requires a WHERE clause\""],
+  },
+  {
     version: "2.34.0",
     date: "2026-11-19",
     items: [
