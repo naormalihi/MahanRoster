@@ -102,7 +102,7 @@ export function DashboardPage() {
         <Tile title="בקשות פטור ממתינות" value={d.requests.pending} note={d.requests.urgent ? `${d.requests.urgent} דחופות` : "אין דחופות"} />
         <Tile title="הגישו בעצמם" value={d.requests.by_soldiers} note="מתוך הממתינות" />
         <Tile
-          title="חיילים עם חשבון אישי"
+          title="עובדים עם חשבון אישי"
           value={`${d.accounts.with_account}/${d.accounts.soldiers}`}
           note={d.accounts.soldiers ? `${Math.round((d.accounts.with_account / d.accounts.soldiers) * 100)}%` : ""}
         />
@@ -111,7 +111,7 @@ export function DashboardPage() {
 
       {/* two by two, each pair the same height */}
       <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, alignItems: "stretch" }}>
-        <Card title="העומס לפי גף">
+        <Card title="העומס לפי מסגרת">
           <Stack spacing={1}>
             {d.by_gaf.map((g) => (
               <Box key={g.gaf}>
@@ -120,7 +120,7 @@ export function DashboardPage() {
                     {g.gaf}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {g.soldiers} חיילים · {g.duties} תורנויות · {perSoldier(g).toFixed(1)} נק׳ לחייל
+                    {g.soldiers} עובדים · {g.duties} תורנויות · {perSoldier(g).toFixed(1)} נק׳ לעובד
                   </Typography>
                 </Stack>
                 <Box sx={{ height: 8, bgcolor: "action.hover", borderRadius: 1, mt: 0.5 }}>
@@ -140,7 +140,7 @@ export function DashboardPage() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  {["", "חיילים", "ממוצע", "טווח", "בלי תורנות"].map((h) => (
+                  {["", "עובדים", "ממוצע", "טווח", "בלי תורנות"].map((h) => (
                     <TableCell key={h}>{h}</TableCell>
                   ))}
                 </TableRow>

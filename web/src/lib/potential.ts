@@ -58,10 +58,10 @@ export const REASON_LABEL: Record<string, string> = {
   date_block: "חסימת תאריך",
   removed: "הוסר מהתורנות הזו",
   personal_constraint: "אילוץ אישי",
-  penalty_other: "משבצת קנס של חייל אחר",
+  penalty_other: "משבצת קנס של עובד אחר",
   busy: "משובץ בתורנות סמוכה (כולל מנוחה)",
   at_cap: "בתקרה החודשית",
-  gaf_rule: "עתודת חובה – רק מגף המבצע",
+  gaf_rule: "עתודת חובה – רק ממסגרת המבצע",
   other_role: "כבר משובץ בתורנות הזו בתפקיד אחר",
 };
 

@@ -531,7 +531,7 @@ function CalendarExport({ query }: { query: string }) {
             {!rows && !error && <CircularProgress size={22} />}
             {rows && names.length === 0 && <Alert severity="info">לא נמצאו תורנויות קרובות לשם "{query.trim()}".</Alert>}
             {names.length > 1 && (
-              <TextField select label="בחירת חייל" value={name} onChange={(e) => setName(e.target.value)} fullWidth>
+              <TextField select label="בחירת עובד" value={name} onChange={(e) => setName(e.target.value)} fullWidth>
                 {names.map((n) => (
                   <MenuItem key={n} value={n}>
                     {n}
@@ -731,8 +731,8 @@ export function BoardPage() {
           </Stack>
           <Collapse in={filters} unmountOnExit>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-              <TextField select size="small" label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ flex: 1 }}>
-                <MenuItem value="">כל הגפים</MenuItem>
+              <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ flex: 1 }}>
+                <MenuItem value="">כל המסגרות</MenuItem>
                 {gafim.map((g) => (
                   <MenuItem key={g} value={g}>
                     {g}

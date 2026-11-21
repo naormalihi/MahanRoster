@@ -3,7 +3,7 @@ import type { BoardRow } from "./api";
 import { dayKey, timeLabel, TZ } from "./dates";
 import { gafFromFramework } from "./roster";
 
-/** "גף ענן" also from an old full framework path. */
+/** "מסגרת ענן" also from an old full framework path. */
 export const shortGaf = (name: string) => (name.includes("/") ? gafFromFramework(name) ?? name : name);
 
 export interface Person {

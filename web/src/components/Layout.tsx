@@ -52,8 +52,8 @@ const ROLE_LABEL: Record<string, string> = {
   coordinator: "נע\"ת תורנויות",
   deputy: "ממלא מקום",
   viewer: "צפייה",
-  gaf_commander: "מפקד גף",
-  soldier: "חייל",
+  gaf_commander: "מפקד מסגרת",
+  soldier: "עובד",
   unit_commander: "מפקד יחידה",
 };
 

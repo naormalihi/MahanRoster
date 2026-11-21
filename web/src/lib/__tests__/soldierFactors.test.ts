@@ -63,7 +63,7 @@ describe("soldier factors", () => {
   it("a new soldier in his training period, with his opening score", () => {
     const f = soldierFactors(base({ soldier: soldier({ unit_join_date: "2027-01-01", opening_score: 10.86 }), graceDays: 90 }));
     const n = f.find((x) => x.icon === "newcomer");
-    expect(n?.title).toBe("חייל חדש – בהכשרה עד 31.3");
+    expect(n?.title).toBe("עובד חדש – בהכשרה עד 31.3");
     expect(n?.effect).toContain("ניקוד פתיחה 10.9");
     // the training period ended before the cycle: nothing to show
     expect(soldierFactors(base({ soldier: soldier({ unit_join_date: "2026-01-01" }), graceDays: 90 })).some((x) => x.icon === "newcomer")).toBe(false);

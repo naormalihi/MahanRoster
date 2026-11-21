@@ -125,7 +125,7 @@ export function SwapDialog({ duty, onClose, onSent }: { duty: MyDuty; onClose: (
           </Alert>
         )}
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
-          החייל השני יקבל התראה. ברגע שהוא מאשר – ההחלפה מתבצעת והנקודות עוברות למי שעושה את התורנות. נע״ת התורנויות מקבל עדכון.
+          העובד השני יקבל התראה. ברגע שהוא מאשר – ההחלפה מתבצעת והנקודות עוברות למי שעושה את התורנות. נע״ת התורנויות מקבל עדכון.
         </Typography>
       </DialogContent>
       <DialogActions>
@@ -238,10 +238,10 @@ export function SwapLogCard() {
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
       <Typography variant="h3" sx={{ mb: 0.5 }}>
-        החלפות בין חיילים
+        החלפות בין עובדים
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        חיילים מתחלפים בעצמם עד 24 שעות לפני תורנות, בלי אישור. כאן רואים מה השתנה; אפשר לתקן בתפעול השוטף כרגיל.
+        עובדים מתחלפים בעצמם עד 24 שעות לפני תורנות, בלי אישור. כאן רואים מה השתנה; אפשר לתקן בתפעול השוטף כרגיל.
       </Typography>
       <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
         {rows.slice(0, 12).map((r) => {

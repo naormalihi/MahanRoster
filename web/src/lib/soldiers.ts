@@ -121,7 +121,7 @@ export function activeLoadRole(s: Pick<SoldierDetail, "load_roles">, today = tod
   return activeLoadRoles(s, today)[0] ?? null;
 }
 
-/** The line under the הת"ש level, on the soldier card and in "הוספת חייל". */
+/** The line under the הת"ש level, on the soldier card and in "הוספת עובד". */
 export const tashHelp = (level: number | null | undefined) =>
   level
     ? level === 7

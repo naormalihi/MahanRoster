@@ -51,7 +51,7 @@ const LOAD_ROLES: LoadRoleRef[] = [
   { id: "lr2", name: "כונן מבצעי", factor: 0.7 },
 ];
 
-const GAFIM = ["גף מבצעים", "גף טכני", "גף מודיעין", "גף לוגיסטיקה"];
+const GAFIM = ["מבצעים", "טכני", "מודיעין", "לוגיסטיקה"];
 // neutral names, read from the military ones in files (index order kept for the demo rules)
 const RANK_ALIASES: [string, string][] = [["חובה 1", "טוראי"], ["חובה 2", "רב\"ט"], ["חובה 3", "סמל"], ["חובה 4", "סמ\"ר"],
   ["מקצועי 1", "רס\"ל"], ["מקצועי 2", "רס\"ר"], ["מקצועי 3", "רס\"מ"], ["מוביל 2", "סגן"], ["אקדמאי 1", "קמ\"א"],
@@ -324,7 +324,7 @@ export class DemoApi implements Api {
 
   // "הצעות ומשוב" – fictitious examples
   private feedback: FeedbackItem[] = [
-    { id: "fb1", created_at: new Date(Date.now() - 3600_000).toISOString(), kind: "idea", body: "יהיה נחמד לקבל תזכורת גם יום לפני התורנות, לא רק בבוקר.", sender_name: "חייל לדוגמה", anonymous: false, screen: "/my", app_version: "2.35.0", device: "phone", status: "new", note: null, reply: null, handled_by_name: null, handled_at: null },
+    { id: "fb1", created_at: new Date(Date.now() - 3600_000).toISOString(), kind: "idea", body: "יהיה נחמד לקבל תזכורת גם יום לפני התורנות, לא רק בבוקר.", sender_name: "עובד לדוגמה", anonymous: false, screen: "/my", app_version: "2.35.0", device: "phone", status: "new", note: null, reply: null, handled_by_name: null, handled_at: null },
     { id: "fb2", created_at: new Date(Date.now() - 86400_000).toISOString(), kind: "bug", body: "במסך הבקשות התאריך קפץ לחודש הבא כשבחרתי יום.", sender_name: null, anonymous: true, screen: "/requests", app_version: "2.34.1", device: "phone", status: "in_progress", note: "לבדוק בסמסונג", reply: null, handled_by_name: "naat", handled_at: new Date().toISOString() },
   ];
 
@@ -468,7 +468,7 @@ export class DemoApi implements Api {
   async deleteLoadRole(id: string) {
     await delay();
     if (this.soldierList.some((s) => this.extraOf(s.id).load_roles?.some((r) => r.load_role_id === id)))
-      throw new Error("יש חיילים עם ההקלה הזו, ולכן אי אפשר למחוק אותה. הסר אותה מהם קודם.");
+      throw new Error("יש עובדים עם ההקלה הזו, ולכן אי אפשר למחוק אותה. הסר אותה מהם קודם.");
     const i = LOAD_ROLES.findIndex((r) => r.id === id);
     if (i >= 0) LOAD_ROLES.splice(i, 1);
   }
@@ -702,7 +702,7 @@ export class DemoApi implements Api {
     await delay();
     for (const b of rows) {
       if (this.blockList.some((x) => x.status === "active" && x.soldier_id === b.soldier_id && x.day.slice(0, 7) === b.day.slice(0, 7)))
-        throw new Error("לחייל כבר יש חסימה בחודש הזה");
+        throw new Error("לעובד כבר יש חסימה בחודש הזה");
       this.blockList.push({ ...b, id: this.nextId("b"), cycle_id: cycleId, status: "active" });
     }
   }
@@ -1130,7 +1130,7 @@ export class DemoApi implements Api {
     await delay();
     const cycleId = [...this.slotsByCycle].find(([, v]) => v.some((s) => s.id === slotId))?.[0] ?? "";
     if (this.draft.some((a) => a.slot_id === slotId && a.soldier_id === soldierId && !["draft", "dropped"].includes(a.status)))
-      throw new Error("החייל כבר משובץ בתורנות הזו");
+      throw new Error("העובד כבר משובץ בתורנות הזו");
     this.draft = this.draft.filter((a) => !(a.slot_id === slotId && a.status === "draft" && (a.role === role || a.soldier_id === soldierId)));
     const id = this.nextId("as");
     this.draft.push({
@@ -1195,7 +1195,7 @@ export class DemoApi implements Api {
     await delay();
     const u = this.users.find((x) => x.user_id === userId);
     if (!u) throw new Error("המשתמש לא נמצא");
-    if (role === "soldier") throw new Error("תפקיד החייל נקבע לפי השיוך לחייל – מנתקים את השיוך במקום");
+    if (role === "soldier") throw new Error("תפקיד העובד נקבע לפי השיוך לעובד – מנתקים את השיוך במקום");
     if (!u.roles.some((r) => r.role !== role)) throw new Error("זה התפקיד היחיד שלו – מחק את המשתמש במקום");
     u.roles = u.roles.filter((r) => r.role !== role);
   }
@@ -1220,7 +1220,7 @@ export class DemoApi implements Api {
   async reactivateSoldier(soldierId: string, joinDate: string) {
     await delay();
     const s = this.soldierList.find((x) => x.id === soldierId);
-    if (!s || s.is_active) throw new Error("החייל לא נמצא או שהוא כבר פעיל");
+    if (!s || s.is_active) throw new Error("העובד לא נמצא או שהוא כבר פעיל");
     s.is_active = true;
     this.extraOf(soldierId).unit_join_date = joinDate;
   }
@@ -1228,7 +1228,7 @@ export class DemoApi implements Api {
   async removeFromUnit(soldierId: string, _fromDay: string) {
     await delay();
     const s = this.soldierList.find((x) => x.id === soldierId);
-    if (!s || !s.is_active) throw new Error("החייל לא נמצא או שהוא כבר לא פעיל");
+    if (!s || !s.is_active) throw new Error("העובד לא נמצא או שהוא כבר לא פעיל");
     s.is_active = false;
     return 0;
   }
@@ -1352,7 +1352,7 @@ export class DemoApi implements Api {
     this.demoDutyList ??= [
       { assignment_id: "demo-d1", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "שמירות חובה", starts_at: at(4, 8), ends_at: at(4, 20),
         role: "performer", status: "assigned", points: 1, explanation: "הניקוד שלך הנמוך בקבוצה", report_at: null, report_place: "שער ראשי",
-        briefing_at: at(3, 13), briefing_place: "גף אבטחה פיזית", equipment: null,
+        briefing_at: at(3, 13), briefing_place: "אבטחה פיזית", equipment: null,
         contact_name: "שני משיח", contact_phone: "052-0000000", briefing_note: "לא מאושרות החלפות בעת ביצוע התורנות!" },
       { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער | ש.ג קבע", starts_at: at(11, 20), ends_at: at(12, 8),
         role: "reserve", status: "reserve_idle", points: 0, explanation: "עתודה לפי תור", report_at: null, report_place: null,
@@ -1368,7 +1368,7 @@ export class DemoApi implements Api {
     this.swapsSeeded = true;
     const at = (days: number) => new Date(Date.now() + days * 86400_000).toISOString();
     this.swaps.push({
-      id: "demo-sw1", kind: "mutual", status: "pending_peer", mine: false, other_name: this.soldierList[5]?.full_name ?? "חייל",
+      id: "demo-sw1", kind: "mutual", status: "pending_peer", mine: false, other_name: this.soldierList[5]?.full_name ?? "עובד",
       give_task: "מטבח", give_starts_at: at(6), give_ends_at: at(6.5), take_task: "שמירות חובה", take_starts_at: at(4), take_ends_at: at(4.5),
       reason: null, created_at: new Date().toISOString(), expired: false,
     });
@@ -1432,7 +1432,7 @@ export class DemoApi implements Api {
   async swapLog(): Promise<SwapLogRow[]> {
     await delay();
     const at = (days: number) => new Date(Date.now() + days * 86400_000).toISOString();
-    const n = (i: number) => this.soldierList[i]?.full_name ?? "חייל";
+    const n = (i: number) => this.soldierList[i]?.full_name ?? "עובד";
     return [
       { id: "demo-l1", kind: "handover", status: "approved", requester: n(3), target: n(7), give_task: "מטבח", give_starts_at: at(5),
         take_task: null, take_starts_at: null, reason: null, created_at: at(-1), decided_at: at(-0.9) },
@@ -1502,7 +1502,7 @@ export class DemoApi implements Api {
   async withdrawMyExemption(id: string) {
     const e = this.exemptionList.find((x) => x.id === id && x.status === "pending");
     if (!e) throw new Error("אפשר לבטל רק בקשה שעוד ממתינה");
-    Object.assign(e, { status: "cancelled", decision_reason: "בוטל על ידי החייל" });
+    Object.assign(e, { status: "cancelled", decision_reason: "בוטל על ידי העובד" });
   }
 
   async addMyDateBlock(day: string) {
@@ -1530,7 +1530,7 @@ export class DemoApi implements Api {
 
   async cancelMyAbsence(id: string) {
     const a = this.absenceList.find((x) => x.id === id);
-    if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי החייל" });
+    if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי העובד" });
   }
 
   async unitDashboard(): Promise<UnitDashboard> {
@@ -1658,7 +1658,7 @@ export class DemoApi implements Api {
     }
     if (q.assignmentId) name = found[0]?.p.name;
     const s = this.soldierList.find((x) => x.full_name === name);
-    if (!s) throw new Error("החייל לא נמצא");
+    if (!s) throw new Error("העובד לא נמצא");
     const has_account = [...this.accounts.values()].includes(s.id);
     const code = has_account ? null : (await this.createSoldierInvites([s.id], 30))[0]?.code ?? null;
     this.demoMessaged.add(s.id);

@@ -39,7 +39,7 @@ export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; 
             <li>{impact.assignments} שיבוצים יחזרו לטיוטה, כמו שהם, כולל התיקונים הידניים.</li>
             <li>המחזור יחזור לשלב "שיבוץ: טיוטה", והפוטנציאל, לוח הבסיס והשיבוץ ייפתחו לעריכה.</li>
             {impact.nextWeek > 0 && <li>{impact.nextWeek} תורנויות נופלות בשבעת הימים הקרובים.</li>}
-            <li>מי שכבר ראה או הדפיס את הלוח לא יקבל עדכון מהמערכת – צריך להודיע לגפים בערוצים הרגילים.</li>
+            <li>מי שכבר ראה או הדפיס את הלוח לא יקבל עדכון מהמערכת – צריך להודיע למסגרות בערוצים הרגילים.</li>
           </ul>
         </Alert>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>

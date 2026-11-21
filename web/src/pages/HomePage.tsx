@@ -106,7 +106,7 @@ export function HomePage() {
           <Box component="ul" sx={{ m: 0, mt: 0.5, pr: 2.5, pl: 0 }}>
             {orphans.slice(0, 6).map((o) => (
               <li key={o.id}>
-                {names.get(o.soldier_id) ?? "חייל"} · {ORPHAN_KIND[o.kind]}
+                {names.get(o.soldier_id) ?? "עובד"} · {ORPHAN_KIND[o.kind]}
                 {o.pending ? " (ממתין)" : ""} · {fmtDay(o.from)}
                 {o.to !== o.from ? `–${fmtDay(o.to)}` : ""}
               </li>
@@ -141,7 +141,7 @@ export function HomePage() {
             </Button>
           }
         >
-          עוד לא נבחרו אנשי קשר לחיילים – בלי זה החיילים לא רואים למי לפנות ואיך.
+          עוד לא נבחרו אנשי קשר לעובדים – בלי זה העובדים לא רואים למי לפנות ואיך.
         </Alert>
       )}
 
@@ -230,7 +230,7 @@ export function HomePage() {
 
       <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
         {[
-          { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי חיילים" },
+          { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי עובדים" },
           { to: "/board", label: "לוח התורנויות", hint: "מה שכל היחידה רואה" },
           { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ומועד סגירת אילוצים" },
           { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים" },

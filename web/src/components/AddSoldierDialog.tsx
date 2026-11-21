@@ -129,7 +129,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
   const graceEnd = f.joinDate ? fmt(addDays(f.joinDate, grace)) : "";
   return (
     <Dialog open onClose={onClose} fullScreen={fullScreen} maxWidth="sm" fullWidth>
-      <DialogTitle>הוספת חייל</DialogTitle>
+      <DialogTitle>הוספת עובד</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {!keyOk && (
@@ -147,7 +147,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
           )}
           {firstKey && (
             <Alert severity="warning">
-              זה המפתח הראשון של היחידה, והוא נקבע עכשיו. שמור עותק שלו במקום בטוח: בלעדיו אי אפשר לזהות את החיילים בטעינות הבאות.
+              זה המפתח הראשון של היחידה, והוא נקבע עכשיו. שמור עותק שלו במקום בטוח: בלעדיו אי אפשר לזהות את העובדים בטעינות הבאות.
             </Alert>
           )}
           <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, opacity: keyOk ? 1 : 0.5 }}>
@@ -164,7 +164,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
                 <MenuItem key="c" value="career">קבע</MenuItem>,
               ],
             })}
-            {field("gafId", "גף *", { select: true, disabled: !keyOk, children: gafim.map((g) => <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>) })}
+            {field("gafId", "מסגרת *", { select: true, disabled: !keyOk, children: gafim.map((g) => <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>) })}
             {field("gender", "מין", {
               select: true,
               disabled: !keyOk,
@@ -204,7 +204,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
             )}
           </Stack>
           <Alert severity="info" icon={false}>
-            <b>חייל חדש ביחידה:</b> נכנס עם הניקוד הממוצע של הקבוצה שלו. המנוע לא ישבץ אותו אוטומטית עד {graceEnd || "תום תקופת החסד"} ({grace} יום מהכניסה).
+            <b>עובד חדש ביחידה:</b> נכנס עם הניקוד הממוצע של הקבוצה שלו. המנוע לא ישבץ אותו אוטומטית עד {graceEnd || "תום תקופת החסד"} ({grace} יום מהכניסה).
             אפשר לשבץ אותו ידנית גם קודם – אז זה נחשב הקפצה, כפיצוי.
           </Alert>
           {found && (

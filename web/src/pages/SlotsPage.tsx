@@ -525,7 +525,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
         </Table>
       </TableContainer>
       <Typography variant="caption" color="text.secondary">
-        ת״ש 7 = משבצת שהבסיס ייעד קודם לחיילים שלנים בבית; אם אין מהם זמין, ישובץ כל חייל זכאי. משבצת שכבר שובצה בה תורנות אי אפשר למחוק מכאן.
+        ת״ש 7 = משבצת שהבסיס ייעד קודם לעובדים שלנים בבית; אם אין מהם זמין, ישובץ כל עובד זכאי. משבצת שכבר שובצה בה תורנות אי אפשר למחוק מכאן.
       </Typography>
     </Stack>
   );

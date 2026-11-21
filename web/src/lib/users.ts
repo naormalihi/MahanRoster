@@ -44,10 +44,10 @@ export const ROLE_NAME: Record<Role, string> = {
   coordinator: "נע\"ת תורנויות",
   deputy: "ממלא מקום",
   viewer: "צפייה משותפת",
-  gaf_commander: "מפקד גף – צפייה",
-  gaf_rep: "נציג גף",
+  gaf_commander: "מפקד מסגרת – צפייה",
+  gaf_rep: "נציג מסגרת",
   unit_commander: "מפקד יחידה",
-  soldier: "חייל",
+  soldier: "עובד",
 };
 
 /** The accounts נע"ת creates in the users screen (soldiers come in with an invite code). */

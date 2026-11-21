@@ -102,11 +102,11 @@ def prepare(problem: Problem) -> Prepared:
         # A fixed assignment is kept even if the soldier is no longer eligible – with a warning.
         for f in fixed_by_slot.get(slot.id, ()):
             if f.soldier_id not in soldiers:
-                warnings.append(f"שיבוץ קבוע במשבצת {slot.id} לחייל לא מוכר {f.soldier_id} – הושמט")
+                warnings.append(f"שיבוץ קבוע במשבצת {slot.id} לעובד לא מוכר {f.soldier_id} – הושמט")
                 continue
             if f.soldier_id not in ok:
                 r = idx.check(soldiers[f.soldier_id], slot)
-                warnings.append(f"שיבוץ קבוע במשבצת {slot.id} לחייל {f.soldier_id} מפר: {', '.join(r)}")
+                warnings.append(f"שיבוץ קבוע במשבצת {slot.id} לעובד {f.soldier_id} מפר: {', '.join(r)}")
                 ok.append(f.soldier_id)
         if slot.is_penalty and slot.penalty_soldier_id:
             r = [c for c in _personal_conflicts(idx, soldiers.get(slot.penalty_soldier_id), slot)]
@@ -229,9 +229,9 @@ RELAXABLE = ("fixed", "overlap", "cap", "gaf", "penalty", "tash")
 
 DIAGNOSIS = {
     "fixed": "השיבוצים הקבועים (המפורסמים) לא מתיישבים זה עם זה או עם הגדרות התורנות.",
-    "overlap": "כלל החפיפה והמנוחה חוסם: יש חייל ששיבוציו הקבועים לא משאירים מקום.",
+    "overlap": "כלל החפיפה והמנוחה חוסם: יש עובד ששיבוציו הקבועים לא משאירים מקום.",
     "cap": "התקרה החודשית חוסמת: שיבוצים קבועים כבר מעבר לתקרה.",
-    "gaf": "כלל העתודה מאותו הגף (בחובה) חוסם.",
+    "gaf": "כלל העתודה מאותה המסגרת (בחובה) חוסם.",
     "penalty": "תורנות עונש קבועה מתנגשת בשיבוץ אחר.",
     "tash": "מגבלת הלילות של בעלי הת\"ש חוסמת: שיבוצים קבועים כבר מעבר לה.",
 }

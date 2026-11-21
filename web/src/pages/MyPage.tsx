@@ -157,7 +157,7 @@ function ScoreCard({ s }: { s: MyScore }) {
             <Box sx={{ position: "absolute", insetInlineStart: pct(mean), top: -3, bottom: -3, width: 2, bgcolor: "text.primary" }} />
           </Box>
           <Typography variant="body2" color="text.secondary">
-            הממוצע של מי שזכאים לאותן תורנויות{s.group_label ? ` (${s.group_label})` : ""}: <b>{mean.toFixed(1)}</b> · {s.group_size} חיילים.{" "}
+            הממוצע של מי שזכאים לאותן תורנויות{s.group_label ? ` (${s.group_label})` : ""}: <b>{mean.toFixed(1)}</b> · {s.group_size} עובדים.{" "}
             {Math.abs(diff) < 0.05 ? "אתה בדיוק בממוצע." : diff > 0 ? `אתה ${diff.toFixed(1)} מעל.` : `אתה ${(-diff).toFixed(1)} מתחת.`}
           </Typography>
         </>

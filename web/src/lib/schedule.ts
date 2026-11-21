@@ -96,8 +96,8 @@ export function topReasons(reasons: Record<string, number>, labels: Record<strin
 
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const FIXED_BREAKS = new RegExp(`^שיבוץ קבוע במשבצת (${UUID}) לחייל (${UUID}) מפר: (.+)$`);
-const FIXED_UNKNOWN = new RegExp(`^שיבוץ קבוע במשבצת (${UUID}) לחייל לא מוכר (${UUID}) – הושמט$`);
+const FIXED_BREAKS = new RegExp(`^שיבוץ קבוע במשבצת (${UUID}) (?:לעובד|לחייל) (${UUID}) מפר: (.+)$`);
+const FIXED_UNKNOWN = new RegExp(`^שיבוץ קבוע במשבצת (${UUID}) (?:לעובד|לחייל) לא מוכר (${UUID}) – הושמט$`);
 const PENALTY_CLASH = new RegExp(`^משבצת קנס (${UUID}) מתנגשת אצל (${UUID}): (.+)$`);
 
 /**
@@ -115,7 +115,7 @@ export function warningText(
   let m = w.match(FIXED_BREAKS);
   if (m) return `שיבוץ ידני/מפורסם: ${soldier(m[2])} ב${slot(m[1])} – לא עומד בכלל: ${rules(m[3])}. השיבוץ נשאר; כדאי לבדוק.`;
   m = w.match(FIXED_UNKNOWN);
-  if (m) return `שיבוץ ב${slot(m[1])} לחייל שכבר לא ברשימה – לא נכלל בהרצה.`;
+  if (m) return `שיבוץ ב${slot(m[1])} לעובד שכבר לא ברשימה – לא נכלל בהרצה.`;
   m = w.match(PENALTY_CLASH);
   if (m) return `משבצת קנס ב${slot(m[1])} של ${soldier(m[2])} מתנגשת: ${rules(m[3])}.`;
   // anything else (the independent check's findings among them): ids become duties and names
@@ -130,7 +130,7 @@ export function jobErrorText(error: string | null | undefined, diagnosis?: strin
   const e = (error ?? "").trim();
   if (diagnosis) return `המנוע לא מצא שיבוץ שעומד בכל הכללים. ${diagnosis}`;
   if (/INFEASIBLE/.test(e))
-    return "המנוע לא מצא שיבוץ שעומד בכל הכללים הקשיחים. בדרך כלל זה שיבוץ קבוע שמתנגש בכלל (חפיפה, תקרה חודשית, עתודה מגף אחר) – בדוק את השיבוצים שתוקנו ידנית והרץ שוב.";
+    return "המנוע לא מצא שיבוץ שעומד בכל הכללים הקשיחים. בדרך כלל זה שיבוץ קבוע שמתנגש בכלל (חפיפה, תקרה חודשית, עתודה ממסגרת אחרת) – בדוק את השיבוצים שתוקנו ידנית והרץ שוב.";
   if (/MODEL_INVALID/.test(e)) return "הבדיקה העצמאית מצאה הפרה של כלל קשיח בתוצאה, ולכן היא לא נשמרה.";
   if (/UNKNOWN/.test(e)) return "המנוע לא הספיק למצוא פתרון בזמן שהוקצב. נסה להריץ שוב.";
   return e;

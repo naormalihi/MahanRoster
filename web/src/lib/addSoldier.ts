@@ -1,4 +1,4 @@
-/** "הוספת חייל": the short form instead of a personnel file – what it needs and what it sends. */
+/** "הוספת עובד": the short form instead of a personnel file – what it needs and what it sends. */
 import { normalizeEmployeeNumber } from "./hmac";
 import { normalizePhone } from "./phone";
 

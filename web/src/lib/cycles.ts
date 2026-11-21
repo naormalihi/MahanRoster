@@ -21,13 +21,13 @@ export type CycleStatus =
 
 export const STAGES: { status: CycleStatus; label: string; hint: string }[] = [
   { status: "draft", label: "הקמת המחזור", hint: "המחזור נוצר. קובעים תאריכים ומועד סגירת אילוצים." },
-  { status: "loading", label: "טעינת כוח אדם", hint: "טוענים את קובץ כוח האדם העדכני ובודקים את רשימת החיילים." },
-  { status: "collecting", label: "אילוצים: איסוף", hint: "מזינים פטורים, היעדרויות וחסימות שהגיעו מהגפים, עד מועד הסגירה." },
+  { status: "loading", label: "טעינת כוח אדם", hint: "טוענים את קובץ כוח האדם העדכני ובודקים את רשימת העובדים." },
+  { status: "collecting", label: "אילוצים: איסוף", hint: "מזינים פטורים, היעדרויות וחסימות שהגיעו מהמסגרות, עד מועד הסגירה." },
   { status: "approving", label: "אילוצים: אישור פטורים", hint: "בודקים אסמכתאות ומאשרים או דוחים כל פטור." },
   { status: "potential", label: "פוטנציאל", hint: "מפיקים את מטריצת הפוטנציאל ושולחים לבסיס." },
   { status: "slots", label: "לוח הבסיס", hint: "טוענים את קובץ המשימות שהגיע מהבסיס." },
   { status: "scheduling", label: "שיבוץ: הרצה", hint: "מריצים את מנוע השיבוץ." },
-  { status: "review", label: "שיבוץ: טיוטה", hint: "בודקים את הטיוטה, מתקנים ידנית, אוספים הערות מהגפים ומפרסמים." },
+  { status: "review", label: "שיבוץ: טיוטה", hint: "בודקים את הטיוטה, מתקנים ידנית, אוספים הערות מהמסגרות ומפרסמים." },
   { status: "published", label: "תפעול", hint: "הלוח פורסם. מכאן: תורנויות חדשות, הקפצות והפעלת עתודות." },
   { status: "closed", label: "סגור", hint: "המחזור הסתיים." },
 ];
@@ -220,7 +220,7 @@ export type ExemptionDecision =
 
 export function exemptionProblems(e: ExemptionInput): string[] {
   const p: string[] = [];
-  if (!e.soldier_id) p.push("בחר חייל");
+  if (!e.soldier_id) p.push("בחר עובד");
   if (!e.exemption_type_id) p.push("בחר סוג פטור");
   if (!e.start_date || !e.end_date) p.push("חסרים תאריכים");
   else if (e.end_date < e.start_date) p.push("תאריך הסיום לפני תאריך ההתחלה");
@@ -311,7 +311,7 @@ export function blockQuotaProblems(
  * the first column, so it needs no personal numbers. A soldier with more than one
  * absence gets the row copied.
  */
-export const TEMPLATE_HEADERS = ["מזהה (לא לשנות)", "שם מלא", "גף", "תאריך חסימה", "סוג היעדרות", "היעדרות מתאריך", "היעדרות עד תאריך"];
+export const TEMPLATE_HEADERS = ["מזהה (לא לשנות)", "שם מלא", "מסגרת", "תאריך חסימה", "סוג היעדרות", "היעדרות מתאריך", "היעדרות עד תאריך"];
 
 export interface TemplateSoldier {
   id: string;
@@ -351,7 +351,7 @@ export function parseTemplate(
     const [idCell, , , blockCell, typeCell, fromCell, toCell] = [0, 1, 2, 3, 4, 5, 6].map((k) => cell(r, k));
     if ([blockCell, typeCell, fromCell, toCell].every(blank)) return; // nothing filled in
     const s = byId.get(String(idCell).trim());
-    if (!s) return void out.errors.push({ line, message: "מזהה החייל לא מוכר. אל תשנה את העמודה הראשונה" });
+    if (!s) return void out.errors.push({ line, message: "מזהה העובד לא מוכר. אל תשנה את העמודה הראשונה" });
     if (!blank(blockCell)) {
       const d = toIsoDate(blockCell);
       if (!d || d === "invalid") out.errors.push({ line, message: `${s.full_name}: תאריך חסימה לא תקין` });

@@ -46,7 +46,7 @@ function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | nul
       value={options.find((s) => s.id === props.value) ?? null}
       onChange={(_, v) => props.onChange(v?.id ?? null)}
       getOptionLabel={(s) => `${s.full_name} · ${s.gaf_name}`}
-      renderInput={(p) => <TextField {...p} label="החייל (מכוח האדם)" autoFocus={props.autoFocus} helperText="השיוך לפי רשומת החייל – המספר האישי לא נשמר במערכת" />}
+      renderInput={(p) => <TextField {...p} label="העובד (מכוח האדם)" autoFocus={props.autoFocus} helperText="השיוך לפי רשומת העובד – המספר האישי לא נשמר במערכת" />}
     />
   );
 }
@@ -105,14 +105,14 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
 
   return (
     <Dialog open onClose={props.onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>משתמש חדש – {role === "gaf_commander" ? "מפקד גף" : ROLE_NAME[role]}</DialogTitle>
+      <DialogTitle>משתמש חדש – {role === "gaf_commander" ? "מפקד מסגרת" : ROLE_NAME[role]}</DialogTitle>
       <DialogContent dividers>
         {done ? (
           <Handover username={username.trim().toLowerCase()} password={password} />
         ) : (
           <Stack spacing={2}>
             <TextField select label="תפקיד" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
-              <MenuItem value="gaf_commander">מפקד גף</MenuItem>
+              <MenuItem value="gaf_commander">מפקד מסגרת</MenuItem>
               <MenuItem value="unit_commander">מפקד יחידה</MenuItem>
               <MenuItem value="coordinator">נע"ת תורנויות</MenuItem>
             </TextField>
@@ -125,7 +125,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
             <Typography variant="body2" color="text.secondary">
               {role === "unit_commander"
                 ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא \"נתוני היחידה\" – כולל כל שינוי הגדרות שנע\"ת עשה בחודש האחרון."
-                : "מפקד גף רואה לקריאה בלבד את פרטי החיילים של הגף שלו – כולל ת\"ש, פטורים והיעדרויות – ואת הלוח, הטיוטה והפוטנציאל של כל היחידה בלי פרטים אישיים. הגף נקבע לפי החייל שמשויך אליו, ולכן כדאי לבחור אותו כאן."}
+                : "מפקד מסגרת רואה לקריאה בלבד את פרטי העובדים של המסגרת שלו – כולל ת\"ש, פטורים והיעדרויות – ואת הלוח, הטיוטה והפוטנציאל של כל היחידה בלי פרטים אישיים. המסגרת נקבע לפי העובד שמשויך אליו, ולכן כדאי לבחור אותו כאן."}
             </Typography>
             )}
             <SoldierPicker soldiers={props.soldiers} value={soldier} onChange={setSoldier} autoFocus />
@@ -191,8 +191,8 @@ export function UsersTab() {
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 260 }}>
-          חשבונות אישיים. כל משתמש משויך לרשומת החייל שלו מכוח האדם (בלי מספר עובד). כאן נוצרים חשבונות של מפקדי גפים ומפקד היחידה (צפייה);
-          חיילים מצטרפים בקוד הצטרפות ממסך החיילים; נע"ת וממלא מקום מוגדרים בהקמה.
+          חשבונות אישיים. כל משתמש משויך לרשומת העובד שלו מכוח האדם (בלי מספר עובד). כאן נוצרים חשבונות של מפקדי מסגרות ומפקד היחידה (צפייה);
+          עובדים מצטרפים בקוד הצטרפות ממסך העובדים; נע"ת וממלא מקום מוגדרים בהקמה.
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
           משתמש חדש
@@ -216,7 +216,7 @@ export function UsersTab() {
               </Button>
             }
           >
-            חשבון הצפייה המשותף <b>{u.username}</b> עדיין פעיל. בגרסה 2.0 לכל חייל חשבון אישי, ולכן מבטלים אותו: אחרי שהחיילים הצטרפו – לנעול.
+            חשבון הצפייה המשותף <b>{u.username}</b> עדיין פעיל. בגרסה 2.0 לכל עובד חשבון אישי, ולכן מבטלים אותו: אחרי שהעובדים הצטרפו – לנעול.
           </Alert>
         ))}
       {!users ? (
@@ -244,7 +244,7 @@ export function UsersTab() {
               );
             // a gaf commander sees personal records of his own gaf only: without a gaf, of none
             if (u.roles.some((r) => r.role === "gaf_commander" && !r.gaf_id) && !u.soldier_id)
-              roles.push(<Chip key="nogaf" size="small" color="warning" variant="outlined" label="לא משויך לגף – לא רואה פרטים אישיים" />);
+              roles.push(<Chip key="nogaf" size="small" color="warning" variant="outlined" label="לא משויך למסגרת – לא רואה פרטים אישיים" />);
             const login = u.last_login_at ? new Date(u.last_login_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }) : "לא נכנס";
             const status = u.is_locked ? (
               <Chip size="small" color="error" label="נעול" />
@@ -256,8 +256,8 @@ export function UsersTab() {
             const actions = (
               <>
                 {commander && (
-                  <Tooltip title="שיוך לחייל">
-                    <IconButton size="small" aria-label="שיוך לחייל" onClick={() => setLinking({ user: u, soldier: u.soldier_id })}>
+                  <Tooltip title="שיוך לעובד">
+                    <IconButton size="small" aria-label="שיוך לעובד" onClick={() => setLinking({ user: u, soldier: u.soldier_id })}>
                       <LinkIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -328,7 +328,7 @@ export function UsersTab() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["שם משתמש", "תפקיד", "חייל", "גף", "כניסה אחרונה", "מצב", ""].map((h) => (
+                {["שם משתמש", "תפקיד", "עובד", "מסגרת", "כניסה אחרונה", "מצב", ""].map((h) => (
                   <TableCell key={h} sx={{ whiteSpace: "nowrap" }}>
                     {h}
                   </TableCell>
@@ -499,7 +499,7 @@ export function UsersTab() {
 
       {linking && (
         <Dialog open onClose={() => setLinking(null)} maxWidth="sm" fullWidth>
-          <DialogTitle>שיוך {linking.user.username} לחייל</DialogTitle>
+          <DialogTitle>שיוך {linking.user.username} לעובד</DialogTitle>
           <DialogContent dividers>
             <Box sx={{ pt: 1 }}>
               <SoldierPicker soldiers={soldiers} value={linking.soldier} onChange={(id) => setLinking({ ...linking, soldier: id })} autoFocus />

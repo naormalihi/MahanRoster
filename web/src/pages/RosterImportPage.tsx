@@ -88,7 +88,7 @@ function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) => f.label),
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) =>
-      ({ idNumber: "1234567", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "חובה 3",
+      ({ idNumber: "1234567", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "מסגרת מבצעים", framework: "", rank: "חובה 3",
          gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא", phone: "050-1234567" } as Record<string, string>)[f.key] ?? ""),
   ]);
   const wb = XLSX.utils.book_new();
@@ -185,7 +185,7 @@ export function RosterImportPage() {
     if (stored && stored !== check) {
       forgetUnitKey();
       setMismatch(true);
-      return setKeyError("המפתח לא תואם למפתח שבו נטענו החיילים בעבר. בדוק שהוקלד נכון.");
+      return setKeyError("המפתח לא תואם למפתח שבו נטענו העובדים בעבר. בדוק שהוקלד נכון.");
     }
     if (!stored) await api!.setUnitKeyCheck(check); // first import fixes the key
     rememberUnitKey(key);
@@ -202,7 +202,7 @@ export function RosterImportPage() {
       unitKey,
       "",
       "שמור את הקובץ במקום מאובטח (מנהל סיסמאות או כונן מוצפן) ומחק אותו מתיקיית ההורדות.",
-      "בלי המפתח המערכת לא מזהה חיילים קיימים בטעינה.",
+      "בלי המפתח המערכת לא מזהה עובדים קיימים בטעינה.",
     ].join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
@@ -348,7 +348,7 @@ export function RosterImportPage() {
     <Stack spacing={2}>
       <Box>
         <Button size="small" startIcon={<BackIcon />} component={RouterLink} to="/soldiers">
-          חיילים
+          עובדים
         </Button>
         <Typography variant="h1">טעינת כוח אדם</Typography>
       </Box>
@@ -374,13 +374,13 @@ export function RosterImportPage() {
             </Typography>
             {rekey && (
               <Alert severity="warning">
-                החלפת מפתח: הזן מפתח חדש וטען את קובץ כוח האדם המלא. המערכת תתאים כל שורה לחייל קיים לפי השם, ואחרי שתאשר את ההתאמות החיילים יעברו
+                החלפת מפתח: הזן מפתח חדש וטען את קובץ כוח האדם המלא. המערכת תתאים כל שורה לעובד קיים לפי השם, ואחרי שתאשר את ההתאמות העובדים יעברו
                 למפתח החדש עם כל ההיסטוריה שלהם. המפתח הישן יפסיק לעבוד.
               </Alert>
             )}
             {(firstKey || rekey) && (
               <Alert severity="info">
-                שמור את המפתח במנהל סיסמאות או במקום מאובטח אחר. בלעדיו המערכת לא מזהה חיילים קיימים בטעינה הבאה.
+                שמור את המפתח במנהל סיסמאות או במקום מאובטח אחר. בלעדיו המערכת לא מזהה עובדים קיימים בטעינה הבאה.
                 <Box sx={{ mt: 1 }}>
                   <Button size="small" variant="outlined" startIcon={<DownloadIcon />} disabled={!!unitKeyProblems(unitKey)} onClick={downloadKeyBackup}>
                     הורדת קובץ גיבוי של המפתח
@@ -537,7 +537,7 @@ export function RosterImportPage() {
                   </Button>
                 }
               >
-                {plan.movedOut.length === 1 ? "חייל אחד מופיע" : `${plan.movedOut.length} חיילים מופיעים`} בקובץ במסגרת שלא נבחרה – כנראה עברו.
+                {plan.movedOut.length === 1 ? "עובד אחד מופיע" : `${plan.movedOut.length} עובדים מופיעים`} בקובץ במסגרת שלא נבחרה – כנראה עברו.
                 הם נשארים פעילים, אלא אם תסמן אותם בלשונית &quot;עברו מסגרת&quot;.
               </Alert>
             )}
@@ -552,7 +552,7 @@ export function RosterImportPage() {
               </Alert>
             )}
             {!mapping.gaf && mapping.framework && (
-              <Alert severity="info">הגף נלקח מעמודת המסגרת (החלק שמתחיל ב"גף").</Alert>
+              <Alert severity="info">המסגרת נלקחת מנתיב המסגרת (החלק שמתחיל ב"גף").</Alert>
             )}
             {plan.unknownRanks.length > 0 && (
               <Alert severity="error">
@@ -560,16 +560,16 @@ export function RosterImportPage() {
               </Alert>
             )}
             {plan.unknownGafim.length > 0 && (
-              <Alert severity="warning">גפים חדשים שייווצרו בטעינה: {plan.unknownGafim.join(", ")}</Alert>
+              <Alert severity="warning">מסגרות חדשות שייווצרו בטעינה: {plan.unknownGafim.join(", ")}</Alert>
             )}
             {plan.added.length > 0 && plan.added.length === parsed.rows.length && plan.unchanged + plan.updated.length === 0 && plan.removed.length > 0 && (
               <Alert severity="error">
-                כל החיילים בקובץ מזוהים כחדשים, וכל הקיימים כחסרים. זה קורה בדרך כלל כשמפתח היחידה שגוי. מומלץ לבדוק לפני שממשיכים.
+                כל העובדים בקובץ מזוהים כחדשים, וכל הקיימים כחסרים. זה קורה בדרך כלל כשמפתח היחידה שגוי. מומלץ לבדוק לפני שממשיכים.
               </Alert>
             )}
             {changes.length > 0 && (
               <Alert severity="info">
-                נמצאו {changes.length} שינויים אצל חיילים קיימים (בלשונית "שינויים לאישור"). רק שינוי שמסומן לאישור ייטען; שינוי שלא אושר
+                נמצאו {changes.length} שינויים אצל עובדים קיימים (בלשונית "שינויים לאישור"). רק שינוי שמסומן לאישור ייטען; שינוי שלא אושר
                 לא דורס את הערך שבמערכת. מה שהוזן ידנית (שח"ר, תפקיד הקלה, דרגת מינוי, עקיפות) לא משתנה בטעינה בכל מקרה.
                 <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap", rowGap: 1 }}>
                   {fieldGroups.map(([field, keys]) => {
@@ -606,7 +606,7 @@ export function RosterImportPage() {
                   <>
                     <TableHead>
                       <TableRow>
-                        {["שם", "סוג שירות", "גף", "דרגה", "גיוס", "שחרור"].map((h) => <TableCell key={h}>{h}</TableCell>)}
+                        {["שם", "סוג שירות", "מסגרת", "דרגה", "גיוס", "שחרור"].map((h) => <TableCell key={h}>{h}</TableCell>)}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -657,7 +657,7 @@ export function RosterImportPage() {
                   <>
                     <TableHead>
                       <TableRow>
-                        {["שם", "גף", "דרגה"].map((h) => <TableCell key={h}>{h}</TableCell>)}
+                        {["שם", "מסגרת", "דרגה"].map((h) => <TableCell key={h}>{h}</TableCell>)}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -685,7 +685,7 @@ export function RosterImportPage() {
                             slotProps={{ input: { "aria-label": "סמן את כולם לא פעילים" } }}
                           />
                         </TableCell>
-                        {["שם", "גף עכשיו", "בקובץ", ""].map((h, i) => <TableCell key={i}>{h}</TableCell>)}
+                        {["שם", "מסגרת עכשיו", "בקובץ", ""].map((h, i) => <TableCell key={i}>{h}</TableCell>)}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -747,7 +747,7 @@ export function RosterImportPage() {
             {busy && <LinearProgress />}
             {parsed.errors.length > 0 && (
               <Typography variant="caption" color="text.secondary">
-                שורות שגויות לא ייטענו. חיילים שמופיעים רק בשורות שגויות לא יסומנו כלא פעילים, אלא אם הם חסרים בקובץ.
+                שורות שגויות לא ייטענו. עובדים שמופיעים רק בשורות שגויות לא יסומנו כלא פעילים, אלא אם הם חסרים בקובץ.
               </Typography>
             )}
           </Stack>
@@ -759,7 +759,7 @@ export function RosterImportPage() {
           <Stack spacing={2}>
             <Alert severity="success">
               הטעינה הושלמה: {done.added} חדשים, {done.updated} עודכנו, {done.deactivated} סומנו לא פעילים
-              {done.gafimCreated ? `, ${done.gafimCreated} גפים חדשים` : ""}.
+              {done.gafimCreated ? `, ${done.gafimCreated} מסגרות חדשות` : ""}.
             </Alert>
             <NextStage />
             <Box>
@@ -795,7 +795,7 @@ function RekeyPanel(props: {
   return (
     <Paper sx={{ p: 3 }}>
       <Stack spacing={2}>
-        <Typography variant="h2">התאמת חיילים למפתח החדש</Typography>
+        <Typography variant="h2">התאמת עובדים למפתח החדש</Typography>
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
           <Chip color="success" label={`התאמה ודאית: ${sure}`} />
           <Chip color="warning" label={`לבדיקה: ${rows.length - sure}`} />
@@ -803,8 +803,8 @@ function RekeyPanel(props: {
           <Chip label={`קיימים שלא הותאמו: ${left.length}`} />
         </Stack>
         <Alert severity="info">
-          ודאי = שם יחיד בשני הצדדים, ורוב הפרטים (גף, דרגה, מין, גיוס) זהים. בשורות לבדיקה בחר את החייל הקיים, או "חייל חדש" אם אין לו התאמה. שורה בלי
-          התאמה תיטען כחייל חדש, וחייל קיים שלא הותאם יופיע בטעינה כ"לא בקובץ".
+          ודאי = שם יחיד בשני הצדדים, ורוב הפרטים (מסגרת, דרגה, מין, גיוס) זהים. בשורות לבדיקה בחר את העובד הקיים, או "עובד חדש" אם אין לו התאמה. שורה בלי
+          התאמה תיטען כעובד חדש, ועובד קיים שלא הותאם יופיע בטעינה כ"לא בקובץ".
         </Alert>
         <Tabs value={only} onChange={(_, v) => setOnly(v)}>
           <Tab value="check" label={`לבדיקה (${rows.length - sure})`} />
@@ -814,7 +814,7 @@ function RekeyPanel(props: {
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                {["בקובץ", "גף · דרגה · גיוס", "חייל קיים במערכת"].map((h) => (
+                {["בקובץ", "מסגרת · דרגה · גיוס", "עובד קיים במערכת"].map((h) => (
                   <TableCell key={h}>{h}</TableCell>
                 ))}
               </TableRow>
@@ -846,7 +846,7 @@ function RekeyPanel(props: {
                         }}
                         slotProps={{ select: { displayEmpty: true } }}
                       >
-                        <MenuItem value="">חייל חדש (ללא התאמה)</MenuItem>
+                        <MenuItem value="">עובד חדש (ללא התאמה)</MenuItem>
                         {r.candidates.map((c) => (
                           <MenuItem key={c.id} value={c.id}>
                             {who(c)}
@@ -868,7 +868,7 @@ function RekeyPanel(props: {
         </Box>
         {left.length > 0 && (
           <Alert severity="warning">
-            {left.length} חיילים פעילים במערכת לא הותאמו: {left.slice(0, 12).map((s) => s.full_name).join(", ")}
+            {left.length} עובדים פעילים במערכת לא הותאמו: {left.slice(0, 12).map((s) => s.full_name).join(", ")}
             {left.length > 12 ? " ועוד" : ""}. הם ישארו עם המפתח הישן ויסומנו בטעינה כ"לא בקובץ".
           </Alert>
         )}

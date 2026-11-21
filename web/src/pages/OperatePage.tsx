@@ -330,7 +330,7 @@ export function OperatePage() {
     if (!u.length) return "";
     const merged: Record<string, number> = {};
     for (const x of u) for (const [r, n] of Object.entries(x.reasons)) merged[r] = Math.max(merged[r] ?? 0, n);
-    return topReasons(merged, REASON_LABEL, 3) || (u[0].eligible_count === 0 ? "אין אף חייל זכאי" : "");
+    return topReasons(merged, REASON_LABEL, 3) || (u[0].eligible_count === 0 ? "אין אף עובד זכאי" : "");
   };
   const drafts = (id: string) => of(id).filter((a) => a.status === "draft");
   const withDraft = pending.filter((k) => drafts(k.id).length > 0);
@@ -534,7 +534,7 @@ export function OperatePage() {
         <Stack spacing={2}>
           <Typography variant="h3">הפעלת עתודה וביטול הפעלה</Typography>
           <Typography variant="body2" color="text.secondary">
-            הדרך המהירה: בלוח המפורסם לוחצים על התורנות. כאן אפשר לחפש תורנות לפי שם חייל, שם תורנות או תאריך, בכל המחזור.
+            הדרך המהירה: בלוח המפורסם לוחצים על התורנות. כאן אפשר לחפש תורנות לפי שם עובד, שם תורנות או תאריך, בכל המחזור.
           </Typography>
           <TextField
             size="small"

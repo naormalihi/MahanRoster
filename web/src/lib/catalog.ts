@@ -22,7 +22,7 @@ export interface Briefing {
 export const BRIEFING_KIND_LABEL: Record<Briefing["kind"], string> = { briefing: "תדריך", report: "התייצבות", by_call: "תדריך לפי הזימון" };
 const DAY_NAME = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-/** "תדריך שלישי שלפני 13:00 · גף אבטחה פיזית" */
+/** "תדריך שלישי שלפני 13:00 · מסגרת אבטחה פיזית" */
 export function briefingLabel(b: Briefing | null | undefined): string {
   if (!b) return "";
   if (b.kind === "by_call") return [BRIEFING_KIND_LABEL.by_call, b.place].filter(Boolean).join(" · ");
@@ -42,7 +42,7 @@ export function briefingProblems(b: Briefing | null | undefined): string[] {
   if ((b.place ?? "").length > 120) p.push("מיקום התדריך – עד 120 תווים");
   if ((b.contact_name ?? "").length > 80) p.push("שם איש הקשר – עד 80 תווים");
   if ((b.contact_phone ?? "").length > 30) p.push("טלפון איש הקשר – עד 30 תווים");
-  if ((b.note ?? "").length > 300) p.push("ההערה לחייל – עד 300 תווים");
+  if ((b.note ?? "").length > 300) p.push("ההערה לעובד – עד 300 תווים");
   return p;
 }
 
@@ -163,7 +163,7 @@ export function scoringProblems(s: ScoringSettings): string[] {
   if (!Number.isInteger(s.surprise_notice_hours) || s.surprise_notice_hours < 1 || s.surprise_notice_hours > 336)
     p.push("סף הקפצה – בין 1 ל-336 שעות");
   if (!(s.fairness_tolerance_pct >= 1) || s.fairness_tolerance_pct > 100) p.push("טווח הוגנות – בין 1% ל-100%");
-  for (const [k, label] of [["ack_reminder_hours", "תזכורת לאישור"], ["ack_escalation_hours", "עדכון למפקד הגף"]] as const)
+  for (const [k, label] of [["ack_reminder_hours", "תזכורת לאישור"], ["ack_escalation_hours", "עדכון למפקד המסגרת"]] as const)
     if (!Number.isInteger(s[k]) || s[k] < 0 || s[k] > 168) p.push(`${label} – בין 0 ל-168 שעות`);
   if (!Number.isInteger(s.briefing_reminder_hours) || s.briefing_reminder_hours < 2 || s.briefing_reminder_hours > 72)
     p.push("תזכורת תדריך – בין 2 ל-72 שעות לפני");

@@ -31,7 +31,7 @@ const activeRole = (u: AppUser, now = Date.now()) =>
   )?.role ?? null;
 
 /**
- * "אנשי קשר לחיילים": whom soldiers see under "למי לפנות". Up to two of נע"ת / מ"מ are shown,
+ * "אנשי קשר לעובדים": whom soldiers see under "למי לפנות". Up to two of נע"ת / מ"מ are shown,
  * in this order, and each soldier sees his own gaf's commander if he is on the list.
  * The list reads as rows; adding or editing one opens a small window, and every change is saved.
  */
@@ -81,15 +81,15 @@ export function ContactsTab() {
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
       <Stack spacing={2}>
         <Box>
-          <Typography variant="h3">אנשי קשר לחיילים</Typography>
+          <Typography variant="h3">אנשי קשר לעובדים</Typography>
           <Typography variant="body2" color="text.secondary">
-            מי שמופיע כאן מוצג לחיילים תחת &quot;למי לפנות&quot;, עם וואטסאפ וחיוג. מוצגים עד שניים מנע&quot;ת / מ&quot;מ לפי הסדר, וכל חייל רואה גם את מפקד הגף שלו אם הוא ברשימה. הטלפון של מי
-            שלא ברשימה לא מוצג לחיילים.
+            מי שמופיע כאן מוצג לעובדים תחת &quot;למי לפנות&quot;, עם וואטסאפ וחיוג. מוצגים עד שניים מנע&quot;ת / מ&quot;מ לפי הסדר, וכל עובד רואה גם את מפקד המסגרת שלו אם הוא ברשימה. הטלפון של מי
+            שלא ברשימה לא מוצג לעובדים.
           </Typography>
         </Box>
 
         {list.length === 0 ? (
-          <Alert severity="warning">עוד לא נבחר איש קשר – החיילים לא רואים למי לפנות.</Alert>
+          <Alert severity="warning">עוד לא נבחר איש קשר – העובדים לא רואים למי לפנות.</Alert>
         ) : (
           <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2 }}>
             {list.map((c, i) => {
@@ -112,7 +112,7 @@ export function ContactsTab() {
                       ) : (
                         "בלי טלפון"
                       )}
-                      {!c.phone && c.card_phone ? " (מכרטיס החייל)" : ""}
+                      {!c.phone && c.card_phone ? " (מכרטיס העובד)" : ""}
                     </Typography>
                   </Box>
                   <Tooltip title="למעלה">
@@ -190,7 +190,7 @@ export function ContactsTab() {
                 {roleOf(editing.entry) ? ` · ${ROLE_LABEL[roleOf(editing.entry)!]}` : ""}
               </Typography>
               <TextField
-                label="שם שמוצג לחיילים"
+                label="שם שמוצג לעובדים"
                 value={editing.entry.display_name}
                 onChange={(e) => setEditing({ ...editing, entry: { ...editing.entry, display_name: e.target.value } })}
                 autoFocus
@@ -198,9 +198,9 @@ export function ContactsTab() {
               <TextField
                 label="טלפון"
                 value={formatPhone(editing.entry.phone)}
-                placeholder={editing.entry.card_phone ? `${formatPhone(editing.entry.card_phone)} (מכרטיס החייל)` : "050-0000000"}
+                placeholder={editing.entry.card_phone ? `${formatPhone(editing.entry.card_phone)} (מכרטיס העובד)` : "050-0000000"}
                 onChange={(e) => setEditing({ ...editing, entry: { ...editing.entry, phone: e.target.value } })}
-                helperText={editing.entry.card_phone ? "ריק – הטלפון מכרטיס החייל" : undefined}
+                helperText={editing.entry.card_phone ? "ריק – הטלפון מכרטיס העובד" : undefined}
                 slotProps={{ htmlInput: { dir: "ltr", inputMode: "tel" }, inputLabel: { shrink: true } }}
               />
               {problems.length > 0 && <Alert severity="warning">{problems.join(" · ")}</Alert>}
@@ -214,7 +214,7 @@ export function ContactsTab() {
               onClick={async () => {
                 const next =
                   editing.index === null ? [...list, editing.entry] : list.map((c, j) => (j === editing.index ? editing.entry : c));
-                if (await save(next, editing.index === null ? `${editing.entry.display_name.trim()} נוסף – החיילים רואים אותו.` : "נשמר."))
+                if (await save(next, editing.index === null ? `${editing.entry.display_name.trim()} נוסף – העובדים רואים אותו.` : "נשמר."))
                   setEditing(null);
               }}
             >

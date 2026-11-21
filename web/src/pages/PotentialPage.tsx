@@ -364,7 +364,7 @@ function HeatTab({ daily, categories }: { daily: DailyAvailability[] | null; cat
   return (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
-        בכל תא: כמה חיילים זמינים לקטגוריה ביום הכי חלש של השבוע (אחרי היעדרויות, פטורים, גיוס ושחרור). אדום = השבועות החלשים של אותה קטגוריה.
+        בכל תא: כמה עובדים זמינים לקטגוריה ביום הכי חלש של השבוע (אחרי היעדרויות, פטורים, גיוס ושחרור). אדום = השבועות החלשים של אותה קטגוריה.
         התיקונים הידניים במטריצה לא נכללים כאן.
       </Typography>
       <TableContainer component={Paper} variant="outlined">
@@ -506,7 +506,7 @@ export function PotentialPage() {
           <Stack spacing={2}>
             <Typography variant="h2">חישוב פוטנציאל ל{cycle.name}</Typography>
             <Typography variant="body2">
-              המערכת תחשב לכל חייל פעיל, לכל קטגוריית תורנות, אם הוא זכאי ולאיזה חלק מהמחזור הוא זמין. הדרגה, האוכלוסייה, משרת הורה והפטור המזכה
+              המערכת תחשב לכל עובד פעיל, לכל קטגוריית תורנות, אם הוא זכאי ולאיזה חלק מהמחזור הוא זמין. הדרגה, האוכלוסייה, משרת הורה והפטור המזכה
               ננעלים ברגע החישוב וחלים על כל המחזור.
             </Typography>
             <Typography variant="body2" color="text.secondary">
