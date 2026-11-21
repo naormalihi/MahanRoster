@@ -117,6 +117,8 @@ export interface RosterRow {
 export interface ParseResult {
   rows: RosterRow[];
   errors: { line: number; message: string }[];
+  /** rows of frameworks that were not chosen: not loaded, not errors – kept to spot who moved out */
+  outside: { line: number; idNumber: string; record: Record<string, unknown> }[];
 }
 
 /**
@@ -183,15 +185,21 @@ export function serviceOf(
   return MANDATORY_RANKS.has(rank) ? "mandatory" : "career";
 }
 
-/** Parse sheet rows (objects keyed by header) with a column mapping. */
-export function parseRows(records: Record<string, unknown>[], m: Mapping): ParseResult {
+/** Parse sheet rows (objects keyed by header) with a column mapping. `keep` = the chosen
+ *  frameworks: a row it leaves out is set aside (outside), not parsed and not an error. */
+export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?: (r: Record<string, unknown>) => boolean): ParseResult {
   const rows: RosterRow[] = [];
   const errors: ParseResult["errors"] = [];
+  const outside: ParseResult["outside"] = [];
   const seen = new Map<string, number>();
   records.forEach((r, i) => {
     const line = i + 2; // header is line 1
     const get = (k: FieldKey) => (m[k] ? r[m[k] as string] : undefined);
     const pn = normalizeEmployeeNumber(get("idNumber"));
+    if (keep && !keep(r)) {
+      if (pn) outside.push({ line, idNumber: pn, record: r });
+      return;
+    }
     if (!pn) {
       if (Object.values(r).some((v) => String(v ?? "").trim() !== "")) errors.push({ line, message: "מספר עובד חסר או לא תקין (רק ספרות)" });
       return;
@@ -245,7 +253,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping): Parse
       homeNightly: m.homeNightly ? truthy(get("homeNightly")) || /(^|\D)7(\D|$)/.test(String(get("homeNightly") ?? "")) : null,
     });
   });
-  return { rows, errors };
+  return { rows, errors, outside };
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +301,8 @@ export interface RosterPlan {
   added: SoldierRecord[];
   updated: { id: string; before: ExistingSoldier; after: SoldierRecord; changes: (keyof SoldierRecord)[] }[];
   removed: ExistingSoldier[];
+  /** in the file, but in a framework that was not chosen – stays active unless נע"ת marks it */
+  movedOut: { soldier: ExistingSoldier; to: string }[];
   unchanged: number;
   unknownGafim: string[];
   unknownRanks: string[];
@@ -321,9 +331,11 @@ export function planImport(
   existing: ExistingSoldier[],
   knownGafim: string[],
   knownRanks: string[],
+  /** soldier key → the framework (not chosen) the file puts him in */
+  outside: Map<string, string> = new Map(),
 ): RosterPlan {
   const byKey = new Map(existing.map((s) => [s.soldier_key, s]));
-  const plan: RosterPlan = { added: [], updated: [], removed: [], unchanged: 0, unknownGafim: [], unknownRanks: [] };
+  const plan: RosterPlan = { added: [], updated: [], removed: [], movedOut: [], unchanged: 0, unknownGafim: [], unknownRanks: [] };
   const fields = Object.keys(RECORD_LABELS).filter((k) => k !== "soldier_key") as (keyof SoldierRecord)[];
   for (const rec of incoming) {
     const old = byKey.get(rec.soldier_key);
@@ -337,7 +349,12 @@ export function planImport(
     if (changes.length || !old.is_active) plan.updated.push({ id: old.id, before: old, after: rec, changes });
     else plan.unchanged++;
   }
-  plan.removed = [...byKey.values()].filter((s) => s.is_active);
+  for (const s of byKey.values()) {
+    if (!s.is_active) continue;
+    const to = outside.get(s.soldier_key);
+    if (to !== undefined) plan.movedOut.push({ soldier: s, to });
+    else plan.removed.push(s);
+  }
   const gafSet = new Set(knownGafim), rankSet = new Set(knownRanks);
   plan.unknownGafim = [...new Set(incoming.map((r) => r.gaf_name).filter((g) => !gafSet.has(g)))].sort();
   plan.unknownRanks = [...new Set(incoming.map((r) => r.rank_name).filter((r) => !rankSet.has(r)))].sort();
@@ -352,7 +369,7 @@ export const changeKey = (id: string, field: keyof SoldierRecord) => `${id}:${fi
  * the record, so the load leaves the stored value as it is. A soldier left with no change is
  * counted as unchanged – unless he returns to activity, which the file itself decides.
  */
-export function approvePlan(plan: RosterPlan, approved: Set<string>): RosterPlan {
+export function approvePlan(plan: RosterPlan, approved: Set<string>, deactivate: Set<string> = new Set()): RosterPlan {
   const updated: RosterPlan["updated"] = [];
   let unchanged = plan.unchanged;
   for (const u of plan.updated) {
@@ -362,5 +379,7 @@ export function approvePlan(plan: RosterPlan, approved: Set<string>): RosterPlan
     if (changes.length || !u.before.is_active) updated.push({ ...u, after: after as unknown as SoldierRecord, changes });
     else unchanged++;
   }
-  return { ...plan, updated, unchanged };
+  // moved to a framework not chosen: only the ones נע"ת marked go inactive
+  const removed = [...plan.removed, ...plan.movedOut.filter((m) => deactivate.has(m.soldier.id)).map((m) => m.soldier)];
+  return { ...plan, updated, unchanged, removed };
 }

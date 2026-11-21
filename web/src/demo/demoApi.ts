@@ -1,4 +1,5 @@
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "../lib/feedback";
+import type { FrameworkSelection } from "../lib/frameworks";
 import type { ContactEntry, MyContact } from "../lib/contacts";
 /**
  * Demo backend: a fictitious unit in memory. Lets the app run, be reviewed and
@@ -392,6 +393,16 @@ export class DemoApi implements Api {
 
   async setUnitKeyCheck(v: string) {
     this.keyCheck = v;
+  }
+
+  private frameworks: FrameworkSelection | null = null;
+
+  async rosterFrameworks() {
+    return this.frameworks;
+  }
+
+  async setRosterFrameworks(sel: FrameworkSelection) {
+    this.frameworks = sel;
   }
 
   async rekeySoldiers(pairs: { id: string; key: string }[], check: string) {

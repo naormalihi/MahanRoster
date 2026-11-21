@@ -120,6 +120,14 @@ describe("plan", () => {
     expect(plan.unknownGafim).toEqual(["גף חדש"]);
     expect(plan.unknownRanks).toEqual([]);
   });
+  it("a soldier the file puts in a framework not chosen stays active unless marked", () => {
+    const plan = planImport([rec("k1")], [existing("k1"), existing("k2"), existing("k3")], ["גף א"], ["סרן"],
+      new Map([["k2", "מסגרת אחרת / גף ז"]]));
+    expect(plan.removed.map((s) => s.id)).toEqual(["id-k3"]); // not in the file at all
+    expect(plan.movedOut.map((m) => [m.soldier.id, m.to])).toEqual([["id-k2", "מסגרת אחרת / גף ז"]]);
+    expect(approvePlan(plan, new Set()).removed.map((s) => s.id)).toEqual(["id-k3"]);
+    expect(approvePlan(plan, new Set(), new Set(["id-k2"])).removed.map((s) => s.id).sort()).toEqual(["id-k2", "id-k3"]);
+  });
   it("loads only the approved changes of existing soldiers", () => {
     const plan = planImport([rec("k1", { rank_name: "רס\"ן", gaf_name: "גף ב" }), rec("k2", { rank_name: "רס\"ן" })],
       [existing("k1"), existing("k2")], ["גף א", "גף ב"], ["סרן", "רס\"ן"]);
