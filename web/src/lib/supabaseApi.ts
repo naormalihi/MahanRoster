@@ -975,7 +975,7 @@ export class SupabaseApi implements Api {
   }
 
   async renameUser(userId: string, username: string): Promise<void> {
-    check(await this.sb.rpc("rename_user", { p_user: userId, p_username: username }));
+    run(await this.sb.rpc("rename_user", { p_user: userId, p_username: username }));
   }
 
   async deleteUser(userId: string) {
