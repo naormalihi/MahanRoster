@@ -6,8 +6,9 @@
    named by their content) are kept as they load; when index.html names a new entry, the kept files
    of the old version are dropped. Only the app's own files are kept – never data from the server
    (the soldier's duties are kept by the app itself, per user). */
-const SHELL = "mahan-shell-v1";
-const ASSETS = "mahan-assets-v1";
+// v2: drops the caches of v1, which could keep a page (index.html) under a script's name
+const SHELL = "mahan-shell-v2";
+const ASSETS = "mahan-assets-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) =>
@@ -31,14 +32,21 @@ async function keepShell(res) {
     // a new version: drop the old one's files, keep the new entry files now
     await caches.delete(ASSETS);
     const assets = await caches.open(ASSETS);
-    await Promise.all(now.map((u) => assets.add(u).catch(() => undefined)));
+    await Promise.all(
+      now.map((u) =>
+        fetch(u, { cache: "no-cache" })
+          .then((r) => (r.ok && !isPage(r) ? assets.put(u, r) : undefined))
+          .catch(() => undefined),
+      ),
+    );
     await shell.put("/__entries", new Response(JSON.stringify(now), { headers: { "content-type": "application/json" } }));
   }
 }
 
 async function page(event) {
   try {
-    const res = await fetch(event.request);
+    // past the browser's own cache too: the page must name the files that are on the server now
+    const res = await fetch(event.request, { cache: "no-cache" });
     if (res.ok && (res.headers.get("content-type") || "").includes("text/html")) event.waitUntil(keepShell(res.clone()).catch(() => undefined));
     return res;
   } catch (e) {
@@ -48,12 +56,16 @@ async function page(event) {
   }
 }
 
+// a file that is gone from the server comes back as the page itself (200, text/html) – never keep that
+const isPage = (res) => (res.headers.get("content-type") || "").includes("text/html");
+
 async function asset(event) {
   const assets = await caches.open(ASSETS);
   const kept = await assets.match(event.request);
-  if (kept) return kept;
+  if (kept && !isPage(kept)) return kept;
+  if (kept) await assets.delete(event.request);
   const res = await fetch(event.request);
-  if (res.ok) event.waitUntil(assets.put(event.request, res.clone()).catch(() => undefined));
+  if (res.ok && !isPage(res)) event.waitUntil(assets.put(event.request, res.clone()).catch(() => undefined));
   return res;
 }
 
