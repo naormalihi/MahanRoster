@@ -1,3 +1,5 @@
+import { frameworkName } from "./gafName";
+
 /** Potential matrix (מטריצת הפוטנציאל): soldier × duty category. */
 
 export interface PotentialCell {
@@ -129,10 +131,10 @@ export function exportSheets(
     .filter((s) => categories.some((c) => (at.get(`${s.id}|${c.id}`) ?? 0) > 0))
     .sort((a, b) => a.gaf_name.localeCompare(b.gaf_name, "he") || a.full_name.localeCompare(b.full_name, "he"));
   const nameRows: (string | number | null)[][] = [
-    ["שם מלא", "גף", "דרגה", ...categories.map((c) => c.name)],
+    ["שם מלא", "מסגרת", "דרגה", ...categories.map((c) => c.name)],
     ...names.map((s) => [
       s.full_name,
-      s.gaf_name,
+      frameworkName(s.gaf_name),
       s.rank_name,
       ...categories.map((c) => {
         const v = at.get(`${s.id}|${c.id}`) ?? 0;
