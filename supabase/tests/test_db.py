@@ -2995,9 +2995,10 @@ def test_delete_coordinator_while_another_stays(conn):
     with pytest.raises(psycopg.Error, match='רק חשבונות של נע"ת ושל מפקדי מסגרות'):
         _as_coord(conn, "select public.delete_user(%s)", uc)
 def test_commander_framework_follows_his_employee_or_is_chosen(conn):
-    g1, g2 = [r[0] for r in conn.execute("select id from org_units where kind = 'gaf' order by id limit 2").fetchall()]
-    emp = conn.execute("select id from soldiers s where gaf_id = %s and is_active "
-                       "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 1", (g1,)).fetchone()[0]
+    # an active employee with no account, in some framework (not "the first one": ids are random)
+    emp, g1 = conn.execute("select s.id, s.gaf_id from soldiers s where s.gaf_id is not null and s.is_active "
+                           "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by s.id limit 1").fetchone()
+    g2 = conn.execute("select id from org_units where kind = 'gaf' and id <> %s order by id limit 1", (g1,)).fetchone()[0]
     uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.frame", "temp-pass-123", emp)[0][0]
 
     def gafs():
