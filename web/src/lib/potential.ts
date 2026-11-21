@@ -174,3 +174,26 @@ export function heat(value: number, all: number[]): number {
   const lo = Math.min(...all), hi = Math.max(...all);
   return hi === lo ? 1 : (value - lo) / (hi - lo);
 }
+
+/** One cause of the days a fraction leaves out (public.potential_cell_why). */
+export interface PotentialWhy {
+  cause: "not_enlisted" | "released" | "grace" | "absence" | "exemption" | string;
+  detail: string | null;
+  from_day: string;
+  to_day: string;
+  days: number;
+}
+
+export const WHY_LABEL: Record<string, string> = {
+  not_enlisted: "לפני הגיוס",
+  released: "אחרי השחרור",
+  grace: "חדש ביחידה",
+  absence: "היעדרות",
+  exemption: "פטור",
+};
+
+/** "01.06–30.06" or "15.03" */
+export function whyRange(from: string, to: string): string {
+  const f = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}`;
+  return from === to ? f(from) : `${f(from)}–${f(to)}`;
+}

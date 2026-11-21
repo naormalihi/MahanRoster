@@ -1,3 +1,4 @@
+import type { PotentialWhy } from "./potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
 import type { FrameworkSelection } from "./frameworks";
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
@@ -640,6 +641,10 @@ export class SupabaseApi implements Api {
 
   async computePotential(cycleId: string) {
     return Number(check(await this.sb.rpc("compute_potential", { p_cycle: cycleId })));
+  }
+
+  async potentialCellWhy(cycleId: string, soldierId: string, taskTypeId: string): Promise<PotentialWhy[]> {
+    return check(await this.sb.rpc("potential_cell_why", { p_cycle: cycleId, p_soldier: soldierId, p_task_type: taskTypeId })) as PotentialWhy[];
   }
 
   async potentialMatrix(cycleId: string): Promise<PotentialCell[]> {

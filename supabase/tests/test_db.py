@@ -2938,4 +2938,29 @@ def test_frameworks_stored_without_the_gaf_prefix(conn):
         merged = conn.execute("select merged_into_id, active_to is not null from org_units where id = %s", (b_old,)).fetchone()
         assert merged == (b_new, True)
         assert conn.execute("select count(*) from org_units where kind = 'gaf' and name ~ '^גף\\s' and merged_into_id is null").fetchone()[0] == 0
+
+
+def test_potential_cell_why_lists_the_missing_days(conn):
+    cycle = conn.cycle_id
+    start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
+    sid = conn.execute("select id from soldiers where is_active order by id limit 1").fetchone()[0]
+    task_a, task_b = [r[0] for r in conn.execute("select id from task_types where is_active order by name limit 2").fetchall()]
+    with conn.transaction():
+        conn.execute("update absences set status = 'cancelled' where soldier_id = %s", (sid,))
+        conn.execute("update exemptions set status = 'cancelled', decision_reason = 'test' where soldier_id = %s", (sid,))
+        conn.execute("update soldiers set release_date = %s::date - 10, enlistment_date = null, unit_join_date = null where id = %s", (end, sid))
+        vac = conn.execute("select id, name from absence_types limit 1").fetchone()
+        conn.execute("""insert into absences (soldier_id, absence_type_id, starts_at, ends_at)
+                        values (%s, %s, (%s::date)::timestamp at time zone 'Asia/Jerusalem', (%s::date + 5)::timestamp at time zone 'Asia/Jerusalem')""",
+                     (sid, vac[0], start, start))
+        et = conn.execute("insert into exemption_types (name) values ('פטור לבדיקה') returning id").fetchone()[0]
+        conn.execute("insert into exemption_type_duties values (%s, %s, 'excludes')", (et, task_a))
+        conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+                        values (%s, %s, 'full', %s::date + 20, %s::date + 26, 'approved', now())""", (sid, et, start, start))
+        why = lambda t: _as_coord(conn, "select cause, detail, from_day, to_day, days from public.potential_cell_why(%s, %s, %s)", cycle, sid, t)
+        a = why(task_a)
+        assert [(r[0], r[4]) for r in a] == [("absence", 5), ("exemption", 7), ("released", 10)]
+        assert a[0][1] == vac[1] and a[1][1] == "פטור לבדיקה" and a[2][1].startswith("שחרור ")
+        # the exemption maps to task a only
+        assert [r[0] for r in why(task_b)] == ["absence", "released"]
         raise psycopg.Rollback()

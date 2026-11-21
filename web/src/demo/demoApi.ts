@@ -1,3 +1,4 @@
+import type { PotentialWhy } from "../lib/potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "../lib/feedback";
 import type { FrameworkSelection } from "../lib/frameworks";
 import type { ContactEntry, MyContact } from "../lib/contacts";
@@ -749,6 +750,22 @@ export class DemoApi implements Api {
     await delay(500);
     this.cycleList.find((x) => x.id === cycleId)!.potential_computed_at = new Date().toISOString();
     return this.soldierList.filter((s) => s.is_active).length;
+  }
+
+  async potentialCellWhy(cycleId: string, soldierId: string, taskTypeId: string): Promise<PotentialWhy[]> {
+    await delay(200);
+    const c = this.cycleList.find((x) => x.id === cycleId);
+    const cell = this.demoCells(cycleId).find((x) => x.soldier_id === soldierId && x.best_task_type_id === taskTypeId);
+    if (!c || !cell) return [];
+    const missing = cell.cycle_days - cell.available_days;
+    if (missing <= 0) return [];
+    const day = (n: number) => new Date(Date.parse(c.start_date) + n * 86_400_000).toISOString().slice(0, 10);
+    // fictitious: a vacation at the start, the rest as a release before the end
+    const vac = Math.min(missing, 6);
+    const rows: PotentialWhy[] = [{ cause: "absence", detail: "חופשה", from_day: day(0), to_day: day(vac - 1), days: vac }];
+    if (missing > vac)
+      rows.push({ cause: "released", detail: `שחרור ${day(cell.cycle_days - (missing - vac) - 1).split("-").reverse().join(".")}`, from_day: day(cell.cycle_days - (missing - vac)), to_day: c.end_date, days: missing - vac });
+    return rows;
   }
 
   async potentialMatrix(cycleId: string) {
