@@ -6,6 +6,7 @@ import LinkIcon from "@mui/icons-material/LinkOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import LockOpenIcon from "@mui/icons-material/LockOpenOutlined";
 import {
   Alert,
@@ -39,6 +40,7 @@ import { useAuth } from "../lib/auth";
 import type { ExistingSoldier } from "../lib/roster";
 import { GRANTABLE, ROLE_NAME, tempPassword, usernameProblem, type AppUser, type CreatableRole } from "../lib/users";
 import type { NamedRef } from "../lib/api";
+import { whatsappUrl } from "../lib/invites";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | null; onChange: (id: string | null) => void; autoFocus?: boolean }) {
@@ -54,10 +56,11 @@ function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | nul
   );
 }
 
-/** What to hand over: username + temporary password, shown once. */
-function Handover({ username, password }: { username: string; password: string }) {
+/** What to hand over: username + temporary password, shown once – copied, or sent on his own WhatsApp. */
+function Handover({ username, password, name, phone }: { username: string; password: string; name?: string | null; phone?: string | null }) {
   const [copied, setCopied] = useState(false);
   const text = `כתובת: ${window.location.origin}\nשם משתמש: ${username}\nסיסמה זמנית: ${password}`;
+  const message = `${name ? `היי ${name.trim().split(/\s+/)[0]}, ` : ""}נפתח לך חשבון בתורנצ׳יק.\n${text}\nבכניסה הראשונה תבחר סיסמה חדשה ותגדיר אימות דו-שלבי.`;
   return (
     <Alert severity="success" icon={false}>
       <Typography sx={{ fontWeight: 700, mb: 0.5 }}>למסור למשתמש (פעם אחת – הסיסמה לא תוצג שוב):</Typography>
@@ -75,6 +78,14 @@ function Handover({ username, password }: { username: string; password: string }
       >
         {copied ? "הועתק" : "העתקה"}
       </Button>
+      <Button size="small" color="success" startIcon={<WhatsAppIcon />} sx={{ mt: 1, ml: 1 }} component="a" href={whatsappUrl(message, phone)} target="_blank" rel="noopener">
+        {phone ? `וואטסאפ ל${name ? name.trim().split(/\s+/)[0] : "משתמש"}` : "שליחה בוואטסאפ"}
+      </Button>
+      {!phone && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+          אין טלפון בכרטיס העובד – וואטסאפ יפתח בחירת איש קשר.
+        </Typography>
+      )}
       <Typography variant="body2" sx={{ mt: 1 }}>
         בכניסה הראשונה המשתמש יבחר סיסמה חדשה ויגדיר אימות דו-שלבי באפליקציית Authenticator.
       </Typography>
@@ -111,7 +122,12 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
       <DialogTitle>משתמש חדש – {role === "gaf_commander" ? "מפקד מסגרת" : ROLE_NAME[role]}</DialogTitle>
       <DialogContent dividers>
         {done ? (
-          <Handover username={username.trim().toLowerCase()} password={password} />
+          <Handover
+            username={username.trim().toLowerCase()}
+            password={password}
+            name={props.soldiers.find((x) => x.id === soldier)?.full_name}
+            phone={props.soldiers.find((x) => x.id === soldier)?.phone}
+          />
         ) : (
           <Stack spacing={2}>
             <TextField select label="תפקיד" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
@@ -569,7 +585,12 @@ export function UsersTab() {
           <DialogTitle>סיסמה זמנית חדשה – {reset.user.username}</DialogTitle>
           <DialogContent dividers>
             {reset.done ? (
-              <Handover username={reset.user.username} password={reset.password} />
+              <Handover
+                username={reset.user.username}
+                password={reset.password}
+                name={reset.user.soldier_name}
+                phone={soldiers.find((x) => x.id === reset.user.soldier_id)?.phone}
+              />
             ) : (
               <Typography variant="body2">הסיסמה הנוכחית תפסיק לעבוד. המשתמש יקבל סיסמה זמנית ויבחר חדשה בכניסה הבאה.</Typography>
             )}
