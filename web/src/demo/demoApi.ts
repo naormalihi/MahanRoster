@@ -1,3 +1,4 @@
+import type { Inversion } from "../lib/fairness";
 import type { PotentialWhy } from "../lib/potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "../lib/feedback";
 import type { FrameworkSelection } from "../lib/frameworks";
@@ -766,6 +767,18 @@ export class DemoApi implements Api {
     if (missing > vac)
       rows.push({ cause: "released", detail: `שחרור ${day(cell.cycle_days - (missing - vac) - 1).split("-").reverse().join(".")}`, from_day: day(cell.cycle_days - (missing - vac)), to_day: c.end_date, days: missing - vac });
     return rows;
+  }
+
+  // one fictitious example, to show what it looks like
+  async orderInversions(cycleId: string): Promise<Inversion[]> {
+    await delay(300);
+    const slots = this.slotsByCycle.get(cycleId) ?? [];
+    const a = this.draft.find((x) => x.role === "performer" && slots.some((k) => k.id === x.slot_id && Date.parse(k.ends_at) > Date.now()));
+    const k = a && slots.find((x) => x.id === a.slot_id);
+    const other = a && this.soldierList.find((x) => x.id !== a.soldier_id && x.is_active);
+    if (!a || !k || !other) return [];
+    return [{ slot_id: k.id, assignment_id: a.id, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "תורנות", starts_at: k.starts_at, ends_at: k.ends_at,
+              assigned_id: a.soldier_id, assigned_total: 24, skipped_id: other.id, skipped_total: 9, points: a.normalized_points || 9 }];
   }
 
   async potentialMatrix(cycleId: string) {

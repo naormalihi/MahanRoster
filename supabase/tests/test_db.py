@@ -3030,3 +3030,43 @@ def test_commander_framework_follows_his_employee_or_is_chosen(conn):
         conn.execute("update soldiers set gaf_id = %s where id = %s", (g1, emp))
         conn.execute("delete from auth.users where id = %s", (uid,))
         conn.commit()
+
+
+def test_order_inversions_only_beyond_one_duty(conn):
+    cycle = conn.cycle_id
+    with conn.transaction():
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        task = conn.execute("select id from task_types where is_active and not is_weekend_type order by code limit 1").fetchone()[0]
+        slot = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                            "(%s, %s, date_trunc('day', now()) + interval '5 days 8 hours', date_trunc('day', now()) + interval '5 days 20 hours') returning id",
+                            (cycle, task)).fetchone()[0]
+        free = conn.execute("select c.soldier_id, coalesce(sn.fairness_group, sn.balance_population) from app.slot_candidates_for(%s, null) c "
+                            "join cycle_soldier_snapshot sn on sn.cycle_id = %s and sn.soldier_id = c.soldier_id "
+                            "where cardinality(c.reasons) = 0 and c.conflicts = '[]'::jsonb order by 2, 1", (slot, cycle)).fetchall()
+        pools = {}
+        for s, p in free:
+            pools.setdefault(p, []).append(s)
+        pool, (a, b) = next((p, ss[:2]) for p, ss in pools.items() if len(ss) >= 2)
+        conn.execute("update cycle_soldier_snapshot set baseline_score = 1000 where cycle_id = %s and coalesce(fairness_group, balance_population) = %s", (cycle, pool))
+        conn.execute("update cycle_soldier_snapshot set baseline_score = 50 where cycle_id = %s and soldier_id = %s", (cycle, a))
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) "
+                     "select %s, id, gaf_id, 'performer', 'assigned', 'manual', 'בדיקה', 2, 2 from soldiers where id = %s", (slot, a))
+        base_a = conn.execute("select c.cycle_points from app.slot_candidates_for(%s, %s) c", (slot, a)).fetchone()[0]
+
+        def inversions():
+            conn.execute("set local role authenticated")
+            _claims(conn, COORD)
+            rows = conn.execute("select assigned_id, skipped_id, points from public.order_inversions(%s) where slot_id = %s", (cycle, slot)).fetchall()
+            conn.execute("reset role")
+            return rows
+
+        # b is lower by more than the duty is worth: swapping would bring them closer
+        conn.execute("update cycle_soldier_snapshot set baseline_score = %s where cycle_id = %s and soldier_id = %s", (base_a - 50 - 1, cycle, b))
+        rows = inversions()
+        assert rows and rows[0][0] == a and rows[0][1] == b and float(rows[0][2]) == 2
+        # within one duty: noise, not shown
+        b_cycle = conn.execute("select c.cycle_points from app.slot_candidates_for(%s, %s) c", (slot, b)).fetchone()[0]
+        conn.execute("update cycle_soldier_snapshot set baseline_score = baseline_score + (%s - %s) - 1.5 where cycle_id = %s and soldier_id = %s",
+                     (base_a, b_cycle, cycle, b))
+        assert inversions() == []
+        raise psycopg.Rollback()

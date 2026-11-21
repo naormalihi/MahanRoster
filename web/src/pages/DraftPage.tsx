@@ -51,8 +51,8 @@ import type { SlotRow } from "../lib/baseSchedule";
 import { israeliHolidays, type TaskType } from "../lib/catalog";
 import { slotName } from "../lib/baseSchedule";
 import type { Cycle } from "../lib/cycles";
-import { TZ, dayKey } from "../lib/dates";
-import { fairRows, shortGroupName, verdicts, type FairRow } from "../lib/fairness";
+import { TZ, dayKey, dayLabel } from "../lib/dates";
+import { fairRows, oneDutyByCategory, shortGroupName, verdicts, type FairRow, type Inversion } from "../lib/fairness";
 import { SlotActionsDialog } from "../components/SlotActions";
 import { NoAccountDialog } from "../components/NoAccountDialog";
 import { isStaff } from "../lib/api";
@@ -515,7 +515,36 @@ function useFairness(ctx: Ctx, snapshot: SnapshotSoldier[], cells: PotentialCell
     (id: string) => (cells ? [...(openNames.get(id) ?? [])].sort((a, b) => a.localeCompare(b, "he")).join(" + ") : "הכול"),
     [cells, openNames],
   );
-  const rows = useMemo(() => fairRows(ls, profileOf, tolerance), [ls, profileOf, tolerance]);
+  // what one duty open to each soldier is worth this cycle: a gap within it evens out next cycle
+  const oneDutyOf = useMemo(() => {
+    const slotCat = new Map(ctx.slots.map((k) => [k.id, ctx.tasks.get(k.task_type_id)?.category_id ?? undefined]));
+    const byCat = oneDutyByCategory(ctx.assignments, (id) => slotCat.get(id) ?? undefined);
+    const top = Math.max(0, ...byCat.values());
+    const open = new Map<string, string[]>();
+    for (const c of cells ?? []) if (effective(c) > 0) open.set(c.soldier_id, [...(open.get(c.soldier_id) ?? []), c.category_id]);
+    return (id: string) => {
+      const v = Math.max(0, ...(open.get(id) ?? []).map((c) => byCat.get(c) ?? 0));
+      return v || top;
+    };
+  }, [ctx.slots, ctx.tasks, ctx.assignments, cells]);
+  const rows = useMemo(() => fairRows(ls, profileOf, tolerance, oneDutyOf), [ls, profileOf, tolerance, oneDutyOf]);
+  // duties given out of turn – asked from the server, which checks who was free that day
+  const { api } = useAuth();
+  const [inversions, setInversions] = useState<Inversion[] | null>(null);
+  useEffect(() => {
+    if (!ctx.assignments.length) return setInversions([]);
+    let live = true;
+    const t = setTimeout(() => {
+      api!.orderInversions(ctx.cycle.id).then(
+        (r) => live && setInversions(r),
+        () => live && setInversions([]),
+      );
+    }, 400);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [api, ctx.cycle.id, ctx.assignments]);
   const verdict = useMemo(() => verdicts(rows), [rows]);
   const outliers = useMemo(() => rows.filter((r) => r.outlier).length, [rows]);
   // what each soldier can be given at all: open categories and the slots the cycle has for them
@@ -533,7 +562,8 @@ function useFairness(ctx: Ctx, snapshot: SnapshotSoldier[], cells: PotentialCell
     () => noWorkGroups(snapshot.map((s) => s.soldier_id), elig, (id) => rank.get(id) ?? ""),
     [snapshot, elig, rank],
   );
-  return { ls, groupName, rank, openNames, rows, verdict, outliers, tolerance, hasCells: !!cells, elig, idle };
+  const problems = outliers + (inversions?.length ?? 0);
+  return { ls, groupName, rank, openNames, rows, verdict, outliers, inversions, problems, tolerance, hasCells: !!cells, elig, idle };
 }
 type Fairness = ReturnType<typeof useFairness>;
 
@@ -552,7 +582,7 @@ function LoadTab({
   setOnlyOut: (v: boolean) => void;
   onOpen: (soldierId: string) => void;
 }) {
-  const { ls, groupName, rank, openNames, rows, verdict, tolerance } = fair;
+  const { ls, groupName, rank, openNames, rows, verdict } = fair;
   // groups that need a look first (most outliers first), then the big ones
   const keys = [...verdict.keys()].sort(
     (a, b) => verdict.get(b)!.outliers.length - verdict.get(a)!.outliers.length || verdict.get(b)!.soldiers - verdict.get(a)!.soldiers,
@@ -582,6 +612,44 @@ function LoadTab({
 
   return (
     <Stack spacing={1.5}>
+      {!!fair.inversions?.length && (
+        <Paper variant="outlined" sx={{ p: 1.5, borderColor: "warning.main" }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", mb: 0.5 }}>
+            <WarningIcon color="warning" fontSize="small" sx={{ mt: 0.25 }} />
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 14 }}>שיבוץ לא לפי התור – {fair.inversions.length}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                מישהו מאותה קבוצה היה פנוי וזכאי, והניקוד המצטבר שלו נמוך ביותר ממה שהתורנות שווה – החלפה ביניהם הייתה מקרבת אותם.
+              </Typography>
+            </Box>
+          </Stack>
+          <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+            {fair.inversions.slice(0, 10).map((x) => (
+              <Box key={x.assignment_id} sx={{ py: 0.75 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {x.task_name} · {dayLabel(x.starts_at)}
+                </Typography>
+                <Typography variant="body2">
+                  שובץ:{" "}
+                  <Box component="span" role="button" tabIndex={0} onClick={() => onOpen(x.assigned_id)} sx={{ fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
+                    {name(x.assigned_id)}
+                  </Box>{" "}
+                  ({Number(x.assigned_total).toFixed(1)} נק׳) · היה פנוי:{" "}
+                  <Box component="span" role="button" tabIndex={0} onClick={() => onOpen(x.skipped_id)} sx={{ fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
+                    {name(x.skipped_id)}
+                  </Box>{" "}
+                  ({Number(x.skipped_total).toFixed(1)} נק׳) · התורנות {Number(x.points).toFixed(1)} נק׳
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+          {fair.inversions.length > 10 && (
+            <Typography variant="caption" color="text.secondary">
+              ועוד {fair.inversions.length - 10}.
+            </Typography>
+          )}
+        </Paper>
+      )}
       {/* one scrolling row of groups – the ones with outliers come first */}
       <Box sx={{ display: "flex", gap: 1, overflowX: "auto", pb: 0.5 }}>
         {keys.map((p) => {
@@ -591,7 +659,7 @@ function LoadTab({
             <Tooltip key={p} title={poolName(groupName, p)}>
               <Chip
                 icon={bad ? <WarningIcon /> : <CheckIcon />}
-                label={`${shortGroupName(poolName(groupName, p))} · ${g.soldiers}${bad ? ` · ${g.outliers.length} חורגים` : ""}`}
+                label={`${shortGroupName(poolName(groupName, p))} · ${g.soldiers}${bad ? ` · ${g.outliers.length} ${g.outliers.length === 1 ? "בעיה" : "בעיות"}` : ""}`}
                 color={p === pool ? "primary" : bad ? "warning" : "default"}
                 variant={p === pool ? "filled" : "outlined"}
                 onClick={() => setPool(p)}
@@ -611,16 +679,22 @@ function LoadTab({
               <Typography sx={{ fontWeight: 700, fontSize: 14 }}>{poolName(groupName, pool)}</Typography>
               <Typography variant="body2" color="text.secondary">
                 {v.outliers.length === 0 ? (
-                  <>
-                    הוגן – כל {v.compared} שנבדקו בטווח ±{tolerance}% מממוצע מי שזכאים לאותן תורנויות.
-                  </>
+                  <>מאוזן – לאף אחד מ-{v.compared} שנבדקו אין פער מצטבר של יותר מתורנות אחת.</>
                 ) : (
                   <>
-                    <b>{v.outliers.length} חורגים</b> מטווח ±{tolerance}%. הכי רחוק: {name(v.outliers[0].soldier_id)} {sign(v.outliers[0].diff)} נק׳ (ממוצע
-                    עמיתיו {v.outliers[0].ref.toFixed(1)}).
+                    <b>
+                      {v.outliers.length} עם פער מצטבר
+                    </b>{" "}
+                    – יותר מתורנות אחת מממוצע מי שזכאים לאותן תורנויות, גם אחרי המחזורים הקודמים. הכי רחוק: {name(v.outliers[0].soldier_id)}{" "}
+                    {sign(v.outliers[0].diff)} נק׳ (ממוצע עמיתיו {v.outliers[0].ref.toFixed(1)}, תורנות אחת עד {v.outliers[0].oneDuty.toFixed(1)}).
                   </>
                 )}
               </Typography>
+              {v.small.length > 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                  {v.small.length} עם פער של עד תורנות אחת – כך התורנויות מתחלקות במחזור קצר, וזה יתאזן במחזור הבא.
+                </Typography>
+              )}
               <Button size="small" sx={{ px: 0, minWidth: 0 }} onClick={() => setBreakdown((b) => !b)} endIcon={<ExpandMoreIcon sx={{ transform: breakdown ? "rotate(180deg)" : undefined }} />}>
                 פירוט לפי קטגוריות{notCompared ? ` · ${notCompared} לא נבדקו` : ""}
               </Button>
@@ -692,7 +766,7 @@ function LoadTab({
             <FormControlLabel
               sx={{ mx: 0, "& .MuiFormControlLabel-label": { fontSize: 13, whiteSpace: "nowrap" } }}
               control={<Switch size="small" checked={onlyOut} onChange={(e) => setOnlyOut(e.target.checked)} />}
-              label="רק חורגים"
+              label="רק בעיות"
             />
           </Box>
         <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
@@ -771,7 +845,7 @@ function LoadTab({
           })}
           {shown.length === 0 && (
             <Typography color="text.secondary" sx={{ py: 2 }}>
-              {onlyOut ? "אין חורגים בקבוצה הזו." : "אין עובדים שמתאימים לחיפוש."}
+              {onlyOut ? "אין בעיות בקבוצה הזו." : "אין עובדים שמתאימים לחיפוש."}
             </Typography>
           )}
         </Stack>
@@ -1031,9 +1105,13 @@ function SoldierLoadDialog(props: {
           />
           <EligibilityCard elig={props.elig} rankName={props.rankName} />
           {r.compared ? (
-            <Alert severity={r.outlier ? "warning" : "success"} icon={false}>
-              ממוצע מי שזכאים לאותן תורנויות: {r.ref.toFixed(1)} · הפער: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`} (מותר ±
-              {r.limit.toFixed(1)}, {props.tolerance}%){r.outlier ? " – חורג" : " – בטווח"}
+            <Alert severity={r.outlier ? "warning" : r.small ? "info" : "success"} icon={false}>
+              ממוצע מי שזכאים לאותן תורנויות: {r.ref.toFixed(1)} · הפער המצטבר: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`}
+              {r.outlier
+                ? ` – יותר מתורנות אחת (${r.oneDuty.toFixed(1)} נק׳): פער שצריך לבדוק`
+                : r.small
+                  ? ` – עד תורנות אחת (${r.oneDuty.toFixed(1)} נק׳): יתאזן במחזור הבא`
+                  : ` – בטווח ±${props.tolerance}%`}
             </Alert>
           ) : (
             <Alert severity="info" icon={false}>
@@ -1219,9 +1297,9 @@ function DraftBody(props: {
           }
         />
         <Tile
-          tone={fair.outliers ? "warning" : "success"}
-          title={`הוגנות (±${props.tolerance}%)`}
-          value={fair.outliers ? `${fair.outliers} חורגים` : "✓ הוגן"}
+          tone={fair.problems ? "warning" : "success"}
+          title="איזון"
+          value={fair.inversions === null && !fair.outliers ? "בודק…" : fair.problems ? `${fair.problems} ${fair.problems === 1 ? "בעיה" : "בעיות"}` : "✓ תקין"}
           onClick={() => {
             setView("soldiers");
             setOnlyOut(fair.outliers > 0);
