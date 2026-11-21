@@ -101,7 +101,7 @@ function nextActionStep(cycle: Cycle, f: CycleFacts): { text: string; step: Step
     case "approving":
       return f.pendingExemptions > 0
         ? { text: `לאשר או לדחות ${f.pendingExemptions} פטורים ממתינים`, step: "constraints" }
-        : { text: "להזין את האילוצים שהגיעו מהגפים ולסגור את האיסוף", step: "constraints" };
+        : { text: "להזין את האילוצים שהגיעו מהמסגרות ולסגור את האיסוף", step: "constraints" };
     case "potential":
       return cycle.potential_computed_at
         ? { text: "לבדוק את המטריצה ולייצא לבסיס", step: "potential" }

@@ -147,7 +147,7 @@ function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: 
           <span>
             תדריך והתייצבות
             <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block" }}>
-              מוצג לחייל ב"התורנויות שלי" ובלוח, ונשלחת לו תזכורת לפני. שעה ומקום שנכתבו בתורנות עצמה גוברים.
+              מוצג לעובד ב"התורנויות שלי" ובלוח, ונשלחת לו תזכורת לפני. שעה ומקום שנכתבו בתורנות עצמה גוברים.
             </Typography>
           </span>
         }
@@ -191,7 +191,7 @@ function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: 
               </>
             )}
           </Stack>
-          <TextField label="מיקום" value={b.place ?? ""} onChange={(e) => set({ place: e.target.value })} placeholder="גף אבטחה פיזית / טלפוני" fullWidth />
+          <TextField label="מיקום" value={b.place ?? ""} onChange={(e) => set({ place: e.target.value })} placeholder="מסגרת אבטחה פיזית / טלפוני" fullWidth />
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField label="איש קשר" value={b.contact_name ?? ""} onChange={(e) => set({ contact_name: e.target.value })} fullWidth />
             <TextField
@@ -199,12 +199,12 @@ function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: 
               type="tel"
               value={b.contact_phone ?? ""}
               onChange={(e) => set({ contact_phone: e.target.value })}
-              helperText="מוצג רק לחייל המשובץ"
+              helperText="מוצג רק לעובד המשובץ"
               fullWidth
             />
           </Stack>
           <TextField
-            label="הערה לחייל"
+            label="הערה לעובד"
             value={b.note ?? ""}
             onChange={(e) => set({ note: e.target.value })}
             placeholder="לא מאושרות החלפות בעת ביצוע התורנות!"
@@ -1216,8 +1216,8 @@ function LoadRolesCard() {
           </Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary">
-          חייל עם תפקיד מקבל חלק מהעומס: הניקוד שלו מחולק במקדם (0.5 = חצי מהעומס של חייל רגיל). לחייל עם כמה תפקידים חלה ההקלה הגדולה ביותר – המקדם
-          הנמוך – בלי הכפלה. את התפקיד של כל חייל קובעים במסך חיילים.
+          עובד עם תפקיד מקבל חלק מהעומס: הניקוד שלו מחולק במקדם (0.5 = חצי מהעומס של עובד רגיל). לעובד עם כמה תפקידים חלה ההקלה הגדולה ביותר – המקדם
+          הנמוך – בלי הכפלה. את התפקיד של כל עובד קובעים במסך עובדים.
         </Typography>
         {!roles ? (
           <Loading />
@@ -1379,7 +1379,7 @@ function ScoringTab() {
                   key: "surprise",
                   name: "הקפצה",
                   value: saved?.surprise_multiplier ?? 1.5,
-                  when: `חייל ששובץ פחות מ-${saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו`,
+                  when: `עובד ששובץ פחות מ-${saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו`,
                   label: `×${saved?.surprise_multiplier ?? 1.5}`,
                   active: true,
                   open: openSurprise,
@@ -1428,7 +1428,7 @@ function ScoringTab() {
                 <TableRow hover onClick={openSurprise} sx={{ cursor: "pointer" }}>
                   <TableCell sx={{ fontWeight: 600 }}>הקפצה</TableCell>
                   <TableCell>×{saved?.surprise_multiplier}</TableCell>
-                  <TableCell>חייל ששובץ פחות מ-{saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו</TableCell>
+                  <TableCell>עובד ששובץ פחות מ-{saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו</TableCell>
                   <TableCell>
                     <IconButton size="small" aria-label="עריכה" onClick={openSurprise}>
                       <EditIcon fontSize="small" />
@@ -1450,7 +1450,7 @@ function ScoringTab() {
         <Stack spacing={2}>
           <Typography variant="h3">הגדרות כלליות</Typography>
           <Box>
-            <Typography variant="subtitle2">ימי סוף שבוע (לאיזון סופי השבוע בין החיילים)</Typography>
+            <Typography variant="subtitle2">ימי סוף שבוע (לאיזון סופי השבוע בין העובדים)</Typography>
             <FormGroup row>
               {ISO_WEEK.map((d) => (
                 <FormControlLabel
@@ -1490,13 +1490,13 @@ function ScoringTab() {
               value={s.fairness_tolerance_pct}
               onChange={(e) => setS({ ...s, fairness_tolerance_pct: Number(e.target.value) })}
               slotProps={{ htmlInput: { min: 1, max: 100, step: 1 } }}
-              helperText="במסך העומס, חייל שרחוק יותר מזה מממוצע מי שזכאים לאותן תורנויות מסומן כחורג (לפחות חצי נקודה)."
+              helperText="במסך העומס, עובד שרחוק יותר מזה מממוצע מי שזכאים לאותן תורנויות מסומן כחורג (לפחות חצי נקודה)."
               sx={{ maxWidth: 320 }}
             />
           </Box>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
-              חייל חדש ביחידה
+              עובד חדש ביחידה
             </Typography>
             <TextField
               type="number"
@@ -1506,7 +1506,7 @@ function ScoringTab() {
               slotProps={{ htmlInput: { min: 0, max: 365, step: 1 } }}
               helperText={
                 (s.grace_days >= 30 ? `≈ ${Math.round(s.grace_days / 30)} חודשים. ` : "") +
-                "חייל חדש לא משובץ לתורנויות בימים הראשונים שלו ביחידה, מתחילת המחזור הראשון שלו, ומקבל עליהם זיכוי. 0 = בלי תקופת הכשרה. חל מהחישוב הבא של הפוטנציאל."
+                "עובד חדש לא משובץ לתורנויות בימים הראשונים שלו ביחידה, מתחילת המחזור הראשון שלו, ומקבל עליהם זיכוי. 0 = בלי תקופת הכשרה. חל מהחישוב הבא של הפוטנציאל."
               }
               sx={{ maxWidth: 320 }}
             />
@@ -1532,7 +1532,7 @@ function ScoringTab() {
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
                 type="number"
-                label="תזכורת לחייל – שעות לפני"
+                label="תזכורת לעובד – שעות לפני"
                 value={s.ack_reminder_hours}
                 onChange={(e) => setS({ ...s, ack_reminder_hours: Math.round(Number(e.target.value)) })}
                 slotProps={{ htmlInput: { min: 0, max: 168, step: 1 } }}
@@ -1541,11 +1541,11 @@ function ScoringTab() {
               />
               <TextField
                 type="number"
-                label="עדכון למפקד הגף – שעות לפני"
+                label="עדכון למפקד המסגרת – שעות לפני"
                 value={s.ack_escalation_hours}
                 onChange={(e) => setS({ ...s, ack_escalation_hours: Math.round(Number(e.target.value)) })}
                 slotProps={{ htmlInput: { min: 0, max: 168, step: 1 } }}
-                helperText="מפקד הגף מקבל התראה על חייל שלו שעוד לא אישר. 0 = בלי עדכון."
+                helperText="מפקד המסגרת מקבל התראה על עובד שלו שעוד לא אישר. 0 = בלי עדכון."
                 sx={{ maxWidth: 320 }}
               />
             </Stack>
@@ -1584,7 +1584,7 @@ function ScoringTab() {
                 value={surprise.mult}
                 onChange={(e) => setSurprise({ ...surprise, mult: e.target.value })}
                 slotProps={{ htmlInput: { step: 0.05, min: 1, max: 10 } }}
-                helperText="מכפיל את כל הניקוד של החייל שהוקפץ – המשקל ועוד התוספת."
+                helperText="מכפיל את כל הניקוד של העובד שהוקפץ – המשקל ועוד התוספת."
                 fullWidth
                 autoFocus
               />
@@ -1594,7 +1594,7 @@ function ScoringTab() {
                 value={surprise.hours}
                 onChange={(e) => setSurprise({ ...surprise, hours: e.target.value })}
                 slotProps={{ htmlInput: { step: 1, min: 1, max: 336 } }}
-                helperText="חייל ששובץ פחות מזה לפני שהתורנות מתחילה – עתודה שהופעלה, מחליף או תורנות שנוספה – הוקפץ. הפרסום הראשון של מחזור לא נחשב."
+                helperText="עובד ששובץ פחות מזה לפני שהתורנות מתחילה – עתודה שהופעלה, מחליף או תורנות שנוספה – הוקפץ. הפרסום הראשון של מחזור לא נחשב."
                 fullWidth
               />
             </Stack>
@@ -1995,7 +1995,7 @@ const TABS = [
   { key: "scoring", label: "מקדמי ניקוד", about: "מקדמים, ימי חג והקלות" },
   { key: "calendar", label: "לוח חגים", about: "חגים וימים מיוחדים בכל שנה" },
   { key: "users", label: "משתמשים", about: "חשבונות והרשאות" },
-  { key: "contacts", label: "אנשי קשר לחיילים", about: "למי חיילים פונים" },
+  { key: "contacts", label: "אנשי קשר לעובדים", about: "למי עובדים פונים" },
   { key: "feedback", label: "הצעות ומשוב", about: "מה משתמשים הציעו" },
 ] as const;
 

@@ -629,7 +629,7 @@ export class SupabaseApi implements Api {
     const { error } = await this.sb
       .from("date_blocks")
       .insert(rows.map((b) => ({ ...b, cycle_id: cycleId, received_at: now })));
-    if (error) throw new Error(error.code === "23505" ? "לחייל כבר יש חסימה בחודש הזה" : error.message);
+    if (error) throw new Error(error.code === "23505" ? "לעובד כבר יש חסימה בחודש הזה" : error.message);
   }
 
   async cancelDateBlock(id: string) {

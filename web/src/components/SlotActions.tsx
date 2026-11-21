@@ -326,7 +326,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
                 להסיר את <b>{removing.p.name}</b> ({removing.p.role === "performer" ? "מבצע" : "עתודה"}) מ{data.slot.task_name}, {when}?
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                הוא יקבל התראה, והניקוד על התורנות יירד ממנו. התורנות תופיע ב&quot;ממתינות לשיבוץ&quot;, ושם משבצים מחליף – רק חייל שאין לו תורנות באותן שעות.
+                הוא יקבל התראה, והניקוד על התורנות יירד ממנו. התורנות תופיע ב&quot;ממתינות לשיבוץ&quot;, ושם משבצים מחליף – רק עובד שאין לו תורנות באותן שעות.
               </Typography>
               <TextField label="סיבה" value={removing.reason} onChange={(e) => setRemoving({ ...removing, reason: e.target.value })} required fullWidth autoFocus />
             </Stack>

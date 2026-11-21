@@ -19,7 +19,7 @@ export interface ContactEntry {
   role?: string | null;
 }
 
-export const ROLE_LABEL: Record<string, string> = { coordinator: 'נע"ת', deputy: 'מ"מ', gaf_commander: "מפקד גף" };
+export const ROLE_LABEL: Record<string, string> = { coordinator: 'נע"ת', deputy: 'מ"מ', gaf_commander: "מפקד מסגרת" };
 
 /** What is wrong with the list before saving (empty = fine). */
 export function contactProblems(list: ContactEntry[]): string[] {

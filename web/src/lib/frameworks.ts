@@ -2,11 +2,12 @@
  * "מסגרות לטעינה": which frameworks of the personnel file are loaded.
  *
  * The file may hold far more people than the unit. Each row has a framework path
- * ("מה"ן - מלמסים/גף ענן/צוות תשתיות - מלמסים") or a gaf column. The tree has two levels:
+ * ("מה"ן - מלמסים/מסגרת ענן/צוות תשתיות - מלמסים") or a gaf column. The tree has two levels:
  * the top framework (the first part of the path) and the gafim under it; a row whose path names
- * no gaf sits under its top as "בלי גף". The choice is kept in the settings (roster_frameworks)
+ * no gaf sits under its top as "בלי מסגרת". The choice is kept in the settings (roster_frameworks)
  * and offered again on the next load.
  */
+import { frameworkName } from "./gafName";
 import { gafFromFramework, type Mapping } from "./roster";
 
 /** one row's place in the tree; top "" = the file has a gaf column only */
@@ -38,13 +39,14 @@ export const hasFrameworks = (m: Mapping) => Boolean(m.framework || m.gaf);
 export function placeOf(r: Record<string, unknown>, m: Mapping): Place | null {
   const path = m.framework ? String(r[m.framework] ?? "").trim() : "";
   const gafCell = m.gaf ? String(r[m.gaf] ?? "").trim() : "";
-  // a "גף" column that holds the whole path is read like the framework column
+  // a "מסגרת" column that holds the whole path is read like the framework column
   const full = path || (gafCell.includes("/") ? gafCell : "");
   if (full) {
     const top = full.split("/")[0].trim();
-    return { top, gaf: m.gaf && gafCell && !gafCell.includes("/") ? gafCell : gafFromFramework(full) };
+    const gaf = m.gaf && gafCell && !gafCell.includes("/") ? gafCell : gafFromFramework(full);
+    return { top, gaf: gaf === null ? null : frameworkName(gaf) || null };
   }
-  if (gafCell) return { top: "", gaf: gafCell };
+  if (gafCell) return { top: "", gaf: frameworkName(gafCell) };
   return null;
 }
 
@@ -63,7 +65,7 @@ export function buildTree(records: Record<string, unknown>[], m: Mapping): TreeN
       count: [...g.values()].reduce((a, b) => a + b, 0),
       gafim: [...g.entries()]
         .map(([gaf, count]) => ({ gaf, count }))
-        // the gafim by name, "בלי גף" last
+        // the gafim by name, "בלי מסגרת" last
         .sort((a, b) => (a.gaf === null ? 1 : b.gaf === null ? -1 : a.gaf.localeCompare(b.gaf, "he"))),
     }))
     .sort((a, b) => b.count - a.count || a.top.localeCompare(b.top, "he"));
@@ -123,7 +125,7 @@ export function countSelected(sel: FrameworkSelection, tree: TreeNode[]): number
   );
 }
 
-/** "מה"ן - מלמסים / גף ענן" – for the moved-out warning */
+/** "מה"ן - מלמסים / מסגרת ענן" – for the moved-out warning */
 export function placeLabel(p: Place): string {
-  return [p.top, p.gaf ?? "בלי גף"].filter(Boolean).join(" / ");
+  return [p.top, p.gaf ?? "ישירות תחת המסגרת"].filter(Boolean).join(" / ");
 }

@@ -104,7 +104,7 @@ export function soldierFactors(x: FactorInput): Factor[] {
       icon: "relief",
       title: `הקלה: ${role.name} ×${role.factor}`,
       tag: role.valid_to && role.valid_to < x.cycle.end ? { text: `עד ${dm(role.valid_to)}`, tone: "warning" } : undefined,
-      effect: `מקבל בערך ${Math.round(role.factor * 100)}% מהעומס של חייל רגיל – הניקוד שלו מחולק ב-${role.factor}.`,
+      effect: `מקבל בערך ${Math.round(role.factor * 100)}% מהעומס של עובד רגיל – הניקוד שלו מחולק ב-${role.factor}.`,
     });
   }
 
@@ -119,7 +119,7 @@ export function soldierFactors(x: FactorInput): Factor[] {
       const opening = s.opening_score != null ? ` נכנס עם ניקוד פתיחה ${Number(s.opening_score).toFixed(1)} – ממוצע הקבוצה שלו.` : "";
       out.push({
         icon: "newcomer",
-        title: `חייל חדש – בהכשרה עד ${dm(last)}`,
+        title: `עובד חדש – בהכשרה עד ${dm(last)}`,
         tag: { text: "חוסם", tone: "warning" },
         effect: `לא משובץ לתורנויות עד ${dm(last)}.${opening}`,
       });

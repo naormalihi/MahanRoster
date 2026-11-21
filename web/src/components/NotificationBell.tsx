@@ -184,7 +184,7 @@ function RequestAlertsControl() {
       <FormControlLabel
         sx={{ m: 0, width: "100%", justifyContent: "space-between" }}
         labelPlacement="start"
-        label={<Typography variant="body2">התראה על בקשת פטור חדשה{isStaff(me) ? "" : " בגף שלי"}</Typography>}
+        label={<Typography variant="body2">התראה על בקשת פטור חדשה{isStaff(me) ? "" : " במסגרת שלי"}</Typography>}
         control={
           <Switch
             checked={on}

@@ -464,7 +464,7 @@ function EditDialog(props: {
                 <Alert severity="warning" icon={false}>
                   <Stack spacing={1.5}>
                     <Typography variant="body2">
-                      מתאריך היציאה החייל לא פעיל.
+                      מתאריך היציאה העובד לא פעיל.
                       {leaving.duties > 0
                         ? ` יש לו ${leaving.duties} תורנויות מאותו יום – הן יורדות ממנו ויסומנו כמשבצות שצריך לאייש (הוא יקבל עדכון).`
                         : " אין לו תורנויות מאותו יום."}
@@ -518,7 +518,7 @@ function BulkRangeDialog(props: {
   const [busy, setBusy] = useState(false);
   return (
     <Dialog open onClose={props.onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>עדכון תוקף מטווח ל-{props.count} חיילים</DialogTitle>
+      <DialogTitle>עדכון תוקף מטווח ל-{props.count} עובדים</DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 1 }}>
           <DateField
@@ -768,7 +768,7 @@ export function SoldiersPage() {
       by: (s) => rankOrder.get(s.rank_name) ?? -1,
       first: "desc",
     },
-    { label: "גף", key: "gaf", by: (s) => s.gaf_name },
+    { label: "מסגרת", key: "gaf", by: (s) => s.gaf_name },
     { label: "שירות", key: "service", by: (s) => effectiveService(s) },
     { label: "תום שירות", key: "release", by: (s) => s.release_date ?? "9999" },
     {
@@ -873,7 +873,7 @@ export function SoldiersPage() {
         </Typography>
         {staffUser && (
           <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={() => setAdding(true)}>
-            הוספת חייל
+            הוספת עובד
           </Button>
         )}
         <Button
@@ -993,11 +993,11 @@ export function SoldiersPage() {
           />
           <TextField
             select
-            label="גף"
+            label="מסגרת"
             value={gaf}
             onChange={(e) => setGaf(e.target.value)}
           >
-            <MenuItem value="">כל הגפים</MenuItem>
+            <MenuItem value="">כל המסגרות</MenuItem>
             {gafim.map((g) => (
               <MenuItem key={g} value={g}>
                 {g}
@@ -1111,7 +1111,7 @@ export function SoldiersPage() {
       )}
       {rows && rows.length === 0 && (
         <Alert severity="info">
-          אין עדיין חיילים. טען קובץ כוח אדם במסך "כוח אדם".
+          אין עדיין עובדים. טען קובץ כוח אדם במסך "כוח אדם".
         </Alert>
       )}
 
@@ -1149,7 +1149,7 @@ export function SoldiersPage() {
             </Stack>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              היום לא נופל באף מחזור – בעמודה מופיע רק ניקוד הפתיחה של חיילים חדשים.
+              היום לא נופל באף מחזור – בעמודה מופיע רק ניקוד הפתיחה של עובדים חדשים.
             </Typography>
           )}
           <Typography variant="subtitle2" sx={{ mt: 1 }}>
@@ -1169,7 +1169,7 @@ export function SoldiersPage() {
             </Stack>
           )}
           <Typography variant="caption" color="text.secondary">
-            לפי התאריך של היום. נוכחי = ניקוד פתיחה (לחיילים חדשים) ועוד התורנויות במחזור שהיום בתוכו; עתידי = המחזור הבא. ניקוד = סכום
+            לפי התאריך של היום. נוכחי = ניקוד פתיחה (לעובדים חדשים) ועוד התורנויות במחזור שהיום בתוכו; עתידי = המחזור הבא. ניקוד = סכום
             הנקודות של התורנויות שבלוח (בלי עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של המחזור.
           </Typography>
           </Collapse>
@@ -1249,7 +1249,7 @@ export function SoldiersPage() {
             })}
           </CardList>
           <Typography variant="caption" color="text.secondary">
-            מוצגים {shown.length} מתוך {rows.length}. לחיצה על חייל פותחת עריכה; סימון בתיבה – לפעולות על כמה חיילים.
+            מוצגים {shown.length} מתוך {rows.length}. לחיצה על עובד פותחת עריכה; סימון בתיבה – לפעולות על כמה עובדים.
           </Typography>
         </>
       )}

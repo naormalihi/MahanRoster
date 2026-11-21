@@ -139,7 +139,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
   });
 
   async function run(f: () => Promise<unknown>) {
-    if (!reason.trim() && (!props.published || warn)) return setError(props.published ? "החייל מפר כלל – חובה לכתוב סיבה" : "חובה לכתוב נימוק");
+    if (!reason.trim() && (!props.published || warn)) return setError(props.published ? "העובד מפר כלל – חובה לכתוב סיבה" : "חובה לכתוב נימוק");
     setBusy(true);
     setError(null);
     try {
@@ -225,7 +225,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
               })}
               {shown.length === 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-                  אין חיילים זכאים פנויים. הפעל "גם לא זכאים" כדי לראות את כולם והסיבות.
+                  אין עובדים זכאים פנויים. הפעל "גם לא זכאים" כדי לראות את כולם והסיבות.
                 </Typography>
               )}
             </List>
@@ -243,7 +243,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
             </Alert>
           )}
           <TextField
-            label={props.published ? (warn ? "סיבה (חובה – החייל מפר כלל)" : "הערה (לא חובה)") : "נימוק (חובה)"}
+            label={props.published ? (warn ? "סיבה (חובה – העובד מפר כלל)" : "הערה (לא חובה)") : "נימוק (חובה)"}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             fullWidth
@@ -630,7 +630,7 @@ function LoadTab({
               leaveTouchDelay={6000}
               title={
                 <>
-                  הפס = הניקוד הצפוי (קודם + זיכוי + המחזור). הקו = ממוצע מי שזכאים לאותן תורנויות, והרקע סביבו = הטווח המותר. לחיצה על חייל מציגה את
+                  הפס = הניקוד הצפוי (קודם + זיכוי + המחזור). הקו = ממוצע מי שזכאים לאותן תורנויות, והרקע סביבו = הטווח המותר. לחיצה על עובד מציגה את
                   הפירוט.
                 </>
               }
@@ -644,7 +644,7 @@ function LoadTab({
           <Collapse in={breakdown} unmountOnExit>
             <Stack spacing={1.5} sx={{ mb: 1.5, p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                קבוצה = חיילים מאותה אוכלוסייה שיכולים להתחלק בעומס. בתוכה, כל חייל נמדד מול מי שזכאים לאותן קטגוריות תורנות. חייל שלא זכאי לאף
+                קבוצה = עובדים מאותה אוכלוסייה שיכולים להתחלק בעומס. בתוכה, כל עובד נמדד מול מי שזכאים לאותן קטגוריות תורנות. עובד שלא זכאי לאף
                 קטגוריה, או שהוא היחיד בצירוף שלו, לא נבדק.
                 {credited && " זיכוי = ימים מחוץ ליחידה שלא מבחירה, כפול העומס היומי הממוצע של הקבוצה."}
               </Typography>
@@ -653,7 +653,7 @@ function LoadTab({
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        {["קטגוריות פתוחות", "חיילים", "ממוצע", "מינימום", "מקסימום"].map((h) => (
+                        {["קטגוריות פתוחות", "עובדים", "ממוצע", "מינימום", "מקסימום"].map((h) => (
                           <TableCell key={h}>{h}</TableCell>
                         ))}
                       </TableRow>
@@ -676,8 +676,8 @@ function LoadTab({
           </Collapse>
 
           <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr auto", alignItems: "center", mb: 1 }}>
-            <TextField size="small" select label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)}>
-              <MenuItem value="">כל הגפים</MenuItem>
+            <TextField size="small" select label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)}>
+              <MenuItem value="">כל המסגרות</MenuItem>
               {gafim.map((g) => (
                 <MenuItem key={g} value={g}>
                   {g}
@@ -771,7 +771,7 @@ function LoadTab({
           })}
           {shown.length === 0 && (
             <Typography color="text.secondary" sx={{ py: 2 }}>
-              {onlyOut ? "אין חורגים בקבוצה הזו." : "אין חיילים שמתאימים לחיפוש."}
+              {onlyOut ? "אין חורגים בקבוצה הזו." : "אין עובדים שמתאימים לחיפוש."}
             </Typography>
           )}
         </Stack>
@@ -786,7 +786,7 @@ function IdleDialog({ fair, ctx, onClose, onOpen }: { fair: Fairness; ctx: Ctx; 
   const name = (id: string) => ctx.soldiers.get(id)?.full_name ?? "?";
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>חיילים בלי אף משימה אפשרית במחזור</DialogTitle>
+      <DialogTitle>עובדים בלי אף משימה אפשרית במחזור</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={1.5}>
           <Typography variant="body2" color="text.secondary">
@@ -1227,7 +1227,7 @@ function DraftBody(props: {
             setOnlyOut(fair.outliers > 0);
           }}
         />
-        {idleCount > 0 && <Tile tone="warning" title="בלי משימה במחזור" value={`${idleCount} חיילים`} onClick={() => setIdleOpen(true)} />}
+        {idleCount > 0 && <Tile tone="warning" title="בלי משימה במחזור" value={`${idleCount} עובדים`} onClick={() => setIdleOpen(true)} />}
         <Tile
           tone={manual ? "secondary" : "default"}
           title="שינויים ידניים"
@@ -1262,11 +1262,11 @@ function DraftBody(props: {
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
         <Tabs value={view} onChange={(_, v) => setView(v)} sx={{ minHeight: 40, "& .MuiTab-root": { minHeight: 40 } }}>
           <Tab value="board" label="לוח" />
-          <Tab value="soldiers" label="חיילים" />
+          <Tab value="soldiers" label="עובדים" />
         </Tabs>
         <TextField
           size="small"
-          placeholder={view === "board" ? "חיפוש: חייל, תורנות או תאריך (6.1)" : "חיפוש לפי שם"}
+          placeholder={view === "board" ? "חיפוש: עובד, תורנות או תאריך (6.1)" : "חיפוש לפי שם"}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
@@ -1459,7 +1459,7 @@ export function PublishedDialog({ open, onClose, onMessage }: { open: boolean; o
           הלוח פורסם!
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          הוא מופיע עכשיו ב&quot;לוח התורנויות&quot; לכל מי שיש לו גישה, והחיילים עם חשבון אישי קיבלו התראה. משלב זה שינויים נעשים בתפעול.
+          הוא מופיע עכשיו ב&quot;לוח התורנויות&quot; לכל מי שיש לו גישה, והעובדים עם חשבון אישי קיבלו התראה. משלב זה שינויים נעשים בתפעול.
         </Typography>
       </DialogContent>
       <DialogActions sx={{ justifyContent: "center", pb: 2, flexWrap: "wrap", gap: 1 }}>

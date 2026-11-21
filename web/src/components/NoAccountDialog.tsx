@@ -24,7 +24,7 @@ export function NoAccountDialog({ cycleId, onClose }: { cycleId: string; onClose
       <DialogTitle>שליחה למי שאין לו חשבון</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          החיילים האלה לא קיבלו התראה על הלוח. לכל אחד – הודעה אחת עם כל התורנויות שלו במחזור וקוד הצטרפות אישי. כשהוא עונה &quot;קיבלתי&quot; – מסמנים &quot;וידאתי בטלפון&quot; בתמונת המצב.
+          העובדים האלה לא קיבלו התראה על הלוח. לכל אחד – הודעה אחת עם כל התורנויות שלו במחזור וקוד הצטרפות אישי. כשהוא עונה &quot;קיבלתי&quot; – מסמנים &quot;וידאתי בטלפון&quot; בתמונת המצב.
         </Typography>
         {!rows && !error && <CircularProgress size={22} />}
         {rows?.length === 0 && <Alert severity="success">לכל המשובצים יש חשבון – כולם קיבלו התראה.</Alert>}

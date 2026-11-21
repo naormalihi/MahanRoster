@@ -15,7 +15,7 @@ describe("mapping", () => {
     expect(mappingProblems(detectMapping(["שם מלא"]))).toContain("חסרה עמודה: מספר עובד");
     expect(detectMapping(["מספר עובד", "שם מלא"]).idNumber).toBe("מספר עובד");
     expect(detectMapping(["מס' עובד"]).idNumber).toBe("מס' עובד");
-    expect(mappingProblems(detectMapping(["מספר אישי", "שם מלא"]), ["מספר אישי", "שם מלא"])[0]).toMatch(/מזהה חיילים לפי מספר עובד/);
+    expect(mappingProblems(detectMapping(["מספר אישי", "שם מלא"]), ["מספר אישי", "שם מלא"])[0]).toMatch(/מזהה עובדים לפי מספר עובד/);
   });
 });
 
@@ -67,7 +67,7 @@ describe("gaf column holding the framework path", () => {
     const base = { "ת.ז": "123456782", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה" };
     const m = detectMapping([...Object.keys(base), "גף"]);
     const rows = parseRows([{ ...base, "גף": "מה\"ן - מלמסים/גף ענן/צוות תשתיות - מלמסים" }, { ...base, "ת.ז": "123456790", "גף": "גף טכני" }], m).rows;
-    expect(rows.map((r) => r.gaf)).toEqual(["גף ענן", "גף טכני"]);
+    expect(rows.map((r) => r.gaf)).toEqual(["ענן", "טכני"]); // stored without the "גף" prefix
   });
 });
 
@@ -167,10 +167,10 @@ describe("HR export layout", () => {
       m,
     );
     expect(rows.map((r) => [r.gaf, r.serviceType, r.parent])).toEqual([
-      ["גף ענן", "mandatory", false],
-      ["גף בדיקות", "career", true],
+      ["ענן", "mandatory", false],
+      ["בדיקות", "career", true],
     ]);
-    expect(errors).toEqual([{ line: 4, message: "לא נמצא גף במסגרת" }]);
+    expect(errors).toEqual([{ line: 4, message: "לא נמצאה מסגרת בנתיב המסגרת" }]);
   });
 });
 

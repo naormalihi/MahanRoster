@@ -38,7 +38,7 @@ REASON_LABELS = {
     "absence": "היעדרות",
     "date_block": "חסימת תאריך",
     "personal_constraint": "אילוץ אישי",
-    "penalty_other": "משבצת קנס של חייל אחר",
+    "penalty_other": "משבצת קנס של עובד אחר",
     "busy": "משובץ בתורנות סמוכה (כולל מנוחה)",
     "removed": "הוסר מהתורנות הזו",
 }

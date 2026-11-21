@@ -52,7 +52,7 @@ export function FrameworkPicker({
     const s = q.trim();
     if (!s) return tree;
     return tree
-      .map((t) => (t.top.includes(s) ? t : { ...t, gafim: t.gafim.filter((g) => (g.gaf ?? "בלי גף").includes(s)) }))
+      .map((t) => (t.top.includes(s) ? t : { ...t, gafim: t.gafim.filter((g) => (g.gaf ?? "ישירות תחת המסגרת").includes(s)) }))
       .filter((t) => t.top.includes(s) || t.gafim.length > 0);
   }, [tree, q]);
   const flip = (top: string) =>
@@ -69,14 +69,14 @@ export function FrameworkPicker({
         <Box>
           <Typography variant="h3">מסגרות לטעינה</Typography>
           <Typography variant="body2" color="text.secondary">
-            רק רשומות מהמסגרות המסומנות ייטענו. הבחירה נשמרת לטעינה הבאה; גף חדש תחת מסגרת שמסומנת כולה ייכנס מעצמו.
+            רק רשומות מהמסגרות המסומנות ייטענו. הבחירה נשמרת לטעינה הבאה; מסגרת חדשה תחת מסגרת עליונה שמסומנת כולה תיכנס מעצמה.
           </Typography>
         </Box>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
           <Chip color={chosen ? "primary" : "default"} label={`נבחרו ${chosen} מתוך ${total} רשומות`} />
           <TextField
             size="small"
-            placeholder="חיפוש מסגרת או גף"
+            placeholder="חיפוש מסגרת"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
@@ -125,7 +125,7 @@ export function FrameworkPicker({
                         onChange={() => setSel(toggleGaf(sel, full, g.gaf))}
                       />
                       <Typography sx={{ flex: 1 }} color={g.gaf === null ? "text.secondary" : undefined}>
-                        {g.gaf ?? "בלי גף"}
+                        {g.gaf ?? "ישירות תחת המסגרת"}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ px: 1.5 }}>
                         {g.count}

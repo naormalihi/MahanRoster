@@ -125,7 +125,7 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
                 {job.params.phase === "polishing"
                   ? "ליטוש: המנוע מאזן את הקבוצות על פני כל המחזור"
                   : job.params.phase === "improving"
-                    ? "נמצא שיבוץ – המנוע משפר את האיזון בין החיילים"
+                    ? "נמצא שיבוץ – המנוע משפר את האיזון בין העובדים"
                     : "המנוע מחפש שיבוץ"}
               </Typography>
             </Typography>
@@ -218,7 +218,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
         {(job.warnings?.length ?? 0) > 0 && (
           <Alert severity="info">
             {job.warnings!.slice(0, 10).map((w, i) => (
-              <div key={i}>{warningText(w, slotLabel, (id) => names.get(id) ?? "חייל לא מוכר", REASON_LABEL, (id) => slots.has(id))}</div>
+              <div key={i}>{warningText(w, slotLabel, (id) => names.get(id) ?? "עובד לא מוכר", REASON_LABEL, (id) => slots.has(id))}</div>
             ))}
             {job.warnings!.length > 10 && <div>ועוד {job.warnings!.length - 10} אזהרות.</div>}
           </Alert>
@@ -230,7 +230,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    {["אוכלוסייה", "חיילים", "ממוצע לפני", "ממוצע אחרי", "מינימום", "מקסימום", "סטיית תקן", "מקס׳ סופ״ש", "מקס׳ עתודות"].map((h) => (
+                    {["אוכלוסייה", "עובדים", "ממוצע לפני", "ממוצע אחרי", "מינימום", "מקסימום", "סטיית תקן", "מקס׳ סופ״ש", "מקס׳ עתודות"].map((h) => (
                       <TableCell key={h}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -265,7 +265,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
                     <TableCell>תורנות</TableCell>
                     <TableCell>חסר</TableCell>
                     <TableCell>זכאים</TableCell>
-                    <TableCell>למה אחרים לא מתאימים (מספר חיילים)</TableCell>
+                    <TableCell>למה אחרים לא מתאימים (מספר עובדים)</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>

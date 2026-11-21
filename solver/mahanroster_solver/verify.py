@@ -26,7 +26,7 @@ def violations(problem: Problem, solution: Solution) -> list[str]:
     per_soldier = defaultdict(list)
     for a in solution.assignments:
         if a.slot_id not in slots or a.soldier_id not in soldiers:
-            out.append(f"שיבוץ למשבצת או לחייל לא מוכרים: {a.slot_id}/{a.soldier_id}")
+            out.append(f"שיבוץ למשבצת או לעובד לא מוכרים: {a.slot_id}/{a.soldier_id}")
             continue
         k, s = slots[a.slot_id], soldiers[a.soldier_id]
         per_slot[k.id][a.role].append(s.id)
@@ -47,13 +47,13 @@ def violations(problem: Problem, solution: Solution) -> list[str]:
             out.append(f"{kid}: יותר עתודות מהנדרש")
         both = set(roles[ROLE_PERFORMER]) & set(roles[ROLE_RESERVE])
         if both:
-            out.append(f"{kid}: אותו חייל גם מבצע וגם עתודה: {sorted(both)}")
+            out.append(f"{kid}: אותו עובד גם מבצע וגם עתודה: {sorted(both)}")
         perf_gafs = {soldiers[p].gaf_id for p in roles[ROLE_PERFORMER]}
         for res in roles[ROLE_RESERVE]:
             if (res, kid, ROLE_RESERVE) in fixed:
                 continue  # published facts are kept as they are
             if soldiers[res].service_type == SERVICE_MANDATORY and soldiers[res].gaf_id not in perf_gafs:
-                out.append(f"{kid}: עתודת חובה {res} לא מגף המבצע")
+                out.append(f"{kid}: עתודת חובה {res} לא ממסגרת המבצע")
 
     for sid, items in per_soldier.items():
         items.sort(key=lambda it: it[0].starts_at)

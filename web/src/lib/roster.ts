@@ -3,6 +3,7 @@
  * against the soldiers already in the system. Pure functions – easy to test.
  */
 
+import { frameworkName } from "./gafName";
 import { normalizeEmployeeNumber } from "./hmac";
 import { normalizePhone } from "./phone";
 
@@ -31,8 +32,8 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
   { key: "lastName", label: "שם משפחה", required: false, synonyms: ["שם משפחה"] },
   { key: "serviceType", label: "סוג שירות", required: false, synonyms: ["סוג שירות", "שירות", "מעמד"] },
   { key: "careerStartDate", label: "תאריך כניסה לקבע", required: false, synonyms: ["תאריך כניסה לקבע", "כניסה לקבע", "תאריך תחילת קבע", "תחילת קבע"] },
-  { key: "gaf", label: "גף", required: false, synonyms: ["גף", "מחלקה", "ענף"] },
-  { key: "framework", label: "מסגרת", required: false, synonyms: ["מסגרת", "שיוך ארגוני"] },
+  { key: "gaf", label: "מסגרת", required: false, synonyms: ["גף", "מחלקה", "ענף"] },
+  { key: "framework", label: "נתיב מסגרת", required: false, synonyms: ["מסגרת", "שיוך ארגוני"] },
   { key: "rank", label: "דרגה", required: true, synonyms: ["דרגה", "דרגה מחושבת", "דרגה נוכחית"] },
   { key: "gender", label: "מין", required: false, synonyms: ["מין", "מגדר"] },
   { key: "enlistmentDate", label: "תאריך גיוס", required: false, synonyms: ["תאריך גיוס", "גיוס"] },
@@ -67,10 +68,10 @@ const PERSONAL_NUMBER_HEADERS = ["מספר אישי", "מ\"א", "מא", "מס' �
 export function mappingProblems(m: Mapping, headers: string[] = []): string[] {
   const out: string[] = [];
   if (!m.idNumber && headers.some((h) => PERSONAL_NUMBER_HEADERS.some((p) => clean(h) === clean(p))))
-    out.push("בקובץ יש עמודת מספר אישי – המערכת מזהה חיילים לפי מספר עובד. החלף את העמודה בעמודת מספר עובד");
+    out.push("בקובץ יש עמודת מספר אישי – המערכת מזהה עובדים לפי מספר עובד. החלף את העמודה בעמודת מספר עובד");
   for (const f of FIELDS) if (f.required && !m[f.key]) out.push(`חסרה עמודה: ${f.label}`);
   if (!m.fullName && !(m.firstName && m.lastName)) out.push("חסרה עמודת שם (שם מלא, או שם פרטי ושם משפחה)");
-  if (!m.gaf && !m.framework) out.push("חסרה עמודת גף (גף, או מסגרת שהגף מופיע בה)");
+  if (!m.gaf && !m.framework) out.push("חסרה עמודת מסגרת (מסגרת, או נתיב מסגרת שהיא מופיעה בו)");
   return out;
 }
 
@@ -89,7 +90,7 @@ export function rankResolver(ranks: { name: string; aliases?: string[] }[]): (te
   return (text) => map.get(rankKey(text.trim())) ?? null;
 }
 
-/** "מה"ן - מלמסים/גף ענן/צוות DevOps - מלמסים" → "גף ענן" */
+/** "מה"ן - מלמסים/מסגרת ענן/צוות DevOps - מלמסים" → "מסגרת ענן" */
 export function gafFromFramework(framework: string): string | null {
   const part = framework.split("/").map((p) => p.trim()).find((p) => /^גף[\s]/.test(p));
   return part ? part.replace(/\s+-\s+.*$/, "").trim() : null;
@@ -213,11 +214,14 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
     const rankName = String(get("rank") ?? "").trim();
     const careerStart = toIsoDate(get("careerStartDate"));
     const svc = serviceOf(m, get("serviceType"), careerStart, rankName);
-    // a "גף" column that actually holds the full framework path is read like the framework column
+    // a "מסגרת" column that actually holds the full framework path is read like the framework column
     const rawGaf = m.gaf ? String(get("gaf") ?? "").trim() : "";
-    const gafName = m.gaf
-      ? rawGaf.includes("/") ? gafFromFramework(rawGaf) ?? rawGaf : rawGaf
-      : gafFromFramework(String(get("framework") ?? ""));
+    // stored by its own name: "גף ענן" in the file is the framework "ענן"
+    const gafName = frameworkName(
+      m.gaf
+        ? rawGaf.includes("/") ? gafFromFramework(rawGaf) ?? rawGaf : rawGaf
+        : gafFromFramework(String(get("framework") ?? "")),
+    );
     const dates = {
       enlistmentDate: toIsoDate(get("enlistmentDate")),
       releaseDate: toIsoDate(get("releaseDate")),
@@ -227,7 +231,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
     const problems: string[] = [];
     if (!name) problems.push("שם חסר");
     if (!svc) problems.push(`סוג שירות לא מוכר: "${get("serviceType") ?? ""}"`);
-    if (!gafName) problems.push(m.gaf ? "גף חסר" : "לא נמצא גף במסגרת");
+    if (!gafName) problems.push(m.gaf ? "מסגרת חסרה" : "לא נמצאה מסגרת בנתיב המסגרת");
     if (!rankName) problems.push("דרגה חסרה");
     const phone = m.phone ? normalizePhone(get("phone")) : null;
     if (phone === "invalid") problems.push(`טלפון נייד לא תקין: "${get("phone")}"`);
@@ -285,7 +289,7 @@ export const RECORD_LABELS: Record<keyof SoldierRecord, string> = {
   soldier_key: "מזהה",
   full_name: "שם",
   service_type: "סוג שירות",
-  gaf_name: "גף",
+  gaf_name: "מסגרת",
   rank_name: "דרגה",
   gender: "מין",
   enlistment_date: "תאריך גיוס",

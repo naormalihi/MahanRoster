@@ -36,7 +36,7 @@ export const whatsappUrl = (text: string, phone?: string | null) =>
 /** One group per gaf, soldiers by name. */
 export function byGaf(rows: InviteRow[]): { gaf: string; rows: InviteRow[] }[] {
   const m = new Map<string, InviteRow[]>();
-  for (const r of rows) m.set(r.gaf_name || "בלי גף", [...(m.get(r.gaf_name || "בלי גף") ?? []), r]);
+  for (const r of rows) m.set(r.gaf_name || "בלי מסגרת", [...(m.get(r.gaf_name || "בלי מסגרת") ?? []), r]);
   return [...m.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "he"))
     .map(([gaf, rs]) => ({ gaf, rows: rs.sort((a, b) => a.full_name.localeCompare(b.full_name, "he")) }));
@@ -49,7 +49,7 @@ export function printHtml(rows: InviteRow[], qr: Map<string, string>, origin: st
   const pages = byGaf(rows)
     .map(
       (g) => `<section class="page"><h1>קודי הצטרפות – ${esc(g.gaf)}</h1>
-<p class="note">כל חייל מקבל את הכרטיס שלו. סורקים את הקוד בטלפון, או נכנסים ל-<span dir="ltr">${esc(origin)}</span> ← "יש לי קוד הצטרפות". בתוקף עד ${esc(expires)}.</p>
+<p class="note">כל עובד מקבל את הכרטיס שלו. סורקים את הקוד בטלפון, או נכנסים ל-<span dir="ltr">${esc(origin)}</span> ← "יש לי קוד הצטרפות". בתוקף עד ${esc(expires)}.</p>
 <div class="cards">${g.rows
         .map(
           (r) => `<div class="card"><img src="${qr.get(r.code) ?? ""}" alt="" /><div><div class="name">${esc(r.full_name)}</div><div class="code" dir="ltr">${esc(r.code)}</div><div class="hint">תורנצ׳יק · קוד אישי, חד-פעמי</div></div></div>`,

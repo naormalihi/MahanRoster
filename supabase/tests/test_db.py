@@ -1326,7 +1326,7 @@ def test_load_roles_settings(conn):
         assert hist == [0.7, 0.6]
         sid = conn.execute("select id from soldiers where is_active limit 1").fetchone()[0]
         conn.execute("insert into soldier_load_roles (soldier_id, load_role_id, valid_from) values (%s, %s, '2020-01-01')", (sid, rid))
-        with pytest.raises(psycopg.Error, match="חיילים"):
+        with pytest.raises(psycopg.Error, match="עובדים"):
             _as_coord(conn, "select public.delete_load_role(%s)", rid)
         raise psycopg.Rollback()
 
@@ -1852,7 +1852,7 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
 
     # not a soldier: no self-entry
     with session_as(conn, COORD) as c:
-        with pytest.raises(psycopg.Error, match="רק חייל"):
+        with pytest.raises(psycopg.Error, match="רק עובד"):
             c.execute("select public.add_my_date_block(%s)", (far,))
 
 
@@ -2833,7 +2833,7 @@ def test_soldier_contacts_show_only_the_chosen(conn):
         rows = conn.execute("select display_name, role_label, phone, kind from public.my_contacts()").fetchall()
         assert rows == [("נע\"ת לדוגמה", "נע\"ת התורנויות", "972500000001", "staff"),
                         ("מ\"מ לדוגמה", "ממלא מקום נע\"ת", None, "staff"),
-                        ("מפקד גף א", "מפקד הגף", "972500000003", "gaf")]
+                        ("מפקד גף א", "מפקד המסגרת", "972500000003", "gaf")]
         # the list itself is staff only
         assert conn.execute("select count(*) from public.soldier_contacts_list()").fetchone()[0] == 0
         raise psycopg.Rollback()
@@ -2918,3 +2918,24 @@ def test_spec_document_for_staff_and_commanders_only(conn):
         with pytest.raises(psycopg.Error):
             with conn.transaction():
                 conn.execute("select body from app.spec_document")
+
+
+def test_frameworks_stored_without_the_gaf_prefix(conn):
+    # the 2.43 migration: "גף X" → "X"; one that exists under both names is merged into "X"
+    mig = (pathlib.Path(__file__).resolve().parents[2] / "supabase" / "migrations"
+           / "20261121000130_terms_framework_employee.sql").read_text(encoding="utf-8")
+    rename = mig[mig.index("do $$"):mig.index("end $$;") + len("end $$;")]
+    with conn.transaction():
+        unit = conn.execute("select id from org_units where kind = 'unit' limit 1").fetchone()[0]
+        a = conn.execute("insert into org_units (kind, name, parent_id) values ('gaf', 'גף שמות1', %s) returning id", (unit,)).fetchone()[0]
+        b_old = conn.execute("insert into org_units (kind, name, parent_id) values ('gaf', 'גף שמות2', %s) returning id", (unit,)).fetchone()[0]
+        b_new = conn.execute("insert into org_units (kind, name, parent_id) values ('gaf', 'שמות2', %s) returning id", (unit,)).fetchone()[0]
+        sid = conn.execute("select id from soldiers limit 1").fetchone()[0]
+        conn.execute("update soldiers set gaf_id = %s where id = %s", (b_old, sid))
+        conn.execute(rename)
+        assert conn.execute("select name from org_units where id = %s", (a,)).fetchone()[0] == "שמות1"
+        assert conn.execute("select gaf_id from soldiers where id = %s", (sid,)).fetchone()[0] == b_new
+        merged = conn.execute("select merged_into_id, active_to is not null from org_units where id = %s", (b_old,)).fetchone()
+        assert merged == (b_new, True)
+        assert conn.execute("select count(*) from org_units where kind = 'gaf' and name ~ '^גף\\s' and merged_into_id is null").fetchone()[0] == 0
+        raise psycopg.Rollback()

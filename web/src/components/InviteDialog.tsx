@@ -88,7 +88,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
 
   async function download() {
     const XLSX = await import("xlsx");
-    const ws = XLSX.utils.aoa_to_sheet([["שם", "גף", "קוד הצטרפות"], ...rows.map((r) => [r.full_name, r.gaf_name, r.code])]);
+    const ws = XLSX.utils.aoa_to_sheet([["שם", "מסגרת", "קוד הצטרפות"], ...rows.map((r) => [r.full_name, r.gaf_name, r.code])]);
     ws["!cols"] = [{ wch: 22 }, { wch: 16 }, { wch: 14 }];
     const wb = XLSX.utils.book_new();
     wb.Workbook = { Views: [{ RTL: true }] };
@@ -103,12 +103,12 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
         {!codes ? (
           <Stack spacing={2}>
             <Typography variant="body2">
-              לכל חייל קוד אישי חד-פעמי. החייל נכנס לאתר, בוחר "יש לי קוד הצטרפות", מקליד את הקוד ובוחר שם משתמש וסיסמה. אחרי זה הוא רואה את
+              לכל עובד קוד אישי חד-פעמי. העובד נכנס לאתר, בוחר "יש לי קוד הצטרפות", מקליד את הקוד ובוחר שם משתמש וסיסמה. אחרי זה הוא רואה את
               התורנויות שלו, למה שובץ והניקוד שלו מול הממוצע.
             </Typography>
             <Typography variant="body2">
-              ייווצרו קודים ל-<b>{eligible.length}</b> חיילים
-              {skipped ? ` (${skipped} כבר עם חשבון – בלי קוד)` : ""}. קוד חדש מבטל קוד קודם של אותו חייל.
+              ייווצרו קודים ל-<b>{eligible.length}</b> עובדים
+              {skipped ? ` (${skipped} כבר עם חשבון – בלי קוד)` : ""}. קוד חדש מבטל קוד קודם של אותו עובד.
             </Typography>
             <TextField select label="תוקף" value={days} onChange={(e) => setDays(Number(e.target.value))} sx={{ maxWidth: 200 }}>
               {[7, 14, 30, 60].map((d) => (
@@ -125,8 +125,8 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
               הקודים מוצגים <b>פעם אחת בלבד</b> – המערכת שומרת רק טביעה שלהם. שלח, הדפס או הורד אותם לפני הסגירה.
             </Alert>
             <Typography variant="body2" color="text.secondary">
-              כפתור הוואטסאפ פותח הודעה מוכנה עם הקוד וקישור שממלא אותו – ישר בצ׳אט של החייל אם יש לו טלפון במערכת, ואחרת בוחרים אותו באנשי הקשר. ההדפסה מוציאה דף לכל גף עם כרטיס וקוד QR לכל
-              חייל. מה שנשלח או הודפס מסומן במסך החיילים.
+              כפתור הוואטסאפ פותח הודעה מוכנה עם הקוד וקישור שממלא אותו – ישר בצ׳אט של העובד אם יש לו טלפון במערכת, ואחרת בוחרים אותו באנשי הקשר. ההדפסה מוציאה דף לכל מסגרת עם כרטיס וקוד QR לכל
+              עובד. מה שנשלח או הודפס מסומן במסך העובדים.
             </Typography>
             {error && <Alert severity="error">{error}</Alert>}
             <Typography variant="body2">
@@ -136,7 +136,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
               <TableHead>
                 <TableRow>
                   <TableCell>שם</TableCell>
-                  <TableCell>גף</TableCell>
+                  <TableCell>מסגרת</TableCell>
                   <TableCell>קוד</TableCell>
                   <TableCell />
                 </TableRow>
@@ -198,7 +198,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
               {copied ? "הועתק" : "העתקה"}
             </Button>
             <Button startIcon={<PrintIcon />} onClick={printSheet}>
-              הדפסה לפי גף
+              הדפסה לפי מסגרת
             </Button>
             <Button startIcon={<DownloadIcon />} onClick={download}>
               הורדת קובץ

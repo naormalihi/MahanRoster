@@ -33,9 +33,9 @@ describe("frameworks", () => {
 
   it("builds the tree: top frameworks, gafim under them, rows with no gaf last", () => {
     expect(tree.map((t) => [t.top, t.count])).toEqual([["מה\"ן - מלמסים", 4], ["יחידה אחרת", 3]]);
-    expect(tree[0].gafim).toEqual([{ gaf: "גף טכני", count: 1 }, { gaf: "גף ענן", count: 2 }, { gaf: null, count: 1 }]);
-    expect(placeLabel(placeOf(file[4], m)!)).toBe("יחידה אחרת / גף ים");
-    expect(placeLabel(placeOf(file[3], m)!)).toBe("מה\"ן - מלמסים / בלי גף");
+    expect(tree[0].gafim).toEqual([{ gaf: "טכני", count: 1 }, { gaf: "ענן", count: 2 }, { gaf: null, count: 1 }]);
+    expect(placeLabel(placeOf(file[4], m)!)).toBe("יחידה אחרת / ים");
+    expect(placeLabel(placeOf(file[3], m)!)).toBe("מה\"ן - מלמסים / ישירות תחת המסגרת");
   });
 
   it("first load takes everything; a saved choice comes back, a new top unchosen", () => {
@@ -76,6 +76,6 @@ describe("frameworks", () => {
   it("a file with a gaf column only: one level", () => {
     const g = detectMapping(["מספר עובד", "שם מלא", "גף"]);
     const t = buildTree([{ "מספר עובד": "1", "גף": "גף א" }, { "מספר עובד": "2", "גף": "גף ב" }], g);
-    expect(t).toEqual([{ top: "", count: 2, gafim: [{ gaf: "גף א", count: 1 }, { gaf: "גף ב", count: 1 }] }]);
+    expect(t).toEqual([{ top: "", count: 2, gafim: [{ gaf: "א", count: 1 }, { gaf: "ב", count: 1 }] }]);
   });
 });

@@ -104,7 +104,7 @@ function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string; onCh
       onChange={(_, v) => props.onChange(v?.id ?? "")}
       getOptionLabel={(s) => `${s.full_name} · ${s.gaf_name}`}
       isOptionEqualToValue={(a, b) => a.id === b.id}
-      renderInput={(p) => <TextField {...p} label="חייל" autoFocus={props.autoFocus} />}
+      renderInput={(p) => <TextField {...p} label="עובד" autoFocus={props.autoFocus} />}
       noOptionsText="לא נמצא"
     />
   );
@@ -197,8 +197,8 @@ function useFilter(ctx: Ctx) {
         slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
         sx={{ minWidth: 180 }}
       />
-      <TextField select size="small" label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-        <MenuItem value="">כל הגפים</MenuItem>
+      <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
+        <MenuItem value="">כל המסגרות</MenuItem>
         {gafim.map((g) => (
           <MenuItem key={g} value={g}>
             {g}
@@ -210,7 +210,7 @@ function useFilter(ctx: Ctx) {
   return { match, controls, gafim };
 }
 
-const nameOf = (ctx: Ctx, id: string) => ctx.byId.get(id)?.full_name ?? "חייל לא מוכר";
+const nameOf = (ctx: Ctx, id: string) => ctx.byId.get(id)?.full_name ?? "עובד לא מוכר";
 const gafOf = (ctx: Ctx, id: string) => ctx.byId.get(id)?.gaf_name ?? "";
 
 // ---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
       </Stack>
       {props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
         <Alert severity="info" icon={false}>
-          ת״ש 7: החייל לן בבית ולא ישובץ בתאריכים האלה לתורנות שכוללת שעות לילה. במשבצות שהבסיס סימן "ת״ש 7" הוא מקבל עדיפות.
+          ת״ש 7: העובד לן בבית ולא ישובץ בתאריכים האלה לתורנות שכוללת שעות לילה. במשבצות שהבסיס סימן "ת״ש 7" הוא מקבל עדיפות.
         </Alert>
       )}
       {!props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
@@ -453,8 +453,8 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>חייל</TableCell>
-                <TableCell>גף</TableCell>
+                <TableCell>עובד</TableCell>
+                <TableCell>מסגרת</TableCell>
                 <TableCell>סוג</TableCell>
                 <TableCell>היקף</TableCell>
                 <TableCell>תאריכים</TableCell>
@@ -555,7 +555,7 @@ function AbsenceDialog(props: { ctx: Ctx; types: AbsenceType[]; onClose: () => v
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function save() {
-    if (!a.soldier_id) return setError("בחר חייל");
+    if (!a.soldier_id) return setError("בחר עובד");
     if (!a.absence_type_id) return setError("בחר סוג היעדרות");
     if (!a.from || !a.to) return setError("חסרים תאריכים");
     if (a.to < a.from) return setError("תאריך הסיום לפני תאריך ההתחלה");
@@ -584,7 +584,7 @@ function AbsenceDialog(props: { ctx: Ctx; types: AbsenceType[]; onClose: () => v
       </Stack>
       <ViaSelect value={a.received_via} onChange={(v) => setA({ ...a, received_via: v })} />
       <Typography variant="caption" color="text.secondary">
-        היעדרות לא דורשת אישור. החייל לא ישובץ בימים האלה, והיא מורידה את הזמינות שלו במטריצת הפוטנציאל.
+        היעדרות לא דורשת אישור. העובד לא ישובץ בימים האלה, והיא מורידה את הזמינות שלו במטריצת הפוטנציאל.
       </Typography>
     </FormDialog>
   );
@@ -662,8 +662,8 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>חייל</TableCell>
-                <TableCell>גף</TableCell>
+                <TableCell>עובד</TableCell>
+                <TableCell>מסגרת</TableCell>
                 <TableCell>סוג</TableCell>
                 <TableCell>תאריכים</TableCell>
                 <TableCell>ימים</TableCell>
@@ -757,7 +757,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
 
   async function save() {
     if (!adding) return;
-    if (!adding.soldier_id || !adding.day) return setFormError("בחר חייל ותאריך");
+    if (!adding.soldier_id || !adding.day) return setFormError("בחר עובד ותאריך");
     if (adding.day < ctx.cycle.start_date || adding.day > ctx.cycle.end_date) return setFormError("התאריך מחוץ למחזור");
     const over = blockQuotaProblems([adding], rows ?? [], quota).get(0);
     if (over) return setFormError(over);
@@ -792,7 +792,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
         <FormControlLabel control={<Switch checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label="הצג מבוטלות" />
       </Stack>
       <Typography variant="body2" color="text.secondary">
-        עד {quota} חסימה לחייל בחודש. חסימה לא דורשת אישור ונכנסת כאילוץ קשיח.
+        עד {quota} חסימה לעובד בחודש. חסימה לא דורשת אישור ונכנסת כאילוץ קשיח.
         {deadlinePassed && " מועד הסגירה של המחזור עבר: חסימה חדשה עכשיו היא חריגה מהנוהל."}
       </Typography>
       {shown.length === 0 ? (
@@ -829,8 +829,8 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>חייל</TableCell>
-                <TableCell>גף</TableCell>
+                <TableCell>עובד</TableCell>
+                <TableCell>מסגרת</TableCell>
                 <TableCell>תאריך</TableCell>
                 <TableCell>התקבל ב</TableCell>
                 <TableCell />
@@ -898,9 +898,9 @@ function ExcelTab({ ctx }: { ctx: Ctx }) {
       ["הוראות"],
       [`מחזור: ${ctx.cycle.name} (${fmt(ctx.cycle.start_date)} – ${fmt(ctx.cycle.end_date)})`],
       ["תאריכים בפורמט יום/חודש/שנה, למשל 15/01/2027."],
-      ["חסימה: תאריך אחד לחייל בחודש."],
-      ["היעדרות: סוג, מתאריך ועד תאריך (כולל). ליותר מהיעדרות אחת – העתיקו את שורת החייל."],
-      ["אין לשנות את העמודה הנסתרת עם מזהה החייל."],
+      ["חסימה: תאריך אחד לעובד בחודש."],
+      ["היעדרות: סוג, מתאריך ועד תאריך (כולל). ליותר מהיעדרות אחת – העתיקו את שורת העובד."],
+      ["אין לשנות את העמודה הנסתרת עם מזהה העובד."],
       [],
       ["סוגי היעדרות:"],
       ...types.map((t) => [t.name]),
@@ -909,7 +909,7 @@ function ExcelTab({ ctx }: { ctx: Ctx }) {
     wb.Workbook = { Views: [{ RTL: true }] };
     XLSX.utils.book_append_sheet(wb, ws, "אילוצים");
     XLSX.utils.book_append_sheet(wb, help, "הוראות");
-    XLSX.writeFile(wb, `אילוצים-${gaf || "כל-הגפים"}-${ctx.cycle.start_date}.xlsx`);
+    XLSX.writeFile(wb, `אילוצים-${gaf || "כל-המסגרות"}-${ctx.cycle.start_date}.xlsx`);
   }
 
   async function upload(file: File) {
@@ -957,13 +957,13 @@ function ExcelTab({ ctx }: { ctx: Ctx }) {
     <Stack spacing={2} sx={{ maxWidth: 860 }}>
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={2}>
-          <Typography variant="h3">1. הורדת תבנית לגף</Typography>
+          <Typography variant="h3">1. הורדת תבנית למסגרת</Typography>
           <Typography variant="body2" color="text.secondary">
-            התבנית כוללת את רשימת החיילים של הגף. נציג הגף ממלא חסימות והיעדרויות ומחזיר אותה. בלי מספרים אישיים.
+            התבנית כוללת את רשימת העובדים של המסגרת. נציג המסגרת ממלא חסימות והיעדרויות ומחזיר אותה. בלי מספרים אישיים.
           </Typography>
           <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-            <TextField select size="small" label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 180 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-              <MenuItem value="">כל הגפים</MenuItem>
+            <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 180 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
+              <MenuItem value="">כל המסגרות</MenuItem>
               {filter.gafim.map((g) => (
                 <MenuItem key={g} value={g}>
                   {g}
@@ -971,7 +971,7 @@ function ExcelTab({ ctx }: { ctx: Ctx }) {
               ))}
             </TextField>
             <Button variant="outlined" startIcon={<DownloadIcon />} onClick={download} disabled={!templateSoldiers.length}>
-              הורדת תבנית ({templateSoldiers.length} חיילים)
+              הורדת תבנית ({templateSoldiers.length} עובדים)
             </Button>
           </Stack>
         </Stack>
@@ -1034,7 +1034,7 @@ const TABS = [
   { key: "exemptions", label: "פטורים" },
   { key: "absences", label: "היעדרויות" },
   { key: "blocks", label: "חסימות" },
-  { key: "excel", label: "תבנית לגפים" },
+  { key: "excel", label: "תבנית למסגרות" },
 ] as const;
 
 export function ConstraintsPage() {

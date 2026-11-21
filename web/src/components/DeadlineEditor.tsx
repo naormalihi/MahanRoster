@@ -68,7 +68,7 @@ export function DeadlineEditor({ cycle, onSaved }: { cycle: Cycle; onSaved?: () 
                 value={day}
                 onChange={(e) => setDay(e.target.value)}
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: cycle.start_date } }}
-                helperText="חיילים וגפים מגישים אילוצים, חסימות ופטורים עד 23:59 ביום הזה."
+                helperText="עובדים ומסגרות מגישים אילוצים, חסימות ופטורים עד 23:59 ביום הזה."
                 error={!!day && !!problem}
                 fullWidth
               />

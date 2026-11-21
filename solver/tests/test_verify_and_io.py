@@ -41,7 +41,7 @@ def test_verifier_counts_reserve_toward_rest():
 def test_verifier_mandatory_reserve_from_performer_gaf():
     p = problem([soldier("A", "G1"), soldier("B", "G2")], [slot("a", "guard", "2027-01-04T08:00", "2027-01-05T08:00")])
     sol = solution_from(p, [("A", "a", "performer"), ("B", "a", "reserve")])
-    assert any("גף" in v for v in violations(p, sol))
+    assert any("מסגרת" in v for v in violations(p, sol))
 
 
 def test_clean_schedule_has_no_violations():
