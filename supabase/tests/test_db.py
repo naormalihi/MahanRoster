@@ -943,6 +943,10 @@ def test_reset_dynamic_data_keeps_system_settings(conn):
         conn.execute("delete from app_users where soldier_id = %s", (sid,))
         conn.execute("insert into app_users (id, username, soldier_id) values (%s, 'reset.soldier', %s)", (su, sid))
         conn.execute("insert into user_roles (user_id, role) values (%s, 'soldier')", (su,))
+        # the soldier cancelled an absence of his – the data points at the account (it goes first)
+        conn.execute("""insert into absences (soldier_id, absence_type_id, starts_at, ends_at, status, cancelled_by)
+                        select %s, id, now(), now() + interval '1 day', 'cancelled', %s from absence_types limit 1""", (sid, su))
+        assert count("absences where cancelled_by is not null") == 1
         conn.execute("insert into soldier_invites (soldier_id, code_hash, expires_at) values (%s, 'x', now() + interval '1 day') on conflict do nothing", (sid,))
         conn.execute("insert into settings (key, value) values ('unit_key_check', '\"abc\"') on conflict (key) do update set value = excluded.value")
         staff = count("app_users") - 1
