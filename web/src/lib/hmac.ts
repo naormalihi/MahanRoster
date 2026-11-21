@@ -1,8 +1,8 @@
 /**
- * Soldier identity without ID numbers.
+ * Soldier identity without the employee number.
  *
- * The ID number (ת.ז) never leaves the browser. It is turned into
- * soldier_key = HMAC-SHA256(unit key, ID number) here, and only the key
+ * The employee number (מספר עובד) never leaves the browser. It is turned into
+ * soldier_key = HMAC-SHA256(unit key, employee number) here, and only the key
  * is sent to the server. The unit key is a passphrase held by נע"ת התורנויות;
  * it is never sent. After it is confirmed it stays in this tab (sessionStorage) until sign-out
  * or the tab closes, so it is typed once per working session.
@@ -38,21 +38,16 @@ const enc = new TextEncoder();
 const KEY_CHECK_INPUT = "mahanroster-unit-key-check";
 
 /**
- * An Israeli ID number (ת.ז): 5–9 digits, padded with leading zeros to 9, with a valid
- * check digit. Returns null when it is not an ID number (a typo fails the check digit).
+ * An employee number (מספר עובד): digits only (spaces and dashes are ignored), with no leading
+ * zeros – Excel often drops them, so 00123 and 123 are the same person. Null when empty, all
+ * zeros or not digits. No check digit: it is not an ID number.
  */
-export function normalizeIdNumber(raw: unknown): string | null {
+export function normalizeEmployeeNumber(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;
   const digits = String(raw).replace(/[\s-]/g, "");
-  if (!/^\d{5,9}$/.test(digits)) return null;
-  const id = digits.padStart(9, "0");
-  if (/^0+$/.test(id)) return null;
-  let sum = 0;
-  for (let i = 0; i < 9; i++) {
-    const d = Number(id[i]) * ((i % 2) + 1);
-    sum += d > 9 ? d - 9 : d;
-  }
-  return sum % 10 === 0 ? id : null;
+  if (!/^\d{1,15}$/.test(digits)) return null;
+  const n = digits.replace(/^0+/, "");
+  return n || null;
 }
 
 async function hmacHex(secret: string, message: string): Promise<string> {
@@ -61,8 +56,8 @@ async function hmacHex(secret: string, message: string): Promise<string> {
   return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function soldierKey(unitKey: string, idNumber: string): Promise<string> {
-  return hmacHex(unitKey, idNumber);
+export function soldierKey(unitKey: string, employeeNumber: string): Promise<string> {
+  return hmacHex(unitKey, employeeNumber);
 }
 
 /**

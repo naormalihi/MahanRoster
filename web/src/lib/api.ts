@@ -182,7 +182,7 @@ export interface Api {
   soldierContactsList(): Promise<ContactEntry[]>;
   setSoldierContacts(list: { user_id: string; display_name: string; phone: string | null }[]): Promise<void>;
   unitKeyCheck(): Promise<string | null>;
-  /** one soldier by hand (the ת.ז already hashed); an existing one is reported, not duplicated */
+  /** one soldier by hand (the employee number already hashed); an existing one is reported, not duplicated */
   addSoldier(row: AddSoldierRow): Promise<AddSoldierResult>;
   reactivateSoldier(soldierId: string, joinDate: string): Promise<void>;
   /** inactive from a day; his live duties from it are dropped (slots to fill). Returns how many. */

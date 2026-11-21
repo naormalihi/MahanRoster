@@ -191,7 +191,7 @@ export function UsersTab() {
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 260 }}>
-          חשבונות אישיים. כל משתמש משויך לרשומת החייל שלו מכוח האדם (בלי ת.ז). כאן נוצרים חשבונות של מפקדי גפים ומפקד היחידה (צפייה);
+          חשבונות אישיים. כל משתמש משויך לרשומת החייל שלו מכוח האדם (בלי מספר עובד). כאן נוצרים חשבונות של מפקדי גפים ומפקד היחידה (צפייה);
           חיילים מצטרפים בקוד הצטרפות ממסך החיילים; נע"ת וממלא מקום מוגדרים בהקמה.
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>

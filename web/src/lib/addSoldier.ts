@@ -1,5 +1,5 @@
 /** "הוספת חייל": the short form instead of a personnel file – what it needs and what it sends. */
-import { normalizeIdNumber } from "./hmac";
+import { normalizeEmployeeNumber } from "./hmac";
 import { normalizePhone } from "./phone";
 
 export interface AddSoldierForm {
@@ -35,7 +35,7 @@ export const EMPTY_FORM = (today: string): AddSoldierForm => ({
 /** What stops saving, field by field (empty when it can be saved). */
 export function formProblems(f: AddSoldierForm): Partial<Record<keyof AddSoldierForm, string>> {
   const p: Partial<Record<keyof AddSoldierForm, string>> = {};
-  if (!normalizeIdNumber(f.idNumber)) p.idNumber = f.idNumber.trim() ? "ת.ז לא תקינה (ספרת ביקורת)" : "חובה";
+  if (!normalizeEmployeeNumber(f.idNumber)) p.idNumber = f.idNumber.trim() ? "רק ספרות" : "חובה";
   if (!f.firstName.trim()) p.firstName = "חובה";
   if (!f.lastName.trim()) p.lastName = "חובה";
   if (!f.rankId) p.rankId = "חובה";
@@ -47,7 +47,7 @@ export function formProblems(f: AddSoldierForm): Partial<Record<keyof AddSoldier
   return p;
 }
 
-/** The row for add_soldier, with the ת.ז already turned into its key. */
+/** The row for add_soldier, with the employee number already turned into its key. */
 export function toRow(f: AddSoldierForm, soldierKey: string) {
   const phone = normalizePhone(f.phone);
   return {

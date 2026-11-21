@@ -9,6 +9,7 @@ postgresql://postgres:postgres@localhost:5432/postgres. A throwaway database
 from __future__ import annotations
 
 from decimal import Decimal
+import pathlib
 import hashlib
 import json
 from datetime import date, timedelta
@@ -2899,6 +2900,9 @@ def test_spec_document_for_staff_and_commanders_only(conn):
     sol, _ = _soldier_account(conn, "spec.reader")
     (doc,), = _as_coord(conn, "select public.spec_document()")
     assert doc["version"] and doc["body"].startswith("# ") and "/spec/" in doc["body"]
+    # the copy in the database is docs/spec.md – a change to the spec needs a migration with it
+    spec = (pathlib.Path(__file__).resolve().parents[2] / "docs" / "spec.md").read_text(encoding="utf-8")
+    assert doc["body"] == spec, "docs/spec.md changed without a migration that updates app.spec_document"
     gaf_cmd = _as_coord(conn, "select public.create_user('spec.gafcmd', 'temp-pass-123', 'gaf_commander', null)")[0][0]
     with conn.transaction():
         conn.execute("set local role authenticated")
