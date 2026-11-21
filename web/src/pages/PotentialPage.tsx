@@ -1,4 +1,5 @@
 import CalculateIcon from "@mui/icons-material/Calculate";
+import { frameworkName } from "../lib/gafName";
 import DownloadIcon from "@mui/icons-material/Download";
 import SearchIcon from "@mui/icons-material/Search";
 import {
@@ -209,11 +210,11 @@ function MatrixTab(props: {
           onChange={(e) => setQ(e.target.value)}
           slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
         />
-        <TextField select size="small" label="גף" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-          <MenuItem value="">כל הגפים</MenuItem>
+        <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
+          <MenuItem value="">כל המסגרות</MenuItem>
           {gafim.map((g) => (
             <MenuItem key={g} value={g}>
-              {g}
+              {frameworkName(g)}
             </MenuItem>
           ))}
         </TextField>
@@ -246,7 +247,7 @@ function MatrixTab(props: {
                 <RowCard
                   key={s.soldier_id}
                   title={info?.full_name ?? "—"}
-                  sub={`${info?.gaf_name ?? ""} · ${rank.get(s.soldier_id) ?? ""}`}
+                  sub={`${frameworkName(info?.gaf_name)} · ${rank.get(s.soldier_id) ?? ""}`}
                   lines={[
                     <Stack key="o" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }}>
                       {open.length === 0 && "לא זכאי לאף קטגוריה"}
@@ -288,8 +289,8 @@ function MatrixTab(props: {
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell>חייל</TableCell>
-              <TableCell>גף</TableCell>
+              <TableCell>עובד</TableCell>
+              <TableCell>מסגרת</TableCell>
               <TableCell>דרגה</TableCell>
               {categories.map((c) => (
                 <TableCell key={c.id} sx={{ textAlign: "center", whiteSpace: "nowrap" }}>
@@ -312,7 +313,7 @@ function MatrixTab(props: {
             {rows.map(({ s, info }) => (
               <TableRow key={s.soldier_id} hover>
                 <TableCell sx={{ whiteSpace: "nowrap" }}>{info?.full_name ?? "—"}</TableCell>
-                <TableCell sx={{ whiteSpace: "nowrap" }}>{info?.gaf_name}</TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>{frameworkName(info?.gaf_name)}</TableCell>
                 <TableCell sx={{ whiteSpace: "nowrap" }}>{rank.get(s.soldier_id)}</TableCell>
                 {categories.map((c) => {
                   const cell = at.get(`${s.soldier_id}|${c.id}`);
@@ -329,7 +330,7 @@ function MatrixTab(props: {
       </TableContainer>
       )}
       <Typography variant="caption" color="text.secondary">
-        {rows.length} חיילים מוצגים מתוך {data.snapshot.length} במחזור.
+        {rows.length} עובדים מוצגים מתוך {data.snapshot.length} במחזור.
       </Typography>
       {editing && (
         <OverrideDialog
