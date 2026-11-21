@@ -1,3 +1,4 @@
+import type { Inversion } from "./fairness";
 import type { PotentialWhy } from "./potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
 import type { FrameworkSelection } from "./frameworks";
@@ -266,6 +267,8 @@ export interface Api {
   /** Freeze ranks/populations for the cycle (snapshot) and stamp the time. */
   computePotential(cycleId: string): Promise<number>;
   potentialMatrix(cycleId: string): Promise<PotentialCell[]>;
+  /** duties given out of turn: a lower-scored soldier of the group was free and allowed */
+  orderInversions(cycleId: string): Promise<Inversion[]>;
   /** why a cell is a fraction: the missing days, cause by cause */
   potentialCellWhy(cycleId: string, soldierId: string, taskTypeId: string): Promise<PotentialWhy[]>;
   potentialDaily(cycleId: string): Promise<DailyAvailability[]>;

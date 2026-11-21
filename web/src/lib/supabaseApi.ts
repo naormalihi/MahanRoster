@@ -1,3 +1,4 @@
+import type { Inversion } from "./fairness";
 import type { PotentialWhy } from "./potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
 import type { FrameworkSelection } from "./frameworks";
@@ -645,6 +646,10 @@ export class SupabaseApi implements Api {
 
   async potentialCellWhy(cycleId: string, soldierId: string, taskTypeId: string): Promise<PotentialWhy[]> {
     return check(await this.sb.rpc("potential_cell_why", { p_cycle: cycleId, p_soldier: soldierId, p_task_type: taskTypeId })) as PotentialWhy[];
+  }
+
+  async orderInversions(cycleId: string): Promise<Inversion[]> {
+    return check(await this.sb.rpc("order_inversions", { p_cycle: cycleId })) as Inversion[];
   }
 
   async potentialMatrix(cycleId: string): Promise<PotentialCell[]> {
