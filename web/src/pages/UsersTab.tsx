@@ -15,6 +15,7 @@ import {
   Chip,
   CircularProgress,
   Dialog,
+  Divider,
   MenuItem,
   DialogActions,
   DialogContent,
@@ -37,6 +38,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/auth";
 import type { ExistingSoldier } from "../lib/roster";
 import { GRANTABLE, ROLE_NAME, tempPassword, usernameProblem, type AppUser, type CreatableRole } from "../lib/users";
+import type { NamedRef } from "../lib/api";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
 
 function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | null; onChange: (id: string | null) => void; autoFocus?: boolean }) {
@@ -167,6 +169,11 @@ export function UsersTab() {
   const [renaming, setRenaming] = useState<{ user: AppUser; name: string; error: string | null } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [granting, setGranting] = useState<{ user: AppUser; anchor: HTMLElement } | null>(null);
+  const [framing, setFraming] = useState<{ user: AppUser; anchor: HTMLElement } | null>(null);
+  const [gafim, setGafim] = useState<NamedRef[]>([]);
+  useEffect(() => {
+    api!.gafim().then(setGafim, () => setGafim([]));
+  }, [api]);
   const [revoking, setRevoking] = useState<{ user: AppUser; role: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -234,8 +241,15 @@ export function UsersTab() {
               <Chip
                 key={r.id}
                 size="small"
-                label={ROLE_NAME[r.role] ?? r.role}
-                color={r.role === "coordinator" ? "primary" : "default"}
+                label={
+                  r.role === "gaf_commander"
+                    ? `${ROLE_NAME[r.role]} · ${r.gaf_name ?? "בלי מסגרת"}${r.gaf_chosen ? "" : r.gaf_name ? " (לפי העובד)" : ""}`
+                    : (ROLE_NAME[r.role] ?? r.role)
+                }
+                color={r.role === "coordinator" ? "primary" : r.role === "gaf_commander" && !r.gaf_name ? "warning" : "default"}
+                variant={r.role === "gaf_commander" && !r.gaf_name ? "outlined" : "filled"}
+                onClick={r.role === "gaf_commander" && !u.is_locked ? (e) => setFraming({ user: u, anchor: e.currentTarget }) : undefined}
+                title={r.role === "gaf_commander" ? "בחירת המסגרת" : undefined}
                 onDelete={removable(r.role) ? () => setRevoking({ user: u, role: r.role }) : undefined}
               />
             ));
@@ -245,8 +259,8 @@ export function UsersTab() {
                 <Chip key="add" size="small" variant="outlined" icon={<AddIcon />} label="תפקיד" onClick={(e) => setGranting({ user: u, anchor: e.currentTarget })} />,
               );
             // a gaf commander sees personal records of his own gaf only: without a gaf, of none
-            if (u.roles.some((r) => r.role === "gaf_commander" && !r.gaf_id) && !u.soldier_id)
-              roles.push(<Chip key="nogaf" size="small" color="warning" variant="outlined" label="לא משויך למסגרת – לא רואה פרטים אישיים" />);
+            if (u.roles.some((r) => r.role === "gaf_commander" && !r.gaf_name))
+              roles.push(<Chip key="nogaf" size="small" color="warning" variant="outlined" label="לא רואה פרטים אישיים – לחץ על התפקיד ובחר מסגרת" />);
             const login = u.last_login_at ? new Date(u.last_login_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }) : "לא נכנס";
             const status = u.is_locked ? (
               <Chip size="small" color="error" label="נעול" />
@@ -443,6 +457,33 @@ export function UsersTab() {
           </DialogActions>
         </Dialog>
       )}
+      {/* a framework commander's framework: his employee's (follows a move in the roster), or one chosen */}
+      <Menu anchorEl={framing?.anchor} open={!!framing} onClose={() => setFraming(null)}>
+        {framing &&
+          (() => {
+            const r = framing.user.roles.find((x) => x.role === "gaf_commander");
+            const pick = (gafId: string | null) => {
+              const u = framing.user;
+              setFraming(null);
+              void act(async () => {
+                await api!.setCommanderGaf(u.user_id, gafId);
+                const name = gafId ? gafim.find((g) => g.id === gafId)?.name : "המסגרת של העובד המשויך";
+                setNotice(`${u.username}: ${name}`);
+              });
+            };
+            return [
+              <MenuItem key="follow" disabled={!framing.user.soldier_id} selected={!r?.gaf_chosen} onClick={() => pick(null)}>
+                {framing.user.soldier_id ? "לפי העובד המשויך – מתעדכן כשהוא עובר מסגרת" : "לפי העובד המשויך (אין עובד משויך)"}
+              </MenuItem>,
+              <Divider key="d" />,
+              ...gafim.map((g) => (
+                <MenuItem key={g.id} selected={!!r?.gaf_chosen && r?.gaf_in_effect === g.id} onClick={() => pick(g.id)}>
+                  {g.name}
+                </MenuItem>
+              )),
+            ];
+          })()}
+      </Menu>
       <Menu anchorEl={granting?.anchor} open={!!granting} onClose={() => setGranting(null)}>
         {granting &&
           GRANTABLE.filter((g) => !granting.user.roles.some((r) => r.role === g)).map((g) => (

@@ -2984,3 +2984,40 @@ def test_delete_commander_who_does_duties_and_rename(conn):
     # נע"ת's own account is still not deletable here
     with pytest.raises(psycopg.Error):
         _as_coord(conn, "select public.delete_user(%s)", DEPUTY_ACTIVE)
+
+
+def test_commander_framework_follows_his_employee_or_is_chosen(conn):
+    g1, g2 = [r[0] for r in conn.execute("select id from org_units where kind = 'gaf' order by id limit 2").fetchall()]
+    emp = conn.execute("select id from soldiers s where gaf_id = %s and is_active "
+                       "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 1", (g1,)).fetchone()[0]
+    uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.frame", "temp-pass-123", emp)[0][0]
+
+    def gafs():
+        with session_as(conn, uid) as c:
+            return c.execute("select app.my_gafs()").fetchone()[0]
+
+    def role():
+        return next(r for r in _as_coord(conn, "select roles from public.list_users() where user_id = %s", uid)[0][0] if r["role"] == "gaf_commander")
+
+    try:
+        assert conn.execute("select gaf_id from user_roles where user_id = %s and role = 'gaf_commander'", (uid,)).fetchone()[0] is None
+        assert gafs() == [g1]
+        # the employee moves framework in the roster: the commander moves with him
+        conn.execute("update soldiers set gaf_id = %s where id = %s", (g2, emp))
+        conn.commit()
+        assert gafs() == [g2]
+        assert role()["gaf_in_effect"] == str(g2) and role()["gaf_chosen"] is False
+        # chosen by נע"ת: that one, whatever the employee's
+        _as_coord(conn, "select public.set_commander_gaf(%s, %s)", uid, g1)
+        assert gafs() == [g1]
+        assert role()["gaf_chosen"] is True and role()["gaf_name"]
+        # back to following
+        _as_coord(conn, "select public.set_commander_gaf(%s, null)", uid)
+        assert gafs() == [g2]
+        with pytest.raises(psycopg.Error, match="אין תפקיד"):
+            _as_coord(conn, "select public.set_commander_gaf(%s, %s)", COORD, g1)
+    finally:
+        conn.rollback()
+        conn.execute("update soldiers set gaf_id = %s where id = %s", (g1, emp))
+        conn.execute("delete from auth.users where id = %s", (uid,))
+        conn.commit()

@@ -377,6 +377,8 @@ export interface Api {
   deleteUser(userId: string): Promise<"deleted" | "closed">;
   /** נע"ת: a new username (same rules as a new account); the sign-in follows, the password stays */
   renameUser(userId: string, username: string): Promise<void>;
+  /** a framework commander's framework: one chosen, or null = his linked employee's */
+  setCommanderGaf(userId: string, gafId: string | null): Promise<void>;
   setUserSoldier(userId: string, soldierId: string | null): Promise<void>;
 }
 

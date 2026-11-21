@@ -970,6 +970,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("reset_user_password", { p_user: userId, p_password: password }));
   }
 
+  async setCommanderGaf(userId: string, gafId: string | null): Promise<void> {
+    check(await this.sb.rpc("set_commander_gaf", { p_user: userId, p_gaf: gafId }));
+  }
+
   async renameUser(userId: string, username: string): Promise<void> {
     check(await this.sb.rpc("rename_user", { p_user: userId, p_username: username }));
   }
