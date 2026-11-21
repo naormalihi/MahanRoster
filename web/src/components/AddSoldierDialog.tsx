@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { EMPTY_FORM, formProblems, toRow, type AddSoldierForm, type AddSoldierResult } from "../lib/addSoldier";
 import type { NamedRef, RankItem } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { normalizeIdNumber, rememberedUnitKey, rememberUnitKey, soldierKey, unitKeyCheck, unitKeyProblems } from "../lib/hmac";
+import { normalizeEmployeeNumber, rememberedUnitKey, rememberUnitKey, soldierKey, unitKeyCheck, unitKeyProblems } from "../lib/hmac";
 import { tashHelp, TASH_LEVELS } from "../lib/soldiers";
 import { PasswordField } from "./PasswordField";
 
@@ -32,7 +32,7 @@ const addDays = (iso: string, n: number) => {
 };
 
 /**
- * One soldier by hand, instead of a personnel file. The ת.ז is hashed here with the unit key and
+ * One soldier by hand, instead of a personnel file. The employee number is hashed here with the unit key and
  * never sent; the same checks as the file. A newcomer: average score, no automatic duties in his
  * grace period, and a manual one then counts as a call-up.
  */
@@ -102,7 +102,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
     setBusy(true);
     setError(null);
     try {
-      const k = await soldierKey(key, normalizeIdNumber(f.idNumber)!);
+      const k = await soldierKey(key, normalizeEmployeeNumber(f.idNumber)!);
       const r = await api!.addSoldier(toRow(f, k));
       if (r.status === "added") onAdded(r.id, `${f.firstName.trim()} ${f.lastName.trim()}`);
       else setFound(r);
@@ -135,7 +135,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
           {!keyOk && (
             <Box>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                מפתח היחידה – כמו בטעינת כוח אדם. הת.ז מוצפנת בו כאן, במכשיר, ולא נשלחת לשרת.
+                מפתח היחידה – כמו בטעינת כוח אדם. מספר העובד מוצפן בו כאן, במכשיר, ולא נשלח לשרת.
               </Typography>
               <Stack direction="row" spacing={1}>
                 <PasswordField label="מפתח היחידה" value={key} onChange={(e) => setKey(e.target.value)} size="small" fullWidth />
@@ -151,7 +151,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
             </Alert>
           )}
           <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, opacity: keyOk ? 1 : 0.5 }}>
-            {field("idNumber", "ת.ז *", { slotProps: { htmlInput: { inputMode: "numeric", dir: "ltr" } }, disabled: !keyOk })}
+            {field("idNumber", "מספר עובד *", { slotProps: { htmlInput: { inputMode: "numeric", dir: "ltr" } }, disabled: !keyOk })}
             <Box />
             {field("firstName", "שם פרטי *", { disabled: !keyOk })}
             {field("lastName", "שם משפחה *", { disabled: !keyOk })}

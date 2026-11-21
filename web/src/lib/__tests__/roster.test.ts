@@ -12,8 +12,10 @@ describe("mapping", () => {
     expect(mappingProblems(m)).toEqual([]);
   });
   it("reports missing required columns", () => {
-    expect(mappingProblems(detectMapping(["שם מלא"]))).toContain("חסרה עמודה: ת.ז");
-    expect(mappingProblems(detectMapping(["מספר אישי", "שם מלא"]), ["מספר אישי", "שם מלא"])[0]).toMatch(/מזהה חיילים לפי ת.ז/);
+    expect(mappingProblems(detectMapping(["שם מלא"]))).toContain("חסרה עמודה: מספר עובד");
+    expect(detectMapping(["מספר עובד", "שם מלא"]).idNumber).toBe("מספר עובד");
+    expect(detectMapping(["מס' עובד"]).idNumber).toBe("מס' עובד");
+    expect(mappingProblems(detectMapping(["מספר אישי", "שם מלא"]), ["מספר אישי", "שם מלא"])[0]).toMatch(/מזהה חיילים לפי מספר עובד/);
   });
 });
 
@@ -40,8 +42,11 @@ describe("parsing", () => {
     );
     expect(rows).toHaveLength(1);
     expect(errors.map((e) => e.line)).toEqual([3, 4, 5]);
-    expect(errors[0].message).toContain("כפולה");
-    expect(parseRows([row({ "ת\"ז": "123456789" })], m).errors[0].message).toContain("ספרת ביקורת");
+    expect(errors[0].message).toContain("כפול");
+    // an employee number: no check digit, digits only, leading zeros don't make a new person
+    expect(parseRows([row({ "ת\"ז": "123456789" })], m).errors).toEqual([]);
+    expect(parseRows([row({ "ת\"ז": "12A4" })], m).errors[0].message).toContain("רק ספרות");
+    expect(parseRows([row({ "ת\"ז": "0042" }), row({ "ת\"ז": 42 })], m).errors[0].message).toContain("כפול");
   });
 });
 

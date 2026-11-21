@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeIdNumber, soldierKey, unitKeyCheck, unitKeyProblems } from "../hmac";
+import { normalizeEmployeeNumber, soldierKey, unitKeyCheck, unitKeyProblems } from "../hmac";
 
 describe("soldier key", () => {
   it("is HMAC-SHA256 hex (RFC 4231 test case 2)", async () => {
@@ -18,14 +18,15 @@ describe("soldier key", () => {
     expect(await unitKeyCheck(k)).not.toBe(await soldierKey(k, "1234567"));
   });
   it("normalizes ID numbers with the check digit", () => {
-    expect(normalizeIdNumber(" 12345-6782 ")).toBe("123456782");
-    expect(normalizeIdNumber(123456782)).toBe("123456782");
-    expect(normalizeIdNumber("18")).toBeNull(); // too short
-    expect(normalizeIdNumber("00018")).toBe("000000018"); // leading zeros
-    expect(normalizeIdNumber("123456789")).toBeNull(); // check digit
-    expect(normalizeIdNumber("000000000")).toBeNull();
-    expect(normalizeIdNumber("12a456782")).toBeNull();
-    expect(normalizeIdNumber(null)).toBeNull();
+    expect(normalizeEmployeeNumber(" 12345-6782 ")).toBe("123456782");
+    expect(normalizeEmployeeNumber(123456789)).toBe("123456789"); // no check digit
+    expect(normalizeEmployeeNumber("18")).toBe("18"); // any length
+    expect(normalizeEmployeeNumber("00018")).toBe("18"); // leading zeros dropped: Excel drops them too
+    expect(normalizeEmployeeNumber(18)).toBe(normalizeEmployeeNumber("0018"));
+    expect(normalizeEmployeeNumber("000")).toBeNull();
+    expect(normalizeEmployeeNumber("12a456782")).toBeNull(); // digits only
+    expect(normalizeEmployeeNumber("")).toBeNull();
+    expect(normalizeEmployeeNumber(null)).toBeNull();
   });
   it("rejects short unit keys", () => {
     expect(unitKeyProblems("short")).not.toBeNull();

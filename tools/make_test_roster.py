@@ -1,6 +1,6 @@
 """Fictitious roster file in the layout of the unit's HR export (for testing the import).
 
-Every name, ID number (ת.ז) and detail is invented: random 9-digit numbers with a valid
+Every name, employee number (מספר עובד) and detail is invented: random 9-digit numbers with a valid
 check digit.
 """
 
@@ -44,7 +44,7 @@ OFFICER = {"סגן", "סרן", 'רס"ן', 'סא"ל', 'קמ"א'}
 TODAY = date(2026, 11, 7)
 
 HEADERS = [
-    "ת.ז", "מין", "דרגה מחושבת", "שם פרטי", "שם משפחה", "מסגרת", "יחידת סיפוח", "עיסוק מיועד",
+    "מספר עובד", "מין", "דרגה מחושבת", "שם פרטי", "שם משפחה", "מסגרת", "יחידת סיפוח", "עיסוק מיועד",
     "עיסוק מיועד קוד", "תאריך זכאות לדרגה מחושבת", "תאריך תום שירות (תש\"ש)", "תאריך כניסה לקבע", "נמצא במשרת הורה",
     "תאריך סיום - הורה", "מספר ילדים", "מתנדב", "פרופיל", "גיל",
     "ק. הגנ\"ש", "ק. תורן", "מפקד שער", "מפקד תורן", "ממלכת יום", "משימות חיילות", "הערות",
@@ -54,7 +54,7 @@ used = set()
 
 
 def pn():
-    """An invented 9-digit ID number (ת.ז) with a valid check digit."""
+    """An invented 9-digit employee number (מספר עובד) with a valid check digit."""
     while True:
         body = "".join(str(rnd.randint(0, 9)) for _ in range(8))
         s = sum((d := int(c) * (i % 2 + 1)) - 9 * (d > 9) for i, c in enumerate(body))

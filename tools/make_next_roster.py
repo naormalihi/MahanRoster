@@ -28,7 +28,7 @@ ws = wb.active
 headers = [c.value for c in ws[1]]
 col = {h: i for i, h in enumerate(headers)}
 rows = [list(r) for r in ws.iter_rows(min_row=2, values_only=True)]
-R, PN, FIRST, LAST, FRAME = col["דרגה מחושבת"], col["ת.ז"], col["שם פרטי"], col["שם משפחה"], col["מסגרת"]
+R, PN, FIRST, LAST, FRAME = col["דרגה מחושבת"], col["מספר עובד"], col["שם פרטי"], col["שם משפחה"], col["מסגרת"]
 END, CAREER, ELIG = col['תאריך תום שירות (תש"ש)'], col["תאריך כניסה לקבע"], col["תאריך זכאות לדרגה מחושבת"]
 PARENT, PARENT_END, NOTE, AGE, GENDER = col["נמצא במשרת הורה"], col["תאריך סיום - הורה"], col["הערות"], col["גיל"], col["מין"]
 d = lambda v: v.date() if isinstance(v, datetime) else v
@@ -121,7 +121,7 @@ log.append(("שינוי שם", r[PN], name(r), old, name(r)))
 # 7. New soldiers: recruits and two career transfers
 used = {r[PN] for r in rows} | {r[PN] for r in released}
 def pn():
-    """An invented 9-digit ID number (ת.ז) with a valid check digit."""
+    """An invented 9-digit employee number (מספר עובד) with a valid check digit."""
     while True:
         body = "".join(str(rnd.randint(0, 9)) for _ in range(8))
         s = sum((d := int(c) * (i % 2 + 1)) - 9 * (d > 9) for i, c in enumerate(body))
@@ -183,7 +183,7 @@ cb = Workbook()
 cs = cb.active
 cs.title = "שינויים"
 cs.sheet_view.rightToLeft = True
-cs.append(["סוג שינוי", "ת.ז", "שם", "לפני", "אחרי"])
+cs.append(["סוג שינוי", "מספר עובד", "שם", "לפני", "אחרי"])
 for c in cs[1]:
     c.font, c.fill = Font(bold=True), PatternFill("solid", fgColor="C9C6EE")
 for x in log:

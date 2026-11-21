@@ -76,7 +76,7 @@ function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) => f.label),
     FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) =>
-      ({ idNumber: "123456782", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "חובה 3",
+      ({ idNumber: "1234567", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "גף מבצעים", framework: "", rank: "חובה 3",
          gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא", phone: "050-1234567" } as Record<string, string>)[f.key] ?? ""),
   ]);
   const wb = XLSX.utils.book_new();
@@ -306,7 +306,7 @@ export function RosterImportPage() {
               <Typography variant="h2">מפתח היחידה</Typography>
             </Stack>
             <Typography variant="body2">
-              מספרי הת.ז לא יוצאים מהמחשב הזה. הדפדפן הופך כל ת.ז למזהה מוצפן בעזרת מפתח היחידה, ורק המזהה נשלח לשרת.
+              מספרי העובד לא יוצאים מהמחשב הזה. הדפדפן הופך כל מספר עובד למזהה מוצפן בעזרת מפתח היחידה, ורק המזהה נשלח לשרת.
               המפתח לא נשלח לשרת. אחרי שהוזן הוא נשמר בלשונית הזו עד היציאה מהמערכת או סגירת הלשונית.
             </Typography>
             {rekey && (
