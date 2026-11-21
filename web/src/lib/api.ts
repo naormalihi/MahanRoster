@@ -1,3 +1,4 @@
+import type { PotentialWhy } from "./potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
 import type { FrameworkSelection } from "./frameworks";
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
@@ -265,6 +266,8 @@ export interface Api {
   /** Freeze ranks/populations for the cycle (snapshot) and stamp the time. */
   computePotential(cycleId: string): Promise<number>;
   potentialMatrix(cycleId: string): Promise<PotentialCell[]>;
+  /** why a cell is a fraction: the missing days, cause by cause */
+  potentialCellWhy(cycleId: string, soldierId: string, taskTypeId: string): Promise<PotentialWhy[]>;
   potentialDaily(cycleId: string): Promise<DailyAvailability[]>;
   snapshotSoldiers(cycleId: string): Promise<SnapshotSoldier[]>;
   /** The last duty on a holiday (or its eve) per soldier since a date, in published cycles. */

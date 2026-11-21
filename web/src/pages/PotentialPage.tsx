@@ -50,6 +50,9 @@ import {
   type DailyAvailability,
   type PotentialCell,
   type SnapshotSoldier,
+  WHY_LABEL,
+  whyRange,
+  type PotentialWhy,
 } from "../lib/potential";
 import type { ExistingSoldier } from "../lib/roster";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
@@ -73,7 +76,42 @@ interface Data {
 
 // ---------------------------------------------------------------------------
 
+/** "שחרור 07.02.2027 · 01.06–30.06 · 30 ימים" – the days a fraction leaves out, cause by cause */
+function WhyDays({ cycleId, cell }: { cycleId: string; cell: PotentialCell }) {
+  const { api } = useAuth();
+  const [rows, setRows] = useState<PotentialWhy[] | null>(null);
+  useEffect(() => {
+    api!.potentialCellWhy(cycleId, cell.soldier_id, cell.best_task_type_id).then(setRows, () => setRows([]));
+  }, [api, cycleId, cell.soldier_id, cell.best_task_type_id]);
+  if (!rows) return <CircularProgress size={18} />;
+  if (!rows.length) return null;
+  const missing = cell.cycle_days - cell.available_days;
+  const sum = rows.reduce((a, r) => a + r.days, 0);
+  return (
+    <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: "action.hover" }}>
+      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+        למה לא 1 – {missing} ימים חסרים
+      </Typography>
+      <Stack spacing={0.25}>
+        {rows.map((r, i) => (
+          <Typography key={i} variant="body2">
+            <b>{WHY_LABEL[r.cause] ?? r.cause}</b>
+            {r.detail ? ` (${r.detail})` : ""} · <span dir="ltr">{whyRange(r.from_day, r.to_day)}</span> · {r.days === 1 ? "יום אחד" : `${r.days} ימים`}
+          </Typography>
+        ))}
+      </Stack>
+      {sum > missing && (
+        <Typography variant="caption" color="text.secondary">
+          חלק מהימים חופפים, ולכן הסכום גדול מהימים החסרים.
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 function OverrideDialog(props: {
+  cycleId: string;
+  readOnly?: boolean;
   cell: PotentialCell;
   who: string;
   category: string;
@@ -109,6 +147,9 @@ function OverrideDialog(props: {
             {c.value > 0 && c.value < 1 && ` (זמין ${c.available_days} מתוך ${c.cycle_days} ימים)`}
             {c.value === 0 && c.reasons.length > 0 && ` – ${reasonText(c.reasons)}`}
           </Typography>
+          {c.value > 0 && c.value < 1 && <WhyDays cycleId={props.cycleId} cell={c} />}
+          {!props.readOnly && (
+          <>
           <TextField
             type="number"
             label="ערך מתוקן (0 עד 1)"
@@ -118,16 +159,19 @@ function OverrideDialog(props: {
             autoFocus
           />
           <TextField label="נימוק" value={reason} onChange={(e) => setReason(e.target.value)} multiline minRows={2} />
+          </>
+          )}
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>
-        {c.override_value !== null && (
+        {c.override_value !== null && !props.readOnly && (
           <Button color="error" onClick={() => run(props.onClear)} disabled={busy} sx={{ ml: "auto" }}>
             החזרה לערך המחושב
           </Button>
         )}
-        <Button onClick={props.onClose}>ביטול</Button>
+        <Button onClick={props.onClose}>{props.readOnly ? "סגירה" : "ביטול"}</Button>
+        {!props.readOnly && (
         <Button
           variant="contained"
           disabled={busy}
@@ -140,6 +184,7 @@ function OverrideDialog(props: {
         >
           שמירה
         </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
@@ -259,7 +304,7 @@ function MatrixTab(props: {
                             size="small"
                             label={`${c.name} ${cellText(v) || "0"}`}
                             title={cellTitle(cell)}
-                            onClick={props.locked ? undefined : () => setEditing(cell)}
+                            onClick={() => setEditing(cell)}
                             sx={{
                               bgcolor: (t) => (v === 1 ? alpha(t.palette.success.main, 0.16) : v > 0 ? alpha(t.palette.warning.main, 0.18) : undefined),
                               border: cell.override_value !== null ? "2px solid #e8700f" : undefined,
@@ -274,7 +319,7 @@ function MatrixTab(props: {
                           לא זכאי:
                         </Typography>
                         {closed.map(({ c, cell }) => (
-                          <Chip key={c.id} size="small" variant="outlined" label={c.name} title={cellTitle(cell)} onClick={props.locked ? undefined : () => setEditing(cell)} />
+                          <Chip key={c.id} size="small" variant="outlined" label={c.name} title={cellTitle(cell)} onClick={() => setEditing(cell)} />
                         ))}
                       </Stack>
                     ),
@@ -318,7 +363,7 @@ function MatrixTab(props: {
                 {categories.map((c) => {
                   const cell = at.get(`${s.soldier_id}|${c.id}`);
                   return (
-                    <TableCell key={c.id} sx={cellSx(cell)} title={cell ? cellTitle(cell) : undefined} onClick={() => cell && !props.locked && setEditing(cell)}>
+                    <TableCell key={c.id} sx={cellSx(cell)} title={cell ? cellTitle(cell) : undefined} onClick={() => cell && setEditing(cell)}>
                       {cell ? cellText(effective(cell)) : ""}
                     </TableCell>
                   );
@@ -334,6 +379,8 @@ function MatrixTab(props: {
       </Typography>
       {editing && (
         <OverrideDialog
+          cycleId={props.cycle.id}
+          readOnly={props.locked}
           cell={editing}
           who={props.soldiers.get(editing.soldier_id)?.full_name ?? ""}
           category={categories.find((c) => c.id === editing.category_id)?.name ?? ""}
