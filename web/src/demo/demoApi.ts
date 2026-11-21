@@ -1175,12 +1175,31 @@ export class DemoApi implements Api {
   private users: AppUser[] = [
     { user_id: "naat", username: "naat", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: new Date().toISOString(), roles: [{ id: "r1", role: "coordinator", gaf_id: null, valid_from: null, valid_to: null }], has_mfa: true },
     { user_id: "u-mm", username: "mm.demo", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: null, roles: [{ id: "r3", role: "deputy", gaf_id: null, valid_from: null, valid_to: null }], has_mfa: true },
+    // a framework commander linked to his employee record (fictitious)
+    { user_id: "u-cmd", username: "cmd", soldier_id: "s1", soldier_name: "מפקד לדוגמה", is_locked: false, must_change_password: false, last_login_at: null, roles: [{ id: "r4", role: "gaf_commander", gaf_id: null, valid_from: null, valid_to: null }, { id: "r5", role: "soldier", gaf_id: null, valid_from: null, valid_to: null }], has_mfa: true },
     { user_id: "u-board", username: "board", soldier_id: null, soldier_name: null, is_locked: false, must_change_password: false, last_login_at: null, roles: [{ id: "r2", role: "viewer", gaf_id: null, valid_from: null, valid_to: null }] },
   ];
 
   async listUsers() {
     await delay();
-    return this.users.map((u) => ({ ...u, roles: [...u.roles] }));
+    const gafim = await this.gafim();
+    return this.users.map((u) => {
+      const sname = this.soldierList.find((x) => x.id === u.soldier_id)?.gaf_name;
+      const own = gafim.find((g) => g.name === sname)?.id ?? null;
+      return {
+        ...u,
+        roles: u.roles.map((r) => {
+          const g = r.gaf_id ?? (r.role === "gaf_commander" ? own : null);
+          return { ...r, gaf_in_effect: g, gaf_name: gafim.find((x) => x.id === g)?.name ?? null, gaf_chosen: !!r.gaf_id };
+        }),
+      };
+    });
+  }
+
+  async setCommanderGaf(userId: string, gafId: string | null): Promise<void> {
+    await delay(200);
+    const u = this.users.find((x) => x.user_id === userId);
+    for (const r of u?.roles ?? []) if (r.role === "gaf_commander") r.gaf_id = gafId;
   }
 
   async createUser(username: string, password: string, soldierId: string | null, role: CreatableRole = "gaf_commander") {

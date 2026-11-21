@@ -7,6 +7,11 @@ export interface UserRoleRow {
   gaf_id: string | null;
   valid_from: string | null;
   valid_to: string | null;
+  /** a framework commander: the framework in effect – the chosen one, or his employee's */
+  gaf_in_effect?: string | null;
+  gaf_name?: string | null;
+  /** chosen by נע"ת rather than following the linked employee */
+  gaf_chosen?: boolean;
 }
 
 export interface AppUser {
