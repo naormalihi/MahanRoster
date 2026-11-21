@@ -32,7 +32,19 @@ import {
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import { FrameworkPicker } from "../components/FrameworkPicker";
 import { useCycle } from "../lib/cycleContext";
+import {
+  buildTree,
+  forSaving,
+  hasFrameworks,
+  initialSelection,
+  isSelected,
+  placeLabel,
+  placeOf,
+  type FrameworkSelection,
+  type TreeNode,
+} from "../lib/frameworks";
 import { STAGE_SCREEN, stageLabel, type CycleStatus } from "../lib/cycles";
 import * as XLSX from "xlsx";
 import type { ApplyResult } from "../lib/api";
@@ -100,6 +112,11 @@ export function RosterImportPage() {
   // changes of existing soldiers load only when approved here (nothing is approved by default)
   const [approved, setApproved] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState(0);
+  // "מסגרות לטעינה": the tree of the file and what is chosen (kept in the settings)
+  const [tree, setTree] = useState<TreeNode[]>([]);
+  const [sel, setSel] = useState<FrameworkSelection | null>(null);
+  // moved to a framework not chosen: נע"ת marks who goes inactive (nobody by default)
+  const [deactivate, setDeactivate] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ApplyResult | null>(null);
@@ -224,11 +241,47 @@ export function RosterImportPage() {
 
   const mapProblems = useMemo(() => mappingProblems(mapping, headers), [mapping, headers]);
 
+  async function chooseFrameworks() {
+    if (!hasFrameworks(mapping)) {
+      setSel(null);
+      return buildPreview();
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const t = buildTree(records, mapping);
+      setTree(t);
+      setSel(initialSelection(await api!.rosterFrameworks(), t));
+      setStep(2);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmFrameworks() {
+    if (!sel) return;
+    setBusy(true);
+    try {
+      await api!.setRosterFrameworks(forSaving(sel, tree));
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+      return;
+    }
+    await buildPreview();
+  }
+
   async function buildPreview(matching = rekey) {
     setBusy(true);
     setError(null);
     try {
-      const result = parseRows(records, mapping);
+      const chosen = sel && hasFrameworks(mapping) ? sel : null;
+      const result = parseRows(records, mapping, chosen ? (r) => {
+        const p = placeOf(r, mapping);
+        return !p || isSelected(chosen, p);
+      } : undefined);
       setParsed(result);
       // a military rank in the file ("סמל") becomes its neutral name ("חובה 3")
       const resolve = rankResolver(await api!.ranks());
@@ -241,13 +294,23 @@ export function RosterImportPage() {
         setExistingNow(existing);
         setRekeyRows(rows);
         setPicks(defaultPicks(rows));
-        setStep(2);
+        setStep(3);
         return;
       }
       const [existing, gafim, ranks] = await Promise.all([api!.soldiers(), api!.gafim(), api!.ranks()]);
-      setPlan(planImport(incoming, existing, gafim.map((g) => g.name), ranks.map((r) => r.name)));
+      // the file puts them in a framework not chosen – to spot who moved out
+      const outside = new Map(
+        await Promise.all(
+          result.outside.map(async (o) => {
+            const p = placeOf(o.record, mapping);
+            return [await soldierKey(unitKey, o.idNumber), p ? placeLabel(p) : ""] as const;
+          }),
+        ),
+      );
+      setPlan(planImport(incoming, existing, gafim.map((g) => g.name), ranks.map((r) => r.name), outside));
       setApproved(new Set());
-      setStep(2);
+      setDeactivate(new Set());
+      setStep(3);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -260,10 +323,10 @@ export function RosterImportPage() {
     setBusy(true);
     setError(null);
     try {
-      setDone(await api!.applyRoster(approvePlan(plan, approved)));
+      setDone(await api!.applyRoster(approvePlan(plan, approved, deactivate)));
       // the cycle moves on by itself once a file is loaded – let the next step show it
       reloadCycle().catch(() => undefined);
-      setStep(3);
+      setStep(4);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -290,7 +353,7 @@ export function RosterImportPage() {
         <Typography variant="h1">טעינת כוח אדם</Typography>
       </Box>
       <Stepper activeStep={step} alternativeLabel>
-        {["מפתח יחידה", "קובץ ועמודות", "תצוגה מקדימה", "סיום"].map((l) => (
+        {["מפתח יחידה", "קובץ ועמודות", "מסגרות", "תצוגה מקדימה", "סיום"].map((l) => (
           <Step key={l}>
             <StepLabel>{l}</StepLabel>
           </Step>
@@ -417,8 +480,8 @@ export function RosterImportPage() {
                   <Alert key={p} severity="warning">{p}</Alert>
                 ))}
                 <Box>
-                  <Button variant="contained" onClick={() => buildPreview()} disabled={busy || mapProblems.length > 0}>
-                    תצוגה מקדימה
+                  <Button variant="contained" onClick={chooseFrameworks} disabled={busy || mapProblems.length > 0}>
+                    {hasFrameworks(mapping) ? "בחירת מסגרות" : "תצוגה מקדימה"}
                   </Button>
                 </Box>
                 {busy && <LinearProgress />}
@@ -428,7 +491,18 @@ export function RosterImportPage() {
         </Paper>
       )}
 
-      {step === 2 && rekeyRows && (
+      {step === 2 && sel && (
+        <FrameworkPicker
+          tree={tree}
+          sel={sel}
+          setSel={setSel}
+          busy={busy}
+          onBack={() => setStep(1)}
+          onNext={confirmFrameworks}
+        />
+      )}
+
+      {step === 3 && rekeyRows && (
         <RekeyPanel
           rows={rekeyRows}
           existing={existingNow}
@@ -443,7 +517,7 @@ export function RosterImportPage() {
         />
       )}
 
-      {step === 2 && !rekeyRows && plan && parsed && (
+      {step === 3 && !rekeyRows && plan && parsed && (
         <Paper sx={{ p: 3 }}>
           <Stack spacing={2}>
             <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
@@ -452,7 +526,21 @@ export function RosterImportPage() {
               <Chip color="warning" label={`לא בקובץ (יסומנו לא פעילים): ${plan.removed.length}`} />
               <Chip label={`ללא שינוי: ${plan.unchanged}`} />
               {parsed.errors.length > 0 && <Chip color="error" label={`שורות שגויות: ${parsed.errors.length}`} />}
+              {parsed.outside.length > 0 && <Chip variant="outlined" label={`מחוץ למסגרות שנבחרו: ${parsed.outside.length}`} />}
             </Stack>
+            {plan.movedOut.length > 0 && (
+              <Alert
+                severity="warning"
+                action={
+                  <Button color="inherit" size="small" onClick={() => setTab(4)}>
+                    להחלטה
+                  </Button>
+                }
+              >
+                {plan.movedOut.length === 1 ? "חייל אחד מופיע" : `${plan.movedOut.length} חיילים מופיעים`} בקובץ במסגרת שלא נבחרה – כנראה עברו.
+                הם נשארים פעילים, אלא אם תסמן אותם בלשונית &quot;עברו מסגרת&quot;.
+              </Alert>
+            )}
             {!mapping.serviceType && mapping.careerStartDate && (
               <Alert severity="info">
                 סוג השירות נקבע לפי תאריך הכניסה לקבע: תאריך שעבר – קבע, תאריך עתידי – חובה עד שיגיע. בכל מחזור הסיווג נקבע מחדש לפי תאריך תחילת המחזור.
@@ -510,6 +598,7 @@ export function RosterImportPage() {
               <Tab label={`שינויים לאישור (${changes.length})`} />
               <Tab label={`לא בקובץ (${plan.removed.length})`} />
               <Tab label={`שגיאות (${parsed.errors.length})`} />
+              {plan.movedOut.length > 0 && <Tab label={`עברו מסגרת (${plan.movedOut.length})`} />}
             </Tabs>
             <Box sx={{ maxHeight: 420, overflow: "auto" }}>
               <Table size="small" stickyHeader>
@@ -582,6 +671,51 @@ export function RosterImportPage() {
                     </TableBody>
                   </>
                 )}
+                {tab === 4 && (
+                  <>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={deactivate.size === plan.movedOut.length}
+                            indeterminate={deactivate.size > 0 && deactivate.size < plan.movedOut.length}
+                            onChange={() =>
+                              setDeactivate(deactivate.size === plan.movedOut.length ? new Set() : new Set(plan.movedOut.map((m) => m.soldier.id)))
+                            }
+                            slotProps={{ input: { "aria-label": "סמן את כולם לא פעילים" } }}
+                          />
+                        </TableCell>
+                        {["שם", "גף עכשיו", "בקובץ", ""].map((h, i) => <TableCell key={i}>{h}</TableCell>)}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {plan.movedOut.map(({ soldier: m, to }) => {
+                        const on = deactivate.has(m.id);
+                        return (
+                          <TableRow key={m.id}>
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={on}
+                                onChange={() =>
+                                  setDeactivate((cur) => {
+                                    const next = new Set(cur);
+                                    if (next.has(m.id)) next.delete(m.id);
+                                    else next.add(m.id);
+                                    return next;
+                                  })
+                                }
+                              />
+                            </TableCell>
+                            <TableCell>{m.full_name}</TableCell>
+                            <TableCell>{m.gaf_name}</TableCell>
+                            <TableCell>{to}</TableCell>
+                            <TableCell sx={{ color: on ? "warning.main" : "text.secondary" }}>{on ? "יסומן לא פעיל" : "נשאר פעיל"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </>
+                )}
                 {tab === 3 && (
                   <>
                     <TableHead>
@@ -620,7 +754,7 @@ export function RosterImportPage() {
         </Paper>
       )}
 
-      {step === 3 && done && (
+      {step === 4 && done && (
         <Paper sx={{ p: 3 }}>
           <Stack spacing={2}>
             <Alert severity="success">

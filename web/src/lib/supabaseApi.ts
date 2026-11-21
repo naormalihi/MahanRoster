@@ -1,4 +1,5 @@
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
+import type { FrameworkSelection } from "./frameworks";
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { DutyMessage } from "./dutyMessage";
 import type { ContactEntry, MyContact } from "./contacts";
@@ -265,6 +266,15 @@ export class SupabaseApi implements Api {
 
   async setUnitKeyCheck(value: string) {
     maybe(await this.sb.from("settings").upsert({ key: "unit_key_check", value }));
+  }
+
+  async rosterFrameworks(): Promise<FrameworkSelection | null> {
+    const row = maybe(await this.sb.from("settings").select("value").eq("key", "roster_frameworks").maybeSingle());
+    return (row?.value as FrameworkSelection | null) ?? null;
+  }
+
+  async setRosterFrameworks(sel: FrameworkSelection) {
+    maybe(await this.sb.from("settings").upsert({ key: "roster_frameworks", value: sel }));
   }
 
   async rekeySoldiers(pairs: { id: string; key: string }[], fingerprint: string): Promise<number> {

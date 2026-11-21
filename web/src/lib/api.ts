@@ -1,4 +1,5 @@
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
+import type { FrameworkSelection } from "./frameworks";
 import type { AddSoldierResult, AddSoldierRow } from "./addSoldier";
 import type { DutyMessage } from "./dutyMessage";
 import type { ContactEntry, MyContact } from "./contacts";
@@ -189,6 +190,9 @@ export interface Api {
   removeFromUnit(soldierId: string, fromDay: string): Promise<number>;
   futureDuties(soldierId: string, fromDay: string): Promise<number>;
   setUnitKeyCheck(value: string): Promise<void>;
+  /** "מסגרות לטעינה": the frameworks chosen at the last personnel load (null = never chosen) */
+  rosterFrameworks(): Promise<FrameworkSelection | null>;
+  setRosterFrameworks(sel: FrameworkSelection): Promise<void>;
   /** A forgotten unit key: moves the approved soldiers to keys made with the new one, and stores its fingerprint. */
   rekeySoldiers(pairs: { id: string; key: string }[], check: string): Promise<number>;
   /** The people of a published duty with their assignment ids (staff). */
