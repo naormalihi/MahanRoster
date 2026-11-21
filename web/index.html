@@ -21,6 +21,7 @@
     <div id="boot-error" style="display:none;font-family:Arial,sans-serif;padding:24px;max-width:640px;margin:40px auto;border:1px solid #d33;border-radius:10px;background:#fff5f5;color:#611">
       <b>האפליקציה לא הצליחה לעלות.</b>
       <pre id="boot-error-text" style="white-space:pre-wrap;direction:ltr;text-align:left;font-size:12px;margin-top:12px"></pre>
+      <button type="button" onclick="location.reload()" style="font:inherit;font-weight:700;padding:8px 18px;border:0;border-radius:8px;background:#1a1466;color:#fff;cursor:pointer">טעינה מחדש</button>
     </div>
     <!-- A new version was deployed while this tab ran an older one: its pages are gone from the server.
          The owl says so and the page reloads itself into the new version. -->
@@ -74,7 +75,11 @@
           var t = e.target;
           if (t && t !== window && (t.src || t.href)) {
             // a missing font or stylesheet is cosmetic; only a script that failed to load stops the app
-            if (t.tagName === "SCRIPT") show("failed to load " + t.src);
+            if (t.tagName === "SCRIPT") {
+              // our own file missing: an old page, or a deploy in progress – the owl reloads into the new version
+              if (/\/assets\//.test(t.src || "")) return update();
+              show("failed to load " + t.src);
+            }
             return;
           }
           else show((e.message || "error") + (e.filename ? " @ " + e.filename + ":" + e.lineno : ""));
