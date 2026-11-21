@@ -58,16 +58,6 @@ begin
   removed := removed || jsonb_build_object('soldiers', (select count(*) from public.soldiers),
                                            'gafim', (select count(*) from public.org_units where kind <> 'unit'));
 
-  -- soldiers' accounts (no role but "soldier"): each soldier opens a new one with a new invite code
-  -- (their sign-in records go with them; the copy above keeps app_users and user_roles)
-  with gone as (
-    delete from auth.users au
-     where exists (select 1 from public.user_roles r where r.user_id = au.id and r.role = 'soldier')
-       and not exists (select 1 from public.user_roles r where r.user_id = au.id and r.role <> 'soldier')
-    returning 1)
-  select count(*) into n from gone;
-  removed := removed || jsonb_build_object('soldier_accounts', n);
-
   -- links from what stays to what goes (unlinking an account also drops its soldier role,
   -- app.sync_soldier_role – staff who did duties stay staff)
   update public.app_users set soldier_id = null where soldier_id is not null;
@@ -78,6 +68,21 @@ begin
 
   -- one statement for the leaf tables; restrict = never spill into a table not listed
   execute 'truncate ' || (select string_agg(format('public.%I', x), ', ') from unnest(wipe) x) || ' restrict';
+  -- soldiers' accounts (no role but "soldier"): each soldier opens a new one with a new invite code.
+  -- After the truncate: the data tables point at the accounts (a cancelled absence, a request
+  -- sent on someone's behalf ...), and an account can go only once nothing points at it.
+  -- (their sign-in records go with them; the copy above keeps app_users and user_roles)
+  update public.user_roles set delegated_by = null
+   where delegated_by in (select user_id from public.user_roles where role = 'soldier')
+     and not exists (select 1 from public.user_roles o where o.user_id = delegated_by and o.role <> 'soldier');
+  with gone as (
+    delete from auth.users au
+     where exists (select 1 from public.user_roles r where r.user_id = au.id and r.role = 'soldier')
+       and not exists (select 1 from public.user_roles r where r.user_id = au.id and r.role <> 'soldier')
+    returning 1)
+  select count(*) into n from gone;
+  removed := removed || jsonb_build_object('soldier_accounts', n);
+
   -- tables that other kept tables point at: delete, not truncate
   delete from public.soldiers;
   delete from public.org_units where kind <> 'unit';
