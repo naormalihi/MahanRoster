@@ -1262,6 +1262,13 @@ export class DemoApi implements Api {
     if (u) u.must_change_password = true;
   }
 
+  async renameUser(userId: string, username: string): Promise<void> {
+    await delay(200);
+    if (this.users.some((u) => u.username === username)) throw new Error("שם המשתמש כבר קיים");
+    const u = this.users.find((x) => x.user_id === userId);
+    if (u) u.username = username;
+  }
+
   async deleteUser(userId: string) {
     await delay(200);
     void userId;

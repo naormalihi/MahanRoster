@@ -5,6 +5,7 @@ import PhonelinkIcon from "@mui/icons-material/PhonelinkLockOutlined";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import EditIcon from "@mui/icons-material/EditOutlined";
 import LockOpenIcon from "@mui/icons-material/LockOpenOutlined";
 import {
   Alert,
@@ -163,6 +164,7 @@ export function UsersTab() {
   const [linking, setLinking] = useState<{ user: AppUser; soldier: string | null } | null>(null);
   const [deleting, setDeleting] = useState<AppUser | null>(null);
   const [mfaReset, setMfaReset] = useState<AppUser | null>(null);
+  const [renaming, setRenaming] = useState<{ user: AppUser; name: string; error: string | null } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [granting, setGranting] = useState<{ user: AppUser; anchor: HTMLElement } | null>(null);
   const [revoking, setRevoking] = useState<{ user: AppUser; role: string } | null>(null);
@@ -255,6 +257,11 @@ export function UsersTab() {
             );
             const actions = (
               <>
+                <Tooltip title="שינוי שם משתמש">
+                  <IconButton size="small" aria-label="שינוי שם משתמש" onClick={() => setRenaming({ user: u, name: u.username, error: null })}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 {commander && (
                   <Tooltip title="שיוך לעובד">
                     <IconButton size="small" aria-label="שיוך לעובד" onClick={() => setLinking({ user: u, soldier: u.soldier_id })}>
@@ -359,6 +366,50 @@ export function UsersTab() {
         </TableContainer>
           );
         })()
+      )}
+
+      {renaming && (
+        <Dialog open onClose={() => setRenaming(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>שינוי שם משתמש</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                {renaming.user.soldier_name ? `${renaming.user.soldier_name} · ` : ""}השם הנוכחי: <b dir="ltr">{renaming.user.username}</b>. הסיסמה, ההרשאות והחיבורים הפתוחים
+                נשארים; בכניסה הבאה הוא נכנס עם השם החדש – כדאי לעדכן אותו.
+              </Typography>
+              <TextField
+                label="שם משתמש חדש"
+                value={renaming.name}
+                onChange={(e) => setRenaming({ ...renaming, name: e.target.value, error: null })}
+                helperText={renaming.error ?? "אותיות לטיניות קטנות, ספרות, נקודה, מקף או קו תחתון · 3–32 תווים"}
+                error={!!renaming.error}
+                autoFocus
+                slotProps={{ htmlInput: { dir: "ltr", autoCapitalize: "none", autoCorrect: "off", spellCheck: false } }}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRenaming(null)}>ביטול</Button>
+            <Button
+              variant="contained"
+              disabled={!/^[a-z0-9._-]{3,32}$/.test(renaming.name.trim().toLowerCase()) || renaming.name.trim().toLowerCase() === renaming.user.username}
+              onClick={async () => {
+                const r = renaming;
+                const name = r.name.trim().toLowerCase();
+                try {
+                  await api!.renameUser(r.user.user_id, name);
+                  setRenaming(null);
+                  setNotice(`שם המשתמש שונה: ${r.user.username} ← ${name}`);
+                  await load();
+                } catch (e) {
+                  setRenaming({ ...r, error: (e as Error).message });
+                }
+              }}
+            >
+              שמירה
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {mfaReset && (

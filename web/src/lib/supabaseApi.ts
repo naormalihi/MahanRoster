@@ -970,6 +970,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("reset_user_password", { p_user: userId, p_password: password }));
   }
 
+  async renameUser(userId: string, username: string): Promise<void> {
+    check(await this.sb.rpc("rename_user", { p_user: userId, p_username: username }));
+  }
+
   async deleteUser(userId: string) {
     return check(await this.sb.rpc("delete_user", { p_user: userId })) as "deleted" | "closed";
   }
