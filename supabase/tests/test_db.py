@@ -2986,6 +2986,14 @@ def test_delete_commander_who_does_duties_and_rename(conn):
         _as_coord(conn, "select public.delete_user(%s)", DEPUTY_ACTIVE)
 
 
+def test_delete_coordinator_while_another_stays(conn):
+    other = _as_coord(conn, "select public.create_user('coord.two', 'temp-pass-123', 'coordinator', null)")[0][0]
+    # another נע"ת goes – I (an active נע"ת) stay
+    assert _as_coord(conn, "select public.delete_user(%s)", other)[0][0] in ("deleted", "closed")
+    # an account with another role (unit commander) is not deleted here
+    uc = _as_coord(conn, "select public.create_user('unit.cmd2', 'temp-pass-123', 'unit_commander', null)")[0][0]
+    with pytest.raises(psycopg.Error, match='רק חשבונות של נע"ת ושל מפקדי מסגרות'):
+        _as_coord(conn, "select public.delete_user(%s)", uc)
 def test_commander_framework_follows_his_employee_or_is_chosen(conn):
     g1, g2 = [r[0] for r in conn.execute("select id from org_units where kind = 'gaf' order by id limit 2").fetchall()]
     emp = conn.execute("select id from soldiers s where gaf_id = %s and is_active "

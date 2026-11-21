@@ -11,6 +11,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.46.1",
+    date: "2026-11-22",
+    items: [
+      "תיקון: שינוי שם משתמש נכשל בהודעה \"no data returned\" – עכשיו נשמר",
+      "אפשר למחוק גם חשבון של נע\"ת (מלבד שלך), כל עוד נשאר לפחות נע\"ת פעיל אחד",
+    ],
+  },
+  {
     version: "2.46.0",
     date: "2026-11-21",
     items: [

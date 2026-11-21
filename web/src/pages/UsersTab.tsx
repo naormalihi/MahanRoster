@@ -235,6 +235,10 @@ export function UsersTab() {
           const parts = (u: AppUser) => {
             const self = u.user_id === me?.userId;
             const commander = u.roles.some((r) => r.role === "gaf_commander");
+            // a framework commander's or a נע"ת's account (with or without the employee role) can be deleted
+            const deletable =
+              u.roles.some((r) => r.role === "gaf_commander" || r.role === "coordinator") &&
+              u.roles.every((r) => ["gaf_commander", "coordinator", "soldier"].includes(r.role));
             // a staff role can be taken away (not the soldier one – it follows the link to a soldier – nor your own נע"ת)
             const removable = (role: string) => role !== "soldier" && u.roles.length > 1 && !(self && role === "coordinator");
             const roles = u.roles.map((r) => (
@@ -306,7 +310,7 @@ export function UsersTab() {
                     </IconButton>
                   </Tooltip>
                 )}
-                {commander && !self && (
+                {deletable && !self && (
                   <Tooltip title="מחיקת המשתמש">
                     <IconButton size="small" aria-label="מחיקת המשתמש" color="error" onClick={() => setDeleting(u)}>
                       <DeleteIcon fontSize="small" />
