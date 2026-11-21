@@ -2964,3 +2964,23 @@ def test_potential_cell_why_lists_the_missing_days(conn):
         # the exemption maps to task a only
         assert [r[0] for r in why(task_b)] == ["absence", "released"]
         raise psycopg.Rollback()
+
+
+def test_delete_commander_who_does_duties_and_rename(conn):
+    sid = conn.execute("select id from soldiers s where is_active and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 1").fetchone()[0]
+    uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.duty", "temp-pass-123", sid)[0][0]
+    roles = {r for (r,) in conn.execute("select role::text from user_roles where user_id = %s", (uid,)).fetchall()}
+    assert roles == {"gaf_commander", "soldier"}   # a commander linked to his employee record
+    # rename: the sign-in address follows; a taken or bad name is refused
+    _as_coord(conn, "select public.rename_user(%s, %s)", uid, "  Cmd.Renamed ")
+    assert conn.execute("select u.username, a.email from app_users u join auth.users a on a.id = u.id where u.id = %s", (uid,)).fetchone() == ("cmd.renamed", "cmd.renamed@users.invalid")
+    with pytest.raises(psycopg.Error, match="כבר קיים"):
+        _as_coord(conn, "select public.rename_user(%s, %s)", uid, conn.execute("select username from app_users where id = %s", (COORD,)).fetchone()[0])
+    with pytest.raises(psycopg.Error, match="3–32"):
+        _as_coord(conn, "select public.rename_user(%s, %s)", uid, "שם")
+    # deleting it now works; the employee record stays
+    assert _as_coord(conn, "select public.delete_user(%s)", uid)[0][0] in ("deleted", "closed")
+    assert conn.execute("select count(*) from soldiers where id = %s", (sid,)).fetchone()[0] == 1
+    # נע"ת's own account is still not deletable here
+    with pytest.raises(psycopg.Error):
+        _as_coord(conn, "select public.delete_user(%s)", DEPUTY_ACTIVE)
