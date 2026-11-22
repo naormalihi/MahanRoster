@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.48.5",
+    date: "2026-11-22",
+    items: ["הגדרות בטלפון: סרגל הלשוניות צף בתחתית המסך, כמו סרגל השלבים בתכנון ושיבוץ"],
+  },
+  {
     version: "2.48.4",
     date: "2026-11-22",
     items: [
