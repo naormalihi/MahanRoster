@@ -153,7 +153,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               error={!!problem}
-              helperText={problem ?? "למשל dana.k – כך המשתמש ייכנס"}
+              helperText={problem ?? "למשל dana.k – הוא יוכל לתקן אותו בכניסה הראשונה, ואחר כך מהתפריט"}
               slotProps={{ htmlInput: { dir: "ltr", autoCapitalize: "none" } }}
             />
             {error && <Alert severity="error">{error}</Alert>}

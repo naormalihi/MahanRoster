@@ -129,7 +129,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export class DemoApi implements Api {
   readonly demo = true;
-  private user: { name: string; roles: Role[]; mustChange: boolean; aal2: boolean } | null = null;
+  private user: { name: string; roles: Role[]; mustChange: boolean; aal2: boolean; username?: string; renamedAt?: number } | null = null;
   // version 2.1: soldier accounts (username → soldier) and open invite codes (code → soldier, expiry)
   private accounts = new Map<string, string>();
   private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean; sent?: string }>();
@@ -281,7 +281,7 @@ export class DemoApi implements Api {
 
   async me(): Promise<Me | null> {
     if (!this.user) return null;
-    return { userId: this.user.name, username: this.user.name, roles: this.user.roles, mustChangePassword: this.user.mustChange };
+    return { userId: this.user.name, username: this.user.username ?? this.user.name, roles: this.user.roles, mustChangePassword: this.user.mustChange };
   }
 
   async mfaState(): Promise<MfaState> {
@@ -297,6 +297,23 @@ export class DemoApi implements Api {
     await delay();
     if (!/^\d{6}$/.test(code)) throw new Error("הקוד שגוי או שפג תוקפו");
     if (this.user) this.user.aal2 = true;
+  }
+
+  async renameMe(username: string, password: string | null) {
+    await delay(200);
+    const u = this.user;
+    if (!u) throw new Error("not signed in");
+    if (u.roles.includes("viewer")) throw new Error("לחשבון הצפייה המשותף אין שינוי שם");
+    const name = username.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{3,32}$/.test(name)) throw new Error("שם משתמש: 3–32 אותיות לטיניות קטנות, ספרות, נקודה, מקף או קו תחתון");
+    if (name === (u.username ?? u.name)) return;
+    if (!u.mustChange) {
+      if (!password) throw new Error("הסיסמה הנוכחית שגויה");
+      if (u.renamedAt && Date.now() - u.renamedAt < 7 * 86400000) throw new Error("אפשר לשנות שם משתמש פעם בשבוע");
+      u.renamedAt = Date.now();
+    }
+    if (this.users.some((x) => x.username === name)) throw new Error("שם המשתמש כבר קיים");
+    u.username = name;
   }
 
   async changePassword() {
