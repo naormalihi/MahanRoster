@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.48.2",
+    date: "2026-11-22",
+    items: ["כוח אדם בטלפון: הכותרת בשורה משלה והכפתורים מתחתיה – היא לא נשברת לשתי שורות"],
+  },
+  {
     version: "2.48.1",
     date: "2026-11-22",
     items: [

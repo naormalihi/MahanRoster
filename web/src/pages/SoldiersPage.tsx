@@ -868,7 +868,8 @@ export function SoldiersPage() {
         direction="row"
         sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}
       >
-        <Typography variant="h1" sx={{ flex: 1 }}>
+        {/* on a phone the title has its own line and the buttons go under it */}
+        <Typography variant="h1" sx={{ flex: { xs: "1 0 100%", sm: 1 }, whiteSpace: "nowrap" }}>
           כוח אדם
         </Typography>
         {staffUser && (
