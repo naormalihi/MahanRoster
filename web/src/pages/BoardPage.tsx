@@ -487,7 +487,9 @@ function CalendarExport({ query }: { query: string }) {
   const { api } = useAuth();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<BoardRow[] | null>(null);
-  const [name, setName] = useState("");
+  const [picked, setPicked] = useState("");
+  /** whose duties – the search line, or typed here */
+  const [who, setWho] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -497,15 +499,12 @@ function CalendarExport({ query }: { query: string }) {
     const now = new Date();
     api!
       .board(now.toISOString(), addDays(now, 400).toISOString())
-      .then((r) => {
-        setRows(r);
-        const names = matchingNames(r, query);
-        setName(names.length === 1 ? names[0] : "");
-      })
+      .then(setRows)
       .catch((e) => setError((e as Error).message));
-  }, [api, open, query]);
+  }, [api, open]);
 
-  const names = rows ? matchingNames(rows, query) : [];
+  const names = useMemo(() => (rows ? matchingNames(rows, who) : []), [rows, who]);
+  const name = names.length === 1 ? names[0] : names.includes(picked) ? picked : "";
   const preview = rows && name ? dutiesIcs(rows, name) : null;
 
   function download() {
@@ -520,7 +519,12 @@ function CalendarExport({ query }: { query: string }) {
 
   return (
     <>
-      <Button size="small" variant="outlined" startIcon={<EventIcon />} onClick={() => setOpen(true)} disabled={!query.trim()} sx={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+      <Button size="small" variant="outlined" startIcon={<EventIcon />} onClick={() => {
+          setWho(query);
+          setOpen(true);
+        }}
+        sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
+      >
         ליומן
       </Button>
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
@@ -529,9 +533,10 @@ function CalendarExport({ query }: { query: string }) {
           <Stack spacing={1.5}>
             {error && <Alert severity="error">{error}</Alert>}
             {!rows && !error && <CircularProgress size={22} />}
-            {rows && names.length === 0 && <Alert severity="info">לא נמצאו תורנויות קרובות לשם "{query.trim()}".</Alert>}
+            <TextField label="שם" value={who} onChange={(e) => setWho(e.target.value)} size="small" autoFocus={!query.trim()} placeholder="השם שלך, כמו בלוח" />
+            {rows && who.trim() && names.length === 0 && <Alert severity="info">לא נמצאו תורנויות קרובות לשם "{who.trim()}".</Alert>}
             {names.length > 1 && (
-              <TextField select label="בחירת עובד" value={name} onChange={(e) => setName(e.target.value)} fullWidth>
+              <TextField select label="בחירת עובד" value={name} onChange={(e) => setPicked(e.target.value)} fullWidth>
                 {names.map((n) => (
                   <MenuItem key={n} value={n}>
                     {n}
@@ -635,7 +640,7 @@ export function BoardPage() {
       : `${dateFmt.format(from)} – ${dateFmt.format(addDays(to, -1))}`;
 
   const nav = (label: string, prev: () => void, nextFn: () => void) => (
-    <Stack direction="row" sx={{ alignItems: "center" }}>
+    <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", width: { xs: "100%", sm: "auto" } }}>
       <IconButton size="small" aria-label="הקודם" onClick={prev}>
         <ChevronRightIcon />
       </IconButton>
@@ -682,8 +687,9 @@ export function BoardPage() {
 
       <Paper variant="outlined" sx={{ p: 1.25, "@media print": { display: "none" } }}>
         <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
-            <ToggleButtonGroup value={view} exclusive onChange={(_, v) => v && setView(v)} size="small" color="primary" sx={{ "& .MuiToggleButton-root": { px: 1.25, py: 0.5 } }}>
+          {/* on a phone each control is a full line: the views, the range, the dates – even and centred */}
+          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
+            <ToggleButtonGroup value={view} exclusive onChange={(_, v) => v && setView(v)} size="small" color="primary" sx={{ width: { xs: "100%", sm: "auto" }, "& .MuiToggleButton-root": { px: 1.25, py: 0.5, flex: { xs: 1, sm: "none" } } }}>
               <ToggleButton value="list" aria-label="רשימה">
                 <ViewListIcon fontSize="small" sx={{ ml: 0.5 }} />
                 רשימה
@@ -698,7 +704,7 @@ export function BoardPage() {
               </ToggleButton>
             </ToggleButtonGroup>
             {view === "list" && (
-              <ToggleButtonGroup value={range} exclusive onChange={(_, v) => v && setRange(v)} size="small" sx={{ "& .MuiToggleButton-root": { px: 1.25, py: 0.5 } }}>
+              <ToggleButtonGroup value={range} exclusive onChange={(_, v) => v && setRange(v)} size="small" sx={{ width: { xs: "100%", sm: "auto" }, "& .MuiToggleButton-root": { px: 1.25, py: 0.5, flex: { xs: 1, sm: "none" } } }}>
                 <ToggleButton value="week">השבוע</ToggleButton>
                 <ToggleButton value="next">הבא</ToggleButton>
                 <ToggleButton value="weekend">סופ"ש</ToggleButton>
