@@ -12,7 +12,8 @@ export function useCanEdit(): boolean {
 
 /**
  * Around the planning screens: for a reader every action button is shown greyed out and does
- * nothing. Buttons that only show or export carry data-read and stay active.
+ * nothing. Buttons that only show or export carry data-read and stay active, as do switches and
+ * checkboxes inside an element with data-read (view filters).
  */
 export function ReadOnlyScope({ children }: { children: ReactNode }) {
   const canEdit = useCanEdit();
@@ -20,7 +21,7 @@ export function ReadOnlyScope({ children }: { children: ReactNode }) {
   return (
     <Box
       sx={{
-        "& .MuiButton-root:not([data-read]), & .MuiIconButton-root:not([data-read]), & .MuiCheckbox-root, & .MuiSwitch-root": {
+        "& .MuiButton-root:not([data-read]), & .MuiIconButton-root:not([data-read]), & .MuiCheckbox-root:not([data-read] *), & .MuiSwitch-root:not([data-read] *)": {
           pointerEvents: "none",
           opacity: 0.4,
         },
