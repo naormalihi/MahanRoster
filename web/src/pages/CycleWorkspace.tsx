@@ -145,6 +145,7 @@ function StepBar({ step, states }: { step: StepKey; states: ReturnType<typeof st
       onGo={(k) => navigate(STEPS.find((s) => s.key === k)!.path)}
       title={(x, i) => (i > 0 ? `שלב ${i} מתוך ${n} · ${x.label}` : x.label)}
       menuLabel={(x, i) => (i > 0 ? `${i}. ${x.label}` : x.label)}
+      floating
     />
   );
 }

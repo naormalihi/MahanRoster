@@ -24,6 +24,7 @@ export function PagerBar({
   onGo,
   title,
   menuLabel = (x) => x.label,
+  floating = false,
 }: {
   items: PagerItem[];
   current: string;
@@ -32,13 +33,25 @@ export function PagerBar({
   title: (item: PagerItem, i: number) => string;
   /** an item in the full list */
   menuLabel?: (item: PagerItem, i: number) => string;
+  /** fixed to the bottom of the screen (a phone), with room kept for it under the page */
+  floating?: boolean;
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const i = Math.max(0, items.findIndex((x) => x.key === current));
   const cur = items[i];
   const go = (j: number) => j >= 0 && j < items.length && onGo(items[j].key);
   return (
-    <Paper variant="outlined" sx={{ px: 0.5, py: 0.75 }}>
+    <>
+    {floating && <Box sx={{ height: 96, order: 99 }} />}
+    <Paper
+      variant={floating ? "elevation" : "outlined"}
+      elevation={floating ? 8 : 0}
+      sx={
+        floating
+          ? { position: "fixed", insetInline: 0, bottom: 0, zIndex: (t) => t.zIndex.appBar, borderRadius: 0, px: 0.5, pt: 0.75, pb: "calc(6px + env(safe-area-inset-bottom))" }
+          : { px: 0.5, py: 0.75 }
+      }
+    >
       <Stack direction="row" sx={{ alignItems: "center" }}>
         <IconButton data-read aria-label="הקודם" disabled={i <= 0} onClick={() => go(i - 1)}>
           <ChevronRightIcon />
@@ -87,5 +100,6 @@ export function PagerBar({
         ))}
       </Menu>
     </Paper>
+    </>
   );
 }
