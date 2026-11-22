@@ -1075,6 +1075,7 @@ export function SoldiersPage() {
           sx={{ mt: 1.5, alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
         >
           <FormControlLabel
+            data-read
             control={
               <Switch
                 checked={showInactive}
@@ -1084,7 +1085,7 @@ export function SoldiersPage() {
             label="הצגת לא פעילים"
           />
           <Box sx={{ flex: 1 }} />
-          {selected.size > 0 && (
+          {selected.size > 0 && !narrow && (
             <>
               <Typography variant="body2">נבחרו {selected.size}</Typography>
               <Button variant="contained" onClick={() => setBulk(true)}>
@@ -1103,6 +1104,31 @@ export function SoldiersPage() {
         </Stack>
       </Paper>
 
+      {narrow && selected.size > 0 && (
+        // on a phone the bar stays at the bottom while scrolling – the choice is seen
+        <Paper
+          elevation={8}
+          sx={{ position: "fixed", insetInline: 0, bottom: 0, zIndex: (t) => t.zIndex.appBar, px: 1.5, pt: 1, pb: "calc(8px + env(safe-area-inset-bottom))", borderRadius: 0 }}
+        >
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+              נבחרו {selected.size}
+            </Typography>
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" variant="contained" onClick={() => setBulk(true)} sx={{ whiteSpace: "nowrap" }}>
+              עדכון מטווח
+            </Button>
+            {staffUser && (
+              <Button size="small" variant="outlined" onClick={() => setInviting(true)} sx={{ whiteSpace: "nowrap" }}>
+                קודי הצטרפות
+              </Button>
+            )}
+            <Button size="small" onClick={() => setSelected(new Set())}>
+              ניקוי
+            </Button>
+          </Stack>
+        </Paper>
+      )}
       {error && <Alert severity="error">{error}</Alert>}
       {!rows && !error && (
         <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
@@ -1191,14 +1217,25 @@ export function SoldiersPage() {
                   dim={!s.is_active}
                   onClick={() => setEditing(s)}
                   lead={
-                    <Checkbox
-                      size="small"
-                      sx={{ p: 0.25, mt: 0.1 }}
-                      checked={selected.has(s.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggle(s.id)}
-                      slotProps={{ input: { "aria-label": `בחירת ${s.full_name}` } }}
-                    />
+                    !staffUser ? undefined : (
+                    // the whole strip beside the card selects (a finger is wider than the box); the rest opens
+                    <Box
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle(s.id);
+                      }}
+                      sx={{ alignSelf: "stretch", minWidth: 44, my: -1.25, ms: -1.5, display: "flex", justifyContent: "center", pt: 1, cursor: "pointer" }}
+                    >
+                      <Checkbox
+                        size="small"
+                        sx={{ p: 0.25, height: "fit-content" }}
+                        checked={selected.has(s.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggle(s.id)}
+                        slotProps={{ input: { "aria-label": `בחירת ${s.full_name}` } }}
+                      />
+                    </Box>
+                    )
                   }
                   title={s.full_name}
                   chips={
@@ -1248,6 +1285,7 @@ export function SoldiersPage() {
               );
             })}
           </CardList>
+          {selected.size > 0 && <Box sx={{ height: 64 }} />}
           <Typography variant="caption" color="text.secondary">
             מוצגים {shown.length} מתוך {rows.length}. לחיצה על עובד פותחת עריכה; סימון בתיבה – לפעולות על כמה עובדים.
           </Typography>
@@ -1260,6 +1298,7 @@ export function SoldiersPage() {
             <Table size="small" stickyHeader sx={{ minWidth: 1180 }}>
               <TableHead>
                 <TableRow>
+                  {staffUser && (
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={allSelected}
@@ -1278,6 +1317,7 @@ export function SoldiersPage() {
                       }}
                     />
                   </TableCell>
+                  )}
                   {columns.map((c, i) => {
                     const on = !!c.key && sort?.key === c.key;
                     return (
@@ -1329,6 +1369,7 @@ export function SoldiersPage() {
                       selected={selected.has(s.id)}
                       sx={{ opacity: s.is_active ? 1 : 0.5 }}
                     >
+                      {staffUser && (
                       <TableCell padding="checkbox">
                         <Checkbox
                           checked={selected.has(s.id)}
@@ -1338,6 +1379,7 @@ export function SoldiersPage() {
                           }}
                         />
                       </TableCell>
+                      )}
                       <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                         {s.full_name}
                       </TableCell>
