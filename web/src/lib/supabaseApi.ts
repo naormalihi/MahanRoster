@@ -402,6 +402,27 @@ export class SupabaseApi implements Api {
       maybe(await this.sb.from("soldier_load_roles").insert(roles.map((r) => ({ ...r, soldier_id: soldierId }))));
   }
 
+  async myCommandedGafs() {
+    return ((check(await this.sb.rpc("my_commanded_gafs")) as string[] | null) ?? []).map(String);
+  }
+
+  async updateSoldiersAdmin(ids: string[], patch: { phone?: string | null; range_valid_until?: string | null }) {
+    if (!ids.length) return;
+    run(
+      await this.sb.rpc("update_soldiers_admin", {
+        p_soldiers: ids,
+        p_set_phone: "phone" in patch,
+        p_phone: patch.phone ?? null,
+        p_set_range: "range_valid_until" in patch,
+        p_range: patch.range_valid_until ?? null,
+      }),
+    );
+  }
+
+  async setSoldierLoadRolesAdmin(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]) {
+    run(await this.sb.rpc("set_soldier_load_roles_admin", { p_soldier: soldierId, p_roles: roles }));
+  }
+
   async taskTypes(): Promise<TaskType[]> {
     const rows = check(await this.sb.from("task_types").select("*").order("name")) as TaskType[];
     const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null);

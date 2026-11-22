@@ -500,6 +500,21 @@ export class DemoApi implements Api {
     });
   }
 
+  async myCommandedGafs() {
+    if (!this.user?.roles.includes("gaf_commander")) return [];
+    const s1 = this.soldierList.find((s) => s.id === "s1");
+    const g = this.gafList.find((x) => x.name === s1?.gaf_name)?.id;
+    return g ? [g] : [];
+  }
+
+  async updateSoldiersAdmin(ids: string[], patch: { phone?: string | null; range_valid_until?: string | null }) {
+    await this.updateSoldiers(ids, patch);
+  }
+
+  async setSoldierLoadRolesAdmin(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]) {
+    await this.setSoldierLoadRoles(soldierId, roles);
+  }
+
   async taskTypes() {
     await delay();
     return this.tasks.map((t) => ({ ...t })).sort((a, b) => a.name.localeCompare(b.name, "he"));

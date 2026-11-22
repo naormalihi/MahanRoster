@@ -100,7 +100,7 @@ export function NoAccountStrip({ cycleId }: { cycleId: string }) {
         <Alert
           severity="warning"
           action={
-            <Button color="inherit" size="small" onClick={() => setOpen(true)} sx={{ whiteSpace: "nowrap" }}>
+            <Button data-read color="inherit" size="small" onClick={() => setOpen(true)} sx={{ whiteSpace: "nowrap" }}>
               שליחת וואטסאפ
             </Button>
           }

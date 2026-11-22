@@ -46,6 +46,7 @@ import { useAuth } from "../lib/auth";
 import { isStaff } from "../lib/api";
 import { accountLabel, type SoldierAccount } from "../lib/me";
 import { InviteDialog } from "../components/InviteDialog";
+import { NoAccountStrip } from "../components/NoAccountDialog";
 import { AddSoldierDialog } from "../components/AddSoldierDialog";
 import PersonAddIcon from "@mui/icons-material/PersonAddAlt1Outlined";
 import { formatPhone, normalizePhone } from "../lib/phone";
@@ -101,10 +102,12 @@ function DateField(props: {
   value: string | null;
   onChange: (v: string | null) => void;
   helperText?: string;
+  disabled?: boolean;
 }) {
   return (
     <TextField
       type="date"
+      disabled={props.disabled}
       label={props.label}
       value={props.value ?? ""}
       onChange={(e) => props.onChange(e.target.value || null)}
@@ -123,11 +126,15 @@ function EditDialog(props: {
   soldier: SoldierDetail;
   ranks: NamedRef[];
   loadRoles: LoadRoleRef[];
+  /** full – נע"ת; admin – a gaf commander, his own people: phone, range and relief roles; view – read */
+  mode: "full" | "admin" | "view";
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { api } = useAuth();
   const s = props.soldier;
+  const full = props.mode === "full";
+  const ro = props.mode === "view";
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
   // taking him out of the unit: the day, and how many of his duties that drops
   const [leaving, setLeaving] = useState<{ from: string; duties: number } | null>(null);
@@ -202,8 +209,13 @@ function EditDialog(props: {
             ? null
             : p.home_nightly_override_reason,
       };
-      await api!.updateSoldiers([s.id], patch);
-      await api!.setSoldierLoadRoles(s.id, roles);
+      if (full) {
+        await api!.updateSoldiers([s.id], patch);
+        await api!.setSoldierLoadRoles(s.id, roles);
+      } else {
+        await api!.updateSoldiersAdmin([s.id], { phone: patch.phone, range_valid_until: patch.range_valid_until });
+        await api!.setSoldierLoadRolesAdmin(s.id, roles);
+      }
       props.onSaved();
     } catch (e) {
       setError((e as Error).message);
@@ -231,7 +243,15 @@ function EditDialog(props: {
       </DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2.5}>
+          {!full && (
+            <Alert severity="info" icon={false}>
+              {ro
+                ? "צפייה בלבד."
+                : "כאן מעדכנים טלפון, מטווח ותפקידי הקלה. פטורים, ת\"ש, הקלות ושאר הפרטים – אצל נע\"ת."}
+            </Alert>
+          )}
           <TextField
+            disabled={ro}
             label="טלפון נייד"
             value={phoneText}
             onChange={(e) => setPhoneText(e.target.value)}
@@ -247,12 +267,15 @@ function EditDialog(props: {
             </Typography>
             <DateField
               label="תוקף מטווח עד"
+              disabled={ro}
               value={p.range_valid_until}
               onChange={(v) => set("range_valid_until", v)}
               helperText="ריק = בתוקף כברירת מחדל, כל עוד ההנחה מופעלת בהגדרות"
             />
           </Box>
           <Divider />
+          {full && (
+          <>
           <Box>
             <Typography variant="h3" gutterBottom>
               דרגת מינוי
@@ -378,6 +401,8 @@ function EditDialog(props: {
             </Stack>
           </Box>
           <Divider />
+          </>
+          )}
           <Box>
             <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
               <Typography variant="h3" sx={{ flex: 1 }}>
@@ -385,6 +410,7 @@ function EditDialog(props: {
               </Typography>
               <Button
                 size="small"
+                disabled={ro}
                 startIcon={<AddIcon />}
                 onClick={() =>
                   setRoles([
@@ -415,6 +441,7 @@ function EditDialog(props: {
                 >
                   <TextField
                     select
+                    disabled={ro}
                     label="תפקיד"
                     value={r.load_role_id}
                     onChange={(e) =>
@@ -434,6 +461,7 @@ function EditDialog(props: {
                   </TextField>
                   <DateField
                     label="מתאריך"
+                    disabled={ro}
                     value={r.valid_from}
                     onChange={(v) =>
                       setRoles(
@@ -445,6 +473,7 @@ function EditDialog(props: {
                   />
                   <IconButton
                     aria-label="מחיקה"
+                    disabled={ro}
                     onClick={() => setRoles(roles.filter((_, j) => j !== i))}
                   >
                     <DeleteIcon />
@@ -453,6 +482,8 @@ function EditDialog(props: {
               ))}
             </Stack>
           </Box>
+          {full && (
+          <>
           <Divider />
           {s.is_active ? (
             <Box>
@@ -492,14 +523,18 @@ function EditDialog(props: {
           ) : (
             <FormControlLabel control={<Switch checked={p.is_active} onChange={(e) => set("is_active", e.target.checked)} />} label="להחזיר ליחידה" />
           )}
+          </>
+          )}
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={props.onClose}>ביטול</Button>
-        <Button variant="contained" onClick={save} disabled={busy}>
-          שמירה
-        </Button>
+        <Button onClick={props.onClose}>{ro ? "סגירה" : "ביטול"}</Button>
+        {!ro && (
+          <Button variant="contained" onClick={save} disabled={busy}>
+            שמירה
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
@@ -553,15 +588,23 @@ function BulkRangeDialog(props: {
 export function SoldiersPage() {
   const { api, me } = useAuth();
   const staffUser = isStaff(me);
+  // a gaf commander updates phone, range, relief roles and join codes of his own framework's people
+  const [commanded, setCommanded] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (staffUser) return;
+    api!.myCommandedGafs().then((g) => setCommanded(new Set(g)), () => setCommanded(new Set()));
+  }, [api, staffUser]);
+  const manages = (s: { gaf_id: string }) => staffUser || commanded.has(s.gaf_id);
+  const canManage = staffUser || commanded.size > 0;
   const [accounts, setAccounts] = useState<Map<string, SoldierAccount>>(new Map());
   const [inviting, setInviting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<{ id: string; name: string } | null>(null);
   const loadAccounts = useCallback(async () => {
-    if (!staffUser) return;
+    if (!canManage) return;
     const a = await api!.soldierAccounts().catch(() => [] as SoldierAccount[]);
     setAccounts(new Map(a.map((x) => [x.soldier_id, x])));
-  }, [api, staffUser]);
+  }, [api, canManage]);
   useEffect(() => {
     void loadAccounts();
   }, [loadAccounts]);
@@ -814,7 +857,7 @@ export function SoldiersPage() {
       key: "second",
       by: (s) => s.second_role_signed_at ?? "",
     },
-    ...(staffUser
+    ...(canManage
       ? [
           {
             label: "חשבון",
@@ -840,8 +883,9 @@ export function SoldiersPage() {
       return sign * c || a.full_name.localeCompare(b.full_name, "he");
     });
   }
+  const selectable = shown.filter(manages);
   const allSelected =
-    shown.length > 0 && shown.every((s) => selected.has(s.id));
+    selectable.length > 0 && selectable.every((s) => selected.has(s.id));
   const counts = useMemo(() => {
     const active = (rows ?? []).filter((s) => s.is_active);
     return {
@@ -1089,15 +1133,13 @@ export function SoldiersPage() {
           {selected.size > 0 && !narrow && (
             <>
               <Typography variant="body2">נבחרו {selected.size}</Typography>
-              <Button variant="contained" onClick={() => setBulk(true)}>
+              <Button data-read variant="contained" onClick={() => setBulk(true)}>
                 עדכון מטווח לנבחרים
               </Button>
-              {staffUser && (
-                <Button variant="outlined" onClick={() => setInviting(true)}>
-                  קודי הצטרפות
-                </Button>
-              )}
-              <Button onClick={() => setSelected(new Set())}>
+              <Button data-read variant="outlined" onClick={() => setInviting(true)}>
+                קודי הצטרפות
+              </Button>
+              <Button data-read onClick={() => setSelected(new Set())}>
                 ניקוי בחירה
               </Button>
             </>
@@ -1116,20 +1158,23 @@ export function SoldiersPage() {
               נבחרו {selected.size}
             </Typography>
             <Box sx={{ flex: 1 }} />
-            <Button size="small" variant="contained" onClick={() => setBulk(true)} sx={{ whiteSpace: "nowrap" }}>
+            <Button data-read size="small" variant="contained" onClick={() => setBulk(true)} sx={{ whiteSpace: "nowrap" }}>
               עדכון מטווח
             </Button>
-            {staffUser && (
-              <Button size="small" variant="outlined" onClick={() => setInviting(true)} sx={{ whiteSpace: "nowrap" }}>
-                קודי הצטרפות
-              </Button>
-            )}
-            <Button size="small" onClick={() => setSelected(new Set())}>
+            <Button data-read size="small" variant="outlined" onClick={() => setInviting(true)} sx={{ whiteSpace: "nowrap" }}>
+              קודי הצטרפות
+            </Button>
+            <Button data-read size="small" onClick={() => setSelected(new Set())}>
               ניקוי
             </Button>
           </Stack>
         </Paper>
       )}
+      {/* a gaf commander: his people with duties and no account – a WhatsApp each (נע"ת has it in operations) */}
+      {!staffUser && canManage && (() => {
+        const pub = [cur?.cycle, nxt?.cycle].find((c) => c && isPublished(c));
+        return pub ? <NoAccountStrip cycleId={pub.id} /> : null;
+      })()}
       {error && <Alert severity="error">{error}</Alert>}
       {!rows && !error && (
         <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
@@ -1210,7 +1255,7 @@ export function SoldiersPage() {
               const lr = activeLoadRole(s);
               const appointed = s.appointment_rank_id && (!s.appointment_rank_until || s.appointment_rank_until >= today);
               const n = nowScore(s);
-              const a = staffUser ? accountLabel(accounts.get(s.id), todayIso()) : null;
+              const a = manages(s) ? accountLabel(accounts.get(s.id), todayIso()) : null;
               const h = holidayDuty.get(s.id);
               return (
                 <RowCard
@@ -1218,9 +1263,10 @@ export function SoldiersPage() {
                   dim={!s.is_active}
                   onClick={() => setEditing(s)}
                   lead={
-                    !staffUser ? undefined : (
+                    !manages(s) ? undefined : (
                     // the whole strip beside the card selects (a finger is wider than the box); the rest opens
                     <Box
+                      data-read
                       onClick={(e) => {
                         e.stopPropagation();
                         toggle(s.id);
@@ -1299,18 +1345,18 @@ export function SoldiersPage() {
             <Table size="small" stickyHeader sx={{ minWidth: 1180 }}>
               <TableHead>
                 <TableRow>
-                  {staffUser && (
-                  <TableCell padding="checkbox">
+                  {canManage && (
+                  <TableCell padding="checkbox" data-read>
                     <Checkbox
                       checked={allSelected}
                       indeterminate={
-                        !allSelected && shown.some((s) => selected.has(s.id))
+                        !allSelected && selectable.some((s) => selected.has(s.id))
                       }
                       onChange={() =>
                         setSelected(
                           allSelected
                             ? new Set()
-                            : new Set(shown.map((s) => s.id)),
+                            : new Set(selectable.map((s) => s.id)),
                         )
                       }
                       slotProps={{
@@ -1370,8 +1416,9 @@ export function SoldiersPage() {
                       selected={selected.has(s.id)}
                       sx={{ opacity: s.is_active ? 1 : 0.5 }}
                     >
-                      {staffUser && (
-                      <TableCell padding="checkbox">
+                      {canManage && (
+                      <TableCell padding="checkbox" data-read>
+                        {manages(s) && (
                         <Checkbox
                           checked={selected.has(s.id)}
                           onChange={() => toggle(s.id)}
@@ -1379,6 +1426,7 @@ export function SoldiersPage() {
                             input: { "aria-label": `בחירת ${s.full_name}` },
                           }}
                         />
+                        )}
                       </TableCell>
                       )}
                       <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
@@ -1545,7 +1593,7 @@ export function SoldiersPage() {
                             })}
                       </TableCell>
                       <TableCell>{fmt(s.second_role_signed_at)}</TableCell>
-                      {staffUser &&
+                      {canManage &&
                         (() => {
                           const a = accountLabel(accounts.get(s.id), todayIso());
                           return (
@@ -1556,6 +1604,7 @@ export function SoldiersPage() {
                         })()}
                       <TableCell padding="checkbox">
                         <IconButton
+                          data-read
                           aria-label={`עריכת ${s.full_name}`}
                           onClick={() => setEditing(s)}
                         >
@@ -1584,6 +1633,7 @@ export function SoldiersPage() {
           soldier={editing}
           ranks={ranks}
           loadRoles={loadRoles}
+          mode={staffUser ? "full" : manages(editing) ? "admin" : "view"}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -1614,7 +1664,7 @@ export function SoldiersPage() {
           count={selected.size}
           onClose={() => setBulk(false)}
           onApply={async (date) => {
-            await api!.updateSoldiers([...selected], {
+            await api!.updateSoldiersAdmin([...selected], {
               range_valid_until: date,
             });
             setBulk(false);

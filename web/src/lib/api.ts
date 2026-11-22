@@ -218,6 +218,12 @@ export interface Api {
   deleteLoadRole(id: string): Promise<void>;
   /** Replace the soldier's load-role periods with the given list. */
   setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
+  /** The frameworks whose employees a gaf commander updates (phone, range, relief roles, join codes). */
+  myCommandedGafs(): Promise<string[]>;
+  /** Phone and/or range date – staff, or a gaf commander for his own people. A field left out stays. */
+  updateSoldiersAdmin(ids: string[], patch: { phone?: string | null; range_valid_until?: string | null }): Promise<void>;
+  /** Relief roles – staff, or a gaf commander for his own people (נע"ת is told). */
+  setSoldierLoadRolesAdmin(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
   // settings screen
   taskTypes(): Promise<TaskType[]>;
   /** Create (id null) or update a duty type. */
