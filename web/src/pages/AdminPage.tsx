@@ -2012,6 +2012,7 @@ export function AdminPage() {
           current={tab}
           onGo={(k) => setParams({ tab: k }, { replace: true })}
           title={(x, i) => `${i + 1} מתוך ${TABS.length} · ${x.label}`}
+          floating
         />
       ) : (
       <Tabs value={tab} onChange={(_, v) => setParams({ tab: v }, { replace: true })} variant="scrollable" allowScrollButtonsMobile>
