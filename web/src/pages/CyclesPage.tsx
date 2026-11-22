@@ -242,7 +242,7 @@ export function CyclesPage() {
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Typography variant="h1" sx={{ flex: 1 }}>
+        <Typography variant="h1" sx={{ flex: 1, whiteSpace: "nowrap" }}>
           ניהול מחזורים
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
