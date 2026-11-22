@@ -1,6 +1,7 @@
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { passwordProblems } from "../lib/api";
+import { usernameProblem } from "../lib/users";
 import { useAuth } from "../lib/auth";
 import { Mascot, type MascotPose } from "../components/Mascot";
 import { PasswordField } from "../components/PasswordField";
@@ -259,13 +260,20 @@ export function ChangePasswordPage() {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const problem = pw ? passwordProblems(pw, me?.username ?? "") : null;
+  /** the name נע"ת typed is only a start – it may be fixed here, once with the password */
+  const canRename = !!me && !me.roles.includes("viewer");
+  const [name, setName] = useState(me?.username ?? "");
+  const newName = name.trim().toLowerCase();
+  const nameProblem = canRename && newName !== me?.username ? usernameProblem(newName, []) : null;
+  const problem = pw ? passwordProblems(pw, newName || me?.username || "") : null;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (nameProblem) return setError(nameProblem);
     if (problem) return setError(problem);
     if (pw !== pw2) return setError("הסיסמאות לא זהות");
     try {
+      if (canRename && newName !== me?.username) await api!.renameMe(newName, null);
       await api!.changePassword(pw);
       await refresh();
     } catch (err) {
@@ -274,9 +282,21 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <Card pose="point" title="החלפת סיסמה" subtitle="קיבלת סיסמה זמנית. בחר סיסמה חדשה כדי להמשיך.">
+    <Card pose="point" title="החלפת סיסמה" subtitle={canRename ? "קיבלת סיסמה זמנית. בדוק את שם המשתמש ובחר סיסמה חדשה." : "קיבלת סיסמה זמנית. בחר סיסמה חדשה כדי להמשיך."}>
       <form onSubmit={submit}>
         <Stack spacing={2}>
+          {canRename && (
+            <TextField
+              label="שם משתמש"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="username"
+              helperText={nameProblem ?? "אפשר לתקן עכשיו – זה השם לכניסות הבאות"}
+              error={!!nameProblem}
+              required
+              slotProps={{ htmlInput: { dir: "ltr", autoCapitalize: "none", spellCheck: false } }}
+            />
+          )}
           <PasswordField
             label="סיסמה חדשה"
             value={pw}

@@ -3070,3 +3070,53 @@ def test_order_inversions_only_beyond_one_duty(conn):
                      (base_a, b_cycle, cycle, b))
         assert inversions() == []
         raise psycopg.Rollback()
+
+
+def test_rename_me_first_sign_in_then_with_password_once_a_week(conn):
+    uid = _as_coord(conn, "select public.create_user('cmd.typo', 'temp-pass-123', 'gaf_commander', null)")[0][0]
+    try:
+        with session_as(conn, uid) as c:
+            def rename(name, pw=None):
+                with c.transaction():
+                    c.execute("select public.rename_me(%s, %s)", (name, pw))
+            # first sign-in (temporary password): fixed freely, no password, twice
+            rename("cmd.fixed")
+            rename("cmd.fixed2")
+            assert c.execute("select username, username_changed_at from app_users where id = %s", (uid,)).fetchone() == ("cmd.fixed2", None)
+            c.execute("reset role")
+            assert c.execute("select email from auth.users where id = %s", (uid,)).fetchone()[0] == "cmd.fixed2@users.invalid"
+            c.execute("set local role authenticated")
+            # after the password was changed: the current password is needed, then once a week
+            c.execute("select public.password_changed()")
+            with pytest.raises(psycopg.Error, match="הסיסמה הנוכחית שגויה"):
+                rename("cmd.later", "wrong-pass")
+            with pytest.raises(psycopg.Error, match="הסיסמה הנוכחית שגויה"):
+                rename("cmd.later")
+            rename("cmd.later", "temp-pass-123")
+            assert c.execute("select username from app_users where id = %s", (uid,)).fetchone()[0] == "cmd.later"
+            with pytest.raises(psycopg.Error, match="פעם בשבוע"):
+                rename("cmd.again", "temp-pass-123")
+            c.execute("reset role")
+            actions = [a for (a,) in c.execute("select action from audit_log where entity_id = %s and action = 'rename_me'", (str(uid),)).fetchall()]
+            assert len(actions) == 3
+    finally:
+        _as_coord(conn, "select public.delete_user(%s)", uid)
+
+
+def test_rename_me_refuses_taken_names_and_the_shared_viewer(conn):
+    uid = _as_coord(conn, "select public.create_user('cmd.taken', 'temp-pass-123', 'gaf_commander', null)")[0][0]
+    try:
+        coord_name = conn.execute("select username from app_users where id = %s", (COORD,)).fetchone()[0]
+        with session_as(conn, uid) as c:
+            with pytest.raises(psycopg.Error, match="כבר קיים"):
+                c.execute("select public.rename_me(%s, null)", (coord_name,))
+        with session_as(conn, uid) as c:
+            with pytest.raises(psycopg.Error, match="3–32"):
+                c.execute("select public.rename_me('שם', null)")
+        viewer = conn.execute("select user_id from user_roles where role = 'viewer' limit 1").fetchone()
+        if viewer:
+            with session_as(conn, viewer[0]) as c:
+                with pytest.raises(psycopg.Error, match="צפייה המשותף"):
+                    c.execute("select public.rename_me('board.new', null)")
+    finally:
+        _as_coord(conn, "select public.delete_user(%s)", uid)

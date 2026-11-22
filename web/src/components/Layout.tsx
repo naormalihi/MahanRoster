@@ -43,6 +43,8 @@ import { markTourSeen, tourKind, tourSeen, tourSteps } from "../lib/tour";
 import ContactIcon from "@mui/icons-material/ContactPhoneOutlined";
 import { ContactsDialog } from "./ContactCard";
 import { FeedbackDialog } from "./FeedbackDialog";
+import { RenameMeDialog } from "./RenameMeDialog";
+import BadgeIcon from "@mui/icons-material/BadgeOutlined";
 import IdeaIcon from "@mui/icons-material/LightbulbOutlined";
 import InboxIcon from "@mui/icons-material/InboxOutlined";
 import SpecIcon from "@mui/icons-material/DescriptionOutlined";
@@ -255,6 +257,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [tour, setTour] = useState(false);
   const [contacts, setContacts] = useState(false);
   const [feedback, setFeedback] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   // נע"ת, מ"מ and the unit commander: how many new messages wait in "הצעות ומשוב"
   const [newFeedback, setNewFeedback] = useState(0);
   const seesFeedback = staff || isUnitCommander(me);
@@ -353,6 +356,7 @@ export function Layout({ children }: { children: ReactNode }) {
         />
       )}
       {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
+      {renaming && <RenameMeDialog onClose={() => setRenaming(false)} />}
       {contacts && <ContactsDialog onClose={() => setContacts(false)} />}
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
@@ -433,6 +437,17 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 <HelpIcon fontSize="small" sx={{ ml: 1.5 }} />
                 <ListItemText primary="סיור היכרות עם תורנצ׳יק" />
+              </ListItemButton>
+            )}
+            {me && !me.roles.includes("viewer") && (
+              <ListItemButton
+                onClick={() => {
+                  setOpen(false);
+                  setRenaming(true);
+                }}
+              >
+                <BadgeIcon fontSize="small" sx={{ ml: 1.5 }} />
+                <ListItemText primary="שינוי שם משתמש" />
               </ListItemButton>
             )}
             <ListItemButton onClick={signOut}>

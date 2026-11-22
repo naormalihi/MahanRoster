@@ -163,6 +163,8 @@ export interface Api {
   mfaEnroll(): Promise<{ factorId: string; qrSvg: string; secret: string }>;
   mfaVerify(factorId: string, code: string): Promise<void>;
   changePassword(newPassword: string): Promise<void>;
+  /** His own username. On the first sign-in no password is needed; later – the current one, once a week. */
+  renameMe(username: string, password: string | null): Promise<void>;
   board(fromIso: string, toIso: string): Promise<BoardRow[]>;
   /** Start of the first published duty from a moment on (null = none). */
   nextPublished(fromIso: string): Promise<string | null>;
