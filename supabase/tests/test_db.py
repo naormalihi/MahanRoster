@@ -1811,7 +1811,7 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
     etype = conn.execute("select id from exemption_types where auto_rule is null order by name limit 1").fetchone()[0]
     atype = conn.execute("select id from absence_types where not requires_approval order by name limit 1").fetchone()[0]
     today = date.today()
-    far = today + timedelta(days=800)  # beyond every planned cycle: open
+    far = (today + timedelta(days=800)).replace(day=10)  # beyond every planned cycle: open; mid-month, so +1 day stays in it
     with session_as(conn, uid, aal="aal1") as c:
         opts = c.execute("select public.my_input_options()").fetchone()[0]
         assert any(t["id"] == str(etype) for t in opts["exemption_types"]) and opts["block_quota_per_month"] >= 1
@@ -3183,3 +3183,9 @@ def test_a_reader_without_a_framework_updates_nothing(conn):
     with session_as(conn, uc) as c:
         with pytest.raises(psycopg.Error, match="המסגרת שלך"):
             c.execute("select public.update_soldiers_admin(%s, false, null, true, '2027-03-01')", ([some],))
+
+
+def test_no_function_still_says_the_old_board_name(conn):
+    left = conn.execute("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                        "where n.nspname in ('app', 'public') and p.prosrc like '%לוח התורנויות%'").fetchall()
+    assert left == []

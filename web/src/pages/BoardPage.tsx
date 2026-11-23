@@ -661,7 +661,7 @@ export function BoardPage() {
     <Stack spacing={1.5} sx={{ maxWidth: view === "week" ? 1400 : 1100, mx: "auto", width: "100%" }}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
         <Box sx={{ flex: 1 }}>
-          <Typography variant="h1">לוח התורנויות</Typography>
+          <Typography variant="h1">לוח השיבוצים</Typography>
           <Typography variant="body2" color="text.secondary">
             {title}
             {rows && ` · ${shown.length} תורנויות`}

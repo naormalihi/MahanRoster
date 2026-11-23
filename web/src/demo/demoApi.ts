@@ -139,7 +139,7 @@ export class DemoApi implements Api {
       requires_ack: true, read_at: null, acked_at: null, created_at: new Date(Date.now() - 20 * 60_000).toISOString() },
     { id: "n2", type: "exemption_decided", title: "בקשת הפטור אושרה", body: "פטור מלא, 10/08–20/08", url: "/requests",
       requires_ack: false, read_at: null, acked_at: null, created_at: new Date(Date.now() - 5 * 3600_000).toISOString() },
-    { id: "n3", type: "board_published", title: "לוח התורנויות פורסם – דצמבר 2026 – מאי 2027", body: "יש לך 3 תורנויות ו-2 עתודות. הראשונה: א׳ 03/01 08:00.",
+    { id: "n3", type: "board_published", title: "לוח השיבוצים פורסם – דצמבר 2026 – מאי 2027", body: "יש לך 3 תורנויות ו-2 עתודות. הראשונה: א׳ 03/01 08:00.",
       url: "/", requires_ack: false, read_at: new Date().toISOString(), acked_at: null, created_at: new Date(Date.now() - 3 * 86_400_000).toISOString() },
   ];
   private soldierList: ExistingSoldier[] = [];
