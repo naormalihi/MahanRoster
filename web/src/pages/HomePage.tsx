@@ -231,7 +231,7 @@ export function HomePage() {
       <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
         {[
           { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי עובדים" },
-          { to: "/board", label: "לוח התורנויות", hint: "מה שכל היחידה רואה" },
+          { to: "/board", label: "לוח השיבוצים", hint: "מה שכל היחידה רואה" },
           { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ומועד סגירת אילוצים" },
           { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים" },
         ]

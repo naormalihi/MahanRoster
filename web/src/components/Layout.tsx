@@ -64,7 +64,7 @@ const STAFF_LINKS = [
   { to: "/", label: "תמונת מצב", match: (p: string) => p === "/" },
   { to: "/cycle", label: "תכנון ושיבוץ", match: (p: string) => p.startsWith("/cycle") },
   { to: "/soldiers", label: "כוח אדם", match: (p: string) => p.startsWith("/soldiers") },
-  { to: "/board", label: "לוח התורנויות", match: (p: string) => p === "/board" },
+  { to: "/board", label: "לוח השיבוצים", match: (p: string) => p === "/board" },
   { to: "/dashboard", label: "נתוני היחידה", match: (p: string) => p === "/dashboard" },
   { to: "/admin", label: "הגדרות", match: (p: string) => p === "/admin" },
 ];
@@ -73,7 +73,7 @@ const STAFF_LINKS = [
 const SOLDIER_LINKS = [
   { to: "/", label: "התורנויות שלי", match: (p: string) => p === "/" },
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
-  { to: "/board", label: "לוח התורנויות", match: (p: string) => p === "/board" },
+  { to: "/board", label: "לוח השיבוצים", match: (p: string) => p === "/board" },
   { to: "/scoring", label: "איך מחושב הניקוד", match: (p: string) => p === "/scoring" },
 ];
 

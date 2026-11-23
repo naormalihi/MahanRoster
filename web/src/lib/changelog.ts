@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.49.1",
+    date: "2026-11-23",
+    items: ["\"לוח התורנויות\" נקרא עכשיו \"לוח השיבוצים\" – בתפריט, בכותרת, בהדפסה ובהתראות"],
+  },
+  {
     version: "2.49.0",
     date: "2026-11-22",
     items: [

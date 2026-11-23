@@ -68,7 +68,7 @@ function Sheet({ page, printed }: { page: SheetPage; printed: string }) {
   return (
     <div className="mr-page">
       <div className="mr-hd">
-        <h1>לוח תורנויות · {page.title}</h1>
+        <h1>לוח שיבוצים · {page.title}</h1>
         <span className="s">{page.count} תורנויות</span>
         {page.updated && <span className="upd">עודכן {dmFmt.format(new Date(page.updated))}</span>}
         <span className="p">הודפס {printed} · תורנצ׳יק</span>

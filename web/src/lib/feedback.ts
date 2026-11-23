@@ -56,7 +56,7 @@ const SCREENS: Record<string, string> = {
   "/": "דף הבית",
   "/my": "התורנויות שלי",
   "/requests": "הבקשות שלי",
-  "/board": "לוח התורנויות",
+  "/board": "לוח השיבוצים",
   "/soldiers": "כוח אדם",
   "/admin": "הגדרות",
   "/scoring": "איך מחושב הניקוד",
