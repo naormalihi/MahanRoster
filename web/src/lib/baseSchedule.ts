@@ -1,5 +1,5 @@
 /**
- * Base schedule file (אוסף המשימות): one row = one slot, one performer + one reserve.
+ * Base schedule file (לוח המשימות): one row = one slot, one performer + one reserve.
  * Only two columns are read: the date (מועד) and the duty type (סוג משימה). Everything else is
  * derived: the hours from the duty type (by weekday), the Shabbat variant and the holidays from
  * the date, who may do it from the duty type. Any other column in the file is ignored.

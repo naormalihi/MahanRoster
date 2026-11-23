@@ -272,7 +272,7 @@ export function CycleWorkspace({ step }: { step: StepKey }) {
             )
           }
         >
-          המחזור פורסם{cycle.published_at ? ` ב-${fmt(cycle.published_at)}` : ""}. הפוטנציאל, אוסף המשימות והשיבוץ נעולים; שינויים נעשים בתפעול.
+          המחזור פורסם{cycle.published_at ? ` ב-${fmt(cycle.published_at)}` : ""}. הפוטנציאל, לוח המשימות והשיבוץ נעולים; שינויים נעשים בתפעול.
           פטורים והיעדרויות אפשר עדיין להזין.
         </Alert>
       )}

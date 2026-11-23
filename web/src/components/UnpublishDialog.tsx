@@ -37,7 +37,7 @@ export function UnpublishDialog(props: { cycle: Cycle; impact: UnpublishImpact; 
           <Typography sx={{ fontWeight: 700, mb: 0.5 }}>הלוח ייעלם מיד לכל היחידה.</Typography>
           <ul style={{ margin: 0, paddingInlineStart: 18 }}>
             <li>{impact.assignments} שיבוצים יחזרו לטיוטה, כמו שהם, כולל התיקונים הידניים.</li>
-            <li>המחזור יחזור לשלב "שיבוץ: טיוטה", והפוטנציאל, אוסף המשימות והשיבוץ ייפתחו לעריכה.</li>
+            <li>המחזור יחזור לשלב "שיבוץ: טיוטה", והפוטנציאל, לוח המשימות והשיבוץ ייפתחו לעריכה.</li>
             {impact.nextWeek > 0 && <li>{impact.nextWeek} משימות נופלות בשבעת הימים הקרובים.</li>}
             <li>מי שכבר ראה או הדפיס את הלוח לא יקבל עדכון מהמערכת – צריך להודיע למסגרות בערוצים הרגילים.</li>
           </ul>

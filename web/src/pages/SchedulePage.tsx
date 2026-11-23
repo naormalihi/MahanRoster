@@ -490,7 +490,7 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                     שיבוץ מלא מחדש · כ-7 דקות
                   </Button>
                   <Typography variant="caption" color="text.secondary">
-                    מתחיל מאפס ומחליף את כל הטיוטה. מתאים אחרי שינוי גדול באוסף המשימות או בכוח האדם.
+                    מתחיל מאפס ומחליף את כל הטיוטה. מתאים אחרי שינוי גדול בלוח המשימות או בכוח האדם.
                   </Typography>
                 </Stack>
               )}
@@ -527,7 +527,7 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
                   )}
                   {slots && !slots.length && (
                     <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 1.5 }}>
-                      קודם צריך לקלוט את אוסף המשימות.
+                      קודם צריך לקלוט את לוח המשימות.
                     </Typography>
                   )}
                 </Box>

@@ -25,7 +25,7 @@ export const STAGES: { status: CycleStatus; label: string; hint: string }[] = [
   { status: "collecting", label: "אילוצים: איסוף", hint: "מזינים פטורים, היעדרויות וחסימות שהגיעו מהמסגרות, עד מועד הסגירה." },
   { status: "approving", label: "אילוצים: אישור פטורים", hint: "בודקים אסמכתאות ומאשרים או דוחים כל פטור." },
   { status: "potential", label: "פוטנציאל", hint: "מפיקים את מטריצת הפוטנציאל ושולחים לבסיס." },
-  { status: "slots", label: "טעינת אוסף משימות", hint: "טוענים את קובץ המשימות שהגיע מהבסיס." },
+  { status: "slots", label: "טעינת לוח משימות", hint: "טוענים את קובץ המשימות שהגיע מהבסיס." },
   { status: "scheduling", label: "שיבוץ: הרצה", hint: "מריצים את מנוע השיבוץ." },
   { status: "review", label: "שיבוץ: טיוטה", hint: "בודקים את הטיוטה, מתקנים ידנית, אוספים הערות מהמסגרות ומפרסמים." },
   { status: "published", label: "תפעול", hint: "הלוח פורסם. מכאן: משימות חדשות, הקפצות והפעלת עתודות." },
