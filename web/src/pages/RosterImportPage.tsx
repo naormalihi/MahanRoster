@@ -115,7 +115,7 @@ export function RosterImportPage() {
   // "מסגרות לטעינה": the tree of the file and what is chosen (kept in the settings)
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [sel, setSel] = useState<FrameworkSelection | null>(null);
-  // moved to a framework not chosen: נע"ת marks who goes inactive (nobody by default)
+  // moved to a framework not chosen: אחראי השיבוצים marks who goes inactive (nobody by default)
   const [deactivate, setDeactivate] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

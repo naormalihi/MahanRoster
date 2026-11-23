@@ -1,5 +1,5 @@
 /**
- * The cycle נע"ת works on, chosen once for the whole app (header switcher) instead of on
+ * The cycle אחראי השיבוצים works on, chosen once for the whole app (header switcher) instead of on
  * every screen – so a step is never done on the wrong cycle by mistake.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";

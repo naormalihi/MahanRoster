@@ -13,7 +13,7 @@ const HOURS = 72;
 
 /**
  * "לא אישרו": duties of the next 72 hours whose soldier has not pressed "ראיתי" yet, soonest first.
- * נע"ת can call and mark "וידאתי בטלפון"; a gaf commander sees his gaf, read only.
+ * אחראי השיבוצים can call and mark "וידאתי בטלפון"; a gaf commander sees his gaf, read only.
  */
 export function UnackedCard() {
   const { api, me } = useAuth();

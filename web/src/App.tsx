@@ -18,7 +18,7 @@ import { RequestsPage } from "./pages/RequestsPage";
 import { CycleProvider } from "./lib/cycleContext";
 import { SoldiersPage } from "./pages/SoldiersPage";
 
-// Excel parsing is heavy and only נע"ת needs it (the cycle steps load lazily inside the workspace).
+// Excel parsing is heavy and only אחראי השיבוצים needs it (the cycle steps load lazily inside the workspace).
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const SpecPage = lazy(() => import("./pages/SpecPage").then((m) => ({ default: m.SpecPage })));
 const ScoringPage = lazy(() => import("./pages/ScoringPage").then((m) => ({ default: m.ScoringPage })));
@@ -75,7 +75,7 @@ function Gate() {
               <Route
                 path="/soldiers"
                 element={
-                  <ReadOnlyScope commanderNote={'לעובדי המסגרת שלך אפשר לעדכן טלפון, מטווח ותפקידי הקלה, ולשלוח קודי הצטרפות. פטורים, ת"ש, הקלות ושאר הפרטים – אצל נע"ת.'}>
+                  <ReadOnlyScope commanderNote={'לעובדי המסגרת שלך אפשר לעדכן טלפון, מטווח ותפקידי הקלה, ולשלוח קודי הצטרפות. פטורים, ת"ש, הקלות ושאר הפרטים – אצל אחראי השיבוצים.'}>
                     <SoldiersPage />
                   </ReadOnlyScope>
                 }

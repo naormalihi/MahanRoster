@@ -1,4 +1,4 @@
-/** "למי לפנות": the contacts נע"ת chose to show soldiers. */
+/** "למי לפנות": the contacts אחראי השיבוצים chose to show soldiers. */
 import { normalizePhone } from "./phone";
 
 export interface MyContact {
@@ -19,7 +19,7 @@ export interface ContactEntry {
   role?: string | null;
 }
 
-export const ROLE_LABEL: Record<string, string> = { coordinator: 'נע"ת', deputy: 'מ"מ', gaf_commander: "מפקד מסגרת" };
+export const ROLE_LABEL: Record<string, string> = { coordinator: 'אחראי השיבוצים', deputy: 'מ"מ', gaf_commander: "מפקד מסגרת" };
 
 /** What is wrong with the list before saving (empty = fine). */
 export function contactProblems(list: ContactEntry[]): string[] {

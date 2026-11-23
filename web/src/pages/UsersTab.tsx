@@ -133,17 +133,17 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
             <TextField select label="תפקיד" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
               <MenuItem value="gaf_commander">מפקד מסגרת</MenuItem>
               <MenuItem value="unit_commander">מפקד יחידה</MenuItem>
-              <MenuItem value="coordinator">נע"ת תורנויות</MenuItem>
+              <MenuItem value="coordinator">אחראי שיבוצים</MenuItem>
             </TextField>
             {role === "coordinator" ? (
               <Alert severity="warning">
-                נע"ת תורנויות נוסף מקבל את כל ההרשאות שלך: שיבוץ, פרסום, הגדרות וניהול משתמשים – כולל איפוס סיסמאות ונעילה של נע"ת אחרים. בכניסה הראשונה
+                אחראי שיבוצים נוסף מקבל את כל ההרשאות שלך: שיבוץ, פרסום, הגדרות וניהול משתמשים – כולל איפוס סיסמאות ונעילה של אחראי השיבוצים אחרים. בכניסה הראשונה
                 הוא יחליף את הסיסמה הזמנית ויגדיר אימות דו-שלבי לפני שיוכל לפעול.
               </Alert>
             ) : (
             <Typography variant="body2" color="text.secondary">
               {role === "unit_commander"
-                ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא \"נתוני היחידה\" – כולל כל שינוי הגדרות שנע\"ת עשה בחודש האחרון."
+                ? "מפקד היחידה רואה את כל נתוני היחידה לקריאה בלבד, ומסך הבית שלו הוא \"נתוני היחידה\" – כולל כל שינוי הגדרות שאחראי השיבוצים עשה בחודש האחרון."
                 : "מפקד מסגרת רואה לקריאה בלבד את פרטי העובדים של המסגרת שלו – כולל ת\"ש, פטורים והיעדרויות – ואת הלוח, הטיוטה והפוטנציאל של כל היחידה בלי פרטים אישיים. המסגרת נקבע לפי העובד שמשויך אליו, ולכן כדאי לבחור אותו כאן."}
             </Typography>
             )}
@@ -217,7 +217,7 @@ export function UsersTab() {
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 260 }}>
           חשבונות אישיים. כל משתמש משויך לרשומת העובד שלו מכוח האדם (בלי מספר עובד). כאן נוצרים חשבונות של מפקדי מסגרות ומפקד היחידה (צפייה);
-          עובדים מצטרפים בקוד הצטרפות ממסך העובדים; נע"ת וממלא מקום מוגדרים בהקמה.
+          עובדים מצטרפים בקוד הצטרפות ממסך העובדים; אחראי השיבוצים וממלא מקום מוגדרים בהקמה.
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
           משתמש חדש
@@ -251,11 +251,11 @@ export function UsersTab() {
           const parts = (u: AppUser) => {
             const self = u.user_id === me?.userId;
             const commander = u.roles.some((r) => r.role === "gaf_commander");
-            // a framework commander's or a נע"ת's account (with or without the employee role) can be deleted
+            // a framework commander's or a אחראי השיבוצים's account (with or without the employee role) can be deleted
             const deletable =
               u.roles.some((r) => r.role === "gaf_commander" || r.role === "coordinator") &&
               u.roles.every((r) => ["gaf_commander", "coordinator", "soldier"].includes(r.role));
-            // a staff role can be taken away (not the soldier one – it follows the link to a soldier – nor your own נע"ת)
+            // a staff role can be taken away (not the soldier one – it follows the link to a soldier – nor your own אחראי השיבוצים)
             const removable = (role: string) => role !== "soldier" && u.roles.length > 1 && !(self && role === "coordinator");
             const roles = u.roles.map((r) => (
               <Chip
@@ -311,7 +311,7 @@ export function UsersTab() {
                     </IconButton>
                   </Tooltip>
                 )}
-                {/* a new phone: another נע"ת or מ"מ removes the two-step login; he sets it up again when he signs in */}
+                {/* a new phone: another אחראי השיבוצים or מ"מ removes the two-step login; he sets it up again when he signs in */}
                 {!self && u.has_mfa && (
                   <Tooltip title="איפוס אימות דו-שלבי (טלפון חדש)">
                     <IconButton size="small" aria-label="איפוס אימות דו-שלבי" onClick={() => setMfaReset(u)}>

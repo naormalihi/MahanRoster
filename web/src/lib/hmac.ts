@@ -3,7 +3,7 @@
  *
  * The employee number (מספר עובד) never leaves the browser. It is turned into
  * soldier_key = HMAC-SHA256(unit key, employee number) here, and only the key
- * is sent to the server. The unit key is a passphrase held by נע"ת התורנויות;
+ * is sent to the server. The unit key is a passphrase held by אחראי השיבוצים;
  * it is never sent. After it is confirmed it stays in this tab (sessionStorage) until sign-out
  * or the tab closes, so it is typed once per working session.
  */

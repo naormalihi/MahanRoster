@@ -125,7 +125,7 @@ export function SwapDialog({ duty, onClose, onSent }: { duty: MyDuty; onClose: (
           </Alert>
         )}
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
-          העובד השני יקבל התראה. ברגע שהוא מאשר – ההחלפה מתבצעת והנקודות עוברות למי שעושה את התורנות. נע״ת התורנויות מקבל עדכון.
+          העובד השני יקבל התראה. ברגע שהוא מאשר – ההחלפה מתבצעת והנקודות עוברות למי שעושה את התורנות. אחראי השיבוצים מקבל עדכון.
         </Typography>
       </DialogContent>
       <DialogActions>
@@ -227,7 +227,7 @@ export function SwapsCard({ swaps, onChange }: { swaps: MySwap[]; onChange: () =
   );
 }
 
-/** For נע"ת: the swaps soldiers made between themselves lately (no approval needed – this is the update). */
+/** For אחראי השיבוצים: the swaps soldiers made between themselves lately (no approval needed – this is the update). */
 export function SwapLogCard() {
   const { api } = useAuth();
   const [rows, setRows] = useState<SwapLogRow[] | null>(null);

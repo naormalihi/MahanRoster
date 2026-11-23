@@ -32,7 +32,7 @@ export function ReadOnlyScope({ children, commanderNote }: { children: ReactNode
       }}
     >
       <Alert severity="info" icon={note ? <EditIcon /> : <VisibilityIcon />} sx={{ mb: 2 }}>
-        {note ?? 'צפייה בלבד. אפשר לראות את כל נתוני היחידה; שינויים נעשים על ידי נע"ת התורנויות.'}
+        {note ?? 'צפייה בלבד. אפשר לראות את כל נתוני היחידה; שינויים נעשים על ידי אחראי השיבוצים.'}
       </Alert>
       {children}
     </Box>

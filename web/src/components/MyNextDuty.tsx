@@ -8,7 +8,7 @@ import { splitDuties, type MyDuty } from "../lib/me";
 
 const WEEK = 7 * 86_400_000;
 
-/** On the home of נע"ת or a commander who does duties too: his own next duty, in the coming week. */
+/** On the home of אחראי השיבוצים or a commander who does duties too: his own next duty, in the coming week. */
 export function MyNextDuty() {
   const { api, me } = useAuth();
   const soldier = isSoldier(me);

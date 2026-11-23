@@ -103,7 +103,7 @@ function DutyRow({ d, open, onToggle, onSwap, onAck }: { d: MyDuty; open: boolea
             </Typography>
           )}
           <Typography variant="body2" color="text.secondary">
-            <b>למה שובצתי:</b> {d.explanation ?? "שובץ ידנית על ידי נע\"ת התורנויות."}
+            <b>למה שובצתי:</b> {d.explanation ?? "שובץ ידנית על ידי אחראי השיבוצים."}
           </Typography>
           <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Typography variant="caption" color="text.secondary">
@@ -336,7 +336,7 @@ export function MyPage() {
       </Box>
 
       <Typography variant="caption" color="text.secondary">
-        פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". החלפה – בלחיצה על התורנות, עד 24 שעות לפניה; אחר כך פונים לנע"ת התורנויות.
+        פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". החלפה – בלחיצה על התורנות, עד 24 שעות לפניה; אחר כך פונים לאחראי השיבוצים.
       </Typography>
       <ContactCard />
       {swapping && (

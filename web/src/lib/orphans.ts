@@ -1,7 +1,7 @@
 /**
  * Requests that fall in no cycle. The constraints screens show a cycle's dates only, so an
  * exemption, absence or date block for days no cycle covers yet is invisible there – until a
- * cycle is opened for them. The home screen lists them so נע"ת knows to open (or stretch) one.
+ * cycle is opened for them. The home screen lists them so אחראי השיבוצים knows to open (or stretch) one.
  */
 import { absenceDays, type Absence, type DateBlock, type Exemption } from "./cycles";
 
