@@ -205,11 +205,11 @@ export function HomePage() {
           {!week ? (
             <CircularProgress size={20} />
           ) : week.length === 0 ? (
-            <EmptyState size="sm" pose="sleep" title="שקט השבוע" text="אין תורנויות מפורסמות בשבעת הימים הקרובים." />
+            <EmptyState size="sm" pose="sleep" title="שקט השבוע" text="אין משימות מפורסמות בשבעת הימים הקרובים." />
           ) : (
             <>
               <Typography>
-                <b>{week.length}</b> תורנויות מפורסמות בשבעת הימים הקרובים
+                <b>{week.length}</b> משימות מפורסמות בשבעת הימים הקרובים
                 {unstaffed.length > 0 ? (
                   <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
                     {` · ${unstaffed.length} לא מאוישות`}

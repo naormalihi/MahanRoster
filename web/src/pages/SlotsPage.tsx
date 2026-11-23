@@ -81,7 +81,7 @@ function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) =
     <TextField
       select
       size="small"
-      label={props.label ?? "סוג תורנות"}
+      label={props.label ?? "סוג משימה"}
       value={props.value}
       onChange={(e) => (e.target.value === NEW ? props.onNew?.() : props.onChange(e.target.value))}
       sx={{ minWidth: 220 }}
@@ -91,12 +91,12 @@ function TaskSelect(props: { refs: Refs; value: string; onChange: (id: string) =
       </MenuItem>
       {props.onNew && (
         <MenuItem value={NEW} sx={{ color: "primary.main", fontWeight: 600 }}>
-          + סוג תורנות חדש בשם הזה
+          + סוג משימה חדש בשם הזה
         </MenuItem>
       )}
       {!groups.length && !loose.length && (
         <MenuItem disabled sx={{ whiteSpace: "normal" }}>
-          אין סוגי תורנות פעילים בקטלוג
+          אין סוגי משימה פעילים בקטלוג
         </MenuItem>
       )}
       {/* a category heads its types only when it has more than one – a lone type is its own title */}
@@ -175,7 +175,7 @@ function ImportCard(props: {
       const sheetName = wb.SheetNames.find((n) => readRows(XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[n], { header: 1, raw: true, defval: "" })).header) ?? wb.SheetNames[0];
       const data = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: true, defval: "" });
       const r = readRows(data);
-      if (!r.header) setMsg("לא מצאתי שורת כותרות עם העמודות \"מועד\" ו\"סוג תורנות\".");
+      if (!r.header) setMsg("לא מצאתי שורת כותרות עם העמודות \"מועד\" ו\"סוג משימה\".");
       else {
         setFile(f.name);
         setRows(r.rows);
@@ -242,8 +242,8 @@ function ImportCard(props: {
       <Stack spacing={2}>
         <Typography variant="h3">קליטת קובץ המשבצות מהבסיס</Typography>
         <Typography variant="body2" color="text.secondary">
-          בקובץ נדרשות רק שתי עמודות: <b>מועד</b> ו<b>סוג תורנות</b>. שורה = משבצת עם מבצע ועתודה. כל השאר נגזר: השעות מסוג התורנות (לפי יום
-          בשבוע), גרסת השבת והחגים מהתאריך, ומי יכול לבצע מסוג התורנות. עמודות אחרות בקובץ לא נקראות. משבצת שייכת למחזור שבו היא מתחילה.
+          בקובץ נדרשות רק שתי עמודות: <b>מועד</b> ו<b>סוג משימה</b>. שורה = משבצת עם מבצע ועתודה. כל השאר נגזר: השעות מסוג המשימה (לפי יום
+          בשבוע), גרסת השבת והחגים מהתאריך, ומי יכול לבצע מסוג המשימה. עמודות אחרות בקובץ לא נקראות. משבצת שייכת למחזור שבו היא מתחילה.
         </Typography>
         <Box>
           <Button variant="contained" component="label" startIcon={<UploadIcon />} disabled={busy}>
@@ -276,11 +276,11 @@ function ImportCard(props: {
             <Stack spacing={1.5}>
               {!refs.tasks.some((t) => t.is_active && !t.is_special) && (
                 <Alert severity="error">
-                  בקטלוג אין סוגי תורנות פעילים, ולכן אין למה להתאים. הוסף סוג מכל שם כאן (&quot;+ סוג תורנות חדש&quot; ברשימה) או בהגדרות ← קטלוג.
+                  בקטלוג אין סוגי משימה פעילים, ולכן אין למה להתאים. הוסף סוג מכל שם כאן (&quot;+ סוג משימה חדש&quot; ברשימה) או בהגדרות ← קטלוג.
                 </Alert>
               )}
               <Typography>
-                <b>{result.unmapped.length} שמות תורנות לא מוכרים.</b> בחר לכל שם את סוג התורנות בקטלוג. שם ותורנות שבת של אותו סוג מזוהים אוטומטית לפי היום.
+                <b>{result.unmapped.length} שמות משימה לא מוכרים.</b> בחר לכל שם את סוג המשימה בקטלוג. שם ומשימת שבת של אותו סוג מזוהים אוטומטית לפי היום.
               </Typography>
               {result.unmapped.map((u) => (
                 <Stack key={u.duty} direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { sm: "center" } }}>
@@ -318,7 +318,7 @@ function ImportCard(props: {
             <Alert severity={result.slots.length ? "info" : "warning"}>
               <b>{result.slots.length} משבצות ייקלטו</b> ל{cycle.name}.
               {result.outside.length > 0 && ` ${result.outside.length} שורות מתחילות מחוץ למחזור ולא ייקלטו.`}
-              {switched > 0 && ` ${switched} משבצות שמתחילות בסוף שבוע הועברו לסוג התורנות של שבת.`}
+              {switched > 0 && ` ${switched} משבצות שמתחילות בסוף שבוע הועברו לסוג המשימה של שבת.`}
               {result.unmapped.length > 0 && ` ${result.unmapped.reduce((n, u) => n + u.count, 0)} שורות של שמות שסומנו "לא לקלוט" דולגו.`}
             </Alert>
             {(errors.length > 0 || unknownRankRows.length > 0) && (
@@ -347,7 +347,7 @@ function ImportCard(props: {
             )}
             {popMismatch.length > 0 && (
               <Alert severity="warning">
-                <b>עמודת האוכלוסייה סותרת את סוג התורנות ב-{popMismatch.length} משבצות</b> (למשל "חובה" על סוג שמיועד לקבע). בדוק את ההתאמה:
+                <b>עמודת האוכלוסייה סותרת את סוג המשימה ב-{popMismatch.length} משבצות</b> (למשל "חובה" על סוג שמיועד לקבע). בדוק את ההתאמה:
                 <List dense disablePadding>
                   {[...new Set(popMismatch.map((s) => `${s.duty} → ${taskName.get(s.task_type_id)}`))].map((t) => (
                     <ListItem key={t} disableGutters sx={{ py: 0 }}>
@@ -384,7 +384,7 @@ function ImportCard(props: {
                     {!narrow && <TableCell>שורה</TableCell>}
                     <TableCell>מועד</TableCell>
                     {!narrow && <TableCell>בקובץ</TableCell>}
-                    <TableCell>סוג תורנות</TableCell>
+                    <TableCell>סוג משימה</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -485,7 +485,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
             <TableRow>
               {!props.locked && <TableCell padding="checkbox" />}
               <TableCell>מועד</TableCell>
-              <TableCell>תורנות</TableCell>
+              <TableCell>משימה</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -525,7 +525,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
         </Table>
       </TableContainer>
       <Typography variant="caption" color="text.secondary">
-        ת״ש 7 = משבצת שהבסיס ייעד קודם לעובדים שלנים בבית; אם אין מהם זמין, ישובץ כל עובד זכאי. משבצת שכבר שובצה בה תורנות אי אפשר למחוק מכאן.
+        ת״ש 7 = משבצת שהבסיס ייעד קודם לעובדים שלנים בבית; אם אין מהם זמין, ישובץ כל עובד זכאי. משבצת שכבר שובצה בה משימה אי אפשר למחוק מכאן.
       </Typography>
     </Stack>
   );

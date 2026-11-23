@@ -275,13 +275,13 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
       </Stack>
       {props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
         <Alert severity="info" icon={false}>
-          ת״ש 7: העובד לן בבית ולא ישובץ בתאריכים האלה לתורנות שכוללת שעות לילה. במשבצות שהבסיס סימן "ת״ש 7" הוא מקבל עדיפות.
+          ת״ש 7: העובד לן בבית ולא ישובץ בתאריכים האלה למשימה שכוללת שעות לילה. במשבצות שהבסיס סימן "ת״ש 7" הוא מקבל עדיפות.
         </Alert>
       )}
       {!props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
       <RadioGroup row value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value as "full" | "partial" })}>
         <FormControlLabel value="full" control={<Radio />} label="לפי סוג הפטור" />
-        <FormControlLabel value="partial" control={<Radio />} label="מצומצם לתורנויות או לשעות" />
+        <FormControlLabel value="partial" control={<Radio />} label="מצומצם למשימות או לשעות" />
       </RadioGroup>
       )}
       {e.kind === "partial" && !props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
@@ -292,7 +292,7 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
             value={activeTasks.filter((t) => e.excluded_task_type_ids?.includes(t.id))}
             onChange={(_, v) => setE({ ...e, excluded_task_type_ids: v.map((t) => t.id) })}
             getOptionLabel={(t) => t.name}
-            renderInput={(p) => <TextField {...p} label="פטור מהתורנויות" />}
+            renderInput={(p) => <TextField {...p} label="פטור מהמשימות" />}
           />
           <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
             <FormControlLabel control={<Switch checked={hours.on} onChange={(ev) => setHours({ ...hours, on: ev.target.checked })} />} label="פטור בשעות" />

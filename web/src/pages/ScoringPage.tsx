@@ -91,7 +91,7 @@ export function ScoringPage() {
         <Box>
           <Typography variant="h1">איך מחושב הניקוד</Typography>
           <Typography variant="body2" color="text.secondary">
-            כל תורנות שווה נקודות. מי שצבר פחות – משובץ קודם.
+            כל משימה שווה נקודות. מי שצבר פחות – משובץ קודם.
           </Typography>
         </Box>
       </Stack>
@@ -99,10 +99,10 @@ export function ScoringPage() {
       <Section title="הנוסחה">
         <Formula r={rules} />
         <Stack spacing={0.5} sx={{ mt: 1.25 }}>
-          <Line b="משקל">של התורנות כולה, גם אם היא נמשכת כמה ימים.</Line>
-          <Line b="תוספת יום">לפי היום שבו התורנות נופלת (הרשימה למטה). אם חלות כמה – רק הגבוהה, פעם אחת.</Line>
+          <Line b="משקל">של המשימה כולה, גם אם היא נמשכת כמה ימים.</Line>
+          <Line b="תוספת יום">לפי היום שבו המשימה נופלת (הרשימה למטה). אם חלות כמה – רק הגבוהה, פעם אחת.</Line>
           <Line b="הקפצה">
-            פי {num(rules.surprise_multiplier)} למי ששובץ אחרי הפרסום, פחות מ-{rules.surprise_notice_hours} שעות לפני התורנות.
+            פי {num(rules.surprise_multiplier)} למי ששובץ אחרי הפרסום, פחות מ-{rules.surprise_notice_hours} שעות לפני המשימה.
           </Line>
         </Stack>
       </Section>
@@ -126,7 +126,7 @@ export function ScoringPage() {
 
       <Section title="המספרים">
         <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.75 }}>
-          משקל לכל תורנות
+          משקל לכל משימה
         </Typography>
         <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
           {rules.tasks
@@ -156,12 +156,12 @@ export function ScoringPage() {
 
       <Section title="למה זה הוגן">
         <Stack spacing={0.5}>
-          <Line b="משווים נכון">רק מול מי שיכולים לעשות אותן תורנויות.</Line>
+          <Line b="משווים נכון">רק מול מי שיכולים לעשות אותן משימות.</Line>
           <Line b="יש זיכרון">נספרות גם הנקודות של {rules.window_months} החודשים האחרונים.</Line>
           <Line b="היעדרות לא מבחירה">
             {rules.credit_absences?.length ? `${orList(rules.credit_absences)} של ${rules.credit_min_days ?? 7} ימים ומעלה, או פטור מלא, מזכים` : "פטור מלא מזכה"} – לא חוזרים לערימה.
           </Line>
-          <Line b="חגים וסופי שבוע">מתחלקים בתורות. מי שעשה תורנות בחג בשנה האחרונה – אחרון לחג הבא.</Line>
+          <Line b="חגים וסופי שבוע">מתחלקים בתורות. מי שעשה משימה בחג בשנה האחרונה – אחרון לחג הבא.</Line>
         </Stack>
       </Section>
 

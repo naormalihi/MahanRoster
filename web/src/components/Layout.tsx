@@ -71,7 +71,7 @@ const STAFF_LINKS = [
 
 /** A soldier with his own account: his duties and the published board. */
 const SOLDIER_LINKS = [
-  { to: "/", label: "התורנויות שלי", match: (p: string) => p === "/" },
+  { to: "/", label: "המשימות שלי", match: (p: string) => p === "/" },
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
   { to: "/board", label: "לוח השיבוצים", match: (p: string) => p === "/board" },
   { to: "/scoring", label: "איך מחושב הניקוד", match: (p: string) => p === "/scoring" },
@@ -79,7 +79,7 @@ const SOLDIER_LINKS = [
 
 /** Staff and commanders who do duties too: their own corner, next to the unit's screens. */
 const MY_LINKS = [
-  { to: "/my", label: "התורנויות שלי", match: (p: string) => p === "/my" },
+  { to: "/my", label: "המשימות שלי", match: (p: string) => p === "/my" },
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
 ];
 
@@ -462,7 +462,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <Box sx={{ display: "none", "@media print": { display: "flex" }, alignItems: "center", gap: 2, px: 1, pt: 1, pb: 2, borderBottom: "2px solid #e8700f" }}>
         <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ height: 56, width: 56 }} />
         <Box>
-          <Typography sx={{ fontWeight: 700, fontSize: 18 }}>תורנצ׳יק – תורנויות</Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: 18 }}>תורנצ׳יק – משימות</Typography>
           <Typography variant="body2">הודפס ב-{new Date().toLocaleDateString("he-IL")}</Typography>
         </Box>
       </Box>

@@ -147,7 +147,7 @@ function ScoreCard({ s }: { s: MyScore }) {
       <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mt: 0.5 }}>
         <Typography variant="h2">{s.points.toFixed(1)}</Typography>
         <Typography variant="body2" color="text.secondary">
-          נק׳ ב-{s.duties} תורנויות
+          נק׳ ב-{s.duties} משימות
         </Typography>
       </Stack>
       {s.group_mean !== null && (
@@ -157,7 +157,7 @@ function ScoreCard({ s }: { s: MyScore }) {
             <Box sx={{ position: "absolute", insetInlineStart: pct(mean), top: -3, bottom: -3, width: 2, bgcolor: "text.primary" }} />
           </Box>
           <Typography variant="body2" color="text.secondary">
-            הממוצע של מי שזכאים לאותן תורנויות{s.group_label ? ` (${s.group_label})` : ""}: <b>{mean.toFixed(1)}</b> · {s.group_size} עובדים.{" "}
+            הממוצע של מי שזכאים לאותן משימות{s.group_label ? ` (${s.group_label})` : ""}: <b>{mean.toFixed(1)}</b> · {s.group_size} עובדים.{" "}
             {Math.abs(diff) < 0.05 ? "אתה בדיוק בממוצע." : diff > 0 ? `אתה ${diff.toFixed(1)} מעל.` : `אתה ${(-diff).toFixed(1)} מתחת.`}
           </Typography>
         </>
@@ -190,7 +190,7 @@ export function MyPage() {
   useEffect(() => {
     const fromCopy = (e: unknown) => {
       const copy = isOfflineError(e) && me ? readOffline(me.userId) : null;
-      if (!copy) return setError(isOfflineError(e) ? "אין חיבור לאינטרנט, ואין במכשיר עותק של התורנויות שלך." : (e as Error).message);
+      if (!copy) return setError(isOfflineError(e) ? "אין חיבור לאינטרנט, ואין במכשיר עותק של המשימות שלך." : (e as Error).message);
       setDuties(copy.duties);
       setStale(copy.savedAt);
     };
@@ -231,11 +231,11 @@ export function MyPage() {
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
         <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ width: 48, height: 48, flexShrink: 0 }} />
         <Box>
-          <Typography variant="h1">התורנויות שלי</Typography>
+          <Typography variant="h1">המשימות שלי</Typography>
           <Typography variant="body2" color="text.secondary">
             {greeting()}
             {me?.username ? `, ${me.username}` : ""}
-            {next ? ` · התורנות הבאה ${dayLabel(next.starts_at)}` : ""}
+            {next ? ` · המשימה הבאה ${dayLabel(next.starts_at)}` : ""}
           </Typography>
         </Box>
       </Stack>
@@ -261,7 +261,7 @@ export function MyPage() {
               </Button>
             }
           >
-            {waiting.length} תורנויות חדשות או שהשתנו – אשר שראית.
+            {waiting.length} משימות חדשות או שהשתנו – אשר שראית.
           </Alert>
         );
       })()}
@@ -273,12 +273,12 @@ export function MyPage() {
       {next ? (
         <Paper sx={{ p: 2, borderInlineStart: 4, borderColor: "primary.main" }}>
           <Typography variant="subtitle2" color="text.secondary">
-            התורנות הבאה · {dayLabel(next.starts_at)}
+            המשימה הבאה · {dayLabel(next.starts_at)}
           </Typography>
           <DutyRow d={next} open onToggle={() => undefined} onSwap={stale ? undefined : setSwapping} onAck={stale ? undefined : ack} />
         </Paper>
       ) : (
-        <EmptyState pose="sleep" title="אין לך תורנויות קרובות" text="כשיתפרסם לוח חדש, התורנויות שלך יופיעו כאן ותקבל התראה." />
+        <EmptyState pose="sleep" title="אין לך משימות קרובות" text="כשיתפרסם לוח חדש, המשימות שלך יופיעו כאן ותקבל התראה." />
       )}
 
       {upcoming.length > 1 && (
@@ -297,7 +297,7 @@ export function MyPage() {
       {past.length > 0 && (
         <Accordion variant="outlined" disableGutters>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle2">תורנויות שעברו ({past.length})</Typography>
+            <Typography variant="subtitle2">משימות שעברו ({past.length})</Typography>
           </AccordionSummary>
           <AccordionDetails>
             <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
@@ -336,7 +336,7 @@ export function MyPage() {
       </Box>
 
       <Typography variant="caption" color="text.secondary">
-        פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". החלפה – בלחיצה על התורנות, עד 24 שעות לפניה; אחר כך פונים לאחראי השיבוצים.
+        פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". החלפה – בלחיצה על המשימה, עד 24 שעות לפניה; אחר כך פונים לאחראי השיבוצים.
       </Typography>
       <ContactCard />
       {swapping && (

@@ -51,7 +51,7 @@ describe("soldier factors", () => {
       }),
       holiday: { day: "2027-04-21", task_name: "שמירות חובה" },
     });
-    expect(t).toEqual(["הקלה: ראש צוות ×0.5", "הורה", 'שח"ר', "מטווח בתוקף עד 12.3", "תורנות חג", "שחרור 15.5"]);
+    expect(t).toEqual(["הקלה: ראש צוות ×0.5", "הורה", 'שח"ר', "מטווח בתוקף עד 12.3", "משימת חג", "שחרור 15.5"]);
     expect(soldierFactors(base({ soldier: soldier({ load_roles: [{ load_role_id: "r", name: "ראש צוות", factor: 0.5, valid_from: "2026-01-01", valid_to: null }] }) }))[0].effect).toContain("50%");
   });
   it("a range never entered is assumed valid; an entered date that passed blocks", () => {

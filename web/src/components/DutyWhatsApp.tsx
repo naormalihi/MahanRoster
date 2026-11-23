@@ -45,7 +45,7 @@ export function DutyWhatsAppButton(props: { query: Query; name: string; compact?
     );
   if (props.compact)
     return (
-      <Tooltip title="הודעת וואטסאפ על התורנות">
+      <Tooltip title="הודעת וואטסאפ על המשימה">
         <span>
           <IconButton size="small" color="success" disabled={busy === key} onClick={go} aria-label={`וואטסאפ ל${props.name}`}>
             <WhatsAppIcon fontSize="small" />

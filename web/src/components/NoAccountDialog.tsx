@@ -24,7 +24,7 @@ export function NoAccountDialog({ cycleId, onClose }: { cycleId: string; onClose
       <DialogTitle>שליחה למי שאין לו חשבון</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          העובדים האלה לא קיבלו התראה על הלוח. לכל אחד – הודעה אחת עם כל התורנויות שלו במחזור וקוד הצטרפות אישי. כשהוא עונה &quot;קיבלתי&quot; – מסמנים &quot;וידאתי בטלפון&quot; בתמונת המצב.
+          העובדים האלה לא קיבלו התראה על הלוח. לכל אחד – הודעה אחת עם כל המשימות שלו במחזור וקוד הצטרפות אישי. כשהוא עונה &quot;קיבלתי&quot; – מסמנים &quot;וידאתי בטלפון&quot; בתמונת המצב.
         </Typography>
         {!rows && !error && <CircularProgress size={22} />}
         {rows?.length === 0 && <Alert severity="success">לכל המשובצים יש חשבון – כולם קיבלו התראה.</Alert>}
@@ -43,7 +43,7 @@ export function NoAccountDialog({ cycleId, onClose }: { cycleId: string; onClose
                     {r.sent && <Chip size="small" color="success" variant="outlined" label="נשלח" />}
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
-                    {r.duties === 1 ? "תורנות אחת" : `${r.duties} תורנויות`} · הראשונה {shortDayLabel(r.first_at)}
+                    {r.duties === 1 ? "משימה אחת" : `${r.duties} משימות`} · הראשונה {shortDayLabel(r.first_at)}
                     {!r.phone && (
                       <>
                         {" · "}
@@ -105,7 +105,7 @@ export function NoAccountStrip({ cycleId }: { cycleId: string }) {
             </Button>
           }
         >
-          {left === 1 ? "משובץ אחד בלי חשבון עוד לא קיבל" : `${left} משובצים בלי חשבון עוד לא קיבלו`} הודעה על התורנויות שלו{left === 1 ? "" : "הם"}.
+          {left === 1 ? "משובץ אחד בלי חשבון עוד לא קיבל" : `${left} משובצים בלי חשבון עוד לא קיבלו`} הודעה על המשימות שלו{left === 1 ? "" : "הם"}.
         </Alert>
       )}
       {open && <NoAccountDialog cycleId={cycleId} onClose={() => setOpen(false)} />}

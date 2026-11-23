@@ -30,11 +30,11 @@ export function MyNextDuty() {
       severity="info"
       action={
         <Button color="inherit" size="small" component={RouterLink} to="/my">
-          התורנויות שלי
+          המשימות שלי
         </Button>
       }
     >
-      <b>התורנות הבאה שלך:</b> {next.task_name} · {dayLabel(next.starts_at)} · {spanLabel(next.starts_at, next.ends_at)}
+      <b>המשימה הבאה שלך:</b> {next.task_name} · {dayLabel(next.starts_at)} · {spanLabel(next.starts_at, next.ends_at)}
       {next.role === "reserve" ? " · עתודה" : ""}
     </Alert>
   );

@@ -50,7 +50,7 @@ export function ErrorState({ text, onRetry }: { text: string; onRetry?: () => vo
     <EmptyState
       pose={offline ? "sleep" : "confused"}
       title={offline ? "אין חיבור" : "משהו לא הסתדר"}
-      text={offline ? 'המסך הזה צריך חיבור לאינטרנט. "התורנויות שלי" זמינות גם בלי קליטה.' : text}
+      text={offline ? 'המסך הזה צריך חיבור לאינטרנט. "המשימות שלי" זמינות גם בלי קליטה.' : text}
       action={
         onRetry && (
           <Button variant="contained" size="small" onClick={onRetry}>

@@ -213,7 +213,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
                       }
                       secondary={
                         <>
-                          ניקוד צפוי {c.cycle_points.toFixed(1)} · {c.cycle_duties} תורנויות במחזור
+                          ניקוד צפוי {c.cycle_points.toFixed(1)} · {c.cycle_duties} משימות במחזור
                           {bad && ` · ${reasonText(c.reasons)}`}
                           {c.conflicts.length > 0 &&
                             ` · ${c.conflicts.map((x) => `${x.task} ${dm.format(new Date(x.starts_at))}`).join(", ")}`}
@@ -238,7 +238,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
                 </div>
               )}
               {chosen!.reasons.some((x) => x !== "grace") && <div>לא זכאי: {reasonText(chosen!.reasons.filter((x) => x !== "grace"))}.</div>}
-              {chosen!.conflicts.length > 0 && <div>בלי מספיק מנוחה מתורנות אחרת.</div>}
+              {chosen!.conflicts.length > 0 && <div>בלי מספיק מנוחה ממשימה אחרת.</div>}
               אפשר לשבץ בכל זאת – {props.published ? "עם סיבה, שנשמרת ביומן" : "הנימוק נשמר ביומן"}.
             </Alert>
           )}
@@ -400,11 +400,11 @@ function BoardView({
         >
           {shown.length ? (
             <>
-              התורנויות של <b>{name(who)}</b> ({shown.length})
+              המשימות של <b>{name(who)}</b> ({shown.length})
             </>
           ) : (
             <>
-              ל<b>{name(who)}</b> אין תורנויות בטיוטה.{" "}
+              ל<b>{name(who)}</b> אין משימות בטיוטה.{" "}
               <Button size="small" onClick={() => onOpenSoldier(who)}>
                 למה?
               </Button>
@@ -619,7 +619,7 @@ function LoadTab({
             <Box>
               <Typography sx={{ fontWeight: 700, fontSize: 14 }}>שיבוץ לא לפי התור – {fair.inversions.length}</Typography>
               <Typography variant="body2" color="text.secondary">
-                מישהו מאותה קבוצה היה פנוי וזכאי, והניקוד המצטבר שלו נמוך ביותר ממה שהתורנות שווה – החלפה ביניהם הייתה מקרבת אותם.
+                מישהו מאותה קבוצה היה פנוי וזכאי, והניקוד המצטבר שלו נמוך ביותר ממה שהמשימה שווה – החלפה ביניהם הייתה מקרבת אותם.
               </Typography>
             </Box>
           </Stack>
@@ -638,7 +638,7 @@ function LoadTab({
                   <Box component="span" role="button" tabIndex={0} onClick={() => onOpen(x.skipped_id)} sx={{ fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
                     {name(x.skipped_id)}
                   </Box>{" "}
-                  ({Number(x.skipped_total).toFixed(1)} נק׳) · התורנות {Number(x.points).toFixed(1)} נק׳
+                  ({Number(x.skipped_total).toFixed(1)} נק׳) · המשימה {Number(x.points).toFixed(1)} נק׳
                 </Typography>
               </Box>
             ))}
@@ -679,20 +679,20 @@ function LoadTab({
               <Typography sx={{ fontWeight: 700, fontSize: 14 }}>{poolName(groupName, pool)}</Typography>
               <Typography variant="body2" color="text.secondary">
                 {v.outliers.length === 0 ? (
-                  <>מאוזן – לאף אחד מ-{v.compared} שנבדקו אין פער מצטבר של יותר מתורנות אחת.</>
+                  <>מאוזן – לאף אחד מ-{v.compared} שנבדקו אין פער מצטבר של יותר ממשימה אחת.</>
                 ) : (
                   <>
                     <b>
                       {v.outliers.length} עם פער מצטבר
                     </b>{" "}
-                    – יותר מתורנות אחת מממוצע מי שזכאים לאותן תורנויות, גם אחרי המחזורים הקודמים. הכי רחוק: {name(v.outliers[0].soldier_id)}{" "}
-                    {sign(v.outliers[0].diff)} נק׳ (ממוצע עמיתיו {v.outliers[0].ref.toFixed(1)}, תורנות אחת עד {v.outliers[0].oneDuty.toFixed(1)}).
+                    – יותר ממשימה אחת מממוצע מי שזכאים לאותן משימות, גם אחרי המחזורים הקודמים. הכי רחוק: {name(v.outliers[0].soldier_id)}{" "}
+                    {sign(v.outliers[0].diff)} נק׳ (ממוצע עמיתיו {v.outliers[0].ref.toFixed(1)}, משימה אחת עד {v.outliers[0].oneDuty.toFixed(1)}).
                   </>
                 )}
               </Typography>
               {v.small.length > 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                  {v.small.length} עם פער של עד תורנות אחת – כך התורנויות מתחלקות במחזור קצר, וזה יתאזן במחזור הבא.
+                  {v.small.length} עם פער של עד משימה אחת – כך המשימות מתחלקות במחזור קצר, וזה יתאזן במחזור הבא.
                 </Typography>
               )}
               <Button size="small" sx={{ px: 0, minWidth: 0 }} onClick={() => setBreakdown((b) => !b)} endIcon={<ExpandMoreIcon sx={{ transform: breakdown ? "rotate(180deg)" : undefined }} />}>
@@ -704,7 +704,7 @@ function LoadTab({
               leaveTouchDelay={6000}
               title={
                 <>
-                  הפס = הניקוד הצפוי (קודם + זיכוי + המחזור). הקו = ממוצע מי שזכאים לאותן תורנויות, והרקע סביבו = הטווח המותר. לחיצה על עובד מציגה את
+                  הפס = הניקוד הצפוי (קודם + זיכוי + המחזור). הקו = ממוצע מי שזכאים לאותן משימות, והרקע סביבו = הטווח המותר. לחיצה על עובד מציגה את
                   הפירוט.
                 </>
               }
@@ -718,7 +718,7 @@ function LoadTab({
           <Collapse in={breakdown} unmountOnExit>
             <Stack spacing={1.5} sx={{ mb: 1.5, p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                קבוצה = עובדים מאותה אוכלוסייה שיכולים להתחלק בעומס. בתוכה, כל עובד נמדד מול מי שזכאים לאותן קטגוריות תורנות. עובד שלא זכאי לאף
+                קבוצה = עובדים מאותה אוכלוסייה שיכולים להתחלק בעומס. בתוכה, כל עובד נמדד מול מי שזכאים לאותן קטגוריות משימה. עובד שלא זכאי לאף
                 קטגוריה, או שהוא היחיד בצירוף שלו, לא נבדק.
                 {credited && " זיכוי = ימים מחוץ ליחידה שלא מבחירה, כפול העומס היומי הממוצע של הקבוצה."}
               </Typography>
@@ -798,7 +798,7 @@ function LoadTab({
                     {r.manual > 0 && <Chip size="small" color="secondary" variant="outlined" label="ידני" sx={{ mr: 0.5, height: 18 }} />}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap component="div">
-                    {s?.gaf_name} · {rank.get(r.soldier_id)} · {r.duties} תורנויות{r.weekends ? ` · ${r.weekends} סופ״ש` : ""}
+                    {s?.gaf_name} · {rank.get(r.soldier_id)} · {r.duties} משימות{r.weekends ? ` · ${r.weekends} סופ״ש` : ""}
                     {r.reserves ? ` · ${r.reserves} עתודות` : ""}
                   </Typography>
                 </Box>
@@ -864,7 +864,7 @@ function IdleDialog({ fair, ctx, onClose, onOpen }: { fair: Fairness; ctx: Ctx; 
       <DialogContent dividers>
         <Stack spacing={1.5}>
           <Typography variant="body2" color="text.secondary">
-            זה לא בגלל האיזון: הם לא כשירים לאף קטגוריה, או כשירים רק לקטגוריות שאין להן משבצות במחזור. מה שקובע זה רשימת הדרגות של כל סוג תורנות
+            זה לא בגלל האיזון: הם לא כשירים לאף קטגוריה, או כשירים רק לקטגוריות שאין להן משבצות במחזור. מה שקובע זה רשימת הדרגות של כל סוג משימה
             בקטלוג וסוגי המשבצות בלוח הבסיס.
           </Typography>
           {fair.idle.map((g) => (
@@ -902,7 +902,7 @@ function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string
       </Typography>
       {why && (
         <Alert severity="warning" sx={{ mb: 1 }}>
-          {why} לכן אין לו תורנויות – זה לא האיזון. משנים ברשימת הדרגות של סוג התורנות בקטלוג או בלוח הבסיס.
+          {why} לכן אין לו משימות – זה לא האיזון. משנים ברשימת הדרגות של סוג המשימה בקטלוג או בלוח הבסיס.
         </Alert>
       )}
       {elig.length === 0 ? (
@@ -915,7 +915,7 @@ function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string
             <TableRow>
               <TableCell>קטגוריה</TableCell>
               <TableCell>כשיר</TableCell>
-              <TableCell>תורנויות במחזור</TableCell>
+              <TableCell>משימות במחזור</TableCell>
               <TableCell>למה לא</TableCell>
             </TableRow>
           </TableHead>
@@ -929,7 +929,7 @@ function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string
                 </TableCell>
                 <TableCell sx={{ color: e.slots === 0 ? "warning.main" : undefined }}>{e.slots}</TableCell>
                 <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
-                  {e.open ? (e.slots === 0 ? "אין תורנויות במחזור" : "") : reasonText(e.reasons) || "—"}
+                  {e.open ? (e.slots === 0 ? "אין משימות במחזור" : "") : reasonText(e.reasons) || "—"}
                 </TableCell>
               </TableRow>
             ))}
@@ -991,7 +991,7 @@ function WhyReasonRow(props: {
               {grouped
                 ? [...groups].map(([tt, ks]) => (
                     <Typography key={tt} variant="body2">
-                      {props.taskName(tt)} · {ks.length} תורנויות · {dmShort(ks[0].starts_at)}
+                      {props.taskName(tt)} · {ks.length} משימות · {dmShort(ks[0].starts_at)}
                       {ks.length > 1 ? `–${dmShort(ks[ks.length - 1].starts_at)}` : ""}
                     </Typography>
                   ))
@@ -1007,7 +1007,7 @@ function WhyReasonRow(props: {
                   ))}
               {rows.length > WHY_LIST_MAX && (
                 <Button size="small" sx={{ mt: 0.5, px: 0 }} onClick={() => setAll(!all)}>
-                  {all ? "קיבוץ לפי תורנות" : `הצג את כל ה-${rows.length}`}
+                  {all ? "קיבוץ לפי משימה" : `הצג את כל ה-${rows.length}`}
                 </Button>
               )}
             </Box>
@@ -1053,7 +1053,7 @@ function SoldierLoadDialog(props: {
   }
   const WHY_LABEL: Record<string, string> = {
     ...REASON_LABEL,
-    busy: "משובץ באותו זמן בתורנות אחרת (כולל מנוחה)",
+    busy: "משובץ באותו זמן במשימה אחרת (כולל מנוחה)",
     assigned: "משובץ בה",
     free: "זכאי ופנוי – המנוע בחר אחרים לטובת האיזון",
   };
@@ -1101,16 +1101,16 @@ function SoldierLoadDialog(props: {
             soldierId={r.soldier_id}
             creditDays={r.creditDays}
             credit={r.credit}
-            taskName={(id) => ctx.tasks.get(id)?.name ?? "תורנות"}
+            taskName={(id) => ctx.tasks.get(id)?.name ?? "משימה"}
           />
           <EligibilityCard elig={props.elig} rankName={props.rankName} />
           {r.compared ? (
             <Alert severity={r.outlier ? "warning" : r.small ? "info" : "success"} icon={false}>
-              ממוצע מי שזכאים לאותן תורנויות: {r.ref.toFixed(1)} · הפער המצטבר: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`}
+              ממוצע מי שזכאים לאותן משימות: {r.ref.toFixed(1)} · הפער המצטבר: {`\u2066${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}\u2069`}
               {r.outlier
-                ? ` – יותר מתורנות אחת (${r.oneDuty.toFixed(1)} נק׳): פער שצריך לבדוק`
+                ? ` – יותר ממשימה אחת (${r.oneDuty.toFixed(1)} נק׳): פער שצריך לבדוק`
                 : r.small
-                  ? ` – עד תורנות אחת (${r.oneDuty.toFixed(1)} נק׳): יתאזן במחזור הבא`
+                  ? ` – עד משימה אחת (${r.oneDuty.toFixed(1)} נק׳): יתאזן במחזור הבא`
                   : ` – בטווח ±${props.tolerance}%`}
             </Alert>
           ) : (
@@ -1119,20 +1119,20 @@ function SoldierLoadDialog(props: {
               {noWork(props.elig)
                 ? "אין לו אף משימה אפשרית במחזור (פירוט בכשירות למעלה)"
                 : r.profile
-                  ? "הוא היחיד בקבוצה עם הצירוף הזה של תורנויות"
-                  : "לא זכאי לאף קטגוריית תורנות"}
+                  ? "הוא היחיד בקבוצה עם הצירוף הזה של משימות"
+                  : "לא זכאי לאף קטגוריית משימה"}
               .
             </Alert>
           )}
           <Box>
             {why === null ? (
               <Button size="small" variant="outlined" onClick={checkWhy} disabled={whyProgress !== null}>
-                {whyProgress === null ? "למה מעט תורנויות? בדיקת כל התורנויות" : `בודק… ${Math.round(whyProgress * 100)}%`}
+                {whyProgress === null ? "למה מעט משימות? בדיקת כל המשימות" : `בודק… ${Math.round(whyProgress * 100)}%`}
               </Button>
             ) : (
               <>
                 <Typography variant="subtitle2" gutterBottom>
-                  מה מנע תורנויות ({ctx.slots.length} תורנויות במחזור)
+                  מה מנע משימות ({ctx.slots.length} משימות במחזור)
                 </Typography>
                 <Table size="small">
                   <TableBody>
@@ -1147,20 +1147,20 @@ function SoldierLoadDialog(props: {
                         open={openWhy === w.reason}
                         onToggle={() => setOpenWhy(openWhy === w.reason ? null : w.reason)}
                         slotOf={slotOf}
-                        taskName={(id) => ctx.tasks.get(id)?.name ?? "תורנות"}
+                        taskName={(id) => ctx.tasks.get(id)?.name ?? "משימה"}
                       />
                     ))}
                   </TableBody>
                 </Table>
                 <Typography variant="caption" color="text.secondary">
-                  תורנות אחת יכולה להיספר בכמה סיבות. לחיצה על שורה פותחת את התאריכים.
+                  משימה אחת יכולה להיספר בכמה סיבות. לחיצה על שורה פותחת את התאריכים.
                 </Typography>
               </>
             )}
           </Box>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
-              התורנויות שלו בטיוטה ({mine.length})
+              המשימות שלו בטיוטה ({mine.length})
             </Typography>
             {mine.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
@@ -1344,7 +1344,7 @@ function DraftBody(props: {
         </Tabs>
         <TextField
           size="small"
-          placeholder={view === "board" ? "חיפוש: עובד, תורנות או תאריך (6.1)" : "חיפוש לפי שם"}
+          placeholder={view === "board" ? "חיפוש: עובד, משימה או תאריך (6.1)" : "חיפוש לפי שם"}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}

@@ -280,7 +280,7 @@ function DayCell({ d, s, inMonth, isSel, today, onPick, tall }: { d: string; s?:
     <Box
             role="button"
       tabIndex={0}
-      aria-label={`${dayLabel(localDay(d))}${s ? `, ${s.total} תורנויות` : ""}`}
+      aria-label={`${dayLabel(localDay(d))}${s ? `, ${s.total} משימות` : ""}`}
       onClick={() => onPick(d)}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onPick(d)}
       sx={{
@@ -381,7 +381,7 @@ function MonthView({ month, rows, query }: { month: Date; rows: BoardRow[]; quer
           {dayRows.length ? (
             <DayBlock day={selected} items={dayRows} query={query} />
           ) : (
-            <Typography color="text.secondary">אין תורנויות ביום הזה.</Typography>
+            <Typography color="text.secondary">אין משימות ביום הזה.</Typography>
           )}
         </Box>
       )}
@@ -412,7 +412,7 @@ function WeekStrip({ sunday, rows, query }: { sunday: Date; rows: BoardRow[]; qu
           ))}
         </Box>
       </Paper>
-      {dayRows.length ? <DayBlock day={selected} items={dayRows} query={query} /> : <Typography color="text.secondary">אין תורנויות ביום הזה.</Typography>}
+      {dayRows.length ? <DayBlock day={selected} items={dayRows} query={query} /> : <Typography color="text.secondary">אין משימות ביום הזה.</Typography>}
     </Stack>
   );
 }
@@ -429,7 +429,7 @@ function WeekTable({ sunday, rows, query }: { sunday: Date; rows: BoardRow[]; qu
         <thead>
           <tr>
             <Box component="th" sx={{ width: 130, textAlign: "start", bgcolor: "action.hover" }}>
-              תורנות
+              משימה
             </Box>
             {days.map((d) => (
               <Box
@@ -512,7 +512,7 @@ function CalendarExport({ query }: { query: string }) {
     const url = URL.createObjectURL(new Blob([preview.ics], { type: "text/calendar;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `תורנויות-${name}.ics`;
+    a.download = `משימות-${name}.ics`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
@@ -528,13 +528,13 @@ function CalendarExport({ query }: { query: string }) {
         ליומן
       </Button>
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>התורנויות שלי ביומן</DialogTitle>
+        <DialogTitle>המשימות שלי ביומן</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1.5}>
             {error && <Alert severity="error">{error}</Alert>}
             {!rows && !error && <CircularProgress size={22} />}
             <TextField label="שם" value={who} onChange={(e) => setWho(e.target.value)} size="small" autoFocus={!query.trim()} placeholder="השם שלך, כמו בלוח" />
-            {rows && who.trim() && names.length === 0 && <Alert severity="info">לא נמצאו תורנויות קרובות לשם "{who.trim()}".</Alert>}
+            {rows && who.trim() && names.length === 0 && <Alert severity="info">לא נמצאו משימות קרובות לשם "{who.trim()}".</Alert>}
             {names.length > 1 && (
               <TextField select label="בחירת עובד" value={name} onChange={(e) => setPicked(e.target.value)} fullWidth>
                 {names.map((n) => (
@@ -546,8 +546,8 @@ function CalendarExport({ query }: { query: string }) {
             )}
             {preview && (
               <Typography variant="body2">
-                <b>{preview.count}</b> תורנויות קרובות של {name}, כמבצע או כעתודה, עם השעות וההנחיות ותזכורת 12 שעות לפני. פותחים את הקובץ בטלפון,
-                והתורנויות נכנסות ליומן. אחרי שינוי בלוח – מורידים שוב.
+                <b>{preview.count}</b> משימות קרובות של {name}, כמבצע או כעתודה, עם השעות וההנחיות ותזכורת 12 שעות לפני. פותחים את הקובץ בטלפון,
+                והמשימות נכנסות ליומן. אחרי שינוי בלוח – מורידים שוב.
               </Typography>
             )}
           </Stack>
@@ -664,7 +664,7 @@ export function BoardPage() {
           <Typography variant="h1">לוח השיבוצים</Typography>
           <Typography variant="body2" color="text.secondary">
             {title}
-            {rows && ` · ${shown.length} תורנויות`}
+            {rows && ` · ${shown.length} משימות`}
             {unstaffed > 0 && (
               <Box component="span" sx={{ color: "error.main", fontWeight: 600 }}>
                 {` · ${unstaffed} לא מאוישות`}
@@ -721,7 +721,7 @@ export function BoardPage() {
           </Stack>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <TextField
-              placeholder="חיפוש שם – מה התורנויות שלי?"
+              placeholder="חיפוש שם – מה המשימות שלי?"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               size="small"
@@ -776,10 +776,10 @@ export function BoardPage() {
           }
         >
           {rows.length
-            ? "אין תורנויות שמתאימות לחיפוש או לסינון."
+            ? "אין משימות שמתאימות לחיפוש או לסינון."
             : next
-              ? `אין תורנויות מפורסמות בטווח הזה. הלוח המפורסם הבא מתחיל ב-${dayLabel(next)}.`
-              : "אין תורנויות מפורסמות בטווח הזה."}
+              ? `אין משימות מפורסמות בטווח הזה. הלוח המפורסם הבא מתחיל ב-${dayLabel(next)}.`
+              : "אין משימות מפורסמות בטווח הזה."}
         </Alert>
       )}
 

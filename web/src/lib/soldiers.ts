@@ -125,7 +125,7 @@ export function activeLoadRole(s: Pick<SoldierDetail, "load_roles">, today = tod
 export const tashHelp = (level: number | null | undefined) =>
   level
     ? level === 7
-      ? "בבית כל לילה – בלי תורנויות לילה"
+      ? "בבית כל לילה – בלי משימות לילה"
       : `${level} לילות בבית בשבוע – עד ${7 - level} לילות בבסיס`
     : "כמה לילות בשבוע חייב לישון בבית";
 

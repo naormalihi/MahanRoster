@@ -920,7 +920,7 @@ def test_delete_task_type_only_when_unused(conn):
     assert conn.execute("select count(*) from task_types where id = %s", (used,)).fetchone()[0] == 1
 
     new = conn.execute(
-        "insert into task_types (code, name, weight) values ('tmp_del', 'תורנות למחיקה', 1) returning id").fetchone()[0]
+        "insert into task_types (code, name, weight) values ('tmp_del', 'משימה למחיקה', 1) returning id").fetchone()[0]
     conn.execute("insert into task_type_aliases (alias, task_type_id) values ('כינוי למחיקה', %s)", (new,))
     with session_as(conn, VIEWER) as c, pytest.raises(psycopg.Error):
         c.execute("select public.delete_task_type(%s)", (new,))
@@ -1876,7 +1876,7 @@ def test_soldier_is_notified_of_his_board_changes_and_decisions(conn):
         types = lambda: [r[0] for r in conn.execute("select type from notifications where recipient_user_id = %s order by created_at, type", (uid,)).fetchall()]
         assert types() == ["board_published"]
         body = conn.execute("select payload->>'body' from notifications where recipient_user_id = %s", (uid,)).fetchone()[0]
-        assert "תורנויות" in body and "עתודות" in body and "הראשונה" in body
+        assert "משימות" in body and "עתודות" in body and "הראשונה" in body
         # after publishing: an added duty, an activated reserve, a removed duty
         conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (k3, sid))
         conn.execute("update assignments set status = 'reserve_activated' where slot_id = %s and soldier_id = %s", (k2, sid))
@@ -2416,7 +2416,7 @@ def test_poster_fills_the_catalog_briefings(conn):
                 ("p_katzin", "קצין תורן – חול", "קצין תורן", "any"), ("p_mamlachat", "ממלכת יום", None, "any"),
                 ("p_shag", 'ש"ג – חול', "שמירות חובה", "mandatory"), ("p_shaar", "מפקד שער | ש.ג קבע", "מפקד שער", "any"),
                 ("p_keva", "שמירת קבע", None, "career"), ("p_toran", "מפקד תורן", None, "any"),
-                ("p_other", "תורנות אחרת", None, "mandatory")]
+                ("p_other", "משימה אחרת", None, "mandatory")]
         for code, name, c, svc in rows:
             conn.execute("update task_types set name = name || ' (קודם)' where name = %s", (name,))
             conn.execute("insert into task_types (code, name, weight, service_restriction, category_id) "
@@ -3187,11 +3187,17 @@ def test_a_reader_without_a_framework_updates_nothing(conn):
 
 def test_no_function_still_says_the_old_board_name(conn):
     left = conn.execute("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
-                        "where n.nspname in ('app', 'public') and p.prosrc like '%לוח התורנויות%'").fetchall()
+                        "where n.nspname in ('app', 'public') and p.prosrc like '%לוח המשימות%'").fetchall()
     assert left == []
 
 
 def test_no_function_still_says_the_old_coordinator_name(conn):
     left = conn.execute("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
                         "where n.nspname in ('app', 'public') and (p.prosrc like '%%נע\"ת%%' or p.prosrc like '%%נע״ת%%')").fetchall()
+    assert left == []
+
+
+def test_no_function_still_says_the_old_duty_word(conn):
+    left = conn.execute("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                        "where n.nspname in ('app', 'public') and (p.prosrc like '%%תורנות%%' or p.prosrc like '%%תורנויות%%')").fetchall()
     assert left == []

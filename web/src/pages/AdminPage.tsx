@@ -147,7 +147,7 @@ function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: 
           <span>
             תדריך והתייצבות
             <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block" }}>
-              מוצג לעובד ב"התורנויות שלי" ובלוח, ונשלחת לו תזכורת לפני. שעה ומקום שנכתבו בתורנות עצמה גוברים.
+              מוצג לעובד ב"המשימות שלי" ובלוח, ונשלחת לו תזכורת לפני. שעה ומקום שנכתבו במשימה עצמה גוברים.
             </Typography>
           </span>
         }
@@ -172,8 +172,8 @@ function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: 
                   }}
                   fullWidth
                 >
-                  <MenuItem value="same_day">ביום התורנות</MenuItem>
-                  <MenuItem value="day_before">יום לפני התורנות</MenuItem>
+                  <MenuItem value="same_day">ביום המשימה</MenuItem>
+                  <MenuItem value="day_before">יום לפני המשימה</MenuItem>
                   {WEEKDAY_KEYS.filter((d) => d.key !== "after_holiday").map((d) => (
                     <MenuItem key={d.key} value={`w${d.key}`}>
                       ביום {d.label} שלפני
@@ -207,7 +207,7 @@ function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: 
             label="הערה לעובד"
             value={b.note ?? ""}
             onChange={(e) => set({ note: e.target.value })}
-            placeholder="לא מאושרות החלפות בעת ביצוע התורנות!"
+            placeholder="לא מאושרות החלפות בעת ביצוע המשימה!"
             fullWidth
           />
         </Stack>
@@ -234,7 +234,7 @@ function WeekdayHours(props: { value: Record<string, string> | null; onChange: (
       {on && (
         <>
           <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
-            לפי היום שבו התורנות מתחילה. תבנית 08:00-18:00; סיום למחרת: 06:00-08:00+1 (או כשהסיום לא אחרי ההתחלה, כמו 08:00-08:00). ריק = שעות ברירת
+            לפי היום שבו המשימה מתחילה. תבנית 08:00-18:00; סיום למחרת: 06:00-08:00+1 (או כשהסיום לא אחרי ההתחלה, כמו 08:00-08:00). ריק = שעות ברירת
             המחדל. "אחרי חג" גובר ביום שאחרי חג.
           </Typography>
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 1 }}>
@@ -343,7 +343,7 @@ export function TaskDialog(props: {
 
   return (
     <Dialog open onClose={props.onClose} fullScreen={fullScreen} maxWidth="md" fullWidth>
-      <DialogTitle>{props.task ? `עריכת תורנות – ${props.task.name}` : "תורנות חדשה"}</DialogTitle>
+      <DialogTitle>{props.task ? `עריכת משימה – ${props.task.name}` : "משימה חדשה"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -364,7 +364,7 @@ export function TaskDialog(props: {
               value={t.weight}
               onChange={(e) => set("weight", Number(e.target.value))}
               slotProps={{ htmlInput: { step: 0.25, min: 0.25, max: 99 } }}
-              helperText={weightChanged ? "חל על שיבוצים חדשים בלבד. ניקוד שכבר נצבר לא משתנה" : "הניקוד של התורנות כולה – לא תלוי במספר הימים"}
+              helperText={weightChanged ? "חל על שיבוצים חדשים בלבד. ניקוד שכבר נצבר לא משתנה" : "הניקוד של המשימה כולה – לא תלוי במספר הימים"}
               fullWidth
             />
           </Stack>
@@ -461,7 +461,7 @@ export function TaskDialog(props: {
             />
             <FormControlLabel
               control={<Switch checked={t.is_weekend_type} onChange={(e) => set("is_weekend_type", e.target.checked)} />}
-              label="תורנות שבת (המשקל כבר כולל את סוף השבוע, בלי תוספת סוף שבוע)"
+              label="משימת שבת (המשקל כבר כולל את סוף השבוע, בלי תוספת סוף שבוע)"
             />
             <FormControlLabel
               control={<Switch checked={t.includes_holidays} onChange={(e) => set("includes_holidays", e.target.checked)} />}
@@ -469,18 +469,18 @@ export function TaskDialog(props: {
                 <span>
                   המשקל כבר כולל חגים (בלי תוספת חג)
                   <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                    התוספות של לוח החגים לא חלות עליה. החג עדיין נחשב לה כ"תורנות חג".
+                    התוספות של לוח החגים לא חלות עליה. החג עדיין נחשב לה כ"משימת חג".
                   </Typography>
                 </span>
               }
             />
             <FormControlLabel
               control={<Switch checked={t.qualifying_duty} onChange={(e) => set("qualifying_duty", e.target.checked)} />}
-              label="תורנות מזכה (פתוחה גם למשרתי הורה ולבעלי פטור מזכה)"
+              label="משימה מזכה (פתוחה גם למשרתי הורה ולבעלי פטור מזכה)"
             />
             <FormControlLabel
               control={<Switch checked={t.is_active} onChange={(e) => set("is_active", e.target.checked)} />}
-              label="פעילה (תורנות לא פעילה לא תשובץ)"
+              label="פעילה (משימה לא פעילה לא תשובץ)"
             />
           </FormGroup>
         </Stack>
@@ -503,7 +503,7 @@ export function TaskDialog(props: {
             </>
           ) : (
             <Button color="error" onClick={() => setConfirmDelete(true)} disabled={busy} sx={{ mr: "auto" }}>
-              מחיקת התורנות
+              מחיקת המשימה
             </Button>
           ))}
         {!confirmDelete && (
@@ -578,7 +578,7 @@ function CatalogTab() {
     <Stack spacing={2}>
       <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
-          תורנות חדשה
+          משימה חדשה
         </Button>
         <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditCats(true)}>
           קטגוריות
@@ -619,7 +619,7 @@ function CatalogTab() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>תורנות</TableCell>
+              <TableCell>משימה</TableCell>
               <TableCell>קטגוריה</TableCell>
               <TableCell>משקל</TableCell>
               <TableCell>שעות</TableCell>
@@ -718,11 +718,11 @@ function CategoriesDialog(props: { categories: NamedRef[]; tasks: TaskType[]; on
 
   return (
     <Dialog open onClose={props.onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>קטגוריות תורנות</DialogTitle>
+      <DialogTitle>קטגוריות משימה</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={1.5}>
           <Typography variant="body2" color="text.secondary">
-            הקטגוריה מקבצת סוגי תורנות לפוטנציאל ולקבוצות ההוגנות. שינוי שם מתעדכן בכל המקומות; מחזורים קודמים שומרים את שמות הקבוצות מהחישוב שלהם.
+            הקטגוריה מקבצת סוגי משימה לפוטנציאל ולקבוצות ההוגנות. שינוי שם מתעדכן בכל המקומות; מחזורים קודמים שומרים את שמות הקבוצות מהחישוב שלהם.
           </Typography>
           {error && <Alert severity="error">{error}</Alert>}
           {sorted.map((c) => {
@@ -736,7 +736,7 @@ function CategoriesDialog(props: { categories: NamedRef[]; tasks: TaskType[]; on
                   value={v}
                   onChange={(e) => setNames((n) => ({ ...n, [c.id]: e.target.value }))}
                   onKeyDown={(e) => e.key === "Enter" && dirty && void save(v, c.id)}
-                  helperText={`${used(c.id)} סוגי תורנות`}
+                  helperText={`${used(c.id)} סוגי משימה`}
                 />
                 <Button size="small" variant="contained" disabled={!dirty || !!busy} onClick={() => void save(v, c.id)} sx={{ mb: 2.5 }}>
                   {busy === c.id ? <CircularProgress size={16} color="inherit" /> : "שמירה"}
@@ -905,7 +905,7 @@ function MultiplierDialog(props: {
             />
           </Stack>
           <Alert severity="info" icon={false}>
-            המקדם חל על יום של תורנות כשכל התנאים שבחרת מתקיימים. בתוך תנאי מספיק אחת האפשרויות. הערך שלו מתווסף למשקל של התורנות (לא מכפיל אותו). כשכמה מקדמים חלים, מתווסף רק הגבוה מביניהם.
+            המקדם חל על יום של משימה כשכל התנאים שבחרת מתקיימים. בתוך תנאי מספיק אחת האפשרויות. הערך שלו מתווסף למשקל של המשימה (לא מכפיל אותו). כשכמה מקדמים חלים, מתווסף רק הגבוה מביניהם.
           </Alert>
           <Typography variant="body2" color="text.secondary">
             תוספת לחג מסוים (ערב חג, החג, חול המועד) נקבעת בטבלה "תוספת לכל יום חג" בהמשך העמוד.
@@ -966,7 +966,7 @@ function MultiplierDialog(props: {
           <Box>
             <FormControlLabel
               control={<Switch checked={m.time_window !== null} onChange={(e) => set("time_window", e.target.checked ? "22:00-06:00" : null)} />}
-              label="חלון שעות (לתורנות קצרה מ-24 שעות שרוב שעותיה בחלון)"
+              label="חלון שעות (למשימה קצרה מ-24 שעות שרוב שעותיה בחלון)"
             />
             {m.time_window !== null && (
               <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
@@ -982,7 +982,7 @@ function MultiplierDialog(props: {
           <FormGroup>
             <FormControlLabel
               control={<Switch checked={m.skip_shabbat_types} onChange={(e) => set("skip_shabbat_types", e.target.checked)} />}
-              label="לא לתורנויות שבת (המשקל שלהן כבר כולל את סוף השבוע)"
+              label="לא למשימות שבת (המשקל שלהן כבר כולל את סוף השבוע)"
             />
             <FormControlLabel control={<Switch checked={m.is_active} onChange={(e) => set("is_active", e.target.checked)} />} label="פעיל" />
           </FormGroup>
@@ -1117,8 +1117,8 @@ function HolidayMatrix({ list, calendar, onChanged }: { list: ScoreMultiplier[];
       <Stack spacing={1.5}>
         <Typography variant="h3">תוספת לכל יום חג</Typography>
         <Typography variant="body2" color="text.secondary">
-          כתוב בתא כמה נקודות מתווספות לתורנות באותו יום (ריק = בלי תוספת). התוספת מתווספת למשקל ולא מכפילה אותו: מטבח (4) בערב ראש השנה (6) = 10.
-          ביום שהוא גם סוף שבוע וגם חג מתווסף רק הגבוה מביניהם: מטבח בחול המועד שחל ביום שישי = 4 + 3 = 7. תורנות של כמה ימים מקבלת את התוספת הגבוהה פעם אחת.
+          כתוב בתא כמה נקודות מתווספות למשימה באותו יום (ריק = בלי תוספת). התוספת מתווספת למשקל ולא מכפילה אותו: מטבח (4) בערב ראש השנה (6) = 10.
+          ביום שהוא גם סוף שבוע וגם חג מתווסף רק הגבוה מביניהם: מטבח בחול המועד שחל ביום שישי = 4 + 3 = 7. משימה של כמה ימים מקבלת את התוספת הגבוהה פעם אחת.
         </Typography>
         {narrow ? (
           <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
@@ -1365,8 +1365,8 @@ function ScoringTab() {
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            הניקוד של תורנות הוא המשקל שלה – לתורנות כולה, לא תלוי במספר הימים – ועוד הערך הגבוה מבין המקדמים שחלים על אחד מימיה (סוף שבוע, חג, ערב חג…),
-            פעם אחת. מקדמים לא מצטברים: מטבח (4) בשישי = 7, בערב ראש השנה = 10. הקפצה מכפילה את הסכום. מקדם שהתורנות כבר כוללת (שבת, חגים) לא חל עליה. שינוי
+            הניקוד של משימה הוא המשקל שלה – למשימה כולה, לא תלוי במספר הימים – ועוד הערך הגבוה מבין המקדמים שחלים על אחד מימיה (סוף שבוע, חג, ערב חג…),
+            פעם אחת. מקדמים לא מצטברים: מטבח (4) בשישי = 7, בערב ראש השנה = 10. הקפצה מכפילה את הסכום. מקדם שהמשימה כבר כוללת (שבת, חגים) לא חל עליה. שינוי
             חל על השיבוץ הבא; ניקוד שכבר נצבר לא משתנה.
           </Typography>
           {narrow ? (
@@ -1379,7 +1379,7 @@ function ScoringTab() {
                   key: "surprise",
                   name: "הקפצה",
                   value: saved?.surprise_multiplier ?? 1.5,
-                  when: `עובד ששובץ פחות מ-${saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו`,
+                  when: `עובד ששובץ פחות מ-${saved?.surprise_notice_hours ?? 72} שעות לפני המשימה · מכפיל את כל הניקוד שלו`,
                   label: `×${saved?.surprise_multiplier ?? 1.5}`,
                   active: true,
                   open: openSurprise,
@@ -1428,7 +1428,7 @@ function ScoringTab() {
                 <TableRow hover onClick={openSurprise} sx={{ cursor: "pointer" }}>
                   <TableCell sx={{ fontWeight: 600 }}>הקפצה</TableCell>
                   <TableCell>×{saved?.surprise_multiplier}</TableCell>
-                  <TableCell>עובד ששובץ פחות מ-{saved?.surprise_notice_hours ?? 72} שעות לפני התורנות · מכפיל את כל הניקוד שלו</TableCell>
+                  <TableCell>עובד ששובץ פחות מ-{saved?.surprise_notice_hours ?? 72} שעות לפני המשימה · מכפיל את כל הניקוד שלו</TableCell>
                   <TableCell>
                     <IconButton size="small" aria-label="עריכה" onClick={openSurprise}>
                       <EditIcon fontSize="small" />
@@ -1490,7 +1490,7 @@ function ScoringTab() {
               value={s.fairness_tolerance_pct}
               onChange={(e) => setS({ ...s, fairness_tolerance_pct: Number(e.target.value) })}
               slotProps={{ htmlInput: { min: 1, max: 100, step: 1 } }}
-              helperText="במסך העומס, עובד שרחוק יותר מזה מממוצע מי שזכאים לאותן תורנויות מסומן כחורג (לפחות חצי נקודה)."
+              helperText="במסך העומס, עובד שרחוק יותר מזה מממוצע מי שזכאים לאותן משימות מסומן כחורג (לפחות חצי נקודה)."
               sx={{ maxWidth: 320 }}
             />
           </Box>
@@ -1506,7 +1506,7 @@ function ScoringTab() {
               slotProps={{ htmlInput: { min: 0, max: 365, step: 1 } }}
               helperText={
                 (s.grace_days >= 30 ? `≈ ${Math.round(s.grace_days / 30)} חודשים. ` : "") +
-                "עובד חדש לא משובץ לתורנויות בימים הראשונים שלו ביחידה, מתחילת המחזור הראשון שלו, ומקבל עליהם זיכוי. 0 = בלי תקופת הכשרה. חל מהחישוב הבא של הפוטנציאל."
+                "עובד חדש לא משובץ למשימות בימים הראשונים שלו ביחידה, מתחילת המחזור הראשון שלו, ומקבל עליהם זיכוי. 0 = בלי תקופת הכשרה. חל מהחישוב הבא של הפוטנציאל."
               }
               sx={{ maxWidth: 320 }}
             />
@@ -1521,13 +1521,13 @@ function ScoringTab() {
               value={s.briefing_reminder_hours}
               onChange={(e) => setS({ ...s, briefing_reminder_hours: Math.round(Number(e.target.value)) })}
               slotProps={{ htmlInput: { min: 2, max: 72, step: 1 } }}
-              helperText="תדריך או התייצבות שקודמים לתורנות ביותר מ-12 שעות מקבלים תזכורת נפרדת, כמה שעות לפניהם. קרובים יותר – כתובים בתזכורת של יום לפני התורנות."
+              helperText="תדריך או התייצבות שקודמים למשימה ביותר מ-12 שעות מקבלים תזכורת נפרדת, כמה שעות לפניהם. קרובים יותר – כתובים בתזכורת של יום לפני המשימה."
               sx={{ maxWidth: 320 }}
             />
           </Box>
           <Box>
             <Typography variant="subtitle2" gutterBottom>
-              אישור קבלת תורנות ("ראיתי")
+              אישור קבלת משימה ("ראיתי")
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
@@ -1594,7 +1594,7 @@ function ScoringTab() {
                 value={surprise.hours}
                 onChange={(e) => setSurprise({ ...surprise, hours: e.target.value })}
                 slotProps={{ htmlInput: { step: 1, min: 1, max: 336 } }}
-                helperText="עובד ששובץ פחות מזה לפני שהתורנות מתחילה – עתודה שהופעלה, מחליף או תורנות שנוספה – הוקפץ. הפרסום הראשון של מחזור לא נחשב."
+                helperText="עובד ששובץ פחות מזה לפני שהמשימה מתחילה – עתודה שהופעלה, מחליף או משימה שנוספה – הוקפץ. הפרסום הראשון של מחזור לא נחשב."
                 fullWidth
               />
             </Stack>
@@ -1892,8 +1892,8 @@ function AliasesTab() {
   return (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
-        השמות שהבסיס משתמש בהם בקובץ המשבצות, ולאיזה סוג תורנות כל שם מותאם. שם שלא מופיע כאן ולא זהה לשם של סוג תורנות יופיע בקליטה לבחירה. משבצת שמתחילה
-        בסוף שבוע עוברת לבד לסוג השבת של אותה תורנות.
+        השמות שהבסיס משתמש בהם בקובץ המשבצות, ולאיזה סוג משימה כל שם מותאם. שם שלא מופיע כאן ולא זהה לשם של סוג משימה יופיע בקליטה לבחירה. משבצת שמתחילה
+        בסוף שבוע עוברת לבד לסוג השבת של אותה משימה.
       </Typography>
       {aliases.length === 0 ? (
         <Alert severity="info">עוד אין התאמות שמורות.</Alert>
@@ -1907,7 +1907,7 @@ function AliasesTab() {
                   select
                   size="small"
                   fullWidth
-                  label="סוג תורנות"
+                  label="סוג משימה"
                   value={a.task_type_id}
                   onChange={async (e) => {
                     await api!.saveTaskTypeAliases([{ alias: a.alias, task_type_id: e.target.value }]);
@@ -1940,7 +1940,7 @@ function AliasesTab() {
             <TableHead>
               <TableRow>
                 <TableCell>שם בקובץ הבסיס</TableCell>
-                <TableCell>סוג תורנות</TableCell>
+                <TableCell>סוג משימה</TableCell>
                 <TableCell />
               </TableRow>
             </TableHead>
@@ -1990,8 +1990,8 @@ function AliasesTab() {
 }
 
 const TABS = [
-  { key: "catalog", label: "קטלוג תורנויות", about: "סוגי התורנויות, משקלים ושעות" },
-  { key: "aliases", label: "שמות מהבסיס", about: "שמות התורנויות בקובץ לוח הבסיס" },
+  { key: "catalog", label: "קטלוג משימות", about: "סוגי המשימות, משקלים ושעות" },
+  { key: "aliases", label: "שמות מהבסיס", about: "שמות המשימות בקובץ לוח הבסיס" },
   { key: "scoring", label: "מקדמי ניקוד", about: "מקדמים, ימי חג והקלות" },
   { key: "calendar", label: "לוח חגים", about: "חגים וימים מיוחדים בכל שנה" },
   { key: "users", label: "משתמשים", about: "חשבונות והרשאות" },

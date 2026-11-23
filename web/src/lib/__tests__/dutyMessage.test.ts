@@ -23,7 +23,7 @@ const origin = "https://example.test";
 describe("dutyMessageText", () => {
   it("one duty as performer, with the briefing line and the join link", () => {
     const t = dutyMessageText(base, origin);
-    expect(t.startsWith("היי דניאל, שובצת לתורנות:")).toBe(true);
+    expect(t.startsWith("היי דניאל, שובצת למשימה:")).toBe(true);
     expect(t).toContain("מטבח – ");
     expect(t).toContain("08:00–20:00 (מבצע)");
     expect(t).toContain("התייצבות יום ב׳ 24.11 07:30, שער ראשי");
@@ -40,7 +40,7 @@ describe("dutyMessageText", () => {
 
   it("several duties: plural greeting, each on its own", () => {
     const t = dutyMessageText({ ...base, duties: [base.duties[0], { ...base.duties[0], assignment_id: "a2", task_name: "שער" }] }, origin);
-    expect(t).toContain("שובצת לתורנויות:");
+    expect(t).toContain("שובצת למשימות:");
     expect(t).toContain("שער – ");
   });
 

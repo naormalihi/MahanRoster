@@ -147,7 +147,7 @@ function fold(line: string): string {
 /** A calendar file with the duties of one person, with a reminder the evening before. */
 export function dutiesIcs(rows: BoardRow[], name: string, now = new Date()): { ics: string; count: number } {
   const mine = rows.filter((r) => r.performers.includes(name) || r.reserves.includes(name));
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MahanRoster//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", `X-WR-CALNAME:${icsText(`תורנויות – ${name}`)}`];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MahanRoster//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", `X-WR-CALNAME:${icsText(`משימות – ${name}`)}`];
   for (const r of mine) {
     const reserve = !r.performers.includes(name);
     const details = [

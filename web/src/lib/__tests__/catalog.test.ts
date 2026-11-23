@@ -3,7 +3,7 @@ import { briefingLabel, briefingProblems, cleanBriefing, EMPTY_MULTIPLIER, descr
 
 const base: TaskTypeInput = {
   code: "new_duty",
-  name: "תורנות חדשה",
+  name: "משימה חדשה",
   category_id: null,
   weight: 1,
   min_rest_hours: 0,
@@ -41,7 +41,7 @@ describe("catalog validation", () => {
   });
   it("briefing: label, problems, clean", () => {
     expect(briefingLabel({ kind: "briefing", rule: "weekday", weekday: 2, time: "13:00", place: "גף אבטחה פיזית" })).toBe("תדריך שלישי שלפני 13:00 · גף אבטחה פיזית");
-    expect(briefingLabel({ kind: "report", rule: "same_day", time: "08:30" })).toBe("התייצבות ביום התורנות 08:30");
+    expect(briefingLabel({ kind: "report", rule: "same_day", time: "08:30" })).toBe("התייצבות ביום המשימה 08:30");
     expect(briefingLabel({ kind: "by_call" })).toBe("תדריך לפי הזימון");
     expect(briefingProblems({ kind: "briefing", rule: "same_day", time: "9" })).toHaveLength(1);
     expect(briefingProblems({ kind: "by_call" })).toEqual([]);
@@ -58,7 +58,7 @@ describe("catalog validation", () => {
   });
   it("describes when a multiplier applies", () => {
     const m = { ...EMPTY_MULTIPLIER, name: "x", day_types: ["holiday"], weekdays: [6, 5], skip_shabbat_types: true };
-    expect(describeMultiplier(m, (c) => (c === "holiday" ? "חג" : c))).toBe("חג · שישי, שבת · לא על תורנויות שבת");
+    expect(describeMultiplier(m, (c) => (c === "holiday" ? "חג" : c))).toBe("חג · שישי, שבת · לא על משימות שבת");
   });
 });
 

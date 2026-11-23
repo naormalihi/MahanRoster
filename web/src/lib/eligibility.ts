@@ -73,15 +73,15 @@ export function noWorkText(rows: EligRow[], rankName: string): string | null {
   const w = noWork(rows);
   if (w === "no_slots") {
     const open = rows.filter((r) => r.open).map((r) => r.name);
-    return `כשיר רק ל${open.join(", ")}, ובמחזור אין תורנויות כאלה.`;
+    return `כשיר רק ל${open.join(", ")}, ובמחזור אין משימות כאלה.`;
   }
   if (w === "none_open") {
     // the rank is the cause only when it closes every category; otherwise say what closes the
     // ones his rank fits (e.g. not available all cycle)
     const rankFits = rows.filter((r) => !r.reasons.includes("rank"));
-    if (!rankFits.length) return `לא כשיר לאף קטגוריית תורנות: הדרגה ${rankName} לא ברשימת הדרגות של אף סוג תורנות.`;
+    if (!rankFits.length) return `לא כשיר לאף קטגוריית משימה: הדרגה ${rankName} לא ברשימת הדרגות של אף סוג משימה.`;
     const why = reasonText(mainReasons(rankFits).slice(0, 2));
-    return `לא כשיר לאף קטגוריית תורנות: הדרגה ${rankName} מתאימה רק ל${rankFits.map((r) => r.name).join(", ")}, ושם – ${why}.`;
+    return `לא כשיר לאף קטגוריית משימה: הדרגה ${rankName} מתאימה רק ל${rankFits.map((r) => r.name).join(", ")}, ושם – ${why}.`;
   }
   return null;
 }

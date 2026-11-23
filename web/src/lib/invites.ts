@@ -20,12 +20,12 @@ const firstName = (full: string) => full.trim().split(/\s+/)[0] ?? full;
 
 export function whatsappText(row: InviteRow, origin: string): string {
   return [
-    `היי ${firstName(row.full_name)}, זה הקוד האישי שלך להצטרפות לתורנצ׳יק – מערכת התורנויות של היחידה:`,
+    `היי ${firstName(row.full_name)}, זה הקוד האישי שלך להצטרפות לתורנצ׳יק – מערכת המשימות של היחידה:`,
     "",
     row.code,
     "",
     `נכנסים כאן (הקוד כבר ממולא): ${joinLink(origin, row.code)}`,
-    "בוחרים שם משתמש וסיסמה – ומשם רואים את התורנויות שלך, מגישים בקשות ומקבלים תזכורות.",
+    "בוחרים שם משתמש וסיסמה – ומשם רואים את המשימות שלך, מגישים בקשות ומקבלים תזכורות.",
   ].join("\n");
 }
 
