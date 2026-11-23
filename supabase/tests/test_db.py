@@ -3120,3 +3120,66 @@ def test_rename_me_refuses_taken_names_and_the_shared_viewer(conn):
                     c.execute("select public.rename_me('board.new', null)")
     finally:
         _as_coord(conn, "select public.delete_user(%s)", uid)
+
+
+def test_gaf_commander_updates_admin_details_of_his_own_people_only(conn):
+    # a commander linked to an employee in g1; another employee of g1, and one of another framework
+    emp, g1 = conn.execute("select s.id, s.gaf_id from soldiers s where s.gaf_id is not null and s.is_active "
+                           "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by s.id limit 1").fetchone()
+    mine = conn.execute("select id from soldiers where gaf_id = %s and is_active and id <> %s order by id limit 1", (g1, emp)).fetchone()[0]
+    other = conn.execute("select id from soldiers where gaf_id <> %s and is_active "
+                         "and not exists (select 1 from app_users u where u.soldier_id = soldiers.id) order by id limit 1", (g1,)).fetchone()[0]
+    role_id = conn.execute("select id from load_roles order by name limit 1").fetchone()[0]
+    uid = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.admin", "temp-pass-123", emp)[0][0]
+    mine_no_acct = conn.execute("select id from soldiers s where gaf_id = %s and is_active and id <> %s "
+                                "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by id limit 1", (g1, emp)).fetchone()[0]
+    try:
+        with session_as(conn, uid) as c:
+            def call(sql, *args):
+                with c.transaction():
+                    return c.execute(sql, args).fetchall()
+            assert call("select public.my_commanded_gafs()")[0][0] == [g1]
+            # phone and range date: his people, alone or together
+            assert call("select public.update_soldiers_admin(%s, true, '972501234567', true, '2027-03-01')", [mine, emp])[0][0] == 2
+            assert c.execute("select phone, range_valid_until::text from soldiers where id = %s", (mine,)).fetchone() == ("972501234567", "2027-03-01")
+            # a field whose flag is off stays
+            call("select public.update_soldiers_admin(%s, false, null, true, null)", [mine])
+            assert c.execute("select phone, range_valid_until from soldiers where id = %s", (mine,)).fetchone() == ("972501234567", None)
+            with pytest.raises(psycopg.Error, match="לא תקין"):
+                call("select public.update_soldiers_admin(%s, true, '123', false, null)", [mine])
+            # not someone from another framework – not even mixed into a list
+            with pytest.raises(psycopg.Error, match="המסגרת שלך"):
+                call("select public.update_soldiers_admin(%s, false, null, true, '2027-03-01')", [mine, other])
+            # the table itself stays closed: a direct update changes nothing
+            with c.transaction():
+                assert c.execute("update soldiers set tash_level = 3 where id = %s", (mine,)).rowcount == 0
+            # relief roles: replaced; נע"ת is told
+            call("select public.set_soldier_load_roles_admin(%s, %s::jsonb)", mine,
+                 json.dumps([{"load_role_id": str(role_id), "valid_from": "2027-01-01", "valid_to": None}]))
+            with pytest.raises(psycopg.Error, match="המסגרת שלך"):
+                call("select public.set_soldier_load_roles_admin(%s, '[]'::jsonb)", other)
+            # join codes for his own people, not for others
+            codes = call("select * from public.create_soldier_invites(%s, 30)", [mine_no_acct])
+            assert len(codes) == 1
+            call("select public.mark_invites_sent(%s)", [mine_no_acct])
+            assert call("select public.revoke_soldier_invites(%s)", [mine_no_acct])[0][0] == 1
+            with pytest.raises(psycopg.Error, match="המסגרת שלך"):
+                call("select * from public.create_soldier_invites(%s, 30)", [other])
+            statuses = {r[0] for r in call("select soldier_id from public.soldier_account_status()")}
+            assert mine_no_acct in statuses and other not in statuses
+            c.execute("reset role")
+            assert c.execute("select count(*) from soldier_load_roles where soldier_id = %s", (mine,)).fetchone()[0] == 1
+            told = c.execute("select count(*) from notifications n join user_roles r on r.user_id = n.recipient_user_id "
+                             "where n.type = 'commander_change' and r.role = 'coordinator'").fetchone()[0]
+            assert told >= 1
+            assert c.execute("select count(*) from audit_log where entity_type = 'soldiers' and actor_user_id = %s", (uid,)).fetchone()[0] >= 1
+    finally:
+        _as_coord(conn, "select public.delete_user(%s)", uid)
+
+
+def test_a_reader_without_a_framework_updates_nothing(conn):
+    some = conn.execute("select id from soldiers where is_active order by id limit 1").fetchone()[0]
+    uc = _as_coord(conn, "select public.create_user('unit.reader', 'temp-pass-123', 'unit_commander', null)")[0][0]
+    with session_as(conn, uc) as c:
+        with pytest.raises(psycopg.Error, match="המסגרת שלך"):
+            c.execute("select public.update_soldiers_admin(%s, false, null, true, '2027-03-01')", ([some],))

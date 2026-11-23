@@ -1,3 +1,4 @@
+import EditIcon from "@mui/icons-material/EditOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import { Alert, Box } from "@mui/material";
 import type { ReactNode } from "react";
@@ -15,8 +16,11 @@ export function useCanEdit(): boolean {
  * nothing. Buttons that only show or export carry data-read and stay active, as do switches and
  * checkboxes inside an element with data-read (view filters).
  */
-export function ReadOnlyScope({ children }: { children: ReactNode }) {
+export function ReadOnlyScope({ children, commanderNote }: { children: ReactNode; commanderNote?: string }) {
   const canEdit = useCanEdit();
+  const { me } = useAuth();
+  // where a gaf commander does part of the work (his own people), the line says what he may do
+  const note = commanderNote && me?.roles.includes("gaf_commander") ? commanderNote : null;
   if (canEdit) return <>{children}</>;
   return (
     <Box
@@ -27,8 +31,8 @@ export function ReadOnlyScope({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <Alert severity="info" icon={<VisibilityIcon />} sx={{ mb: 2 }}>
-        צפייה בלבד. אפשר לראות את כל נתוני היחידה; שינויים נעשים על ידי נע"ת התורנויות.
+      <Alert severity="info" icon={note ? <EditIcon /> : <VisibilityIcon />} sx={{ mb: 2 }}>
+        {note ?? 'צפייה בלבד. אפשר לראות את כל נתוני היחידה; שינויים נעשים על ידי נע"ת התורנויות.'}
       </Alert>
       {children}
     </Box>

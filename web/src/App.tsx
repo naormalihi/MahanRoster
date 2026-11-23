@@ -72,7 +72,14 @@ function Gate() {
               <Route path="/cycle/slots" element={ro(<CycleWorkspace step="slots" />)} />
               <Route path="/cycle/schedule" element={ro(<CycleWorkspace step="schedule" />)} />
               <Route path="/cycle/operate" element={ro(<CycleWorkspace step="operate" />)} />
-              <Route path="/soldiers" element={ro(<SoldiersPage />)} />
+              <Route
+                path="/soldiers"
+                element={
+                  <ReadOnlyScope commanderNote={'לעובדי המסגרת שלך אפשר לעדכן טלפון, מטווח ותפקידי הקלה, ולשלוח קודי הצטרפות. פטורים, ת"ש, הקלות ושאר הפרטים – אצל נע"ת.'}>
+                    <SoldiersPage />
+                  </ReadOnlyScope>
+                }
+              />
             </>
           )}
           {staff && (
