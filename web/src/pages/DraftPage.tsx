@@ -865,7 +865,7 @@ function IdleDialog({ fair, ctx, onClose, onOpen }: { fair: Fairness; ctx: Ctx; 
         <Stack spacing={1.5}>
           <Typography variant="body2" color="text.secondary">
             זה לא בגלל האיזון: הם לא כשירים לאף קטגוריה, או כשירים רק לקטגוריות שאין להן משבצות במחזור. מה שקובע זה רשימת הדרגות של כל סוג משימה
-            בקטלוג וסוגי המשבצות בלוח הבסיס.
+            בקטלוג וסוגי המשבצות באוסף המשימות.
           </Typography>
           {fair.idle.map((g) => (
             <Box key={g.key}>
@@ -902,7 +902,7 @@ function EligibilityCard({ elig, rankName }: { elig: EligRow[]; rankName: string
       </Typography>
       {why && (
         <Alert severity="warning" sx={{ mb: 1 }}>
-          {why} לכן אין לו משימות – זה לא האיזון. משנים ברשימת הדרגות של סוג המשימה בקטלוג או בלוח הבסיס.
+          {why} לכן אין לו משימות – זה לא האיזון. משנים ברשימת הדרגות של סוג המשימה בקטלוג או באוסף המשימות.
         </Alert>
       )}
       {elig.length === 0 ? (

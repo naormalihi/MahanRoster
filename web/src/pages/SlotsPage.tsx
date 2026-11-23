@@ -160,8 +160,8 @@ function ImportCard(props: {
     ws["!cols"] = [{ wch: 14 }, { wch: 24 }];
     const wb = XLSX.utils.book_new();
     wb.Workbook = { Views: [{ RTL: true }] };
-    XLSX.utils.book_append_sheet(wb, ws, "לוח בסיס");
-    XLSX.writeFile(wb, "תבנית לוח בסיס.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "אוסף משימות");
+    XLSX.writeFile(wb, "תבנית אוסף משימות.xlsx");
   }
 
   async function read(f: File) {
@@ -463,7 +463,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
     props.onDeleted();
   }
 
-  if (!props.slots.length) return <EmptyState title="עוד אין משבצות במחזור" text="קולטים את קובץ לוח הבסיס למעלה – ומכאן יוצאים לשיבוץ." />;
+  if (!props.slots.length) return <EmptyState title="עוד אין משבצות במחזור" text="קולטים את קובץ אוסף המשימות למעלה – ומכאן יוצאים לשיבוץ." />;
   return (
     <Stack spacing={1.5}>
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
@@ -589,7 +589,7 @@ export function SlotsPage() {
           )}
           {locked ? (
             <Alert severity="info">
-              המחזור פורסם, ולכן אי אפשר לקלוט מחדש את לוח הבסיס או למחוק משבצות. שינוי מהבסיס אחרי הפרסום ייקלט בתפעול השוטף, בשיבוץ במצב
+              המחזור פורסם, ולכן אי אפשר לקלוט מחדש את אוסף המשימות או למחוק משבצות. שינוי מהבסיס אחרי הפרסום ייקלט בתפעול השוטף, בשיבוץ במצב
               יציבות שמשנה רק את המשבצות שהשתנו.
             </Alert>
           ) : (
