@@ -31,7 +31,7 @@ const activeRole = (u: AppUser, now = Date.now()) =>
   )?.role ?? null;
 
 /**
- * "אנשי קשר לעובדים": whom soldiers see under "למי לפנות". Up to two of נע"ת / מ"מ are shown,
+ * "אנשי קשר לעובדים": whom soldiers see under "למי לפנות". Up to two of אחראי השיבוצים / מ"מ are shown,
  * in this order, and each soldier sees his own gaf's commander if he is on the list.
  * The list reads as rows; adding or editing one opens a small window, and every change is saved.
  */
@@ -83,7 +83,7 @@ export function ContactsTab() {
         <Box>
           <Typography variant="h3">אנשי קשר לעובדים</Typography>
           <Typography variant="body2" color="text.secondary">
-            מי שמופיע כאן מוצג לעובדים תחת &quot;למי לפנות&quot;, עם וואטסאפ וחיוג. מוצגים עד שניים מנע&quot;ת / מ&quot;מ לפי הסדר, וכל עובד רואה גם את מפקד המסגרת שלו אם הוא ברשימה. הטלפון של מי
+            מי שמופיע כאן מוצג לעובדים תחת &quot;למי לפנות&quot;, עם וואטסאפ וחיוג. מוצגים עד שניים מאחראי השיבוצים / מ&quot;מ לפי הסדר, וכל עובד רואה גם את מפקד המסגרת שלו אם הוא ברשימה. הטלפון של מי
             שלא ברשימה לא מוצג לעובדים.
           </Typography>
         </Box>

@@ -1,6 +1,6 @@
 /**
  * The WhatsApp message about duties, for a soldier without an account (or one who has not
- * pressed "ראיתי"). נע"ת presses once, the server returns the duties (and a fresh join code
+ * pressed "ראיתי"). אחראי השיבוצים presses once, the server returns the duties (and a fresh join code
  * when he has no account), and this builds the text. Lines without data are left out.
  */
 import { dayKey, shortDayLabel, timeLabel } from "./dates";

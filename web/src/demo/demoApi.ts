@@ -7,7 +7,7 @@ import type { ContactEntry, MyContact } from "../lib/contacts";
  * Demo backend: a fictitious unit in memory. Lets the app run, be reviewed and
  * be screenshotted with no Supabase project. Nothing here is real.
  *
- * Users (any password): naat – נע"ת (asks for a 6-digit code, any code works)
+ * Users (any password): naat – אחראי השיבוצים (asks for a 6-digit code, any code works)
  *                       board – the shared view account
  *                       new.user – a viewer who must change the password first
  */
@@ -386,7 +386,7 @@ export class DemoApi implements Api {
     return this.contacts
       .filter((c) => c.role === "coordinator" || c.role === "deputy")
       .slice(0, 2)
-      .map((c) => ({ display_name: c.display_name, role_label: c.role === "coordinator" ? 'נע"ת התורנויות' : 'ממלא מקום נע"ת', phone: c.phone ?? c.card_phone ?? null, kind: "staff" as const }));
+      .map((c) => ({ display_name: c.display_name, role_label: c.role === "coordinator" ? 'אחראי השיבוצים' : 'ממלא מקום אחראי השיבוצים', phone: c.phone ?? c.card_phone ?? null, kind: "staff" as const }));
   }
 
   async soldierContactsList(): Promise<ContactEntry[]> {
@@ -1133,7 +1133,7 @@ export class DemoApi implements Api {
 
   async cancelScheduleJob(jobId: string) {
     const j = this.jobs.find((x) => x.id === jobId);
-    if (j && (j.status === "queued" || j.status === "running")) Object.assign(j, { status: "failed", error: "בוטל על ידי נע\"ת", finished_at: new Date().toISOString() });
+    if (j && (j.status === "queued" || j.status === "running")) Object.assign(j, { status: "failed", error: "בוטל על ידי אחראי השיבוצים", finished_at: new Date().toISOString() });
   }
 
   async dispatchConfigured() {
@@ -1396,8 +1396,8 @@ export class DemoApi implements Api {
   async redeemInvite(code: string, username: string, password: string) {
     await delay();
     const inv = this.invites.get(code.toUpperCase().replace(/[^A-Z0-9]/g, ""));
-    if (!inv) throw new Error("הקוד לא תקין. בדוק אותו או בקש קוד חדש מנע\"ת התורנויות");
-    if (inv.used) throw new Error("הקוד כבר נוצל. אם זה לא אתה – פנה לנע\"ת התורנויות");
+    if (!inv) throw new Error("הקוד לא תקין. בדוק אותו או בקש קוד חדש מאחראי השיבוצים");
+    if (inv.used) throw new Error("הקוד כבר נוצל. אם זה לא אתה – פנה לאחראי השיבוצים");
     const u = username.trim().toLowerCase();
     if (!/^[a-z0-9._-]{3,32}$/.test(u)) throw new Error("שם משתמש: 3–32 אותיות לטיניות קטנות, ספרות, נקודה, מקף או קו תחתון");
     if (password.length < 10) throw new Error("סיסמה: לפחות 10 תווים");
@@ -1596,7 +1596,7 @@ export class DemoApi implements Api {
   async addMyDateBlock(day: string) {
     await delay();
     const me = this.mySoldier()!;
-    if (!this.demoOpen(day)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לנע\"ת");
+    if (!this.demoOpen(day)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לאחראי השיבוצים");
     if (this.blockList.some((b) => b.soldier_id === me && b.status === "active" && b.day.slice(0, 7) === day.slice(0, 7)))
       throw new Error("כבר יש לך חסימה בחודש הזה (מכסה: 1 בחודש). בטל אותה כדי לבחור יום אחר");
     this.blockList.push({ id: `b${Date.now()}`, soldier_id: me, cycle_id: null, day, status: "active", received_via: "system" });
@@ -1610,7 +1610,7 @@ export class DemoApi implements Api {
   async addMyAbsence(typeId: string, from: string, to: string) {
     await delay();
     if (to < from) throw new Error("תאריכים לא תקינים");
-    if (!this.demoOpen(from)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לנע\"ת");
+    if (!this.demoOpen(from)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לאחראי השיבוצים");
     const end = new Date(Date.parse(to) + 86_400_000).toISOString().slice(0, 10);
     this.absenceList.push({ id: `ab${Date.now()}`, soldier_id: this.mySoldier()!, absence_type_id: typeId, starts_at: `${from}T00:00:00+02:00`,
       ends_at: `${end}T00:00:00+02:00`, status: "active", cancel_reason: null, received_via: "system" });

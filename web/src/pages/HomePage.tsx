@@ -34,7 +34,7 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
   );
 }
 
-/** נע"ת's home: where the cycle stands, what waits, and the coming days. */
+/** אחראי השיבוצים's home: where the cycle stands, what waits, and the coming days. */
 export function HomePage() {
   const { api, me } = useAuth();
   const staff = isStaff(me);
@@ -57,14 +57,14 @@ export function HomePage() {
       .catch(() => setOrphans([]));
   }, [api, staff, cycles]);
 
-  // a single נע"ת who loses his phone has no one to reset his two-step login
+  // a single אחראי השיבוצים who loses his phone has no one to reset his two-step login
   const [resetters, setResetters] = useState<number | null>(null);
   useEffect(() => {
     if (!staff) return;
     api!.listUsers().then((u) => setResetters(mfaResetters(u).length), () => setResetters(null));
   }, [api, staff]);
 
-  // soldiers see "למי לפנות" only once נע"ת chose someone
+  // soldiers see "למי לפנות" only once אחראי השיבוצים chose someone
   const [contacts, setContacts] = useState<number | null>(null);
   useEffect(() => {
     if (!staff) return;
@@ -125,7 +125,7 @@ export function HomePage() {
             </Button>
           }
         >
-          כדאי למנות נע״ת או מ״מ נוסף: אם תחליף טלפון, הוא יוכל לאפס לך את האימות הדו-שלבי.
+          כדאי למנות אחראי שיבוצים או מ״מ נוסף: אם תחליף טלפון, הוא יוכל לאפס לך את האימות הדו-שלבי.
         </Alert>
       )}
       <MyNextDuty />

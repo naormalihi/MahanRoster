@@ -174,7 +174,7 @@ export function ScoringPage() {
                   {d.task_name} · {dayLabel(d.starts_at)} · {num(d.points)} נק׳
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {d.explanation ?? "שובץ ידנית על ידי נע״ת התורנויות."}
+                  {d.explanation ?? "שובץ ידנית על ידי אחראי השיבוצים."}
                 </Typography>
               </Box>
             ))}

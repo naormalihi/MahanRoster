@@ -175,14 +175,14 @@ export interface Api {
   setMyTheme(choice: "auto" | "light" | "dark"): Promise<void>;
   /** "הצעה לשיפור" – anyone signed in; up to 5 a day */
   submitFeedback(d: FeedbackDraft): Promise<void>;
-  /** "הצעות ומשוב" – נע"ת, מ"מ and the unit commander */
+  /** "הצעות ומשוב" – אחראי השיבוצים, מ"מ and the unit commander */
   feedbackList(): Promise<FeedbackItem[]>;
   feedbackNewCount(): Promise<number>;
   /** "מסמך האפיון" – staff and commanders (gaf and unit); null in the demo */
   specDocument(): Promise<SpecDocument | null>;
   updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void>;
   setMyRequestAlerts(on: boolean): Promise<void>;
-  /** "למי לפנות": up to two of נע"ת / מ"מ and the commander of my gaf, as נע"ת chose */
+  /** "למי לפנות": up to two of אחראי השיבוצים / מ"מ and the commander of my gaf, as אחראי השיבוצים chose */
   myContacts(): Promise<MyContact[]>;
   soldierContactsList(): Promise<ContactEntry[]>;
   setSoldierContacts(list: { user_id: string; display_name: string; phone: string | null }[]): Promise<void>;
@@ -222,7 +222,7 @@ export interface Api {
   myCommandedGafs(): Promise<string[]>;
   /** Phone and/or range date – staff, or a gaf commander for his own people. A field left out stays. */
   updateSoldiersAdmin(ids: string[], patch: { phone?: string | null; range_valid_until?: string | null }): Promise<void>;
-  /** Relief roles – staff, or a gaf commander for his own people (נע"ת is told). */
+  /** Relief roles – staff, or a gaf commander for his own people (אחראי השיבוצים is told). */
   setSoldierLoadRolesAdmin(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
   // settings screen
   taskTypes(): Promise<TaskType[]>;
@@ -242,7 +242,7 @@ export interface Api {
   dayTypes(): Promise<DayTypeRef[]>;
   /** A new calendar day type (e.g. "כוננות מוגברת"); returns its code. */
   addDayType(name: string): Promise<string>;
-  /** Only a type נע"ת added, and only while no calendar day uses it. */
+  /** Only a type אחראי השיבוצים added, and only while no calendar day uses it. */
   deleteDayType(code: string): Promise<void>;
   calendarDays(fromIso: string, toIso: string): Promise<CalendarDay[]>;
   saveCalendarDays(days: CalendarDay[]): Promise<void>;
@@ -337,7 +337,7 @@ export interface Api {
   myScores(): Promise<MyScore[]>;
   /** "ראיתי" on duties of mine; returns how many were marked */
   ackDuties(assignmentIds: string[]): Promise<number>;
-  /** נע"ת: "spoke with him on the phone" */
+  /** אחראי השיבוצים: "spoke with him on the phone" */
   staffAck(assignmentId: string): Promise<void>;
   /** duties of the coming hours not acknowledged yet (a gaf commander: his gaf) */
   unackedDuties(hours?: number): Promise<UnackedDuty[]>;
@@ -351,7 +351,7 @@ export interface Api {
   answerSwap(requestId: string, accept: boolean): Promise<{ status: string; reason?: string }>;
   cancelSwap(requestId: string): Promise<void>;
   mySwaps(): Promise<MySwap[]>;
-  /** for נע"ת and commanders: the swaps of the last weeks */
+  /** for אחראי השיבוצים and commanders: the swaps of the last weeks */
   swapLog(): Promise<SwapLogRow[]>;
   /** the scoring rules for "איך מחושב הניקוד" – every signed-in user, soldiers too */
   scoringRules(): Promise<ScoringRules>;
@@ -386,7 +386,7 @@ export interface Api {
   setUserLocked(userId: string, locked: boolean): Promise<void>;
   /** Deletes a gaf commander's account; one whose name is on records is closed and hidden instead. */
   deleteUser(userId: string): Promise<"deleted" | "closed">;
-  /** נע"ת: a new username (same rules as a new account); the sign-in follows, the password stays */
+  /** אחראי השיבוצים: a new username (same rules as a new account); the sign-in follows, the password stays */
   renameUser(userId: string, username: string): Promise<void>;
   /** a framework commander's framework: one chosen, or null = his linked employee's */
   setCommanderGaf(userId: string, gafId: string | null): Promise<void>;

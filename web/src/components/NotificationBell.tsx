@@ -173,7 +173,7 @@ export function NotificationBell() {
   );
 }
 
-/** נע"ת, מ"מ and gaf commanders: notices on new exemption requests – on unless turned off here. */
+/** אחראי השיבוצים, מ"מ and gaf commanders: notices on new exemption requests – on unless turned off here. */
 function RequestAlertsControl() {
   const { api, me } = useAuth();
   const [on, setOn] = useState(me?.requestAlerts ?? true);

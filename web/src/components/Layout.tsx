@@ -51,7 +51,7 @@ import SpecIcon from "@mui/icons-material/DescriptionOutlined";
 import { ThemeSync, ThemeToggle } from "./ThemePicker";
 
 const ROLE_LABEL: Record<string, string> = {
-  coordinator: "נע\"ת תורנויות",
+  coordinator: "אחראי שיבוצים",
   deputy: "ממלא מקום",
   viewer: "צפייה",
   gaf_commander: "מפקד מסגרת",
@@ -258,7 +258,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [contacts, setContacts] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const [renaming, setRenaming] = useState(false);
-  // נע"ת, מ"מ and the unit commander: how many new messages wait in "הצעות ומשוב"
+  // אחראי השיבוצים, מ"מ and the unit commander: how many new messages wait in "הצעות ומשוב"
   const [newFeedback, setNewFeedback] = useState(0);
   const seesFeedback = staff || isUnitCommander(me);
   useEffect(() => {
@@ -323,7 +323,7 @@ export function Layout({ children }: { children: ReactNode }) {
               {who}
             </Typography>
           )}
-          {/* soldiers, and נע"ת for the swaps soldiers made */}
+          {/* soldiers, and אחראי השיבוצים for the swaps soldiers made */}
           {(isSoldier(me) || staff) && <NotificationBell />}
           {kind && !compact && (
             <IconButton color="inherit" aria-label="סיור היכרות" title="סיור היכרות" onClick={() => setTour(true)}>

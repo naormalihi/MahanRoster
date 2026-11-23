@@ -36,7 +36,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
       <DialogContent dividers>
         {sent ? (
           <Alert severity="success">
-            תודה! ההודעה הגיעה לנע&quot;ת ולמפקד היחידה.{anonymous ? "" : " כשיטפלו בה – תקבל עדכון בפעמון."}
+            תודה! ההודעה הגיעה לאחראי השיבוצים ולמפקד היחידה.{anonymous ? "" : " כשיטפלו בה – תקבל עדכון בפעמון."}
           </Alert>
         ) : (
           <Stack spacing={2}>

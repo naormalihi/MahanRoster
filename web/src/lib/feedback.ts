@@ -1,4 +1,4 @@
-/** "הצעה לשיפור": what a user sends, and how נע"ת, מ"מ and the unit commander see and close it. */
+/** "הצעה לשיפור": what a user sends, and how אחראי השיבוצים, מ"מ and the unit commander see and close it. */
 
 export type FeedbackKind = "idea" | "bug" | "note";
 export type FeedbackStatus = "new" | "in_progress" | "done" | "wont";

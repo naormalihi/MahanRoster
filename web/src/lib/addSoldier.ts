@@ -62,7 +62,7 @@ export function toRow(f: AddSoldierForm, soldierKey: string) {
     career_start_date: f.serviceType === "career" ? f.careerStartDate || null : null,
     range_valid_until: f.rangeValidUntil || null,
     parent_status: f.parent,
-    home_nightly: false, // the personnel file's flag; here נע"ת sets the level, as on the card
+    home_nightly: false, // the personnel file's flag; here אחראי השיבוצים sets the level, as on the card
     tash_level: f.tashLevel === "" ? null : f.tashLevel,
     phone: phone === "invalid" ? null : phone,
     unit_join_date: f.joinDate,

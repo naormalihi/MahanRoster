@@ -126,7 +126,7 @@ function EditDialog(props: {
   soldier: SoldierDetail;
   ranks: NamedRef[];
   loadRoles: LoadRoleRef[];
-  /** full – נע"ת; admin – a gaf commander, his own people: phone, range and relief roles; view – read */
+  /** full – אחראי השיבוצים; admin – a gaf commander, his own people: phone, range and relief roles; view – read */
   mode: "full" | "admin" | "view";
   onClose: () => void;
   onSaved: () => void;
@@ -247,7 +247,7 @@ function EditDialog(props: {
             <Alert severity="info" icon={false}>
               {ro
                 ? "צפייה בלבד."
-                : "כאן מעדכנים טלפון, מטווח ותפקידי הקלה. פטורים, ת\"ש, הקלות ושאר הפרטים – אצל נע\"ת."}
+                : "כאן מעדכנים טלפון, מטווח ותפקידי הקלה. פטורים, ת\"ש, הקלות ושאר הפרטים – אצל אחראי השיבוצים."}
             </Alert>
           )}
           <TextField
@@ -1170,7 +1170,7 @@ export function SoldiersPage() {
           </Stack>
         </Paper>
       )}
-      {/* a gaf commander: his people with duties and no account – a WhatsApp each (נע"ת has it in operations) */}
+      {/* a gaf commander: his people with duties and no account – a WhatsApp each (אחראי השיבוצים has it in operations) */}
       {!staffUser && canManage && (() => {
         const pub = [cur?.cycle, nxt?.cycle].find((c) => c && isPublished(c));
         return pub ? <NoAccountStrip cycleId={pub.id} /> : null;

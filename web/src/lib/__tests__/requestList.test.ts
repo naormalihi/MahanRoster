@@ -24,7 +24,7 @@ describe("requestItems", () => {
     const { current } = requestItems(mine, "2026-11-20");
     const by = new Map(current.map((r) => [r.key, r]));
     expect(by.get("ee1")!.cancellable).toBe(true);
-    expect(by.get("bb2")!.cancellable).toBe(false); // נע"ת entered it
+    expect(by.get("bb2")!.cancellable).toBe(false); // אחראי השיבוצים entered it
     expect(by.get("bb2")!.byStaff).toBe(true);
     expect(by.get("aa1")!.cancellable).toBe(false); // the deadline passed
     expect(by.get("aa1")!.from).toBe("2026-12-01");

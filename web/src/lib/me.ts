@@ -11,7 +11,7 @@ export interface SoldierAccount {
   invited_at: string | null;
   invite_expires_at: string | null;
   invite_state: InviteState | null;
-  /** when נע"ת marked the newest code as handed out (WhatsApp, print) */
+  /** when אחראי השיבוצים marked the newest code as handed out (WhatsApp, print) */
   invite_sent_at?: string | null;
 }
 
@@ -37,11 +37,11 @@ export interface MyDuty {
   contact_name?: string | null;
   contact_phone?: string | null;
   briefing_note?: string | null;
-  /** when he pressed "ראיתי" (or נע"ת marked a phone call); null: still waiting */
+  /** when he pressed "ראיתי" (or אחראי השיבוצים marked a phone call); null: still waiting */
   acked_at?: string | null;
 }
 
-/** A duty of the coming days that its soldier has not acknowledged yet (נע"ת, gaf commander). */
+/** A duty of the coming days that its soldier has not acknowledged yet (אחראי השיבוצים, gaf commander). */
 export interface UnackedDuty {
   assignment_id: string;
   soldier_id: string;

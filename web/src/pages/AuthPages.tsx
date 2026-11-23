@@ -65,7 +65,7 @@ export function LoginPage() {
         <Stack spacing={2}>
           {api?.demo && (
             <Alert severity="info">
-              מצב הדגמה. משתמשים: <b>naat</b> (נע"ת), <b>board</b> (צפייה), <b>cmd</b> (מפקד מסגרת), <b>chayal</b> (עובד), <b>new.user</b>. כל סיסמה מתקבלת.
+              מצב הדגמה. משתמשים: <b>naat</b> (אחראי השיבוצים), <b>board</b> (צפייה), <b>cmd</b> (מפקד מסגרת), <b>chayal</b> (עובד), <b>new.user</b>. כל סיסמה מתקבלת.
             </Alert>
           )}
           <TextField
@@ -91,7 +91,7 @@ export function LoginPage() {
           </Button>
           <Button onClick={() => setJoining(true)}>יש לי קוד הצטרפות</Button>
           <Typography variant="caption" color="text.secondary">
-            שכחת סיסמה? פנה לנע"ת התורנויות לאיפוס.
+            שכחת סיסמה? פנה לאחראי השיבוצים לאיפוס.
           </Typography>
         </Stack>
       </form>
@@ -100,7 +100,7 @@ export function LoginPage() {
 }
 
 /**
- * A soldier opens his account with the one-time code he got from נע"ת: the code ties the
+ * A soldier opens his account with the one-time code he got from אחראי השיבוצים: the code ties the
  * account to his record (no personal number is asked), and he picks a username and a password.
  */
 function JoinPage({ onBack }: { onBack: () => void }) {
@@ -136,7 +136,7 @@ function JoinPage({ onBack }: { onBack: () => void }) {
       <form onSubmit={submit}>
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            את הקוד קיבלת מנע"ת התורנויות. הוא אישי ומשמש פעם אחת.
+            את הקוד קיבלת מאחראי השיבוצים. הוא אישי ומשמש פעם אחת.
           </Typography>
           <TextField
             label="קוד הצטרפות"
@@ -260,7 +260,7 @@ export function ChangePasswordPage() {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [error, setError] = useState<string | null>(null);
-  /** the name נע"ת typed is only a start – it may be fixed here, once with the password */
+  /** the name אחראי השיבוצים typed is only a start – it may be fixed here, once with the password */
   const canRename = !!me && !me.roles.includes("viewer");
   const [name, setName] = useState(me?.username ?? "");
   const newName = name.trim().toLowerCase();

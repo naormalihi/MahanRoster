@@ -20,7 +20,7 @@ export interface RequestItem {
   /** exemptions: pending / approved / …; blocks and absences take effect at once */
   status: "pending" | "approved" | "rejected" | "expired" | "cancelled" | "active";
   urgent: boolean;
-  /** entered by נע"ת, not by the soldier */
+  /** entered by אחראי השיבוצים, not by the soldier */
   byStaff: boolean;
   reason: string | null;
   /** the soldier may cancel it */

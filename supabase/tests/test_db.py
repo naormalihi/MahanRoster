@@ -257,7 +257,7 @@ def test_round_trip_through_the_engine(conn):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute("select public.request_schedule(%s)", (cycle,))
 
-    # 1. snapshot + input, as נע"ת
+    # 1. snapshot + input, as אחראי השיבוצים
     conn.execute("begin")
     conn.execute("set local role authenticated")
     _claims(conn, COORD)
@@ -277,7 +277,7 @@ def test_round_trip_through_the_engine(conn):
     assert solution.status in ("OPTIMAL", "FEASIBLE")
     assert violations(problem, solution) == []
 
-    # 3. apply as the worker (service role) and publish as נע"ת
+    # 3. apply as the worker (service role) and publish as אחראי השיבוצים
     conn.execute("begin")
     conn.execute("set local role service_role")
     applied = conn.execute(
@@ -1908,7 +1908,7 @@ def test_soldier_is_notified_of_his_board_changes_and_decisions(conn):
 
 def test_unit_commander_reads_the_unit_and_its_dashboard(conn):
     uid = _as_coord(conn, "select public.create_user('mefaked.yechida', 'temp-pass-123', 'unit_commander', null)")[0][0]
-    # a rule change by נע"ת shows on the dashboard
+    # a rule change by אחראי השיבוצים shows on the dashboard
     with conn.transaction():
         conn.execute("set local role authenticated")
         _claims(conn, COORD)
@@ -2481,7 +2481,7 @@ def test_reset_user_mfa(conn):
             with conn.transaction():
                 conn.execute("select public.reset_user_mfa(%s)", (DEPUTY_ACTIVE,))
         _claims(conn, VIEWER)  # a reader cannot
-        with pytest.raises(psycopg.Error, match="רק נע"):
+        with pytest.raises(psycopg.Error, match="רק אחראי השיבוצים"):
             with conn.transaction():
                 conn.execute("select public.reset_user_mfa(%s)", (COORD,))
         conn.execute("reset role")
@@ -2624,7 +2624,7 @@ def test_duty_ack_reminder_and_escalation(conn):
             "insert into assignments (slot_id, soldier_id, gaf_id, role, status, source, manual_reason, points, normalized_points) "
             "select %s, id, gaf_id, 'performer', 'assigned', 'manual', 'בדיקה', 1, 1 from soldiers where id = %s returning id", (k, sid)).fetchone()[0]
         a_near, a_soon, a_far, b_near = put(near, free[0]), put(soon, free[0]), put(far, free[0]), put(near, free[1])
-        # what נע"ת sees: the four within 3 days less the far one
+        # what אחראי השיבוצים sees: the four within 3 days less the far one
         conn.execute("set local role authenticated")
         _claims(conn, COORD)
         ids = {r[0] for r in conn.execute("select assignment_id from public.unacked_duties(72)").fetchall()}
@@ -2774,7 +2774,7 @@ def test_new_exemption_request_alerts_staff_grouped(conn):
         (pc,), = rows(cmd)
         # read notices do not swallow the next one
         conn.execute("update notifications set read_at = now() where recipient_user_id = %s", (COORD,))
-        # נע"ת writes one himself: nothing to him; turned off: nothing to the gaf commander
+        # אחראי השיבוצים writes one himself: nothing to him; turned off: nothing to the gaf commander
         conn.execute("update app_users set request_alerts = false where id = %s", (cmd,))
         conn.execute("set local role authenticated")
         _claims(conn, COORD)
@@ -2810,7 +2810,7 @@ def test_soldier_contacts_show_only_the_chosen(conn):
         # nothing chosen: nothing shown
         _claims(conn, uid, aal="aal1")
         assert conn.execute("select count(*) from public.my_contacts()").fetchone()[0] == 0
-        # a soldier cannot set the list; נע"ת can
+        # a soldier cannot set the list; אחראי השיבוצים can
         with pytest.raises(psycopg.Error):
             with conn.transaction():
                 conn.execute("select public.set_soldier_contacts('[]')")
@@ -2822,17 +2822,17 @@ def test_soldier_contacts_show_only_the_chosen(conn):
             with conn.transaction():
                 conn.execute("select public.set_soldier_contacts(%s)", (json.dumps([{"user_id": str(uid), "display_name": "חייל"}]),))
         n = conn.execute("select public.set_soldier_contacts(%s)", (json.dumps([
-            {"user_id": str(COORD), "display_name": "נע\"ת לדוגמה", "phone": "050-000-0001"},
+            {"user_id": str(COORD), "display_name": "אחראי השיבוצים לדוגמה", "phone": "050-000-0001"},
             {"user_id": str(DEPUTY_ACTIVE), "display_name": "מ\"מ לדוגמה"},
             {"user_id": str(cmds[0]), "display_name": "מפקד גף א", "phone": "0500000003"},
             {"user_id": str(cmds[1]), "display_name": "מפקד גף ב", "phone": "0500000004"},
         ]),)).fetchone()[0]
         assert n == 4
-        # the soldier: נע"ת, מ"מ and his own gaf's commander – not the other gaf's
+        # the soldier: אחראי השיבוצים, מ"מ and his own gaf's commander – not the other gaf's
         _claims(conn, uid, aal="aal1")
         rows = conn.execute("select display_name, role_label, phone, kind from public.my_contacts()").fetchall()
-        assert rows == [("נע\"ת לדוגמה", "נע\"ת התורנויות", "972500000001", "staff"),
-                        ("מ\"מ לדוגמה", "ממלא מקום נע\"ת", None, "staff"),
+        assert rows == [("אחראי השיבוצים לדוגמה", "אחראי השיבוצים", "972500000001", "staff"),
+                        ("מ\"מ לדוגמה", "ממלא מקום אחראי השיבוצים", None, "staff"),
                         ("מפקד גף א", "מפקד המסגרת", "972500000003", "gaf")]
         # the list itself is staff only
         assert conn.execute("select count(*) from public.soldier_contacts_list()").fetchone()[0] == 0
@@ -2981,18 +2981,18 @@ def test_delete_commander_who_does_duties_and_rename(conn):
     # deleting it now works; the employee record stays
     assert _as_coord(conn, "select public.delete_user(%s)", uid)[0][0] in ("deleted", "closed")
     assert conn.execute("select count(*) from soldiers where id = %s", (sid,)).fetchone()[0] == 1
-    # נע"ת's own account is still not deletable here
+    # אחראי השיבוצים's own account is still not deletable here
     with pytest.raises(psycopg.Error):
         _as_coord(conn, "select public.delete_user(%s)", DEPUTY_ACTIVE)
 
 
 def test_delete_coordinator_while_another_stays(conn):
     other = _as_coord(conn, "select public.create_user('coord.two', 'temp-pass-123', 'coordinator', null)")[0][0]
-    # another נע"ת goes – I (an active נע"ת) stay
+    # another אחראי השיבוצים goes – I (an active אחראי השיבוצים) stay
     assert _as_coord(conn, "select public.delete_user(%s)", other)[0][0] in ("deleted", "closed")
     # an account with another role (unit commander) is not deleted here
     uc = _as_coord(conn, "select public.create_user('unit.cmd2', 'temp-pass-123', 'unit_commander', null)")[0][0]
-    with pytest.raises(psycopg.Error, match='רק חשבונות של נע"ת ושל מפקדי מסגרות'):
+    with pytest.raises(psycopg.Error, match='רק חשבונות של אחראי השיבוצים ושל מפקדי מסגרות'):
         _as_coord(conn, "select public.delete_user(%s)", uc)
 def test_commander_framework_follows_his_employee_or_is_chosen(conn):
     # an active employee with no account, in some framework (not "the first one": ids are random)
@@ -3016,7 +3016,7 @@ def test_commander_framework_follows_his_employee_or_is_chosen(conn):
         conn.commit()
         assert gafs() == [g2]
         assert role()["gaf_in_effect"] == str(g2) and role()["gaf_chosen"] is False
-        # chosen by נע"ת: that one, whatever the employee's
+        # chosen by אחראי השיבוצים: that one, whatever the employee's
         _as_coord(conn, "select public.set_commander_gaf(%s, %s)", uid, g1)
         assert gafs() == [g1]
         assert role()["gaf_chosen"] is True and role()["gaf_name"]
@@ -3153,7 +3153,7 @@ def test_gaf_commander_updates_admin_details_of_his_own_people_only(conn):
             # the table itself stays closed: a direct update changes nothing
             with c.transaction():
                 assert c.execute("update soldiers set tash_level = 3 where id = %s", (mine,)).rowcount == 0
-            # relief roles: replaced; נע"ת is told
+            # relief roles: replaced; אחראי השיבוצים is told
             call("select public.set_soldier_load_roles_admin(%s, %s::jsonb)", mine,
                  json.dumps([{"load_role_id": str(role_id), "valid_from": "2027-01-01", "valid_to": None}]))
             with pytest.raises(psycopg.Error, match="המסגרת שלך"):
@@ -3188,4 +3188,10 @@ def test_a_reader_without_a_framework_updates_nothing(conn):
 def test_no_function_still_says_the_old_board_name(conn):
     left = conn.execute("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
                         "where n.nspname in ('app', 'public') and p.prosrc like '%לוח התורנויות%'").fetchall()
+    assert left == []
+
+
+def test_no_function_still_says_the_old_coordinator_name(conn):
+    left = conn.execute("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                        "where n.nspname in ('app', 'public') and (p.prosrc like '%%נע\"ת%%' or p.prosrc like '%%נע״ת%%')").fetchall()
     assert left == []

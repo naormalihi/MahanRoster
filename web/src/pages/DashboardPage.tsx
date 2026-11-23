@@ -56,7 +56,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 /**
  * The unit commander's dashboard (version 2.0, stage 2.6), read only: the cycle at a glance,
  * the coming weekend, the load by population and by gaf, open requests, and every change
- * נע"ת made to the rules in the last month.
+ * אחראי השיבוצים made to the rules in the last month.
  */
 /** Points with one decimal, without a "-0.0". */
 const pts = (x: number | string) => (Math.abs(Number(x)) < 0.05 ? 0 : Number(x)).toFixed(1);
@@ -106,7 +106,7 @@ export function DashboardPage() {
           value={`${d.accounts.with_account}/${d.accounts.soldiers}`}
           note={d.accounts.soldiers ? `${Math.round((d.accounts.with_account / d.accounts.soldiers) * 100)}%` : ""}
         />
-        <Tile title="שינויי הגדרות בחודש" value={d.settings_changes.length} note="ע״י נע״ת" />
+        <Tile title="שינויי הגדרות בחודש" value={d.settings_changes.length} note="ע״י אחראי השיבוצים" />
       </Box>
 
       {/* two by two, each pair the same height */}

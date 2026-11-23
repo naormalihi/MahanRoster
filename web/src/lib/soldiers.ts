@@ -45,7 +45,7 @@ export interface SoldierDetail {
   load_roles: SoldierLoadRole[];
 }
 
-/** Fields נע"ת may change on the soldiers screen (the rest comes from the HR file). */
+/** Fields אחראי השיבוצים may change on the soldiers screen (the rest comes from the HR file). */
 export type SoldierPatch = Partial<
   Pick<
     SoldierDetail,

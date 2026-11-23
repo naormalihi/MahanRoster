@@ -1,4 +1,4 @@
-/** Duty catalog, scoring multipliers and the holiday calendar – what נע"ת manages on the settings screen. */
+/** Duty catalog, scoring multipliers and the holiday calendar – what אחראי השיבוצים manages on the settings screen. */
 
 import { HebrewCalendar } from "@hebcal/core";
 

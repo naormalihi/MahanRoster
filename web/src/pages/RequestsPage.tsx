@@ -47,13 +47,13 @@ const dates = (r: RequestItem) => (r.from === r.to ? dayLabel(r.from) : `${fmt(r
 const CHOICES: { kind: RequestKind; label: string; hint: string }[] = [
   { kind: "block", label: "יום שאני לא יכול", hint: "חסימת תאריך – בלי אישור" },
   { kind: "absence", label: "אני לא ביחידה כמה ימים", hint: "היעדרות – בלי אישור" },
-  { kind: "exemption", label: "יש לי סיבה רפואית או אחרת לפטור", hint: 'בקשת פטור – נע"ת מחליט אחרי שיראה אסמכתא' },
+  { kind: "exemption", label: "יש לי סיבה רפואית או אחרת לפטור", hint: 'בקשת פטור – אחראי השיבוצים מחליט אחרי שיראה אסמכתא' },
 ];
 
 /**
  * "הבקשות שלי": one list of all the soldier's requests (the coming first, the passed ones folded),
  * and one "בקשה חדשה" button that asks what happened. Blocks and absences take effect at once
- * until the cycle's deadline; an exemption waits for נע"ת. After the deadline – through נע"ת.
+ * until the cycle's deadline; an exemption waits for אחראי השיבוצים. After the deadline – through אחראי השיבוצים.
  */
 export function RequestsPage() {
   const { api } = useAuth();
@@ -142,7 +142,7 @@ export function RequestsPage() {
         <Typography variant="body2" color="text.secondary">
           {dates(r)}
           {r.reason ? ` · ${r.reason}` : ""}
-          {r.byStaff ? ' · הוזן ע"י נע"ת' : ""}
+          {r.byStaff ? ' · הוזן ע"י אחראי השיבוצים' : ""}
         </Typography>
       </Box>
       {r.urgent && <Chip size="small" color="error" variant="outlined" label="דחוף" />}
@@ -171,7 +171,7 @@ export function RequestsPage() {
         <Box sx={{ flex: 1, minWidth: 200 }}>
           <Typography variant="h1">הבקשות שלי</Typography>
           <Typography variant="body2" color="text.secondary">
-            את האסמכתא לפטור מציגים לנע&quot;ת – המערכת לא שומרת מסמכים או פרטים רפואיים.
+            את האסמכתא לפטור מציגים לאחראי השיבוצים – המערכת לא שומרת מסמכים או פרטים רפואיים.
           </Typography>
         </Box>
         {(current.length > 0 || past.length > 0) && newButton}
@@ -186,7 +186,7 @@ export function RequestsPage() {
             </Button>
           }
         >
-          המועד ל{closed.closed.name} נסגר{closed.closed.deadline ? ` ב-${fmt(dayKey(closed.closed.deadline))}` : ""}. חסימה, היעדרות או פטור דחוף לתאריכים האלה – דרך נע&quot;ת.
+          המועד ל{closed.closed.name} נסגר{closed.closed.deadline ? ` ב-${fmt(dayKey(closed.closed.deadline))}` : ""}. חסימה, היעדרות או פטור דחוף לתאריכים האלה – דרך אחראי השיבוצים.
           {closed.next ? ` ל${closed.next.name} אפשר להגיש כרגיל${closed.next.deadline ? ` עד ${fmt(dayKey(closed.next.deadline))}` : ""}.` : ""}
         </Alert>
       )}
@@ -281,11 +281,11 @@ export function RequestsPage() {
               )}
               {form.kind === "exemption" && (
                 <Typography variant="body2" color="text.secondary">
-                  הבקשה ממתינה עד שנע&quot;ת יראה את האסמכתא ויחליט{exName(form.type) ? ` על "${exName(form.type)}"` : ""}.
+                  הבקשה ממתינה עד שאחראי השיבוצים יראה את האסמכתא ויחליט{exName(form.type) ? ` על "${exName(form.type)}"` : ""}.
                 </Typography>
               )}
               {form.from && !formCycle && !formClosed && (
-                <Alert severity="info">עוד אין מחזור לתאריכים האלה – הבקשה נשמרת, ונע&quot;ת יראה אותה כשייפתח מחזור.</Alert>
+                <Alert severity="info">עוד אין מחזור לתאריכים האלה – הבקשה נשמרת, ואחראי השיבוצים יראה אותה כשייפתח מחזור.</Alert>
               )}
               {formUrgent && <Alert severity="warning">מועד האילוצים לתאריכים האלה נסגר – הבקשה תסומן דחופה.</Alert>}
               {formClosed && (
@@ -297,7 +297,7 @@ export function RequestsPage() {
                     </Button>
                   }
                 >
-                  המועד לתאריכים האלה נסגר – דרך נע&quot;ת.
+                  המועד לתאריכים האלה נסגר – דרך אחראי השיבוצים.
                 </Alert>
               )}
               {formError && <Alert severity="error">{formError}</Alert>}

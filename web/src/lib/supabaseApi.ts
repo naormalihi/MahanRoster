@@ -42,7 +42,7 @@ import type { LoadRoleRef, SoldierDetail, SoldierLoadRole, SoldierPatch } from "
 import { setSignInNotice } from "./signInNotice";
 
 /** The server's "permission denied" (a reader reaching a staff action), in words. */
-export const READ_ONLY_TEXT = 'צפייה בלבד – הפעולה הזו שמורה לנע"ת התורנויות.';
+export const READ_ONLY_TEXT = 'צפייה בלבד – הפעולה הזו שמורה לאחראי השיבוצים.';
 const errorText = (m: string) => (/permission denied/i.test(m) ? READ_ONLY_TEXT : m);
 
 function check<T>(res: { data: T; error: { message: string } | null }): NonNullable<T> {
@@ -101,8 +101,8 @@ export class SupabaseApi implements Api {
   private async accessBlocked(): Promise<string | null> {
     const { data, error } = await this.sb.rpc("my_access");
     if (error) return null; // the database answers for itself anyway
-    if (data === "released") return "השירות שלך הסתיים, ולכן אין אפשרות להתחבר. אם זו טעות – פנה לנע״ת.";
-    if (data === "locked") return "החשבון נעול. לפתיחה – פנה לנע״ת.";
+    if (data === "released") return "השירות שלך הסתיים, ולכן אין אפשרות להתחבר. אם זו טעות – פנה לאחראי השיבוצים.";
+    if (data === "locked") return "החשבון נעול. לפתיחה – פנה לאחראי השיבוצים.";
     return null;
   }
 

@@ -1,4 +1,4 @@
-/** User accounts (נע"ת manages them; v1 creates gaf-commander accounts). */
+/** User accounts (אחראי השיבוצים manages them; v1 creates gaf-commander accounts). */
 import type { Role } from "./api";
 
 export interface UserRoleRow {
@@ -10,7 +10,7 @@ export interface UserRoleRow {
   /** a framework commander: the framework in effect – the chosen one, or his employee's */
   gaf_in_effect?: string | null;
   gaf_name?: string | null;
-  /** chosen by נע"ת rather than following the linked employee */
+  /** chosen by אחראי השיבוצים rather than following the linked employee */
   gaf_chosen?: boolean;
 }
 
@@ -27,7 +27,7 @@ export interface AppUser {
   has_mfa?: boolean;
 }
 
-/** Users who can reset another user's two-step login: נע"ת and מ"מ, active, not locked. */
+/** Users who can reset another user's two-step login: אחראי השיבוצים and מ"מ, active, not locked. */
 export function mfaResetters(users: AppUser[], now = new Date()): AppUser[] {
   const t = now.getTime();
   return users.filter(
@@ -46,7 +46,7 @@ export function mfaResetters(users: AppUser[], now = new Date()): AppUser[] {
 export const GRANTABLE: CreatableRole[] = ["coordinator", "gaf_commander", "unit_commander"];
 
 export const ROLE_NAME: Record<Role, string> = {
-  coordinator: "נע\"ת תורנויות",
+  coordinator: "אחראי שיבוצים",
   deputy: "ממלא מקום",
   viewer: "צפייה משותפת",
   gaf_commander: "מפקד מסגרת – צפייה",
@@ -55,7 +55,7 @@ export const ROLE_NAME: Record<Role, string> = {
   soldier: "עובד",
 };
 
-/** The accounts נע"ת creates in the users screen (soldiers come in with an invite code). */
+/** The accounts אחראי השיבוצים creates in the users screen (soldiers come in with an invite code). */
 export type CreatableRole = "coordinator" | "gaf_commander" | "unit_commander";
 
 export const USERNAME_RULE = /^[a-z0-9._-]{3,32}$/;

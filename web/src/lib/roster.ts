@@ -305,7 +305,7 @@ export interface RosterPlan {
   added: SoldierRecord[];
   updated: { id: string; before: ExistingSoldier; after: SoldierRecord; changes: (keyof SoldierRecord)[] }[];
   removed: ExistingSoldier[];
-  /** in the file, but in a framework that was not chosen – stays active unless נע"ת marks it */
+  /** in the file, but in a framework that was not chosen – stays active unless אחראי השיבוצים marks it */
   movedOut: { soldier: ExistingSoldier; to: string }[];
   unchanged: number;
   unknownGafim: string[];
@@ -383,7 +383,7 @@ export function approvePlan(plan: RosterPlan, approved: Set<string>, deactivate:
     if (changes.length || !u.before.is_active) updated.push({ ...u, after: after as unknown as SoldierRecord, changes });
     else unchanged++;
   }
-  // moved to a framework not chosen: only the ones נע"ת marked go inactive
+  // moved to a framework not chosen: only the ones אחראי השיבוצים marked go inactive
   const removed = [...plan.removed, ...plan.movedOut.filter((m) => deactivate.has(m.soldier.id)).map((m) => m.soldier)];
   return { ...plan, updated, unchanged, removed };
 }

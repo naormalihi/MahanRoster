@@ -82,7 +82,7 @@ export function ContactsDialog({ onClose }: { onClose: () => void }) {
         {rows === null ? null : rows.length ? (
           <ContactRows rows={rows} />
         ) : (
-          <Typography color="text.secondary">עוד לא הוגדרו אנשי קשר. אפשר לפנות לנע&quot;ת התורנויות דרך המפקד.</Typography>
+          <Typography color="text.secondary">עוד לא הוגדרו אנשי קשר. אפשר לפנות לאחראי השיבוצים דרך המפקד.</Typography>
         )}
       </DialogContent>
       <DialogActions>

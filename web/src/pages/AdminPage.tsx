@@ -813,7 +813,7 @@ function DayTypePicker(props: { types: DayTypeRef[]; value: string[]; onChange: 
             color={props.value.includes(t.code) ? "primary" : "default"}
             variant={props.value.includes(t.code) ? "filled" : "outlined"}
             onClick={() => toggle(t.code)}
-            // a type נע"ת added can be deleted (the built-in ones cannot)
+            // a type אחראי השיבוצים added can be deleted (the built-in ones cannot)
             onDelete={t.code.startsWith("custom_") ? () => void remove(t) : undefined}
           />
         ))}

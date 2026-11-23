@@ -44,7 +44,7 @@ export interface SwapLogRow {
   decided_at: string | null;
 }
 
-/** Hours before a duty after which only נע"ת changes it (the server's setting has the last word). */
+/** Hours before a duty after which only אחראי השיבוצים changes it (the server's setting has the last word). */
 export const SWAP_CUTOFF_HOURS = 24;
 
 export function canAskSwap(d: Pick<MyDuty, "status" | "starts_at">, now: number): boolean {
