@@ -85,7 +85,7 @@ export function ActivateDialog(props: {
             <TextField select label="מאיזו יממה" value={from} onChange={(e) => setFrom(Number(e.target.value))} fullWidth helperText="כל אחד מקבל ניקוד על היממות שביצע">
               {Array.from({ length: units }, (_, i) => (
                 <MenuItem key={i} value={i}>
-                  {i === 0 ? "מתחילת התורנות – המבצע לא ביצע כלל" : `היממה ה-${i + 1} (${dayOf(i)})`}
+                  {i === 0 ? "מתחילת המשימה – המבצע לא ביצע כלל" : `היממה ה-${i + 1} (${dayOf(i)})`}
                 </MenuItem>
               ))}
             </TextField>
@@ -93,7 +93,7 @@ export function ActivateDialog(props: {
           <TextField label="הערה (לא חובה)" value={note} onChange={(e) => setNote(e.target.value)} fullWidth />
           <Alert severity="info" icon={false}>
             {from === 0 ? `${replaced} יסומן/תסומן "הוחלף" ולא יקבל/תקבל ניקוד. ` : ""}
-            אחרי ההפעלה חסרה עתודה לתורנות; היא תופיע בתפעול ברשימת הממתינות לשיבוץ.
+            אחרי ההפעלה חסרה עתודה למשימה; היא תופיע בתפעול ברשימת הממתינות לשיבוץ.
           </Alert>
         </Stack>
       </DialogContent>
@@ -174,10 +174,10 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
         fullScreen={false}
         sx={phone ? { "& .MuiDialog-container": { alignItems: "flex-end" }, "& .MuiDialog-paper": { m: 0, width: "100%", borderRadius: "16px 16px 0 0" } } : undefined}
       >
-        <DialogTitle sx={{ pb: 0.5 }}>{data?.slot.task_name ?? "תורנות"}</DialogTitle>
+        <DialogTitle sx={{ pb: 0.5 }}>{data?.slot.task_name ?? "משימה"}</DialogTitle>
         <DialogContent>
           {data === undefined && !error && <CircularProgress size={22} />}
-          {data === null && <Alert severity="warning">התורנות לא נמצאה.</Alert>}
+          {data === null && <Alert severity="warning">המשימה לא נמצאה.</Alert>}
           {data && (
             <Stack spacing={1.5}>
               <Typography variant="body2" color="text.secondary">
@@ -295,7 +295,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
               </Box>
               {started && people.some((p) => p.status === "reserve_activated") && (
                 <Typography variant="caption" color="text.secondary">
-                  התורנות כבר התחילה, ולכן אי אפשר לבטל את הפעלת העתודה.
+                  המשימה כבר התחילה, ולכן אי אפשר לבטל את הפעלת העתודה.
                 </Typography>
               )}
             </Stack>
@@ -309,7 +309,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
         <DialogActions sx={{ justifyContent: "space-between" }}>
           {data && !started ? (
             <Button color="error" disabled={busy} onClick={() => setDeleting({ reason: "" })}>
-              מחיקת התורנות
+              מחיקת המשימה
             </Button>
           ) : (
             <span />
@@ -319,14 +319,14 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
       </Dialog>
       {removing && data && (
         <Dialog open onClose={() => setRemoving(null)} maxWidth="xs" fullWidth>
-          <DialogTitle>הסרה מהתורנות</DialogTitle>
+          <DialogTitle>הסרה מהמשימה</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={1.5}>
               <Typography>
                 להסיר את <b>{removing.p.name}</b> ({removing.p.role === "performer" ? "מבצע" : "עתודה"}) מ{data.slot.task_name}, {when}?
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                הוא יקבל התראה, והניקוד על התורנות יירד ממנו. התורנות תופיע ב&quot;ממתינות לשיבוץ&quot;, ושם משבצים מחליף – רק עובד שאין לו תורנות באותן שעות.
+                הוא יקבל התראה, והניקוד על המשימה יירד ממנו. המשימה תופיע ב&quot;ממתינות לשיבוץ&quot;, ושם משבצים מחליף – רק עובד שאין לו משימה באותן שעות.
               </Typography>
               <TextField label="סיבה" value={removing.reason} onChange={(e) => setRemoving({ ...removing, reason: e.target.value })} required fullWidth autoFocus />
             </Stack>
@@ -359,7 +359,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
       )}
       {deleting && data && (
         <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
-          <DialogTitle>מחיקת התורנות</DialogTitle>
+          <DialogTitle>מחיקת המשימה</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={1.5}>
               <Typography>
@@ -368,7 +368,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
               {people.length > 0 ? (
                 <>
                   <Typography variant="body2" color="text.secondary">
-                    {`יוסרו ממנה ${performing.length} מבצעים ו-${idle.length} עתודות, והניקוד שלהם על התורנות יירד. המחיקה נרשמת ביומן השינויים.`}
+                    {`יוסרו ממנה ${performing.length} מבצעים ו-${idle.length} עתודות, והניקוד שלהם על המשימה יירד. המחיקה נרשמת ביומן השינויים.`}
                   </Typography>
                   <TextField
                     label="סיבה"

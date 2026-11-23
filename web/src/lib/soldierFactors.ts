@@ -75,7 +75,7 @@ export function soldierFactors(x: FactorInput): Factor[] {
       icon: "away",
       title: `${typeOf.get(e.exemption_type_id)?.name ?? "פטור חלקי"} ${span(e.start_date, e.end_date)}`,
       tag: { text: "חלקי", tone: "info" },
-      effect: `פטור ${what.join(" ") || "חלקי"} – בשאר הזמן והתורנויות משובץ כרגיל.`,
+      effect: `פטור ${what.join(" ") || "חלקי"} – בשאר הזמן והמשימות משובץ כרגיל.`,
     });
   }
 
@@ -87,13 +87,13 @@ export function soldierFactors(x: FactorInput): Factor[] {
       icon: "night",
       title: `ת"ש 7 – ${src}`,
       tag: tash7Ex.length && !t7From ? { text: "חלק מהמחזור", tone: "warning" } : undefined,
-      effect: "בבית כל לילה – לא משובץ לתורנויות שכוללות שעות לילה, חוץ מתורנויות שמסומנות \"מתאימה לת\"ש\".",
+      effect: "בבית כל לילה – לא משובץ למשימות שכוללות שעות לילה, חוץ ממשימות שמסומנות \"מתאימה לת\"ש\".",
     });
   } else if (s.tash_level) {
     out.push({
       icon: "night",
       title: `הת"ש ${s.tash_level}`,
-      effect: `${s.tash_level} לילות בבית בשבוע – עד ${7 - s.tash_level} לילות בבסיס בשבוע (ראשון–שבת). תורנויות "מתאימה לת"ש" לא נספרות.`,
+      effect: `${s.tash_level} לילות בבית בשבוע – עד ${7 - s.tash_level} לילות בבסיס בשבוע (ראשון–שבת). משימות "מתאימה לת"ש" לא נספרות.`,
     });
   }
 
@@ -108,9 +108,9 @@ export function soldierFactors(x: FactorInput): Factor[] {
     });
   }
 
-  if (effectiveParent(s, x.cycle.start)) out.push({ icon: "parent", title: "הורה", effect: "פתוחות לו גם תורנויות מזכות (שמיועדות למשרתי הורה ולבעלי פטור מזכה)." });
+  if (effectiveParent(s, x.cycle.start)) out.push({ icon: "parent", title: "הורה", effect: "פתוחות לו גם משימות מזכות (שמיועדות למשרתי הורה ולבעלי פטור מזכה)." });
   if (s.is_shachar && s.service_type === "mandatory")
-    out.push({ icon: "shachar", title: "שח\"ר", effect: "משובץ רק לתורנויות שמסומנות \"גם לשח\"ר\" או \"רק לשח\"ר\"." });
+    out.push({ icon: "shachar", title: "שח\"ר", effect: "משובץ רק למשימות שמסומנות \"גם לשח\"ר\" או \"רק לשח\"ר\"." });
 
   // new soldier: no duties during his training period
   if (s.unit_join_date && x.graceDays) {
@@ -121,7 +121,7 @@ export function soldierFactors(x: FactorInput): Factor[] {
         icon: "newcomer",
         title: `עובד חדש – בהכשרה עד ${dm(last)}`,
         tag: { text: "חוסם", tone: "warning" },
-        effect: `לא משובץ לתורנויות עד ${dm(last)}.${opening}`,
+        effect: `לא משובץ למשימות עד ${dm(last)}.${opening}`,
       });
     }
   }
@@ -134,14 +134,14 @@ export function soldierFactors(x: FactorInput): Factor[] {
       icon: "range",
       title: `מטווח פג ב-${dm(s.range_valid_until)}`,
       tag: { text: "חוסם", tone: "warning" },
-      effect: "לא משובץ לתורנויות שדורשות נשק.",
+      effect: "לא משובץ למשימות שדורשות נשק.",
     });
   } else if (s.range_valid_until < x.cycle.end) {
     out.push({
       icon: "range",
       title: `מטווח בתוקף עד ${dm(s.range_valid_until)}`,
       tag: { text: "פג במחזור", tone: "warning" },
-      effect: `אחרי ${dm(s.range_valid_until)} לא משובץ לתורנויות שדורשות נשק.`,
+      effect: `אחרי ${dm(s.range_valid_until)} לא משובץ למשימות שדורשות נשק.`,
     });
   }
 
@@ -149,9 +149,9 @@ export function soldierFactors(x: FactorInput): Factor[] {
     const done = x.holiday.day <= x.today;
     out.push({
       icon: "holiday",
-      title: "תורנות חג",
+      title: "משימת חג",
       tag: { text: done ? "ביצע" : "משובץ", tone: "info" },
-      effect: `${x.holiday.task_name}, ${dm(x.holiday.day)} – בתורנות חג נוספת יועדפו אחרים.`,
+      effect: `${x.holiday.task_name}, ${dm(x.holiday.day)} – במשימת חג נוספת יועדפו אחרים.`,
     });
   }
 

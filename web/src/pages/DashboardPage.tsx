@@ -120,7 +120,7 @@ export function DashboardPage() {
                     {g.gaf}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {g.soldiers} עובדים · {g.duties} תורנויות · {perSoldier(g).toFixed(1)} נק׳ לעובד
+                    {g.soldiers} עובדים · {g.duties} משימות · {perSoldier(g).toFixed(1)} נק׳ לעובד
                   </Typography>
                 </Stack>
                 <Box sx={{ height: 8, bgcolor: "action.hover", borderRadius: 1, mt: 0.5 }}>
@@ -140,7 +140,7 @@ export function DashboardPage() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  {["", "עובדים", "ממוצע", "טווח", "בלי תורנות"].map((h) => (
+                  {["", "עובדים", "ממוצע", "טווח", "בלי משימה"].map((h) => (
                     <TableCell key={h}>{h}</TableCell>
                   ))}
                 </TableRow>
@@ -163,7 +163,7 @@ export function DashboardPage() {
             </Table>
           )}
           <Typography variant="caption" color="text.secondary">
-            ניקוד בתורנויות המחזור. פירוט ההוגנות בין מי שזכאים לאותן תורנויות – במסך השיבוץ.
+            ניקוד במשימות המחזור. פירוט ההוגנות בין מי שזכאים לאותן משימות – במסך השיבוץ.
           </Typography>
         </Card>
 
@@ -172,7 +172,7 @@ export function DashboardPage() {
             <CircularProgress size={20} />
           ) : weekend.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              אין תורנויות מפורסמות בסופ"ש הקרוב.
+              אין משימות מפורסמות בסופ"ש הקרוב.
             </Typography>
           ) : (
             <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>

@@ -553,7 +553,7 @@ export function PotentialPage() {
           <Stack spacing={2}>
             <Typography variant="h2">חישוב פוטנציאל ל{cycle.name}</Typography>
             <Typography variant="body2">
-              המערכת תחשב לכל עובד פעיל, לכל קטגוריית תורנות, אם הוא זכאי ולאיזה חלק מהמחזור הוא זמין. הדרגה, האוכלוסייה, משרת הורה והפטור המזכה
+              המערכת תחשב לכל עובד פעיל, לכל קטגוריית משימה, אם הוא זכאי ולאיזה חלק מהמחזור הוא זמין. הדרגה, האוכלוסייה, משרת הורה והפטור המזכה
               ננעלים ברגע החישוב וחלים על כל המחזור.
             </Typography>
             <Typography variant="body2" color="text.secondary">

@@ -97,9 +97,9 @@ export function verdicts(rows: FairRow[]): Map<string, GroupVerdict> {
 /** A short group label: population and how many duty categories, e.g. "קבע · 4 קטגוריות". */
 export function shortGroupName(full: string): string {
   const [pop, ...rest] = full.split(" · ");
-  const cats = rest.join(" · ").split(" + ").filter((x) => x.trim() && x.trim() !== "ללא תורנות פתוחה");
+  const cats = rest.join(" · ").split(" + ").filter((x) => x.trim() && !["ללא משימה פתוחה", "ללא תורנות פתוחה"].includes(x.trim()));  // the old wording, in labels kept before 2.50
   if (!rest.length) return full;
-  if (cats.length === 0) return `${pop} · ללא תורנות`;
+  if (cats.length === 0) return `${pop} · ללא משימה`;
   if (cats.length === 1) return `${pop} · ${cats[0]}`;
   return `${pop} · ${cats.length} קטגוריות`;
 }

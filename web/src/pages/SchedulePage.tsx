@@ -182,7 +182,7 @@ function ActiveJob({ job, onChanged }: { job: ScheduleJob; onChanged: () => void
 function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: Map<string, SlotRow>; tasks: Map<string, TaskType>; pools: Map<string, string>; names: Map<string, string> }) {
   const slotLabel = (id: string) => {
     const k = slots.get(id);
-    return k ? `${tasks.get(k.task_type_id)?.name ?? "תורנות"} (${dayLabel(k.starts_at)})` : "משבצת שנמחקה";
+    return k ? `${tasks.get(k.task_type_id)?.name ?? "משימה"} (${dayLabel(k.starts_at)})` : "משבצת שנמחקה";
   };
   const unfilled = job.unfilled ?? [];
   const missingP = unfilled.filter((u) => u.role === "performer").reduce((n, u) => n + u.missing, 0);
@@ -262,7 +262,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
                 <TableHead>
                   <TableRow>
                     <TableCell>מועד</TableCell>
-                    <TableCell>תורנות</TableCell>
+                    <TableCell>משימה</TableCell>
                     <TableCell>חסר</TableCell>
                     <TableCell>זכאים</TableCell>
                     <TableCell>למה אחרים לא מתאימים (מספר עובדים)</TableCell>

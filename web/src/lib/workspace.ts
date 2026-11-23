@@ -119,7 +119,7 @@ function nextActionStep(cycle: Cycle, f: CycleFacts): { text: string; step: Step
             : { text: "להריץ שיבוץ", step: "schedule" };
     default:
       return f.pendingAdditions
-        ? { text: `לשבץ ${f.pendingAdditions} תורנויות שנוספו אחרי הפרסום`, step: "operate" }
+        ? { text: `לשבץ ${f.pendingAdditions} משימות שנוספו אחרי הפרסום`, step: "operate" }
         : { text: "המחזור פורסם. שינויים מכאן – בתפעול השוטף", step: "operate" };
   }
 }

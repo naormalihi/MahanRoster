@@ -60,7 +60,7 @@ export function LoginPage() {
   if (joining) return <JoinPage onBack={() => setJoining(false)} />;
 
   return (
-    <Card title="תורנצ׳יק" subtitle="מערכת התורנויות">
+    <Card title="תורנצ׳יק" subtitle="מערכת המשימות">
       <form onSubmit={submit}>
         <Stack spacing={2}>
           {api?.demo && (
@@ -132,7 +132,7 @@ function JoinPage({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <Card title="הצטרפות" subtitle="חשבון אישי במערכת התורנויות">
+    <Card title="הצטרפות" subtitle="חשבון אישי במערכת המשימות">
       <form onSubmit={submit}>
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">

@@ -8,7 +8,7 @@ describe("feedback", () => {
     expect(draftProblem({ body: "א".repeat(1001) })).toContain("1,000");
   });
   it("the screen by its name, the device by the window", () => {
-    expect(screenLabel("/my")).toBe("התורנויות שלי");
+    expect(screenLabel("/my")).toBe("המשימות שלי");
     expect(screenLabel("/cycle/draft")).toBe("מחזור");
     expect(screenLabel("/x")).toBe("/x");
     expect(deviceOf(400, false)).toBe("phone");

@@ -28,7 +28,7 @@ export const STAGES: { status: CycleStatus; label: string; hint: string }[] = [
   { status: "slots", label: "לוח הבסיס", hint: "טוענים את קובץ המשימות שהגיע מהבסיס." },
   { status: "scheduling", label: "שיבוץ: הרצה", hint: "מריצים את מנוע השיבוץ." },
   { status: "review", label: "שיבוץ: טיוטה", hint: "בודקים את הטיוטה, מתקנים ידנית, אוספים הערות מהמסגרות ומפרסמים." },
-  { status: "published", label: "תפעול", hint: "הלוח פורסם. מכאן: תורנויות חדשות, הקפצות והפעלת עתודות." },
+  { status: "published", label: "תפעול", hint: "הלוח פורסם. מכאן: משימות חדשות, הקפצות והפעלת עתודות." },
   { status: "closed", label: "סגור", hint: "המחזור הסתיים." },
 ];
 
@@ -226,7 +226,7 @@ export function exemptionProblems(e: ExemptionInput): string[] {
   else if (e.end_date < e.start_date) p.push("תאריך הסיום לפני תאריך ההתחלה");
   if (e.restricted_hours && !/^\d{2}:\d{2}-\d{2}:\d{2}$/.test(e.restricted_hours)) p.push("חלון שעות בתבנית 22:00-06:00");
   if (e.kind === "partial" && !e.excluded_task_type_ids?.length && !e.restricted_hours)
-    p.push("בפטור חלקי צריך לבחור תורנויות או חלון שעות");
+    p.push("בפטור חלקי צריך לבחור משימות או חלון שעות");
   return p;
 }
 

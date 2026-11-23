@@ -69,7 +69,7 @@ function Sheet({ page, printed }: { page: SheetPage; printed: string }) {
     <div className="mr-page">
       <div className="mr-hd">
         <h1>לוח שיבוצים · {page.title}</h1>
-        <span className="s">{page.count} תורנויות</span>
+        <span className="s">{page.count} משימות</span>
         {page.updated && <span className="upd">עודכן {dmFmt.format(new Date(page.updated))}</span>}
         <span className="p">הודפס {printed} · תורנצ׳יק</span>
       </div>
@@ -156,7 +156,7 @@ export function PrintDialog({ api, month, onClose, onPrintScreen }: { api: Api; 
     setError(null);
     try {
       const p = await loadPages(api, month, count);
-      if (!p.length) setError("אין תורנויות מפורסמות בחודשים האלה.");
+      if (!p.length) setError("אין משימות מפורסמות בחודשים האלה.");
       else setPages(p);
     } catch (e) {
       setError((e as Error).message);
@@ -173,7 +173,7 @@ export function PrintDialog({ api, month, onClose, onPrintScreen }: { api: Api; 
         <DialogContent dividers>
           <Stack spacing={2}>
             <Typography variant="body2" color="text.secondary">
-              כל חודש בדף A4 אחד לרוחב: הימים בשורות, התורנויות בעמודות. חודש עמוס במיוחד מתחלק לשני דפים כדי שיישאר קריא.
+              כל חודש בדף A4 אחד לרוחב: הימים בשורות, המשימות בעמודות. חודש עמוס במיוחד מתחלק לשני דפים כדי שיישאר קריא.
             </Typography>
             <TextField select label="מה להדפיס" value={count} onChange={(e) => setCount(Number(e.target.value))} fullWidth>
               {[1, 2, 3, 6].map((n) => (

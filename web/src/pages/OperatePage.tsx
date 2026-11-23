@@ -106,7 +106,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
   async function save() {
     const start = new Date(times.start);
     const end = new Date(times.end);
-    if (!taskId) return setError("בחר תורנות");
+    if (!taskId) return setError("בחר משימה");
     const special = taskId === SPECIAL;
     const specialType = specials.find((t) => t.code === SPECIAL_CODE[specialWho]);
     if (special) {
@@ -116,7 +116,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
     }
     if (!(end > start)) return setError("הסיום חייב להיות אחרי ההתחלה");
     if (cycle && (dayKey(start) < cycle.start_date || dayKey(start) > cycle.end_date))
-      return setError(`התחלת התורנות חייבת להיות בתוך המחזור (${cycle.start_date.split("-").reverse().join("/")} – ${cycle.end_date.split("-").reverse().join("/")})`);
+      return setError(`התחלת המשימה חייבת להיות בתוך המחזור (${cycle.start_date.split("-").reverse().join("/")} – ${cycle.end_date.split("-").reverse().join("/")})`);
     if (performers < 1 || reserves < 0) return setError("לפחות מבצע אחד");
     const slot: NewSlot = special
       ? {
@@ -150,10 +150,10 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
 
   return (
     <Dialog open onClose={props.onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>תורנות חדשה במחזור</DialogTitle>
+      <DialogTitle>משימה חדשה במחזור</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
-          <TextField select label="תורנות" value={taskId} onChange={(e) => pickTask(e.target.value)} fullWidth>
+          <TextField select label="משימה" value={taskId} onChange={(e) => pickTask(e.target.value)} fullWidth>
             {specials.length > 0 && (
               <MenuItem value={SPECIAL} sx={{ fontWeight: 600 }}>
                 הקפצה מיוחדת (לא מהקטלוג)
@@ -186,7 +186,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
                   </TextField>
                 </Stack>
                 <Typography variant="caption" color="text.secondary">
-                  הניקוד הוא לכל התורנות, בלי מקדמי שבת, חג או הקפצה. לדוגמה, אמ"ת שווה 13 ושמירה שווה 1.
+                  הניקוד הוא לכל המשימה, בלי מקדמי שבת, חג או הקפצה. לדוגמה, אמ"ת שווה 13 ושמירה שווה 1.
                 </Typography>
                 <TextField
                   select
@@ -370,17 +370,17 @@ export function OperatePage() {
         <Stack spacing={2}>
           <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
             <Typography variant="h3" sx={{ flex: 1 }}>
-              תורנויות שממתינות לשיבוץ
+              משימות שממתינות לשיבוץ
             </Typography>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-              תורנות חדשה
+              משימה חדשה
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            תורנות שנוספה אחרי הפרסום, או שחסר בה מבצע או עתודה (למשל אחרי הפעלת עתודה). מריצים את המנוע רק עליהן – כל מה שכבר פורסם נשאר כמו שהוא – ומאשרים את ההצעה כדי שתיכנס ללוח.
+            משימה שנוספה אחרי הפרסום, או שחסר בה מבצע או עתודה (למשל אחרי הפעלת עתודה). מריצים את המנוע רק עליהן – כל מה שכבר פורסם נשאר כמו שהוא – ומאשרים את ההצעה כדי שתיכנס ללוח.
           </Typography>
           {pending.length === 0 ? (
-            <Typography color="text.secondary">אין תורנויות שממתינות לשיבוץ.</Typography>
+            <Typography color="text.secondary">אין משימות שממתינות לשיבוץ.</Typography>
           ) : narrow ? (
             <CardList>
               {pending.map((k) => {
@@ -413,11 +413,11 @@ export function OperatePage() {
                           </Button>
                         ))}
                         {of(k.id).some(live) ? (
-                          <IconButton size="small" aria-label="פעולות על התורנות" onClick={() => setOpenSlot(k.id)}>
+                          <IconButton size="small" aria-label="פעולות על המשימה" onClick={() => setOpenSlot(k.id)}>
                             <MoreIcon fontSize="small" />
                           </IconButton>
                         ) : (
-                          <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting({ slot: k, reason: "" })}>
+                          <IconButton size="small" aria-label="מחיקת המשימה" onClick={() => setDeleting({ slot: k, reason: "" })}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         )}
@@ -433,7 +433,7 @@ export function OperatePage() {
                 <TableHead>
                   <TableRow>
                     <TableCell>מועד</TableCell>
-                    <TableCell>תורנות</TableCell>
+                    <TableCell>משימה</TableCell>
                     <TableCell>הצעת המנוע</TableCell>
                     <TableCell />
                   </TableRow>
@@ -480,11 +480,11 @@ export function OperatePage() {
                             </Button>
                           ))}
                           {of(k.id).some(live) ? (
-                            <IconButton size="small" aria-label="פעולות על התורנות" onClick={() => setOpenSlot(k.id)}>
+                            <IconButton size="small" aria-label="פעולות על המשימה" onClick={() => setOpenSlot(k.id)}>
                               <MoreIcon fontSize="small" />
                             </IconButton>
                           ) : (
-                            <IconButton size="small" aria-label="מחיקת התורנות" onClick={() => setDeleting({ slot: k, reason: "" })}>
+                            <IconButton size="small" aria-label="מחיקת המשימה" onClick={() => setDeleting({ slot: k, reason: "" })}>
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           )}
@@ -499,7 +499,7 @@ export function OperatePage() {
           {running && (
             <Box>
               <Typography variant="body2" gutterBottom>
-                המנוע משבץ את התורנויות החדשות…
+                המנוע משבץ את המשימות החדשות…
                 {running.status === "running" && running.params.slots ? <b>{` \u2066${running.params.staffed ?? 0}/${running.params.slots}\u2069 שובצו`}</b> : null}
               </Typography>
               <LinearProgress variant={running.status === "running" ? "determinate" : "indeterminate"} value={running.progress} />
@@ -514,7 +514,7 @@ export function OperatePage() {
                 disabled={busy || !!running}
                 onClick={() => run(() => api!.requestSchedule(cycleId, "stability"), null)}
               >
-                {withDraft.length ? "הרצה מחדש" : "שיבוץ התורנויות החדשות"}
+                {withDraft.length ? "הרצה מחדש" : "שיבוץ המשימות החדשות"}
               </Button>
               {withDraft.length > 0 && (
                 <Button
@@ -534,7 +534,7 @@ export function OperatePage() {
         <Stack spacing={2}>
           <Typography variant="h3">הפעלת עתודה וביטול הפעלה</Typography>
           <Typography variant="body2" color="text.secondary">
-            הדרך המהירה: בלוח המפורסם לוחצים על התורנות. כאן אפשר לחפש תורנות לפי שם עובד, שם תורנות או תאריך, בכל המחזור.
+            הדרך המהירה: בלוח המפורסם לוחצים על המשימה. כאן אפשר לחפש משימה לפי שם עובד, שם משימה או תאריך, בכל המחזור.
           </Typography>
           <TextField
             size="small"
@@ -547,7 +547,7 @@ export function OperatePage() {
           />
           {search.trim() && (
             found.length === 0 ? (
-              <Typography color="text.secondary">לא נמצאו תורנויות מפורסמות שעוד לא הסתיימו.</Typography>
+              <Typography color="text.secondary">לא נמצאו משימות מפורסמות שעוד לא הסתיימו.</Typography>
             ) : (
               <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
                 {found.slice(0, 30).map((k) => {
@@ -602,14 +602,14 @@ export function OperatePage() {
       )}
       {deleting && (
         <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
-          <DialogTitle>מחיקת תורנות</DialogTitle>
+          <DialogTitle>מחיקת משימה</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={1.5}>
               <Typography>
                 למחוק את <b>{slotName(deleting.slot, (id) => taskName.get(id))}</b> ב{dayLabel(deleting.slot.starts_at)} {timeLabel(deleting.slot.starts_at)}?
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                גם אם היא פורסמה: מי שהיה עליה יורד ממנה והניקוד שלו על התורנות יורד. הצעות המנוע נמחקות איתה. המחיקה נרשמת ביומן.
+                גם אם היא פורסמה: מי שהיה עליה יורד ממנה והניקוד שלו על המשימה יורד. הצעות המנוע נמחקות איתה. המחיקה נרשמת ביומן.
               </Typography>
               <TextField label="סיבה" value={deleting.reason} onChange={(e) => setDeleting({ ...deleting, reason: e.target.value })} required fullWidth autoFocus />
             </Stack>
@@ -623,7 +623,7 @@ export function OperatePage() {
               onClick={() => {
                 const d = deleting;
                 setDeleting(null);
-                void run(() => api!.deleteSlot(d.slot.id, d.reason.trim()).then(() => announceBoardChange()), "התורנות נמחקה.");
+                void run(() => api!.deleteSlot(d.slot.id, d.reason.trim()).then(() => announceBoardChange()), "המשימה נמחקה.");
               }}
             >
               מחיקה

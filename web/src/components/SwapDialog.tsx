@@ -82,10 +82,10 @@ export function SwapDialog({ duty, onClose, onSent }: { duty: MyDuty; onClose: (
         {opts && tab === "handover" && (
           <Stack spacing={1.5}>
             <Typography variant="body2" color="text.secondary">
-              מוצגים רק מי שיכולים לקחת את התורנות (זכאות, מנוחה, פטורים ותורנויות אחרות) ויש להם חשבון במערכת.
+              מוצגים רק מי שיכולים לקחת את המשימה (זכאות, מנוחה, פטורים ומשימות אחרות) ויש להם חשבון במערכת.
             </Typography>
             {opts.handover.length === 0 ? (
-              <Alert severity="info">אין כרגע מי שיכול לקחת את התורנות הזו.</Alert>
+              <Alert severity="info">אין כרגע מי שיכול לקחת את המשימה הזו.</Alert>
             ) : (
               <Autocomplete
                 options={opts.handover}
@@ -102,7 +102,7 @@ export function SwapDialog({ duty, onClose, onSent }: { duty: MyDuty; onClose: (
         {opts && tab === "mutual" && (
           <Stack spacing={1}>
             <Typography variant="body2" color="text.secondary">
-              אתה לוקח את התורנות שלו, והוא את שלך. מוצגות רק החלפות שמתאימות לשניכם.
+              אתה לוקח את המשימה שלו, והוא את שלך. מוצגות רק החלפות שמתאימות לשניכם.
             </Typography>
             {opts.mutual.length === 0 ? (
               <Alert severity="info">אין כרגע החלפה מתאימה.</Alert>
@@ -125,7 +125,7 @@ export function SwapDialog({ duty, onClose, onSent }: { duty: MyDuty; onClose: (
           </Alert>
         )}
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
-          העובד השני יקבל התראה. ברגע שהוא מאשר – ההחלפה מתבצעת והנקודות עוברות למי שעושה את התורנות. אחראי השיבוצים מקבל עדכון.
+          העובד השני יקבל התראה. ברגע שהוא מאשר – ההחלפה מתבצעת והנקודות עוברות למי שעושה את המשימה. אחראי השיבוצים מקבל עדכון.
         </Typography>
       </DialogContent>
       <DialogActions>
@@ -241,7 +241,7 @@ export function SwapLogCard() {
         החלפות בין עובדים
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        עובדים מתחלפים בעצמם עד 24 שעות לפני תורנות, בלי אישור. כאן רואים מה השתנה; אפשר לתקן בתפעול השוטף כרגיל.
+        עובדים מתחלפים בעצמם עד 24 שעות לפני משימה, בלי אישור. כאן רואים מה השתנה; אפשר לתקן בתפעול השוטף כרגיל.
       </Typography>
       <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
         {rows.slice(0, 12).map((r) => {

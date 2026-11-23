@@ -1,6 +1,6 @@
 /**
  * Base schedule file (לוח הבסיס): one row = one slot, one performer + one reserve.
- * Only two columns are read: the date (מועד) and the duty type (סוג תורנות). Everything else is
+ * Only two columns are read: the date (מועד) and the duty type (סוג משימה). Everything else is
  * derived: the hours from the duty type (by weekday), the Shabbat variant and the holidays from
  * the date, who may do it from the duty type. Any other column in the file is ignored.
  */
@@ -14,7 +14,7 @@ export type BaseField = "start" | "duty";
 
 const SYNONYMS: Record<BaseField, string[]> = {
   start: ["מועד", "תאריך", "תאריךהתחלה", "מתאריך", "התחלה"],
-  duty: ["סוגתורנות", "תורנות", "משימה", "סוגמשימה"],
+  duty: ["סוגתורנות", "תורנות", "משימה", "סוגמשימה"],  // file headers people already have
 };
 
 /** Quotes and gershayim unified, spaces dropped – for matching names. */
@@ -171,7 +171,7 @@ export function readRows(rows: unknown[][]): { rows: BaseRow[]; errors: { line: 
     const startRaw = col(r, "start");
     if (!duty && String(startRaw ?? "").trim() === "") return; // empty / spacer row
     const start = toIsoDate(startRaw);
-    if (!duty) return void errors.push({ line, message: "חסר סוג תורנות" });
+    if (!duty) return void errors.push({ line, message: "חסר סוג משימה" });
     if (!start || start === "invalid") return void errors.push({ line, message: `${duty}: מועד לא תקין` });
     // only the date and the duty type; the rest comes from the duty type and the calendar
     out.push({ line, duty, start, end: start, population: "", ranksText: "", instructions: "", notes: "", holiday: null });
@@ -389,7 +389,7 @@ export interface NewSlot {
 }
 
 /** Template for a base file, for manual preparation or testing. */
-export const BASE_TEMPLATE_HEADERS = ["מועד", "סוג תורנות"];
+export const BASE_TEMPLATE_HEADERS = ["מועד", "סוג משימה"];
 
 export const dayOf = (isoTs: string) => {
   const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -400,5 +400,5 @@ export { isoDate };
 
 /** A duty's name as people see it: a special call-up's own name, else its type's. */
 export function slotName(k: { special_name?: string | null; task_type_id: string }, taskName: (id: string) => string | undefined): string {
-  return k.special_name || taskName(k.task_type_id) || "תורנות";
+  return k.special_name || taskName(k.task_type_id) || "משימה";
 }

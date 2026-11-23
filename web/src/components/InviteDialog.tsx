@@ -104,7 +104,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
           <Stack spacing={2}>
             <Typography variant="body2">
               לכל עובד קוד אישי חד-פעמי. העובד נכנס לאתר, בוחר "יש לי קוד הצטרפות", מקליד את הקוד ובוחר שם משתמש וסיסמה. אחרי זה הוא רואה את
-              התורנויות שלו, למה שובץ והניקוד שלו מול הממוצע.
+              המשימות שלו, למה שובץ והניקוד שלו מול הממוצע.
             </Typography>
             <Typography variant="body2">
               ייווצרו קודים ל-<b>{eligible.length}</b> עובדים
@@ -191,7 +191,7 @@ export function InviteDialog(props: { soldiers: Person[]; hasAccount: (id: strin
             <Button
               startIcon={<CopyIcon />}
               onClick={async () => {
-                await navigator.clipboard.writeText(`הצטרפות למערכת התורנויות: ${join}\n\n${text}`);
+                await navigator.clipboard.writeText(`הצטרפות למערכת המשימות: ${join}\n\n${text}`);
                 setCopied(true);
               }}
             >

@@ -497,8 +497,8 @@ function EditDialog(props: {
                     <Typography variant="body2">
                       מתאריך היציאה העובד לא פעיל.
                       {leaving.duties > 0
-                        ? ` יש לו ${leaving.duties} תורנויות מאותו יום – הן יורדות ממנו ויסומנו כמשבצות שצריך לאייש (הוא יקבל עדכון).`
-                        : " אין לו תורנויות מאותו יום."}
+                        ? ` יש לו ${leaving.duties} משימות מאותו יום – הן יורדות ממנו ויסומנו כמשבצות שצריך לאייש (הוא יקבל עדכון).`
+                        : " אין לו משימות מאותו יום."}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
                       <TextField
@@ -833,7 +833,7 @@ export function SoldiersPage() {
       first: "desc",
     },
     {
-      label: "תורנות חג",
+      label: "משימת חג",
       key: "holiday",
       by: (s) => holidayDuty.get(s.id)?.day ?? "",
       first: "desc",
@@ -1215,7 +1215,7 @@ export function SoldiersPage() {
               ).map((g) => (
                 <Typography key={g.key} variant="body2">
                   <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ · טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
-                  {g.zero ? ` · ${g.zero} בלי תורנות` : ""}
+                  {g.zero ? ` · ${g.zero} בלי משימה` : ""}
                 </Typography>
               ))}
             </Stack>
@@ -1235,14 +1235,14 @@ export function SoldiersPage() {
               ).map((g) => (
                 <Typography key={g.key} variant="body2">
                   <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ · טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
-                  {g.zero ? ` · ${g.zero} בלי תורנות` : ""}
+                  {g.zero ? ` · ${g.zero} בלי משימה` : ""}
                 </Typography>
               ))}
             </Stack>
           )}
           <Typography variant="caption" color="text.secondary">
-            לפי התאריך של היום. נוכחי = ניקוד פתיחה (לעובדים חדשים) ועוד התורנויות במחזור שהיום בתוכו; עתידי = המחזור הבא. ניקוד = סכום
-            הנקודות של התורנויות שבלוח (בלי עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של המחזור.
+            לפי התאריך של היום. נוכחי = ניקוד פתיחה (לעובדים חדשים) ועוד המשימות במחזור שהיום בתוכו; עתידי = המחזור הבא. ניקוד = סכום
+            הנקודות של המשימות שבלוח (בלי עתודות). פירוט לפי קבוצות הוגנות – במסך הטיוטה של המחזור.
           </Typography>
           </Collapse>
         </Paper>
@@ -1301,9 +1301,9 @@ export function SoldiersPage() {
                   lines={[
                     <>
                       ניקוד <b>{n ? n.points.toFixed(1) : "—"}</b>
-                      {n ? ` (${n.opening ? (n.duties ? `פתיחה + ${n.duties} תורנויות` : "פתיחה") : `${n.duties} תורנויות`})` : ""}
+                      {n ? ` (${n.opening ? (n.duties ? `פתיחה + ${n.duties} משימות` : "פתיחה") : `${n.duties} משימות`})` : ""}
                       {nxt && nxt.ids.has(s.id) ? ` · הבא ${(nxt.scores.get(s.id)?.points ?? 0).toFixed(1)}` : ""}
-                      {h ? ` · ${h.day <= today ? "ביצע" : "משובץ"} תורנות חג` : ""}
+                      {h ? ` · ${h.day <= today ? "ביצע" : "משובץ"} משימת חג` : ""}
                     </>,
                     (
                       <Stack direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }} component="span">
@@ -1479,9 +1479,9 @@ export function SoldiersPage() {
                           if (!n) return "—";
                           const note = n.opening
                             ? n.duties
-                              ? `פתיחה ${n.opening.toFixed(1)} + ${n.duties} תורנויות`
+                              ? `פתיחה ${n.opening.toFixed(1)} + ${n.duties} משימות`
                               : "ניקוד פתיחה"
-                            : `${n.duties} תורנויות`;
+                            : `${n.duties} משימות`;
                           return (
                             <>
                               <b>{n.points.toFixed(1)}</b>
@@ -1499,7 +1499,7 @@ export function SoldiersPage() {
                           <>
                             <b>{(nxt.scores.get(s.id)?.points ?? 0).toFixed(1)}</b>
                             <Typography component="span" variant="caption" color="text.secondary">
-                              {" "}· {nxt.scores.get(s.id)?.duties ?? 0} תורנויות
+                              {" "}· {nxt.scores.get(s.id)?.duties ?? 0} משימות
                             </Typography>
                           </>
                         )}
@@ -1514,7 +1514,7 @@ export function SoldiersPage() {
                                 <CheckIcon
                                   color={done ? "success" : "primary"}
                                   fontSize="small"
-                                  aria-label={done ? "ביצע תורנות חג" : "משובץ לתורנות חג"}
+                                  aria-label={done ? "ביצע משימת חג" : "משובץ למשימת חג"}
                                 />
                               </Tooltip>
                             );

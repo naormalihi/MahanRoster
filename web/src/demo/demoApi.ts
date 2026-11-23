@@ -135,11 +135,11 @@ export class DemoApi implements Api {
   private invites = new Map<string, { soldier_id: string; created: string; expires: string; used: boolean; sent?: string }>();
   // stage 2.5: the demo soldier's notifications
   private notes: AppNotification[] = [
-    { id: "n1", type: "reserve_activated", title: "העתודה שלך הופעלה – אתה מבצע את התורנות", body: "קצין תורן, ג׳ 05/01 08:00", url: "/",
+    { id: "n1", type: "reserve_activated", title: "העתודה שלך הופעלה – אתה מבצע את המשימה", body: "קצין תורן, ג׳ 05/01 08:00", url: "/",
       requires_ack: true, read_at: null, acked_at: null, created_at: new Date(Date.now() - 20 * 60_000).toISOString() },
     { id: "n2", type: "exemption_decided", title: "בקשת הפטור אושרה", body: "פטור מלא, 10/08–20/08", url: "/requests",
       requires_ack: false, read_at: null, acked_at: null, created_at: new Date(Date.now() - 5 * 3600_000).toISOString() },
-    { id: "n3", type: "board_published", title: "לוח השיבוצים פורסם – דצמבר 2026 – מאי 2027", body: "יש לך 3 תורנויות ו-2 עתודות. הראשונה: א׳ 03/01 08:00.",
+    { id: "n3", type: "board_published", title: "לוח השיבוצים פורסם – דצמבר 2026 – מאי 2027", body: "יש לך 3 משימות ו-2 עתודות. הראשונה: א׳ 03/01 08:00.",
       url: "/", requires_ack: false, read_at: new Date().toISOString(), acked_at: null, created_at: new Date(Date.now() - 3 * 86_400_000).toISOString() },
   ];
   private soldierList: ExistingSoldier[] = [];
@@ -343,7 +343,7 @@ export class DemoApi implements Api {
 
   // "הצעות ומשוב" – fictitious examples
   private feedback: FeedbackItem[] = [
-    { id: "fb1", created_at: new Date(Date.now() - 3600_000).toISOString(), kind: "idea", body: "יהיה נחמד לקבל תזכורת גם יום לפני התורנות, לא רק בבוקר.", sender_name: "עובד לדוגמה", anonymous: false, screen: "/my", app_version: "2.35.0", device: "phone", status: "new", note: null, reply: null, handled_by_name: null, handled_at: null },
+    { id: "fb1", created_at: new Date(Date.now() - 3600_000).toISOString(), kind: "idea", body: "יהיה נחמד לקבל תזכורת גם יום לפני המשימה, לא רק בבוקר.", sender_name: "עובד לדוגמה", anonymous: false, screen: "/my", app_version: "2.35.0", device: "phone", status: "new", note: null, reply: null, handled_by_name: null, handled_at: null },
     { id: "fb2", created_at: new Date(Date.now() - 86400_000).toISOString(), kind: "bug", body: "במסך הבקשות התאריך קפץ לחודש הבא כשבחרתי יום.", sender_name: null, anonymous: true, screen: "/requests", app_version: "2.34.1", device: "phone", status: "in_progress", note: "לבדוק בסמסונג", reply: null, handled_by_name: "naat", handled_at: new Date().toISOString() },
   ];
 
@@ -530,7 +530,7 @@ export class DemoApi implements Api {
     await delay();
     const t = this.tasks.find((x) => x.id === id);
     if ([...this.slotsByCycle.values()].some((l) => l.some((s) => s.task_type_id === id)))
-      throw new Error(`התורנות "${t?.name}" בשימוש (משבצות במחזור), ולכן אי אפשר למחוק אותה. אפשר להפוך אותה ללא פעילה.`);
+      throw new Error(`המשימה "${t?.name}" בשימוש (משבצות במחזור), ולכן אי אפשר למחוק אותה. אפשר להפוך אותה ללא פעילה.`);
     this.tasks = this.tasks.filter((x) => x.id !== id);
     this.aliasList = this.aliasList.filter((a) => a.task_type_id !== id);
   }
@@ -809,7 +809,7 @@ export class DemoApi implements Api {
     const k = a && slots.find((x) => x.id === a.slot_id);
     const other = a && this.soldierList.find((x) => x.id !== a.soldier_id && x.is_active);
     if (!a || !k || !other) return [];
-    return [{ slot_id: k.id, assignment_id: a.id, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "תורנות", starts_at: k.starts_at, ends_at: k.ends_at,
+    return [{ slot_id: k.id, assignment_id: a.id, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "משימה", starts_at: k.starts_at, ends_at: k.ends_at,
               assigned_id: a.soldier_id, assigned_total: 24, skipped_id: other.id, skipped_total: 9, points: a.normalized_points || 9 }];
   }
 
@@ -1054,7 +1054,7 @@ export class DemoApi implements Api {
 
   async deletePendingSlot(slotId: string) {
     await delay(200);
-    if (this.draft.some((a) => a.slot_id === slotId && a.status !== "draft")) throw new Error("בתורנות יש שיבוץ מפורסם – אי אפשר למחוק אותה");
+    if (this.draft.some((a) => a.slot_id === slotId && a.status !== "draft")) throw new Error("במשימה יש שיבוץ מפורסם – אי אפשר למחוק אותה");
     this.draft = this.draft.filter((a) => a.slot_id !== slotId);
     for (const [c, l] of this.slotsByCycle) this.slotsByCycle.set(c, l.filter((s) => s.id !== slotId));
   }
@@ -1064,7 +1064,7 @@ export class DemoApi implements Api {
     if (!reason.trim()) throw new Error("חובה לכתוב סיבה");
     if (assignmentId.startsWith("bp|")) {
       const row = this.boardRows.find((r) => r.slot_id === assignmentId.split("|")[1])!;
-      if (Date.parse(row.starts_at) <= Date.now()) throw new Error("התורנות כבר התחילה – במקום הסרה מפעילים עתודה");
+      if (Date.parse(row.starts_at) <= Date.now()) throw new Error("המשימה כבר התחילה – במקום הסרה מפעילים עתודה");
       const p = this.peopleOf(row).find((x) => x.id === assignmentId)!;
       Object.assign(p, { status: "dropped" });
       return this.syncBoard(row);
@@ -1077,7 +1077,7 @@ export class DemoApi implements Api {
     await delay(300);
     if (reserveId.startsWith("bp|")) {
       const row = this.boardRows.find((r) => r.slot_id === reserveId.split("|")[1])!;
-      if (Date.parse(row.starts_at) <= Date.now()) throw new Error("התורנות כבר התחילה – אי אפשר לבטל את ההפעלה");
+      if (Date.parse(row.starts_at) <= Date.now()) throw new Error("המשימה כבר התחילה – אי אפשר לבטל את ההפעלה");
       const list = this.peopleOf(row);
       const r = list.find((p) => p.id === reserveId)!;
       const p = list.find((x) => x.id === r.replaced_id)!;
@@ -1192,7 +1192,7 @@ export class DemoApi implements Api {
     await delay();
     const cycleId = [...this.slotsByCycle].find(([, v]) => v.some((s) => s.id === slotId))?.[0] ?? "";
     if (this.draft.some((a) => a.slot_id === slotId && a.soldier_id === soldierId && !["draft", "dropped"].includes(a.status)))
-      throw new Error("העובד כבר משובץ בתורנות הזו");
+      throw new Error("העובד כבר משובץ במשימה הזו");
     this.draft = this.draft.filter((a) => !(a.slot_id === slotId && a.status === "draft" && (a.role === role || a.soldier_id === soldierId)));
     const id = this.nextId("as");
     this.draft.push({
@@ -1441,7 +1441,7 @@ export class DemoApi implements Api {
       { assignment_id: "demo-d1", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "שמירות חובה", starts_at: at(4, 8), ends_at: at(4, 20),
         role: "performer", status: "assigned", points: 1, explanation: "הניקוד שלך הנמוך בקבוצה", report_at: null, report_place: "שער ראשי",
         briefing_at: at(3, 13), briefing_place: "אבטחה פיזית", equipment: null,
-        contact_name: "שני משיח", contact_phone: "052-0000000", briefing_note: "לא מאושרות החלפות בעת ביצוע התורנות!" },
+        contact_name: "שני משיח", contact_phone: "052-0000000", briefing_note: "לא מאושרות החלפות בעת ביצוע המשימה!" },
       { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער | ש.ג קבע", starts_at: at(11, 20), ends_at: at(12, 8),
         role: "reserve", status: "reserve_idle", points: 0, explanation: "עתודה לפי תור", report_at: null, report_place: null,
         briefing_at: null, briefing_place: null, equipment: null },
@@ -1465,7 +1465,7 @@ export class DemoApi implements Api {
   async swapOptions(assignmentId: string): Promise<SwapOptions> {
     await delay();
     const d = this.demoDuties().find((x) => x.assignment_id === assignmentId);
-    if (!d) throw new Error("זו לא תורנות שלך");
+    if (!d) throw new Error("זו לא משימה שלך");
     const others = this.soldierList.filter((x) => x.id !== this.mySoldier()).slice(10, 22);
     return {
       handover: others.slice(0, 8).map((x) => ({ soldier_id: x.id, name: x.full_name })).sort((a, b) => a.name.localeCompare(b.name, "he")),
@@ -1481,7 +1481,7 @@ export class DemoApi implements Api {
     await delay();
     this.seedSwaps();
     const d = this.demoDuties().find((x) => x.assignment_id === assignmentId)!;
-    if (this.swaps.some((w) => w.mine && w.status === "pending_peer" && w.give_starts_at === d.starts_at)) throw new Error("כבר יש בקשת החלפה פתוחה על התורנות הזו");
+    if (this.swaps.some((w) => w.mine && w.status === "pending_peer" && w.give_starts_at === d.starts_at)) throw new Error("כבר יש בקשת החלפה פתוחה על המשימה הזו");
     const opts = await this.swapOptions(assignmentId);
     const m = opts.mutual.find((x) => x.assignment_id === counterAssignmentId);
     const id = crypto.randomUUID();

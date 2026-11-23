@@ -51,10 +51,10 @@ export function draftProblem(d: Pick<FeedbackDraft, "body">): string | null {
 
 export const deviceOf = (width: number, coarse: boolean): "phone" | "desktop" => (width < 900 || coarse ? "phone" : "desktop");
 
-/** "/my" → "התורנויות שלי" – the screen as people call it; unknown paths as they are */
+/** "/my" → "המשימות שלי" – the screen as people call it; unknown paths as they are */
 const SCREENS: Record<string, string> = {
   "/": "דף הבית",
-  "/my": "התורנויות שלי",
+  "/my": "המשימות שלי",
   "/requests": "הבקשות שלי",
   "/board": "לוח השיבוצים",
   "/soldiers": "כוח אדם",

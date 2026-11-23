@@ -44,14 +44,14 @@ export function dutyLine(d: MessageDuty): string {
 
 export function dutyMessageText(m: DutyMessage, origin: string): string {
   const many = m.duties.length > 1;
-  const lines: string[] = [`היי ${firstName(m.full_name)}, ${many ? "שובצת לתורנויות:" : "שובצת לתורנות:"}`];
+  const lines: string[] = [`היי ${firstName(m.full_name)}, ${many ? "שובצת למשימות:" : "שובצת למשימה:"}`];
   for (const d of m.duties) {
     if (many) lines.push("");
     lines.push(dutyLine(d));
     if (d.brief) lines.push(d.brief);
   }
   lines.push("");
-  if (m.code) lines.push(`אפשר לראות את התורנויות שלך ולקבל תזכורות בתורנצ׳יק (הקוד שלך כבר ממולא): ${joinLink(origin, m.code)}`);
+  if (m.code) lines.push(`אפשר לראות את המשימות שלך ולקבל תזכורות בתורנצ׳יק (הקוד שלך כבר ממולא): ${joinLink(origin, m.code)}`);
   else if (m.has_account) lines.push(`אפשר לאשר גם בלחיצה על "ראיתי" בתורנצ׳יק: ${origin}`);
   lines.push(`נא לאשר שקיבלת – תענה "קיבלתי".`);
   return lines.join("\n");

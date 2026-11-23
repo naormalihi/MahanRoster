@@ -12,17 +12,17 @@ export interface UnitDashboard {
 
 export const ENTITY_LABEL: Record<string, string> = {
   settings: "הגדרות",
-  task_types: "סוג תורנות",
+  task_types: "סוג משימה",
   score_multipliers: "מקדם ניקוד",
   exemption_types: "סוג פטור",
   absence_types: "סוג היעדרות",
   load_roles: "תפקיד הקלה",
   ranks: "דרגה",
-  duty_categories: "קטגוריית תורנות",
+  duty_categories: "קטגוריית משימה",
   populations: "אוכלוסייה",
   day_types: "סוג יום",
   calendar_days: "לוח חגים",
-  exemption_type_duties: "פטור ← תורנויות",
+  exemption_type_duties: "פטור ← משימות",
 };
 
 export const ACTION_LABEL: Record<string, string> = { insert: "נוסף", update: "עודכן", delete: "נמחק" };

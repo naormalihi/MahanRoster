@@ -55,11 +55,11 @@ describe("eligibility", () => {
 
   it("tells why a soldier cannot get any duty", () => {
     expect(noWork(rows("A"))).toBe("no_slots");
-    expect(noWorkText(rows("A"), 'רס"ל')).toBe("כשיר רק למפקד שער, ובמחזור אין תורנויות כאלה.");
+    expect(noWorkText(rows("A"), 'רס"ל')).toBe("כשיר רק למפקד שער, ובמחזור אין משימות כאלה.");
     expect(noWork(rows("B"))).toBe("none_open");
-    expect(noWorkText(rows("B"), 'סא"ל')).toBe('לא כשיר לאף קטגוריית תורנות: הדרגה סא"ל לא ברשימת הדרגות של אף סוג תורנות.');
+    expect(noWorkText(rows("B"), 'סא"ל')).toBe('לא כשיר לאף קטגוריית משימה: הדרגה סא"ל לא ברשימת הדרגות של אף סוג משימה.');
     expect(noWorkText(rows("D"), 'קמ"א')).toBe(
-      'לא כשיר לאף קטגוריית תורנות: הדרגה קמ"א מתאימה רק למפקד שער, ושם – לא זמין בכל המחזור (היעדרות, פטור, גיוס/שחרור או תקופת הכשרה).',
+      'לא כשיר לאף קטגוריית משימה: הדרגה קמ"א מתאימה רק למפקד שער, ושם – לא זמין בכל המחזור (היעדרות, פטור, גיוס/שחרור או תקופת הכשרה).',
     );
     expect(noWork(rows("C"))).toBeNull();
     expect(noWork([])).toBeNull();

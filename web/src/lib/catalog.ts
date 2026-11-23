@@ -26,7 +26,7 @@ const DAY_NAME = ["ראשון", "שני", "שלישי", "רביעי", "חמיש�
 export function briefingLabel(b: Briefing | null | undefined): string {
   if (!b) return "";
   if (b.kind === "by_call") return [BRIEFING_KIND_LABEL.by_call, b.place].filter(Boolean).join(" · ");
-  const when = b.rule === "day_before" ? "יום לפני" : b.rule === "weekday" ? `${DAY_NAME[b.weekday ?? 0]} שלפני` : "ביום התורנות";
+  const when = b.rule === "day_before" ? "יום לפני" : b.rule === "weekday" ? `${DAY_NAME[b.weekday ?? 0]} שלפני` : "ביום המשימה";
   return [`${BRIEFING_KIND_LABEL[b.kind]} ${when} ${b.time ?? ""}`.trim(), b.place].filter(Boolean).join(" · ");
 }
 
@@ -119,7 +119,7 @@ export function taskTypeProblems(t: TaskTypeInput, others: Pick<TaskType, "id" |
   const p: string[] = [];
   const rest = others.filter((o) => o.id !== selfId);
   if (!t.name.trim()) p.push("חסר שם");
-  else if (rest.some((o) => o.name.trim() === t.name.trim())) p.push("כבר יש תורנות בשם הזה");
+  else if (rest.some((o) => o.name.trim() === t.name.trim())) p.push("כבר יש משימה בשם הזה");
   if (t.allowed_rank_ids && !t.allowed_rank_ids.length) p.push("בחר לפחות דרגה אחת, או \"כל הדרגות\"");
   if (!(t.weight > 0) || t.weight > 99) p.push("משקל חייב להיות גדול מ-0 (עד 99)");
   if (!Number.isInteger(t.min_rest_hours) || t.min_rest_hours < 0) p.push("שעות מנוחה – מספר שלם, 0 ומעלה");
@@ -232,9 +232,9 @@ export function describeMultiplier(m: ScoreMultiplierInput, dayTypeName: (code: 
   if (m.day_types.length) parts.push(m.day_types.map(dayTypeName).join(", "));
   if (m.weekdays.length) parts.push(ISO_WEEK.filter((d) => m.weekdays.includes(d)).map((d) => ISO_DAY_LABEL[d]).join(", "));
   // ⁦…⁩ keeps times and dates left-to-right inside the Hebrew line
-  if (m.time_window) parts.push(`שעות \u2066${m.time_window.replace("-", "–")}\u2069 (תורנות קצרה מ-24 ש׳)`);
+  if (m.time_window) parts.push(`שעות \u2066${m.time_window.replace("-", "–")}\u2069 (משימה קצרה מ-24 ש׳)`);
   if (m.date_from || m.date_to) parts.push(`תאריכים \u2066${m.date_from ? dmy(m.date_from) : "…"}–${m.date_to ? dmy(m.date_to) : "…"}\u2069`);
-  return parts.join(" · ") + (m.skip_shabbat_types ? " · לא על תורנויות שבת" : "");
+  return parts.join(" · ") + (m.skip_shabbat_types ? " · לא על משימות שבת" : "");
 }
 
 // ---------------------------------------------------------------------------
