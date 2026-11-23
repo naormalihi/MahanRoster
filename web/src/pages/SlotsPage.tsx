@@ -160,8 +160,8 @@ function ImportCard(props: {
     ws["!cols"] = [{ wch: 14 }, { wch: 24 }];
     const wb = XLSX.utils.book_new();
     wb.Workbook = { Views: [{ RTL: true }] };
-    XLSX.utils.book_append_sheet(wb, ws, "לוח בסיס");
-    XLSX.writeFile(wb, "תבנית לוח בסיס.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "לוח משימות");
+    XLSX.writeFile(wb, "תבנית לוח משימות.xlsx");
   }
 
   async function read(f: File) {
@@ -240,7 +240,7 @@ function ImportCard(props: {
         </Suspense>
       )}
       <Stack spacing={2}>
-        <Typography variant="h3">קליטת קובץ המשבצות מהבסיס</Typography>
+        <Typography variant="h3">טעינת לוח משימות</Typography>
         <Typography variant="body2" color="text.secondary">
           בקובץ נדרשות רק שתי עמודות: <b>מועד</b> ו<b>סוג משימה</b>. שורה = משבצת עם מבצע ועתודה. כל השאר נגזר: השעות מסוג המשימה (לפי יום
           בשבוע), גרסת השבת והחגים מהתאריך, ומי יכול לבצע מסוג המשימה. עמודות אחרות בקובץ לא נקראות. משבצת שייכת למחזור שבו היא מתחילה.
@@ -463,7 +463,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
     props.onDeleted();
   }
 
-  if (!props.slots.length) return <EmptyState title="עוד אין משבצות במחזור" text="קולטים את קובץ לוח הבסיס למעלה – ומכאן יוצאים לשיבוץ." />;
+  if (!props.slots.length) return <EmptyState title="עוד אין משבצות במחזור" text="קולטים את קובץ לוח המשימות למעלה – ומכאן יוצאים לשיבוץ." />;
   return (
     <Stack spacing={1.5}>
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
@@ -589,7 +589,7 @@ export function SlotsPage() {
           )}
           {locked ? (
             <Alert severity="info">
-              המחזור פורסם, ולכן אי אפשר לקלוט מחדש את לוח הבסיס או למחוק משבצות. שינוי מהבסיס אחרי הפרסום ייקלט בתפעול השוטף, בשיבוץ במצב
+              המחזור פורסם, ולכן אי אפשר לקלוט מחדש את לוח המשימות או למחוק משבצות. שינוי מהבסיס אחרי הפרסום ייקלט בתפעול השוטף, בשיבוץ במצב
               יציבות שמשנה רק את המשבצות שהשתנו.
             </Alert>
           ) : (

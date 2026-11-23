@@ -7,7 +7,7 @@ export const STEPS: { key: StepKey; label: string; path: string }[] = [
   { key: "overview", label: "סקירה", path: "/cycle" },
   { key: "constraints", label: "אילוצים", path: "/cycle/constraints" },
   { key: "potential", label: "פוטנציאל", path: "/cycle/potential" },
-  { key: "slots", label: "לוח הבסיס", path: "/cycle/slots" },
+  { key: "slots", label: "טעינת לוח משימות", path: "/cycle/slots" },
   { key: "schedule", label: "שיבוץ", path: "/cycle/schedule" },
   { key: "operate", label: "תפעול", path: "/cycle/operate" },
 ];
@@ -107,7 +107,7 @@ function nextActionStep(cycle: Cycle, f: CycleFacts): { text: string; step: Step
         ? { text: "לבדוק את המטריצה ולייצא לבסיס", step: "potential" }
         : { text: "לחשב את הפוטנציאל", step: "potential" };
     case "slots":
-      return f.slots ? { text: "המשימות נקלטו – אפשר להריץ שיבוץ", step: "schedule" } : { text: "לקלוט את קובץ לוח הבסיס", step: "slots" };
+      return f.slots ? { text: "המשימות נקלטו – אפשר להריץ שיבוץ", step: "schedule" } : { text: "לקלוט את קובץ לוח המשימות", step: "slots" };
     case "scheduling":
     case "review":
       return s.schedule.tone === "warn"

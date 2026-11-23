@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.50.1",
+    date: "2026-11-24",
+    items: ["שלב \"לוח הבסיס\" נקרא עכשיו \"טעינת לוח משימות\"; התבנית להורדה – \"תבנית לוח משימות.xlsx\", וכותרת השלב בהתאם"],
+  },
+  {
     version: "2.50.0",
     date: "2026-11-23",
     items: [

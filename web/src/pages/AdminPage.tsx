@@ -1991,7 +1991,7 @@ function AliasesTab() {
 
 const TABS = [
   { key: "catalog", label: "קטלוג משימות", about: "סוגי המשימות, משקלים ושעות" },
-  { key: "aliases", label: "שמות מהבסיס", about: "שמות המשימות בקובץ לוח הבסיס" },
+  { key: "aliases", label: "שמות מהבסיס", about: "שמות המשימות בקובץ לוח המשימות" },
   { key: "scoring", label: "מקדמי ניקוד", about: "מקדמים, ימי חג והקלות" },
   { key: "calendar", label: "לוח חגים", about: "חגים וימים מיוחדים בכל שנה" },
   { key: "users", label: "משתמשים", about: "חשבונות והרשאות" },
