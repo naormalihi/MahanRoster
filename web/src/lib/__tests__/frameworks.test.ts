@@ -15,9 +15,9 @@ import {
 } from "../frameworks";
 import { detectMapping, parseRows } from "../roster";
 
-const H = ["מספר עובד", "שם מלא", "דרגה", "סוג שירות", "מסגרת"];
+const H = ["מספר עובד", "שם פרטי", "שם משפחה", "דרגה", "סוג שירות", "מסגרת"];
 const m = detectMapping(H);
-const row = (n: number, frame: string) => ({ "מספר עובד": String(n), "שם מלא": `חייל ${n}`, "דרגה": "סמל", "סוג שירות": "חובה", "מסגרת": frame });
+const row = (n: number, frame: string) => ({ "מספר עובד": String(n), "שם פרטי": "חייל", "שם משפחה": `${n}`, "דרגה": "סמל", "סוג שירות": "חובה", "מסגרת": frame });
 const file = [
   row(1, "מה\"ן - מלמסים/גף ענן/צוות א"),
   row(2, "מה\"ן - מלמסים/גף ענן/צוות ב"),
@@ -74,7 +74,7 @@ describe("frameworks", () => {
   });
 
   it("a file with a gaf column only: one level", () => {
-    const g = detectMapping(["מספר עובד", "שם מלא", "גף"]);
+    const g = detectMapping(["מספר עובד", "שם פרטי", "שם משפחה", "גף"]);
     const t = buildTree([{ "מספר עובד": "1", "גף": "גף א" }, { "מספר עובד": "2", "גף": "גף ב" }], g);
     expect(t).toEqual([{ top: "", count: 2, gafim: [{ gaf: "א", count: 1 }, { gaf: "ב", count: 1 }] }]);
   });

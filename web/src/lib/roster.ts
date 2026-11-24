@@ -9,7 +9,6 @@ import { normalizePhone } from "./phone";
 
 export type FieldKey =
   | "idNumber"
-  | "fullName"
   | "firstName"
   | "lastName"
   | "serviceType"
@@ -19,18 +18,19 @@ export type FieldKey =
   | "framework"
   | "rank"
   | "gender"
-  | "enlistmentDate"
   | "releaseDate"
   | "rangeValidUntil"
   | "parent"
   | "homeNightly"
   | "phone";
 
-export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms: string[] }[] = [
+/** synonyms – the whole header; contains – a part of it, when no header is exactly a synonym
+ *  ("מספר טלפון נייד עיקרי", "תאריך תום שירות (תת"ש )") */
+export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms: string[]; contains?: string[] }[] = [
   { key: "idNumber", label: "מספר עובד", required: true, synonyms: ["מספר עובד", "מס' עובד", "מס עובד", "מס. עובד", "מ.ע", "מ\"ע", "ת.ז", "ת\"ז", "תז", "ת.ז.", "תעודת זהות", "מספר זהות", "מס' זהות", "מס זהות"] },
-  { key: "fullName", label: "שם מלא", required: false, synonyms: ["שם מלא", "שם"] },
-  { key: "firstName", label: "שם פרטי", required: false, synonyms: ["שם פרטי"] },
-  { key: "lastName", label: "שם משפחה", required: false, synonyms: ["שם משפחה"] },
+  // the name comes in two columns, as in the personnel export
+  { key: "firstName", label: "שם פרטי", required: true, synonyms: ["שם פרטי"] },
+  { key: "lastName", label: "שם משפחה", required: true, synonyms: ["שם משפחה"] },
   { key: "serviceType", label: "סוג שירות", required: false, synonyms: ["סוג שירות", "שירות", "מעמד"] },
   { key: "unitJoinDate", label: "תאריך קליטה", required: false, synonyms: ["תאריך קליטה", "קליטה", "תאריך קליטה ליחידה", "תאריך כניסה ליחידה", "תאריך הצטרפות"] },
   { key: "careerStartDate", label: "תאריך כניסה לקבע", required: false, synonyms: ["תאריך כניסה לקבע", "כניסה לקבע", "תאריך תחילת קבע", "תחילת קבע"] },
@@ -38,11 +38,10 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
   { key: "framework", label: "נתיב מסגרת", required: false, synonyms: ["מסגרת", "שיוך ארגוני"] },
   { key: "rank", label: "דרגה", required: true, synonyms: ["דרגה", "דרגה מחושבת", "דרגה נוכחית"] },
   { key: "gender", label: "מין", required: false, synonyms: ["מין", "מגדר"] },
-  { key: "enlistmentDate", label: "תאריך גיוס", required: false, synonyms: ["תאריך גיוס", "גיוס"] },
-  { key: "releaseDate", label: "תאריך שחרור", required: false, synonyms: ["תאריך שחרור", "שחרור", "תש\"ש", "תאריך תום שירות (תש\"ש)", "תאריך תום שירות"] },
+  { key: "releaseDate", label: "תאריך שחרור", required: false, synonyms: ["תאריך שחרור", "שחרור", "תש\"ש", "תת\"ש", "תאריך תום שירות (תש\"ש)", "תאריך תום שירות (תת\"ש)", "תאריך תום שירות"], contains: ["תוםשירות"] },
   { key: "rangeValidUntil", label: "תוקף מטווח", required: false, synonyms: ["תוקף מטווח", "מטווח"] },
   { key: "parent", label: "משרת הורה", required: false, synonyms: ["משרת הורה", "נמצא במשרת הורה", "הורה"] },
-  { key: "phone", label: "טלפון נייד", required: false, synonyms: ["טלפון", "נייד", "טלפון נייד", "פלאפון", "מספר טלפון", "מס' טלפון", "מס טלפון", "סלולרי"] },
+  { key: "phone", label: "טלפון נייד", required: false, synonyms: ["טלפון", "נייד", "טלפון נייד", "פלאפון", "מספר טלפון", "מס' טלפון", "מס טלפון", "סלולרי", "מספר טלפון נייד", "מספר טלפון נייד עיקרי", "טלפון נייד עיקרי"], contains: ["טלפוןנייד"] },
   { key: "homeNightly", label: "הת\"ש (סוג 3–7)", required: false, synonyms: ["הת\"ש ימי לינה", "ת\"ש ימי לינה", "ימי לינה", "הת\"ש", "סוג הת\"ש", "רמת הת\"ש", "ת\"ש 7", "תש 7", "ת\"ש", "תש", "תנאי שירות", "לינה בבית"] },
 ];
 
@@ -55,7 +54,9 @@ export function detectMapping(headers: string[]): Mapping {
   const mapping: Mapping = {};
   const used = new Set<string>();
   for (const f of FIELDS) {
-    const hit = headers.find((h) => !used.has(h) && f.synonyms.some((syn) => clean(h) === clean(syn)));
+    const hit =
+      headers.find((h) => !used.has(h) && f.synonyms.some((syn) => clean(h) === clean(syn))) ??
+      headers.find((h) => !used.has(h) && (f.contains ?? []).some((part) => clean(h).includes(clean(part))));
     if (hit) {
       mapping[f.key] = hit;
       used.add(hit);
@@ -72,7 +73,6 @@ export function mappingProblems(m: Mapping, headers: string[] = []): string[] {
   if (!m.idNumber && headers.some((h) => PERSONAL_NUMBER_HEADERS.some((p) => clean(h) === clean(p))))
     out.push("בקובץ יש עמודת מספר אישי – המערכת מזהה עובדים לפי מספר עובד. החלף את העמודה בעמודת מספר עובד");
   for (const f of FIELDS) if (f.required && !m[f.key]) out.push(`חסרה עמודה: ${f.label}`);
-  if (!m.fullName && !(m.firstName && m.lastName)) out.push("חסרה עמודת שם (שם מלא, או שם פרטי ושם משפחה)");
   if (!m.gaf && !m.framework) out.push("חסרה עמודת מסגרת (מסגרת, או נתיב מסגרת שהיא מופיעה בו)");
   return out;
 }
@@ -216,7 +216,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
       return;
     }
     seen.set(pn, line);
-    const name = String(get("fullName") ?? `${get("firstName") ?? ""} ${get("lastName") ?? ""}`).trim().replace(/\s+/g, " ");
+    const name = `${get("firstName") ?? ""} ${get("lastName") ?? ""}`.trim().replace(/\s+/g, " ");
     const rankName = String(get("rank") ?? "").trim();
     const careerStart = toIsoDate(get("careerStartDate"));
     const svc = serviceOf(m, get("serviceType"), careerStart, rankName);
@@ -229,7 +229,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
         : gafFromFramework(String(get("framework") ?? "")),
     );
     const dates = {
-      enlistmentDate: toIsoDate(get("enlistmentDate")),
+      enlistmentDate: null, // not in the file: the join date (תאריך קליטה) says when he came
       releaseDate: toIsoDate(get("releaseDate")),
       rangeValidUntil: toIsoDate(get("rangeValidUntil")),
       careerStartDate: careerStart,

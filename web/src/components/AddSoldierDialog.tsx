@@ -174,7 +174,6 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
                 <MenuItem key="f" value="female">נקבה</MenuItem>,
               ],
             })}
-            {f.serviceType === "mandatory" && field("enlistmentDate", "תאריך גיוס", { type: "date", slotProps: { inputLabel: { shrink: true } } })}
             {f.serviceType === "mandatory" && field("releaseDate", "תאריך שחרור", { type: "date", slotProps: { inputLabel: { shrink: true } } })}
             {f.serviceType === "career" && field("careerStartDate", "כניסה לקבע", { type: "date", slotProps: { inputLabel: { shrink: true } } })}
             {field("rangeValidUntil", "תוקף מטווח", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}

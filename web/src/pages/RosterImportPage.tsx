@@ -88,10 +88,10 @@ function show(v: unknown): string {
 
 function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
-    FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) => f.label),
-    FIELDS.filter((f) => f.key !== "firstName" && f.key !== "lastName").map((f) =>
-      ({ idNumber: "1234567", fullName: "ישראל ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "מסגרת מבצעים", framework: "", rank: "חובה 3",
-         gender: "זכר", enlistmentDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא", phone: "050-1234567" } as Record<string, string>)[f.key] ?? ""),
+    FIELDS.map((f) => f.label),
+    FIELDS.map((f) =>
+      ({ idNumber: "1234567", firstName: "ישראל", lastName: "ישראלי", serviceType: "חובה", careerStartDate: "", gaf: "מסגרת מבצעים", framework: "", rank: "חובה 3",
+         gender: "זכר", unitJoinDate: "01/03/2025", releaseDate: "01/09/2027", rangeValidUntil: "", parent: "לא", phone: "050-1234567" } as Record<string, string>)[f.key] ?? ""),
   ]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "כוח אדם");
@@ -608,7 +608,7 @@ export function RosterImportPage() {
                   <>
                     <TableHead>
                       <TableRow>
-                        {["שם", "סוג שירות", "מסגרת", "דרגה", "גיוס", "שחרור"].map((h) => <TableCell key={h}>{h}</TableCell>)}
+                        {["שם", "סוג שירות", "מסגרת", "דרגה", "קליטה", "שחרור"].map((h) => <TableCell key={h}>{h}</TableCell>)}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -618,7 +618,7 @@ export function RosterImportPage() {
                           <TableCell>{show(s.service_type)}</TableCell>
                           <TableCell>{s.gaf_name}</TableCell>
                           <TableCell>{s.rank_name}</TableCell>
-                          <TableCell>{show(s.enlistment_date)}</TableCell>
+                          <TableCell>{show(s.unit_join_date)}</TableCell>
                           <TableCell>{show(s.release_date)}</TableCell>
                         </TableRow>
                       ))}
@@ -793,7 +793,7 @@ function RekeyPanel(props: {
   const shown = rows
     .filter((r) => only === "all" || !(r.sure && picks[r.incoming.soldier_key] === r.candidates[0]?.id))
     .sort((a, b) => b.candidates.length - a.candidates.length);
-  const who = (s: ExistingSoldier) => [s.full_name, s.gaf_name, s.rank_name, s.enlistment_date ? show(s.enlistment_date) : ""].filter(Boolean).join(" · ");
+  const who = (s: ExistingSoldier) => [s.full_name, s.gaf_name, s.rank_name, s.unit_join_date ? `קליטה ${show(s.unit_join_date)}` : ""].filter(Boolean).join(" · ");
   return (
     <Paper sx={{ p: 3 }}>
       <Stack spacing={2}>
@@ -831,7 +831,7 @@ function RekeyPanel(props: {
                       {r.incoming.full_name}
                       {r.sure && v === r.candidates[0]?.id && <Chip size="small" color="success" variant="outlined" label="ודאי" sx={{ mr: 1 }} />}
                     </TableCell>
-                    <TableCell>{[r.incoming.gaf_name, r.incoming.rank_name, show(r.incoming.enlistment_date)].join(" · ")}</TableCell>
+                    <TableCell>{[r.incoming.gaf_name, r.incoming.rank_name, r.incoming.unit_join_date ? `קליטה ${show(r.incoming.unit_join_date)}` : ""].filter(Boolean).join(" · ")}</TableCell>
                     <TableCell sx={{ minWidth: 260 }}>
                       <TextField
                         select
