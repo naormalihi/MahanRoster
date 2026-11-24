@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.53.1",
+    date: "2026-11-24",
+    items: ["תיקון ניקוד בלי הגבלה של 100 נקודות – אפשר להתחיל עם ניקוד התחלתי גבוה"],
+  },
+  {
     version: "2.53.0",
     date: "2026-11-24",
     items: [

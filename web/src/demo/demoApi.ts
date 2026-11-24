@@ -510,7 +510,6 @@ export class DemoApi implements Api {
   async addScoreCorrection(soldierId: string, cycleId: string, points: number, reason: string) {
     await delay();
     if (!points) throw new Error("תיקון של 0 לא משנה כלום");
-    if (Math.abs(points) > 100) throw new Error("תיקון – עד 100 נקודות");
     if (!reason.trim()) throw new Error("כתוב סיבה לתיקון");
     const c = this.cycleList.find((x) => x.id === cycleId);
     this.corrections.unshift({
