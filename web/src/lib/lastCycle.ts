@@ -74,8 +74,10 @@ export function currentScore(
   opening: number | null | undefined,
   inCycle: { points: number; duties: number } | undefined,
   hasCycle: boolean,
-): { points: number; duties: number; opening: number } | null {
+  /** hand corrections given for this cycle */
+  correction = 0,
+): { points: number; duties: number; opening: number; correction: number } | null {
   const o = opening ? Number(opening) : 0;
-  if (!hasCycle && !o) return null;
-  return { points: o + (inCycle?.points ?? 0), duties: inCycle?.duties ?? 0, opening: o };
+  if (!hasCycle && !o && !correction) return null;
+  return { points: o + (inCycle?.points ?? 0) + correction, duties: inCycle?.duties ?? 0, opening: o, correction };
 }

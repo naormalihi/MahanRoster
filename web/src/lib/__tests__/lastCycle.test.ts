@@ -49,8 +49,11 @@ describe("current and next cycle by today's date", () => {
   it("current score: opening score alone, or opening plus the cycle's points", async () => {
     const { currentScore } = await import("../lastCycle");
     expect(currentScore(null, undefined, false)).toBeNull();
-    expect(currentScore(10.9, undefined, false)).toEqual({ points: 10.9, duties: 0, opening: 10.9 });
-    expect(currentScore(10.9, { points: 3, duties: 2 }, true)).toEqual({ points: 13.9, duties: 2, opening: 10.9 });
-    expect(currentScore(null, undefined, true)).toEqual({ points: 0, duties: 0, opening: 0 });
+    expect(currentScore(10.9, undefined, false)).toEqual({ points: 10.9, duties: 0, opening: 10.9, correction: 0 });
+    expect(currentScore(10.9, { points: 3, duties: 2 }, true)).toEqual({ points: 13.9, duties: 2, opening: 10.9, correction: 0 });
+    expect(currentScore(null, undefined, true)).toEqual({ points: 0, duties: 0, opening: 0, correction: 0 });
+    // a hand correction for this cycle is part of the current score
+    expect(currentScore(null, { points: 3, duties: 2 }, true, -1.5)).toEqual({ points: 1.5, duties: 2, opening: 0, correction: -1.5 });
+    expect(currentScore(null, undefined, false, 2)).toEqual({ points: 2, duties: 0, opening: 0, correction: 2 });
   });
 });

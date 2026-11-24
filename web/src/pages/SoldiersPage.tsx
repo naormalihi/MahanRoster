@@ -34,6 +34,8 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   TextField,
   Typography,
@@ -42,7 +44,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
-import type { NamedRef } from "../lib/api";
+import type { NamedRef, ScoreCorrection } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { isStaff } from "../lib/api";
 import { accountLabel, type SoldierAccount } from "../lib/me";
@@ -84,6 +86,106 @@ const RANGE_CHIP: Record<
 const fmt = (iso: string | null) =>
   iso ? iso.split("-").reverse().join("/") : "—";
 const ddmm = (iso: string) => iso.slice(5, 10).split("-").reverse().join("/");
+
+/** A cell that stays at the start (right) while the table scrolls sideways. */
+const stick = (offset: number) => ({ position: "sticky" as const, insetInlineStart: offset, zIndex: 2, bgcolor: "background.paper" });
+
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}`;
+
+/** "ניקוד": the current score, its hand corrections (with who and why), and a new one – saved at once. */
+function ScoreSection({ soldierId, score }: { soldierId: string; score: NonNullable<Parameters<typeof EditDialog>[0]["score"]> }) {
+  const { api } = useAuth();
+  const [form, setForm] = useState<{ how: "total" | "delta"; value: string; reason: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const v = form ? Number(form.value.replace(",", ".")) : NaN;
+  const delta = form && form.value.trim() !== "" && Number.isFinite(v) ? Math.round((form.how === "total" ? v - score.now : v) * 100) / 100 : null;
+
+  async function run(f: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await f();
+      score.onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  }
+
+  return (
+    <Box>
+      <Stack direction="row" sx={{ alignItems: "center", mb: 0.5 }}>
+        <Typography variant="h3" sx={{ flex: 1 }}>
+          ניקוד
+        </Typography>
+        {!form && (
+          <Button size="small" startIcon={<EditIcon />} onClick={() => setForm({ how: "total", value: "", reason: "" })}>
+            תיקון ניקוד
+          </Button>
+        )}
+      </Stack>
+      <Typography variant="body2">
+        ניקוד נוכחי · {score.cycleName}: <b>{score.now.toFixed(1)}</b>
+      </Typography>
+      {score.corrections.map((c) => (
+        <Stack key={c.id} direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
+          <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
+            <Box component="span" sx={{ fontWeight: 700, color: "warning.dark" }}>✎ {signed(c.points)}</Box> · {c.reason}
+            <Typography component="span" variant="caption" color="text.secondary">
+              {" "}· {c.cycle_name ?? ""} · {c.created_by_name ?? ""} · {new Date(c.created_at).toLocaleDateString("he-IL")}
+            </Typography>
+          </Typography>
+          <Tooltip title="ביטול התיקון">
+            <IconButton size="small" disabled={busy} aria-label="ביטול התיקון" onClick={() => void run(() => api!.deleteScoreCorrection(c.id))}>
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ))}
+      {form && (
+        <Stack spacing={1.5} sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: "action.hover" }}>
+          <ToggleButtonGroup size="small" exclusive value={form.how} onChange={(_, h) => h && setForm({ ...form, how: h })}>
+            <ToggleButton value="total">ניקוד נוכחי חדש</ToggleButton>
+            <ToggleButton value="delta">תוספת / הפחתה</ToggleButton>
+          </ToggleButtonGroup>
+          <TextField
+            size="small"
+            label={form.how === "total" ? "הניקוד הנוכחי יהיה" : "כמה להוסיף (מינוס להפחתה)"}
+            value={form.value}
+            onChange={(e) => setForm({ ...form, value: e.target.value })}
+            slotProps={{ htmlInput: { inputMode: "decimal", dir: "ltr" } }}
+            helperText={delta !== null ? (delta === 0 ? "בלי שינוי" : `תיקון של ${signed(delta)} · ${score.cycleName}`) : " "}
+          />
+          <TextField size="small" label="סיבה" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value.slice(0, 200) })} required />
+          {error && <Alert severity="error">{error}</Alert>}
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={busy || !delta || !form.reason.trim()}
+              onClick={() =>
+                void run(async () => {
+                  await api!.addScoreCorrection(soldierId, score.cycleId, delta!, form.reason);
+                  setForm(null);
+                })
+              }
+            >
+              שמירת התיקון
+            </Button>
+            <Button size="small" onClick={() => setForm(null)}>
+              ביטול
+            </Button>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            נשמר מיד ונרשם ביומן. נספר בניקוד של המחזור, באיזון ובשיבוץ הבא, ובניקוד המצטבר של המחזורים הבאים.
+          </Typography>
+        </Stack>
+      )}
+      {!form && error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+    </Box>
+  );
+}
 
 function RangeChip({ until }: { until: string | null }) {
   const st = rangeState(until);
@@ -129,6 +231,8 @@ function EditDialog(props: {
   loadRoles: LoadRoleRef[];
   /** full – אחראי השיבוצים; admin – a gaf commander, his own people: phone, range and relief roles; view – read */
   mode: "full" | "admin" | "view";
+  /** staff: the current score and its hand corrections */
+  score?: { cycleId: string; cycleName: string; now: number; corrections: ScoreCorrection[]; onChanged: () => void };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -404,6 +508,7 @@ function EditDialog(props: {
           <Divider />
           </>
           )}
+          {props.score && <ScoreSection soldierId={s.id} score={props.score} />}
           <Box>
             <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
               <Typography variant="h3" sx={{ flex: 1 }}>
@@ -700,7 +805,16 @@ export function SoldiersPage() {
       setNxt(null);
     });
   }, [api]);
-  const nowScore = (s: SoldierDetail) => currentScore(s.opening_score, cur?.scores.get(s.id), !!cur?.ids.has(s.id));
+  // hand corrections (staff): counted in the current score of the cycle they were given for
+  const [corrections, setCorrections] = useState<ScoreCorrection[]>([]);
+  const loadCorrections = useCallback(() => {
+    if (!staffUser) return;
+    api!.scoreCorrections().then(setCorrections, () => setCorrections([]));
+  }, [api, staffUser]);
+  useEffect(loadCorrections, [loadCorrections]);
+  const correctionOf = (id: string, cycleId?: string) =>
+    cycleId ? corrections.filter((c) => c.soldier_id === id && c.cycle_id === cycleId).reduce((t, c) => t + c.points, 0) : 0;
+  const nowScore = (s: SoldierDetail) => currentScore(s.opening_score, cur?.scores.get(s.id), !!cur?.ids.has(s.id), correctionOf(s.id, cur?.cycle.id));
   const groupOf = (s: SoldierDetail) => (s.service_type === "career" ? "קבע" : "חובה");
   // a duty on a holiday or its eve, from a year back to a year ahead (published cycles)
   const [holidayDuty, setHolidayDuty] = useState<
@@ -869,7 +983,6 @@ export function SoldiersPage() {
           },
         ]
       : []),
-    { label: "" },
   ];
   const sortCol = sort && columns.find((c) => c.key === sort.key);
   if (sortCol?.by) {
@@ -1313,7 +1426,7 @@ export function SoldiersPage() {
                   lines={[
                     <>
                       ניקוד <b>{n ? n.points.toFixed(1) : "—"}</b>
-                      {n ? ` (${n.opening ? (n.duties ? `פתיחה + ${n.duties} משימות` : "פתיחה") : `${n.duties} משימות`})` : ""}
+                      {n ? ` (${n.opening ? (n.duties ? `פתיחה + ${n.duties} משימות` : "פתיחה") : `${n.duties} משימות`}${n.correction ? ` · ✎ ${signed(n.correction)}` : ""})` : ""}
                       {nxt && nxt.ids.has(s.id) ? ` · הבא ${(nxt.scores.get(s.id)?.points ?? 0).toFixed(1)}` : ""}
                       {h ? ` · ${h.day <= today ? "ביצע" : "משובץ"} משימת חג` : ""}
                     </>,
@@ -1358,7 +1471,7 @@ export function SoldiersPage() {
               <TableHead>
                 <TableRow>
                   {canManage && (
-                  <TableCell padding="checkbox" data-read>
+                  <TableCell padding="checkbox" data-read sx={{ ...stick(0), zIndex: 4 }}>
                     <Checkbox
                       checked={allSelected}
                       indeterminate={
@@ -1383,7 +1496,7 @@ export function SoldiersPage() {
                       <TableCell
                         key={i}
                         sortDirection={on ? sort!.dir : false}
-                        sx={{ whiteSpace: "nowrap" }}
+                        sx={{ whiteSpace: "nowrap", ...(i === 0 && { ...stick(canManage ? 48 : 0), zIndex: 4, borderInlineEnd: 1, borderInlineEndColor: "divider" }) }}
                       >
                         {c.key ? (
                           <TableSortLabel
@@ -1426,10 +1539,11 @@ export function SoldiersPage() {
                       key={s.id}
                       hover
                       selected={selected.has(s.id)}
-                      sx={{ opacity: s.is_active ? 1 : 0.5 }}
+                      onClick={() => setEditing(s)}
+                      sx={{ opacity: s.is_active ? 1 : 0.5, cursor: "pointer" }}
                     >
                       {canManage && (
-                      <TableCell padding="checkbox" data-read>
+                      <TableCell padding="checkbox" data-read onClick={(e) => e.stopPropagation()} sx={stick(0)}>
                         {manages(s) && (
                         <Checkbox
                           checked={selected.has(s.id)}
@@ -1441,7 +1555,20 @@ export function SoldiersPage() {
                         )}
                       </TableCell>
                       )}
-                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", ...stick(canManage ? 48 : 0), borderInlineEnd: 1, borderInlineEndColor: "divider" }}>
+                        {/* the name stays in sight when the table scrolls sideways; the pencil with it */}
+                        <IconButton
+                          data-read
+                          size="small"
+                          aria-label={`עריכת ${s.full_name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditing(s);
+                          }}
+                          sx={{ ml: 0.5, p: 0.25 }}
+                        >
+                          <EditIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
                         {s.full_name}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
@@ -1500,6 +1627,11 @@ export function SoldiersPage() {
                               <Typography component="span" variant="caption" color="text.secondary">
                                 {" "}· {note}
                               </Typography>
+                              {n.correction !== 0 && (
+                                <Typography component="span" variant="caption" sx={{ color: "warning.dark", fontWeight: 600 }} title="כולל תיקון ידני">
+                                  {" "}· ✎ {signed(n.correction)}
+                                </Typography>
+                              )}
                             </>
                           );
                         })()}
@@ -1614,15 +1746,6 @@ export function SoldiersPage() {
                             </TableCell>
                           );
                         })()}
-                      <TableCell padding="checkbox">
-                        <IconButton
-                          data-read
-                          aria-label={`עריכת ${s.full_name}`}
-                          onClick={() => setEditing(s)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -1646,6 +1769,17 @@ export function SoldiersPage() {
           ranks={ranks}
           loadRoles={loadRoles}
           mode={staffUser ? "full" : manages(editing) ? "admin" : "view"}
+          score={
+            staffUser && (cur ?? nxt)
+              ? {
+                  cycleId: (cur ?? nxt)!.cycle.id,
+                  cycleName: (cur ?? nxt)!.cycle.name,
+                  now: cur ? (nowScore(editing)?.points ?? 0) : correctionOf(editing.id, nxt!.cycle.id),
+                  corrections: corrections.filter((c) => c.soldier_id === editing.id),
+                  onChanged: loadCorrections,
+                }
+              : undefined
+          }
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
