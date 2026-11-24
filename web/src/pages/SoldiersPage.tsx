@@ -814,7 +814,19 @@ export function SoldiersPage() {
   useEffect(loadCorrections, [loadCorrections]);
   const correctionOf = (id: string, cycleId?: string) =>
     cycleId ? corrections.filter((c) => c.soldier_id === id && c.cycle_id === cycleId).reduce((t, c) => t + c.points, 0) : 0;
-  const nowScore = (s: SoldierDetail) => currentScore(s.opening_score, cur?.scores.get(s.id), !!cur?.ids.has(s.id), correctionOf(s.id, cur?.cycle.id));
+  // between cycles there is no current one: a correction given for the next cycle is the score to start from
+  const nowScore = (s: SoldierDetail) =>
+    cur
+      ? currentScore(s.opening_score, cur.scores.get(s.id), cur.ids.has(s.id), correctionOf(s.id, cur.cycle.id))
+      : currentScore(s.opening_score, undefined, false, correctionOf(s.id, nxt?.cycle.id));
+  /** the next cycle: its duties, and the corrections given for it */
+  const nextScore = (s: SoldierDetail) => {
+    if (!nxt) return null;
+    const correction = correctionOf(s.id, nxt.cycle.id);
+    if (!nxt.ids.has(s.id) && !correction) return null;
+    const d = nxt.scores.get(s.id);
+    return { points: (d?.points ?? 0) + correction, duties: d?.duties ?? 0, correction };
+  };
   const groupOf = (s: SoldierDetail) => (s.service_type === "career" ? "קבע" : "חובה");
   // a duty on a holiday or its eve, from a year back to a year ahead (published cycles)
   const [holidayDuty, setHolidayDuty] = useState<
@@ -945,7 +957,7 @@ export function SoldiersPage() {
     {
       label: nxt ? `ניקוד עתידי · ${nxt.cycle.name}${isPublished(nxt.cycle) ? "" : " (טיוטה)"}` : "ניקוד עתידי",
       key: "score_next",
-      by: (s) => (nxt?.ids.has(s.id) ? (nxt.scores.get(s.id)?.points ?? 0) : -1),
+      by: (s) => nextScore(s)?.points ?? -1,
       first: "desc",
     },
     {
@@ -1356,7 +1368,7 @@ export function SoldiersPage() {
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 2, mt: 0.5 }}>
               {summarize(
                 nxt.members.length ? nxt.members : rows.filter((s) => s.is_active && nxt.ids.has(s.id)).map((s) => ({ soldier_id: s.id, group: groupOf(s) })),
-                nxt.scores,
+                new Map(rows.map((s) => [s.id, { points: nextScore(s)?.points ?? 0 }])),
               ).map((g) => (
                 <Typography key={g.key} variant="body2">
                   <b>{g.key}</b> ({g.n}): ממוצע <b>{g.mean.toFixed(1)}</b> נק׳ · טווח {g.min.toFixed(1)}–{g.max.toFixed(1)}
@@ -1427,7 +1439,7 @@ export function SoldiersPage() {
                     <>
                       ניקוד <b>{n ? n.points.toFixed(1) : "—"}</b>
                       {n ? ` (${n.opening ? (n.duties ? `פתיחה + ${n.duties} משימות` : "פתיחה") : `${n.duties} משימות`}${n.correction ? ` · ✎ ${signed(n.correction)}` : ""})` : ""}
-                      {nxt && nxt.ids.has(s.id) ? ` · הבא ${(nxt.scores.get(s.id)?.points ?? 0).toFixed(1)}` : ""}
+                      {nextScore(s) ? ` · הבא ${nextScore(s)!.points.toFixed(1)}` : ""}
                       {h ? ` · ${h.day <= today ? "ביצע" : "משובץ"} משימת חג` : ""}
                     </>,
                     (
@@ -1637,16 +1649,23 @@ export function SoldiersPage() {
                         })()}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
-                        {!nxt || !nxt.ids.has(s.id) ? (
-                          "—"
-                        ) : (
-                          <>
-                            <b>{(nxt.scores.get(s.id)?.points ?? 0).toFixed(1)}</b>
-                            <Typography component="span" variant="caption" color="text.secondary">
-                              {" "}· {nxt.scores.get(s.id)?.duties ?? 0} משימות
-                            </Typography>
-                          </>
-                        )}
+                        {(() => {
+                          const x = nextScore(s);
+                          if (!x) return "—";
+                          return (
+                            <>
+                              <b>{x.points.toFixed(1)}</b>
+                              <Typography component="span" variant="caption" color="text.secondary">
+                                {" "}· {x.duties} משימות
+                              </Typography>
+                              {x.correction !== 0 && (
+                                <Typography component="span" variant="caption" sx={{ color: "warning.dark", fontWeight: 600 }} title="כולל תיקון ידני">
+                                  {" "}· ✎ {signed(x.correction)}
+                                </Typography>
+                              )}
+                            </>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell align="center">
                         {holidayDuty.has(s.id) &&
@@ -1774,7 +1793,7 @@ export function SoldiersPage() {
               ? {
                   cycleId: (cur ?? nxt)!.cycle.id,
                   cycleName: (cur ?? nxt)!.cycle.name,
-                  now: cur ? (nowScore(editing)?.points ?? 0) : correctionOf(editing.id, nxt!.cycle.id),
+                  now: nowScore(editing)?.points ?? 0,
                   corrections: corrections.filter((c) => c.soldier_id === editing.id),
                   onChanged: loadCorrections,
                 }

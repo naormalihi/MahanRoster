@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.53.3",
+    date: "2026-11-24",
+    items: ["תיקון ניקוד בין מחזורים מוצג עכשיו בטבלה – בניקוד הנוכחי ובניקוד העתידי (קודם נשמר אבל לא הוצג)"],
+  },
+  {
     version: "2.53.2",
     date: "2026-11-24",
     items: ["תיקון: מחיקה לצמיתות של עובדים נכשלה בהודעה \"function gen_salt does not exist\" (ולא נמחק דבר) – עכשיו עובדת"],
