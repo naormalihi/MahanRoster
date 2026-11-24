@@ -117,6 +117,8 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
   const { ctx, slot, current } = props;
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
   const [cands, setCands] = useState<Candidate[] | null>(null);
+  // ממלכ"ת יום: those with priority (parents, qualifying exemption, listed populations) first
+  const [priority, setPriority] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [chosen, setChosen] = useState<Candidate | null>(null);
@@ -125,9 +127,12 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api!
-      .slotCandidates(slot.id)
-      .then((c) => setCands(rankCandidates(c)))
+    Promise.all([api!.slotCandidates(slot.id), api!.qualifyingPriority(slot.id).catch(() => [] as string[])])
+      .then(([c, p]) => {
+        const set = new Set(p);
+        setPriority(set);
+        setCands(rankCandidates(c, set));
+      })
       .catch((e) => setError((e as Error).message));
   }, [api, slot.id]);
 
@@ -203,6 +208,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
                           </Typography>
                           {c.in_slot && <Chip size="small" label={`כבר ${ROLE_LABEL[c.in_slot]}`} />}
                           {newcomer && <Chip size="small" color="info" variant="outlined" label="חדש ביחידה" />}
+                          {priority.has(c.soldier_id) && <Chip size="small" color="success" variant="outlined" label="עדיפות – זכאי" />}
                           {bad && !(newcomer && c.reasons.length === 1) && <Chip size="small" color="error" variant="outlined" label="לא זכאי" />}
                           {clash.length > 0 ? (
                             <Chip size="small" color="error" label="משובץ באותו זמן" />

@@ -1185,6 +1185,10 @@ export class DemoApi implements Api {
     return this.draft.filter((a) => a.cycle_id === cycleId && !gone.includes(a.status)).map(({ cycle_id: _c, ...a }) => ({ ...a }));
   }
 
+  async qualifyingPriority(_slotId: string): Promise<string[]> {
+    return [];
+  }
+
   async slotCandidates(slotId: string): Promise<Candidate[]> {
     await delay(300);
     const cycleId = [...this.slotsByCycle].find(([, v]) => v.some((s) => s.id === slotId))?.[0] ?? "";

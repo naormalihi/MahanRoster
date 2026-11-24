@@ -195,6 +195,8 @@ function MatrixTab(props: {
   data: Data;
   soldiers: Map<string, ExistingSoldier>;
   categories: NamedRef[];
+  /** categories with a qualifying duty: everyone can do it, the qualifying come first */
+  qualifyingCats?: Set<string>;
   reload: () => void;
   locked?: boolean;
 }) {
@@ -340,6 +342,11 @@ function MatrixTab(props: {
               {categories.map((c) => (
                 <TableCell key={c.id} sx={{ textAlign: "center", whiteSpace: "nowrap" }}>
                   {c.name}
+                  {props.qualifyingCats?.has(c.id) && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block" }} title="פתוחה לכולם; משרתי הורה ובעלי פטור מזכה משובצים בעדיפות">
+                      מזכה – עדיפות לזכאים
+                    </Typography>
+                  )}
                 </TableCell>
               ))}
             </TableRow>
@@ -459,6 +466,8 @@ export function PotentialPage() {
   const { cycleId, reload: reloadCycle, locked } = useCycle();
   const canEdit = useCanEdit();
   const [soldiers, setSoldiers] = useState<Map<string, ExistingSoldier>>(new Map());
+  // categories with a qualifying duty (ממלכ"ת יום): open to all, priority to the qualifying
+  const [qualifyingCats, setQualifyingCats] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<NamedRef[]>([]);
   const [data, setData] = useState<Data | null>(null);
   const [tab, setTab] = useState<"matrix" | "heat">("matrix");
@@ -467,7 +476,13 @@ export function PotentialPage() {
   const [error, setError] = useState<string | null>(null);
 
   const loadCycles = useCallback(async () => {
-    const [c, s, cats] = await Promise.all([api!.cycles(), api!.soldiers(), api!.dutyCategories()]);
+    const [c, s, cats, types] = await Promise.all([
+      api!.cycles(),
+      api!.soldiers(),
+      api!.dutyCategories(),
+      api!.taskTypes().catch(() => []),
+    ]);
+    setQualifyingCats(new Set(types.filter((t) => t.qualifying_duty && t.category_id).map((t) => t.category_id!)));
     setCycles(c);
     setSoldiers(new Map(s.map((x) => [x.id, x])));
     setCategories(cats);
@@ -590,7 +605,7 @@ export function PotentialPage() {
           {!data ? (
             <Loading />
           ) : tab === "matrix" ? (
-            <MatrixTab cycle={cycle} data={data} soldiers={soldiers} categories={shownCategories} reload={loadData} locked={locked || !canEdit} />
+            <MatrixTab cycle={cycle} data={data} soldiers={soldiers} categories={shownCategories} qualifyingCats={qualifyingCats} reload={loadData} locked={locked || !canEdit} />
           ) : (
             <HeatTab daily={data.daily} categories={shownCategories} />
           )}

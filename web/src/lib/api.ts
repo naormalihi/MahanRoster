@@ -339,6 +339,8 @@ export interface Api {
   // draft editor
   draftAssignments(cycleId: string): Promise<DraftAssignment[]>;
   slotCandidates(slotId: string): Promise<Candidate[]>;
+  /** a qualifying duty (ממלכ"ת יום): who has priority for it – empty for any other duty */
+  qualifyingPriority(slotId: string): Promise<string[]>;
   manualAssign(slotId: string, role: DraftRole, soldierId: string, replaceId: string | null, reason: string): Promise<string>;
   /** Staffs a waiting duty of a published cycle straight onto the board (reason when a rule is broken). */
   assignPublished(slotId: string, role: DraftRole, soldierId: string, reason: string | null): Promise<string>;

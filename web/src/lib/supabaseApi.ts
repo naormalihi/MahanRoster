@@ -956,6 +956,10 @@ export class SupabaseApi implements Api {
     return out;
   }
 
+  async qualifyingPriority(slotId: string): Promise<string[]> {
+    return (check(await this.sb.rpc("qualifying_priority", { p_slot: slotId })) as string[] | null) ?? [];
+  }
+
   async slotCandidates(slotId: string): Promise<Candidate[]> {
     const rows = check(await this.sb.rpc("slot_candidates", { p_slot: slotId })) as Candidate[];
     return rows.map((r) => ({ ...r, cycle_points: Number(r.cycle_points), conflicts: r.conflicts ?? [] }));
