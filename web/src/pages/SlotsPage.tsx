@@ -25,6 +25,7 @@ import {
 } from "@mui/material";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { NamedRef } from "../lib/api";
+import { DutyNote } from "../components/DutyNote";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { EmptyState } from "../components/EmptyState";
@@ -153,11 +154,12 @@ function ImportCard(props: {
   );
   const taskName = new Map(refs.tasks.map((t) => [t.id, t.name]));
   const replaceable = props.existing.filter((s) => s.assigned === 0).length;
+  const withNote = result?.slots.filter((s) => s.instructions).length ?? 0;
 
   async function downloadTemplate() {
     const XLSX = await import("xlsx");
     const ws = XLSX.utils.aoa_to_sheet([BASE_TEMPLATE_HEADERS]);
-    ws["!cols"] = [{ wch: 14 }, { wch: 24 }];
+    ws["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     wb.Workbook = { Views: [{ RTL: true }] };
     XLSX.utils.book_append_sheet(wb, ws, "לוח משימות");
@@ -242,8 +244,9 @@ function ImportCard(props: {
       <Stack spacing={2}>
         <Typography variant="h3">טעינת לוח משימות</Typography>
         <Typography variant="body2" color="text.secondary">
-          בקובץ נדרשות רק שתי עמודות: <b>מועד</b> ו<b>סוג משימה</b>. שורה = משבצת עם מבצע ועתודה. כל השאר נגזר: השעות מסוג המשימה (לפי יום
-          בשבוע), גרסת השבת והחגים מהתאריך, ומי יכול לבצע מסוג המשימה. עמודות אחרות בקובץ לא נקראות. משבצת שייכת למחזור שבו היא מתחילה.
+          בקובץ נדרשות שתי עמודות: <b>מועד</b> ו<b>סוג משימה</b>, ועמודת <b>הערה</b> אופציונלית – היא מוצגת על המשימה בלוח השיבוצים, ב&quot;המשימות שלי&quot; ובהודעות (עד 300 תווים,
+          גלויה לכל מי שרואה את הלוח – בלי טלפונים). שורה = משבצת עם מבצע ועתודה. כל השאר נגזר: השעות מסוג המשימה (לפי יום בשבוע), גרסת השבת והחגים מהתאריך,
+          ומי יכול לבצע מסוג המשימה. עמודות אחרות בקובץ לא נקראות. משבצת שייכת למחזור שבו היא מתחילה.
         </Typography>
         <Box>
           <Button variant="contained" component="label" startIcon={<UploadIcon />} disabled={busy}>
@@ -377,6 +380,9 @@ function ImportCard(props: {
                 </List>
               </Alert>
             )}
+            <Typography variant="body2" color="text.secondary">
+              {result.slots.length} משבצות{withNote > 0 ? ` · ${withNote} עם הערה` : ""}
+            </Typography>
             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
@@ -385,6 +391,7 @@ function ImportCard(props: {
                     <TableCell>מועד</TableCell>
                     {!narrow && <TableCell>בקובץ</TableCell>}
                     <TableCell>סוג משימה</TableCell>
+                    {!narrow && withNote > 0 && <TableCell>הערה</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -418,7 +425,13 @@ function ImportCard(props: {
                         {s.prefer_home_nightly && <Chip size="small" color="info" label="ת״ש 7" sx={{ mr: 0.5 }} />}
                   {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
                   {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
+                        {narrow && s.instructions && <DutyNote note={s.instructions} />}
                       </TableCell>
+                      {!narrow && withNote > 0 && (
+                        <TableCell sx={{ maxWidth: 280 }} title={s.instructions ?? undefined}>
+                          <Typography variant="body2" noWrap>{s.instructions?.replace(/\n/g, " · ") ?? ""}</Typography>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -427,7 +440,7 @@ function ImportCard(props: {
             {replaceable > 0 && (
               <FormControlLabel
                 control={<Checkbox checked={replace} onChange={(e) => setReplace(e.target.checked)} />}
-                label={`להחליף את ${replaceable} המשבצות שכבר קיימות במחזור ועוד לא שובצו`}
+                label={`להחליף את ${replaceable} המשבצות שכבר קיימות במחזור ועוד לא שובצו (כולל הערות שנערכו ידנית)`}
               />
             )}
             <Stack direction="row" spacing={1}>
@@ -518,6 +531,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
                   {s.allowed_rank_ids && <Chip size="small" variant="outlined" label={`רק ${s.allowed_rank_ids.map((id) => rankName.get(id)).join(", ")}`} sx={{ mr: 0.5 }} />}
                   {s.daily_hours && <Chip size="small" variant="outlined" label={`כל יום ${s.daily_hours.replace("-", "–")}`} sx={{ mr: 0.5 }} />}
                   {s.briefing_at && <Chip size="small" variant="outlined" label={`תדריך ${dowFmt.format(new Date(s.briefing_at))} ${tsFmt.format(new Date(s.briefing_at))}`} sx={{ mr: 0.5 }} />}
+                  <DutyNote note={s.instructions} />
                 </TableCell>
               </TableRow>
             ))}

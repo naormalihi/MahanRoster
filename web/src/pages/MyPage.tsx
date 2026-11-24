@@ -24,6 +24,7 @@ import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
 import { needsAck, splitDuties, type MyDuty, type MyScore } from "../lib/me";
 import { canAskSwap, type MySwap } from "../lib/swaps";
 import { ContactCard } from "../components/ContactCard";
+import { DutyNote } from "../components/DutyNote";
 import { SwapDialog, SwapsCard } from "../components/SwapDialog";
 import CloudOffIcon from "@mui/icons-material/CloudOffOutlined";
 import { isOfflineError, OfflineError, readOffline, saveOffline, savedLabel } from "../lib/offline";
@@ -55,6 +56,7 @@ function DutyRow({ d, open, onToggle, onSwap, onAck }: { d: MyDuty; open: boolea
           <Typography variant="body2" color="text.secondary">
             {dayLabel(d.starts_at)} · {spanLabel(d.starts_at, d.ends_at)}
           </Typography>
+          <DutyNote note={d.note} size={14} />
         </Box>
         {waiting && (
           <Button

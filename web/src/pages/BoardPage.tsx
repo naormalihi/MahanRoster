@@ -37,6 +37,7 @@ import {
 import { createContext, Fragment, useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { isStaff, type BoardRow } from "../lib/api";
+import { DutyNote } from "../components/DutyNote";
 import { SlotActionsDialog } from "../components/SlotActions";
 import { PrintDialog } from "../components/BoardPrint";
 import { HOLIDAY_TYPES, israeliHolidays } from "../lib/catalog";
@@ -70,7 +71,7 @@ function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime
   const openSlot = useContext(OpenSlot);
   const performers = people(r.performers, r.performer_gafim ?? (r.gafim.length === 1 ? r.performers.map(() => r.gafim[0]) : undefined));
   const reserves = people(r.reserves, r.reserve_gafim);
-  const details = !!(r.instructions || r.report_at || r.briefing_at || r.briefing_by_call);
+  const details = !!(r.report_at || r.briefing_at || r.briefing_by_call);
   const hit = (n: string) => (query && n.includes(query) ? { bgcolor: "#ffe58a", color: "#000", borderRadius: 0.5, px: 0.4 } : null);
 
   return (
@@ -164,7 +165,7 @@ function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime
         <Collapse in={open} onClick={(e) => e.stopPropagation()}>
           <Box sx={{ mt: 0.75, p: 1.25, borderRadius: 1, bgcolor: "action.hover", fontSize: 13 }}>
             {(r.report_at || r.briefing_at || r.briefing_by_call) && (
-              <Stack direction="row" spacing={1} sx={{ mb: r.instructions ? 0.75 : 0, flexWrap: "wrap", gap: 0.5 }}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
                 {r.report_at && <Chip size="small" variant="outlined" label={`התייצבות ${timeLabel(r.report_at)}${r.report_place ? ` · ${r.report_place}` : ""}`} />}
                 {r.briefing_at && (
                   <Chip
@@ -178,9 +179,14 @@ function SlotLine({ r, query, showTime }: { r: BoardRow; query: string; showTime
                 )}
               </Stack>
             )}
-            {r.instructions && <Box sx={{ whiteSpace: "pre-line", lineHeight: 1.6 }}>{r.instructions}</Box>}
           </Box>
         </Collapse>
+      )}
+      {/* the duty's note: always in sight, under the briefing */}
+      {r.instructions && (
+        <Box sx={{ mt: 0.25 }}>
+          <DutyNote note={r.instructions} />
+        </Box>
       )}
     </Box>
   );

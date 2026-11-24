@@ -3201,3 +3201,55 @@ def test_no_function_still_says_the_old_duty_word(conn):
     left = conn.execute("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
                         "where n.nspname in ('app', 'public') and (p.prosrc like '%%תורנות%%' or p.prosrc like '%%תורנויות%%')").fetchall()
     assert left == []
+
+
+def test_slot_note_edited_by_staff_and_told_after_publish(conn):
+    cycle = conn.cycle_id
+    sid = conn.execute("select s.id from soldiers s where s.is_active and s.gaf_id is not null "
+                       "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by s.id limit 1").fetchone()[0]
+    uid = _as_coord(conn, "select public.create_user('note.holder', 'temp-pass-123', 'gaf_commander', %s)", sid)[0][0]
+    try:
+        _slot_note_checks(conn, cycle, sid, uid)
+    finally:
+        _as_coord(conn, "select public.delete_user(%s)", uid)
+
+
+def _slot_note_checks(conn, cycle, sid, uid):
+    with session_as(conn, COORD) as c:
+        c.execute("reset role")
+        tid = c.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        slot = c.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '20 days', now() + interval '21 days') returning id", (cycle, tid)).fetchone()[0]
+        c.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) "
+                  "select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s", (slot, sid))
+        c.execute("update cycles set status = 'draft' where id = %s", (cycle,))
+        before = c.execute("select count(*) from notifications where type = 'duty_note'").fetchone()[0]
+        c.execute("set local role authenticated")
+
+        def note(v):
+            with c.transaction():
+                c.execute("select public.set_slot_note(%s, %s)", (slot, v))
+
+        # before publishing: saved, nobody told
+        note("  להגיע עם נשק אישי \r\n וכובע  ")
+        c.execute("reset role")
+        assert c.execute("select instructions from slots where id = %s", (slot,)).fetchone()[0] == "להגיע עם נשק אישי \n וכובע"
+        assert c.execute("select count(*) from notifications where type = 'duty_note'").fetchone()[0] == before
+        c.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        c.execute("set local role authenticated")
+        # published: the holder is told; the same text again tells nobody
+        note("להגיע עם נשק אישי")
+        note("להגיע עם נשק אישי")
+        with pytest.raises(psycopg.Error, match="300"):
+            note("א" * 301)
+        c.execute("reset role")
+        told = c.execute("select payload->>'title', payload->>'body' from notifications where type = 'duty_note' order by created_at").fetchall()
+        assert len(told) == before + 1
+        assert told[-1][0] == "עודכנה הערה למשימה" and told[-1][1].endswith("להגיע עם נשק אישי")
+        # the day-before reminder ends with it, cut short
+        assert c.execute("select app.short_note(%s)", ("ב" * 80,)).fetchone()[0] == "ב" * 59 + "…"
+    # not for someone who is not staff
+    any_slot = conn.execute("select id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+    with session_as(conn, uid) as c:
+        with pytest.raises(psycopg.Error):
+            c.execute("select public.set_slot_note(%s, 'x')", (any_slot,))

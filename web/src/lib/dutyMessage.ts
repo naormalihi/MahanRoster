@@ -14,6 +14,8 @@ export interface MessageDuty {
   ends_at: string;
   /** "התייצבות יום ב׳ 24.11 07:30, שער ראשי. איש קשר: …" or null */
   brief: string | null;
+  /** the duty's own note */
+  note?: string | null;
 }
 
 export interface DutyMessage {
@@ -49,6 +51,7 @@ export function dutyMessageText(m: DutyMessage, origin: string): string {
     if (many) lines.push("");
     lines.push(dutyLine(d));
     if (d.brief) lines.push(d.brief);
+    if (d.note) lines.push(`הערה: ${d.note.replace(/\s*\n\s*/g, " · ")}`);
   }
   lines.push("");
   if (m.code) lines.push(`אפשר לראות את המשימות שלך ולקבל תזכורות בתורנצ׳יק (הקוד שלך כבר ממולא): ${joinLink(origin, m.code)}`);

@@ -52,7 +52,8 @@ export function groupByDay(rows: BoardRow[]): [string, BoardRow[]][] {
 }
 
 /** Does the row involve someone whose name contains q (performer or reserve)? */
-export const mentions = (r: BoardRow, q: string) => !q || r.performers.some((n) => n.includes(q)) || r.reserves.some((n) => n.includes(q));
+export const mentions = (r: BoardRow, q: string) =>
+  !q || r.performers.some((n) => n.includes(q)) || r.reserves.some((n) => n.includes(q)) || !!r.instructions?.includes(q);
 
 // ---------------------------------------------------------------------------
 // Calendar views
@@ -158,7 +159,7 @@ export function dutiesIcs(rows: BoardRow[], name: string, now = new Date()): { i
         : r.briefing_by_call
           ? "תדריך: לפי הזימון"
           : "",
-      r.instructions ?? "",
+      r.instructions ? `הערה: ${r.instructions}` : "",
     ].filter(Boolean);
     lines.push(
       "BEGIN:VEVENT",

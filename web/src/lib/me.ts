@@ -37,6 +37,8 @@ export interface MyDuty {
   contact_name?: string | null;
   contact_phone?: string | null;
   briefing_note?: string | null;
+  /** the duty's own note (third column of the duties file, or written by hand) */
+  note?: string | null;
   /** when he pressed "ראיתי" (or אחראי השיבוצים marked a phone call); null: still waiting */
   acked_at?: string | null;
 }

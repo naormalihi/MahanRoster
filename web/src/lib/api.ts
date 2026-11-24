@@ -120,7 +120,7 @@ export interface SlotPerson {
   is_surprise?: boolean; // put on it less than the notice hours before it starts (הקפצה)
 }
 export interface SlotPeople {
-  slot: { id: string; cycle_id: string; starts_at: string; ends_at: string; task_name: string; published: boolean; fixed_points?: number | null; special_name?: string | null };
+  slot: { id: string; cycle_id: string; starts_at: string; ends_at: string; task_name: string; published: boolean; fixed_points?: number | null; special_name?: string | null; note?: string | null };
   people: SlotPerson[];
 }
 
@@ -301,6 +301,8 @@ export interface Api {
   requestSchedule(cycleId: string, kind?: "full" | "stability" | "update"): Promise<string>;
   /** A duty added by hand to a cycle (after publishing: then filled by a stability run). */
   addSlot(cycleId: string, slot: NewSlot): Promise<void>;
+  /** The duty's note (≤ 300); on a published board its holders are told. Staff. */
+  setSlotNote(slotId: string, note: string | null): Promise<void>;
   /** Renames a special call-up or changes its points (before it starts); re-scores who is on it. */
   updateSpecialSlot(slotId: string, name: string, points: number): Promise<void>;
   /** Approve the engine's draft for duties added after publishing; the cycle stays published. */

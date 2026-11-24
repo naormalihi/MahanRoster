@@ -21,6 +21,9 @@ import {
 import { useEffect, useState } from "react";
 import { isStaff, type SlotPeople, type SlotPerson } from "../lib/api";
 import { DutyWhatsAppButton } from "./DutyWhatsApp";
+import EditNoteIcon from "@mui/icons-material/EditNoteOutlined";
+import { DutyNote } from "./DutyNote";
+import { NOTE_MAX } from "../lib/baseSchedule";
 import { useAuth } from "../lib/auth";
 import { dayLabel, timeLabel } from "../lib/dates";
 
@@ -117,6 +120,66 @@ export function ActivateDialog(props: {
  * reserve, and undoing an activation while the duty has not started. Opened from the published
  * board and from the operations screen.
  */
+/** The duty's note: read, and for staff – written by hand (≤ 300). On a published board, its holders are told. */
+function NoteEditor({ slot, canEdit, onSaved }: { slot: SlotPeople["slot"]; canEdit: boolean; onSaved: () => void }) {
+  const { api } = useAuth();
+  const [text, setText] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (text === null)
+    return (
+      <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {slot.note ? <DutyNote note={slot.note} size={14} /> : canEdit ? null : <Typography variant="body2" color="text.secondary">אין הערה</Typography>}
+        </Box>
+        {canEdit && (
+          <Button size="small" startIcon={<EditNoteIcon />} onClick={() => setText(slot.note ?? "")} sx={{ whiteSpace: "nowrap" }}>
+            {slot.note ? "עריכת הערה" : "הוספת הערה"}
+          </Button>
+        )}
+      </Stack>
+    );
+  return (
+    <Stack spacing={1}>
+      <TextField
+        size="small"
+        label="הערה למשימה"
+        value={text}
+        onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX))}
+        multiline
+        minRows={2}
+        autoFocus
+        helperText={`${text.length}/${NOTE_MAX} · גלוי לכל מי שרואה את הלוח${slot.published ? " · מי שמשובץ יקבל התראה" : ""}`}
+      />
+      {error && <Alert severity="error">{error}</Alert>}
+      <Stack direction="row" spacing={1}>
+        <Button
+          size="small"
+          variant="contained"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await api!.setSlotNote(slot.id, text.trim() || null);
+              setText(null);
+              onSaved();
+            } catch (e) {
+              setError((e as Error).message);
+            }
+            setBusy(false);
+          }}
+        >
+          שמירה
+        </Button>
+        <Button size="small" onClick={() => setText(null)}>
+          ביטול
+        </Button>
+      </Stack>
+    </Stack>
+  );
+}
+
 export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: string; onClose: () => void; onChanged: () => void }) {
   const { api, me } = useAuth();
   const staff = isStaff(me);
@@ -183,6 +246,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
               <Typography variant="body2" color="text.secondary">
                 {when}
               </Typography>
+              <NoteEditor key={`${data.slot.id}-${version}`} slot={data.slot} canEdit={staff && !ended} onSaved={changed} />
               {data.slot.fixed_points != null && (
                 <Box>
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
