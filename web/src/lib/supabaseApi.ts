@@ -993,6 +993,21 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("reactivate_soldier", { p_soldier: soldierId, p_join: joinDate }));
   }
 
+  async removeFromUnitMany(soldierIds: string[], fromDay: string) {
+    return check(await this.sb.rpc("remove_from_unit_many", { p_soldiers: soldierIds, p_from: fromDay })) as {
+      removed: number;
+      duties_dropped: number;
+    };
+  }
+
+  async deleteSoldiers(soldierIds: string[]) {
+    return check(await this.sb.rpc("delete_soldiers", { p_soldiers: soldierIds })) as {
+      deleted: number;
+      accounts: number;
+      blocked: { id: string; name: string }[];
+    };
+  }
+
   async removeFromUnit(soldierId: string, fromDay: string): Promise<number> {
     return check(await this.sb.rpc("remove_from_unit", { p_soldier: soldierId, p_from: fromDay })) as number;
   }

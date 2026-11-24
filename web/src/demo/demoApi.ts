@@ -1324,6 +1324,25 @@ export class DemoApi implements Api {
     return 0;
   }
 
+  async removeFromUnitMany(soldierIds: string[], _fromDay: string) {
+    await delay();
+    let removed = 0;
+    for (const s of this.soldierList) {
+      if (soldierIds.includes(s.id) && s.is_active) {
+        s.is_active = false;
+        removed++;
+      }
+    }
+    return { removed, duties_dropped: 0 };
+  }
+
+  async deleteSoldiers(soldierIds: string[]) {
+    await delay();
+    const before = this.soldierList.length;
+    this.soldierList = this.soldierList.filter((s) => !soldierIds.includes(s.id));
+    return { deleted: before - this.soldierList.length, accounts: 0, blocked: [] };
+  }
+
   async futureDuties(_soldierId: string, _fromDay: string) {
     await delay();
     return 2;
