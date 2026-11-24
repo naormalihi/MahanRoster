@@ -3311,4 +3311,8 @@ def test_score_correction_counts_now_and_later_and_undoes(conn):
             call("select public.add_score_correction(%s, %s, 0, 'x')", sid, cycle)
         call("select public.delete_score_correction(%s)", rid)
         assert base() == b0
+        # no cap of its own: a high opening score
+        big = call("select public.add_score_correction(%s, %s, 250, 'ניקוד התחלתי')", sid, cycle)[0][0]
+        assert base() == b0 + 250
+        call("select public.delete_score_correction(%s)", big)
         assert call("select count(*) from public.score_corrections(%s)", sid)[0][0] == 0
