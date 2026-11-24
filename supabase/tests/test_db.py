@@ -3283,3 +3283,32 @@ def test_bulk_remove_and_delete_employees(conn):
         _claims(c, COORD)
         r = c.execute("select public.remove_from_unit_many(%s::uuid[], current_date)", ([k[0] for k in keep] * 2,)).fetchone()[0]
         assert r["removed"] == 2
+def test_score_correction_counts_now_and_later_and_undoes(conn):
+    cycle = conn.cycle_id
+    sid = conn.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s limit 1", (cycle,)).fetchone()
+    with session_as(conn, COORD) as c:
+        if sid is None:
+            c.execute("select public.snapshot_cycle(%s)", (cycle,))
+            sid = c.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s limit 1", (cycle,)).fetchone()
+        sid = sid[0]
+        base = lambda: c.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s", (cycle, sid)).fetchone()[0]
+
+        def call(sql, *a):
+            with c.transaction():
+                return c.execute(sql, a).fetchall()
+
+        b0 = base()
+        rid = call("select public.add_score_correction(%s, %s, 2.5, 'משימה שבוצעה מחוץ למערכת')", sid, cycle)[0][0]
+        assert base() == b0 + Decimal("2.5")
+        rows = call("select points, reason, cycle_id from public.score_corrections(%s)", sid)
+        assert rows[0] == (Decimal("2.50"), "משימה שבוצעה מחוץ למערכת", cycle)
+        # a rebuilt snapshot keeps it
+        call("select public.snapshot_cycle(%s)", cycle)
+        assert base() == b0 + Decimal("2.5")
+        with pytest.raises(psycopg.Error, match="סיבה"):
+            call("select public.add_score_correction(%s, %s, 1, ' ')", sid, cycle)
+        with pytest.raises(psycopg.Error, match="0"):
+            call("select public.add_score_correction(%s, %s, 0, 'x')", sid, cycle)
+        call("select public.delete_score_correction(%s)", rid)
+        assert base() == b0
+        assert call("select count(*) from public.score_corrections(%s)", sid)[0][0] == 0

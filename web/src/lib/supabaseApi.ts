@@ -12,7 +12,7 @@ import type { AppNotification } from "./notifications";
 import type { UnitDashboard } from "./dashboard";
 import type { InputOptions, MyDuty, MyRequests, MyScore, SoldierAccount, UnackedDuty } from "./me";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople, SpecDocument } from "./api";
+import type { Api, ApplyResult, BoardRow, HolidayDuty, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, ScoreCorrection, SlotPeople, SpecDocument } from "./api";
 import { usernameToEmail } from "./api";
 import { SCORING_KEYS, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "./catalog";
 import {
@@ -400,6 +400,19 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("soldier_load_roles").delete().eq("soldier_id", soldierId));
     if (roles.length)
       maybe(await this.sb.from("soldier_load_roles").insert(roles.map((r) => ({ ...r, soldier_id: soldierId }))));
+  }
+
+  async scoreCorrections(soldierId?: string) {
+    const rows = (check(await this.sb.rpc("score_corrections", { p_soldier: soldierId ?? null })) ?? []) as ScoreCorrection[];
+    return rows.map((r) => ({ ...r, points: Number(r.points) }));
+  }
+
+  async addScoreCorrection(soldierId: string, cycleId: string, points: number, reason: string) {
+    run(await this.sb.rpc("add_score_correction", { p_soldier: soldierId, p_cycle: cycleId, p_points: points, p_reason: reason }));
+  }
+
+  async deleteScoreCorrection(id: string) {
+    run(await this.sb.rpc("delete_score_correction", { p_id: id }));
   }
 
   async myCommandedGafs() {

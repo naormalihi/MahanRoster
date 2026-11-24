@@ -124,6 +124,18 @@ export interface SlotPeople {
   people: SlotPerson[];
 }
 
+/** A score corrected by hand (staff), counted from the cycle it was given for. */
+export interface ScoreCorrection {
+  id: string;
+  soldier_id: string;
+  cycle_id: string | null;
+  cycle_name: string | null;
+  points: number;
+  reason: string;
+  created_by_name: string | null;
+  created_at: string;
+}
+
 export interface NamedRef {
   id: string;
   name: string;
@@ -224,6 +236,10 @@ export interface Api {
   setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
   /** The frameworks whose employees a gaf commander updates (phone, range, relief roles, join codes). */
   myCommandedGafs(): Promise<string[]>;
+  /** Hand corrections of the score (staff): all, or one employee's. */
+  scoreCorrections(soldierId?: string): Promise<ScoreCorrection[]>;
+  addScoreCorrection(soldierId: string, cycleId: string, points: number, reason: string): Promise<void>;
+  deleteScoreCorrection(id: string): Promise<void>;
   /** Phone and/or range date – staff, or a gaf commander for his own people. A field left out stays. */
   updateSoldiersAdmin(ids: string[], patch: { phone?: string | null; range_valid_until?: string | null }): Promise<void>;
   /** Relief roles – staff, or a gaf commander for his own people (אחראי השיבוצים is told). */

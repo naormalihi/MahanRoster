@@ -16,7 +16,7 @@ import type { AddSoldierResult, AddSoldierRow } from "../lib/addSoldier";
 import type { DutyMessage } from "../lib/dutyMessage";
 import type { MyDuty, UnackedDuty } from "../lib/me";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
-import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, SlotPeople, SlotPerson, SpecDocument } from "../lib/api";
+import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, ScoreCorrection, SlotPeople, SlotPerson, SpecDocument } from "../lib/api";
 import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
   absenceSpan,
@@ -499,6 +499,29 @@ export class DemoApi implements Api {
       const lr = LOAD_ROLES.find((x) => x.id === r.load_role_id)!;
       return { ...r, name: lr.name, factor: lr.factor };
     });
+  }
+
+  private corrections: ScoreCorrection[] = [];
+  async scoreCorrections(soldierId?: string) {
+    await delay();
+    return this.corrections.filter((c) => !soldierId || c.soldier_id === soldierId);
+  }
+
+  async addScoreCorrection(soldierId: string, cycleId: string, points: number, reason: string) {
+    await delay();
+    if (!points) throw new Error("תיקון של 0 לא משנה כלום");
+    if (Math.abs(points) > 100) throw new Error("תיקון – עד 100 נקודות");
+    if (!reason.trim()) throw new Error("כתוב סיבה לתיקון");
+    const c = this.cycleList.find((x) => x.id === cycleId);
+    this.corrections.unshift({
+      id: this.nextId("sc"), soldier_id: soldierId, cycle_id: cycleId, cycle_name: c?.name ?? null, points: Math.round(points * 100) / 100,
+      reason: reason.trim(), created_by_name: "אחראי שיבוצים לדוגמה", created_at: new Date().toISOString(),
+    });
+  }
+
+  async deleteScoreCorrection(id: string) {
+    await delay();
+    this.corrections = this.corrections.filter((c) => c.id !== id);
   }
 
   async myCommandedGafs() {
