@@ -1401,15 +1401,24 @@ def test_cycle_stage_follows_the_data(conn):
 
 
 def test_new_soldier_opens_at_group_average(conn):
+    # new = by his join date (תאריך קליטה), never by when he was loaded
     cycle = conn.cycle_id
     with conn.transaction():
-        conn.execute("insert into roster_imports (kind, status, created_at) values ('roster', 'applied', now() - interval '30 days')")
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
         peer = conn.execute(
             "select s.id, s.service_type, s.gaf_id, s.computed_rank_id from soldiers s where s.is_active and s.is_shachar = false "
             "and s.release_date is null order by s.full_name limit 1").fetchone()
         new = conn.execute(
+            """insert into soldiers (soldier_key, full_name, service_type, gaf_id, computed_rank_id, unit_join_date)
+               values (repeat('a', 64), 'עובד חדש', %s, %s, %s, %s) returning id""", (*peer[1:], start - timedelta(days=10))).fetchone()[0]
+        # loaded now, joined two years ago: not new
+        old = conn.execute(
+            """insert into soldiers (soldier_key, full_name, service_type, gaf_id, computed_rank_id, unit_join_date)
+               values (repeat('b', 64), 'עובד ותיק', %s, %s, %s, %s) returning id""", (*peer[1:], start - timedelta(days=730))).fetchone()[0]
+        # loaded now, no join date: not new either – and none is guessed for him
+        nodate = conn.execute(
             """insert into soldiers (soldier_key, full_name, service_type, gaf_id, computed_rank_id)
-               values (repeat('a', 64), 'חייל חדש', %s, %s, %s) returning id""", peer[1:]).fetchone()[0]
+               values (repeat('c', 64), 'עובד בלי תאריך', %s, %s, %s) returning id""", peer[1:]).fetchone()[0]
         conn.execute("select public.snapshot_cycle(%s)", (cycle,))
         group = conn.execute("select fairness_group from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
                              (cycle, new)).fetchone()[0]
@@ -1421,16 +1430,14 @@ def test_new_soldier_opens_at_group_average(conn):
         base = conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
                             (cycle, new)).fetchone()[0]
         assert base == opening
-        # a second snapshot keeps the same opening, and old soldiers get none
+        for sid in (old, nodate):
+            assert conn.execute("select opening_score_at from soldiers where id = %s", (sid,)).fetchone()[0] is None
+        assert conn.execute("select unit_join_date from soldiers where id = %s", (nodate,)).fetchone()[0] is None
+        # a second snapshot keeps the same opening, dated at the cycle's start
         conn.execute("select public.snapshot_cycle(%s)", (cycle,))
         assert conn.execute("select opening_score from soldiers where id = %s", (new,)).fetchone()[0] == opening
-        assert conn.execute("select count(*) from soldiers where opening_score_at > now() - interval '2 hours' and id <> %s",
-                            (new,)).fetchone()[0] == 0
-        # dated at the cycle's start (inside its window), and he joins the unit with the cycle
-        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
-        at, joined = conn.execute("select (opening_score_at at time zone 'Asia/Jerusalem')::date, unit_join_date from soldiers where id = %s",
-                                  (new,)).fetchone()
-        assert at == start and joined == max(start, date.today())
+        at = conn.execute("select (opening_score_at at time zone 'Asia/Jerusalem')::date from soldiers where id = %s", (new,)).fetchone()[0]
+        assert at == start
         raise psycopg.Rollback()
 
 

@@ -215,6 +215,7 @@ export class DemoApi implements Api {
         enlistment_date: "2025-03-01",
         release_date: career ? null : "2027-09-01",
         career_start_date: career ? "2022-08-01" : null,
+        unit_join_date: i === 5 ? "2026-12-15" : null, // one newcomer, to show
         range_valid_until: "2027-06-30",
         parent_status: false,
         home_nightly: i === 8 || i === 21,
@@ -1323,10 +1324,10 @@ export class DemoApi implements Api {
     this.soldierList.push({
       id, soldier_key: row.soldier_key, full_name: row.full_name, service_type: row.service_type as "mandatory" | "career",
       gender: (row.gender as "male" | "female" | null) ?? null, gaf_name: gaf, rank_name: rank, enlistment_date: row.enlistment_date,
-      release_date: row.release_date, career_start_date: row.career_start_date, range_valid_until: row.range_valid_until,
+      release_date: row.release_date, career_start_date: row.career_start_date, unit_join_date: row.unit_join_date ?? null, range_valid_until: row.range_valid_until,
       parent_status: row.parent_status, home_nightly: row.home_nightly, phone: row.phone, is_active: true,
     });
-    Object.assign(this.extraOf(id), { unit_join_date: row.unit_join_date, is_shachar: row.is_shachar, second_role_signed_at: row.second_role_signed_at, tash_level: row.tash_level });
+    Object.assign(this.extraOf(id), { is_shachar: row.is_shachar, second_role_signed_at: row.second_role_signed_at, tash_level: row.tash_level });
     return { status: "added", id };
   }
 
@@ -1335,7 +1336,7 @@ export class DemoApi implements Api {
     const s = this.soldierList.find((x) => x.id === soldierId);
     if (!s || s.is_active) throw new Error("העובד לא נמצא או שהוא כבר פעיל");
     s.is_active = true;
-    this.extraOf(soldierId).unit_join_date = joinDate;
+    s.unit_join_date = joinDate;
   }
 
   async removeFromUnit(soldierId: string, _fromDay: string) {

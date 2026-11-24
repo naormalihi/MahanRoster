@@ -14,6 +14,7 @@ export type FieldKey =
   | "lastName"
   | "serviceType"
   | "careerStartDate"
+  | "unitJoinDate"
   | "gaf"
   | "framework"
   | "rank"
@@ -31,6 +32,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
   { key: "firstName", label: "שם פרטי", required: false, synonyms: ["שם פרטי"] },
   { key: "lastName", label: "שם משפחה", required: false, synonyms: ["שם משפחה"] },
   { key: "serviceType", label: "סוג שירות", required: false, synonyms: ["סוג שירות", "שירות", "מעמד"] },
+  { key: "unitJoinDate", label: "תאריך קליטה", required: false, synonyms: ["תאריך קליטה", "קליטה", "תאריך קליטה ליחידה", "תאריך כניסה ליחידה", "תאריך הצטרפות"] },
   { key: "careerStartDate", label: "תאריך כניסה לקבע", required: false, synonyms: ["תאריך כניסה לקבע", "כניסה לקבע", "תאריך תחילת קבע", "תחילת קבע"] },
   { key: "gaf", label: "מסגרת", required: false, synonyms: ["גף", "מחלקה", "ענף"] },
   { key: "framework", label: "נתיב מסגרת", required: false, synonyms: ["מסגרת", "שיוך ארגוני"] },
@@ -107,6 +109,8 @@ export interface RosterRow {
   enlistmentDate: string | null;
   releaseDate: string | null;
   careerStartDate: string | null;
+  /** תאריך קליטה: decides who is new in the unit (grace, opening score); null: none in the file */
+  unitJoinDate: string | null;
   rangeValidUntil: string | null;
   parent: boolean;
   /** ת"ש 7; null when the file has no such column (the stored value is kept) */
@@ -227,6 +231,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
       releaseDate: toIsoDate(get("releaseDate")),
       rangeValidUntil: toIsoDate(get("rangeValidUntil")),
       careerStartDate: careerStart,
+      unitJoinDate: toIsoDate(get("unitJoinDate")),
     };
     const problems: string[] = [];
     if (!name) problems.push("שם חסר");
@@ -251,6 +256,7 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
       enlistmentDate: dates.enlistmentDate,
       releaseDate: dates.releaseDate,
       careerStartDate: dates.careerStartDate,
+      unitJoinDate: dates.unitJoinDate,
       rangeValidUntil: dates.rangeValidUntil,
       parent: truthy(get("parent")),
       phone: phone as string | null, // "invalid" stopped the row above
@@ -274,6 +280,7 @@ export interface SoldierRecord {
   enlistment_date: string | null;
   release_date: string | null;
   career_start_date: string | null;
+  unit_join_date: string | null;
   range_valid_until: string | null;
   parent_status: boolean;
   home_nightly: boolean | null;
@@ -295,6 +302,7 @@ export const RECORD_LABELS: Record<keyof SoldierRecord, string> = {
   enlistment_date: "תאריך גיוס",
   release_date: "תאריך שחרור",
   career_start_date: "כניסה לקבע",
+  unit_join_date: "תאריך קליטה",
   range_valid_until: "תוקף מטווח",
   parent_status: "משרת הורה",
   home_nightly: "ת\"ש 7",
@@ -323,6 +331,7 @@ export function toRecord(row: RosterRow, key: string): SoldierRecord {
     enlistment_date: row.enlistmentDate,
     release_date: row.releaseDate,
     career_start_date: row.careerStartDate,
+    unit_join_date: row.unitJoinDate,
     range_valid_until: row.rangeValidUntil,
     parent_status: row.parent,
     home_nightly: row.homeNightly,

@@ -195,7 +195,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
                 </MenuItem>
               ))}
             </TextField>
-            {field("joinDate", "תאריך כניסה ליחידה *", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
+            {field("joinDate", "תאריך קליטה *", { type: "date", slotProps: { inputLabel: { shrink: true } }, disabled: !keyOk })}
           </Box>
           <Stack direction="row" sx={{ flexWrap: "wrap" }}>
             <FormControlLabel control={<Checkbox checked={f.parent} onChange={(e) => set("parent")(e.target.checked)} disabled={!keyOk} />} label="משרת הורה" />
@@ -204,7 +204,7 @@ export function AddSoldierDialog({ onClose, onAdded }: { onClose: () => void; on
             )}
           </Stack>
           <Alert severity="info" icon={false}>
-            <b>עובד חדש ביחידה:</b> נכנס עם הניקוד הממוצע של הקבוצה שלו. המנוע לא ישבץ אותו אוטומטית עד {graceEnd || "תום תקופת החסד"} ({grace} יום מהכניסה).
+            <b>עובד חדש ביחידה:</b> נכנס עם הניקוד הממוצע של הקבוצה שלו. המנוע לא ישבץ אותו אוטומטית עד {graceEnd || "תום תקופת החסד"} ({grace} יום מתאריך הקליטה).
             אפשר לשבץ אותו ידנית גם קודם – אז זה נחשב הקפצה, כפיצוי.
           </Alert>
           {found && (

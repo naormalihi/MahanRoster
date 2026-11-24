@@ -190,7 +190,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("soldiers")
         .select(
-          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, range_valid_until, parent_status, home_nightly, phone, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
+          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, unit_join_date, range_valid_until, parent_status, home_nightly, phone, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
         ),
     ) as unknown as (Omit<ExistingSoldier, "gaf_name" | "rank_name"> & { gaf: { name: string }; rank: { name: string } | null })[];
     const full = rows.map(({ gaf, rank, ...s }) => ({ ...s, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
@@ -310,6 +310,7 @@ export class SupabaseApi implements Api {
       enlistment_date: r.enlistment_date,
       release_date: r.release_date,
       career_start_date: r.career_start_date,
+      unit_join_date: r.unit_join_date,
       range_valid_until: r.range_valid_until,
       parent_status: r.parent_status,
       home_nightly: r.home_nightly ?? undefined, // no column in the file: keep / default

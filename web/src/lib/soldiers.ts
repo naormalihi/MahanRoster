@@ -63,6 +63,7 @@ export type SoldierPatch = Partial<
     | "home_nightly_override_until"
     | "tash_level"
     | "phone"
+    | "unit_join_date"
     | "is_active"
   >
 >;

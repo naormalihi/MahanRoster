@@ -101,7 +101,7 @@ describe("phone column", () => {
 describe("plan", () => {
   const rec = (key: string, extra = {}) => ({
     ...toRecord({ line: 2, idNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,
-      enlistmentDate: null, releaseDate: null, careerStartDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null, phone: null }, key),
+      enlistmentDate: null, releaseDate: null, careerStartDate: null, unitJoinDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null, phone: null }, key),
     ...extra,
   });
   const existing = (key: string, extra = {}): ExistingSoldier => ({ ...rec(key), id: "id-" + key, is_active: true, gender: "male", ...extra });
@@ -201,5 +201,26 @@ describe("rank names", () => {
     expect(resolve(" חובה 4 ")).toBe("חובה 4");
     expect(resolve('קמ"א')).toBe("אקדמאי 1");
     expect(resolve("אל\"ם")).toBeNull();
+  });
+});
+
+describe("תאריך קליטה", () => {
+  it("is read from the file and is a change like any other", () => {
+    const m = detectMapping(["מספר עובד", "שם מלא", "דרגה", "סוג שירות", "גף", "תאריך קליטה"]);
+    expect(m.unitJoinDate).toBe("תאריך קליטה");
+    const { rows, errors } = parseRows(
+      [
+        { "מספר עובד": "11", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה", "גף": "ענן", "תאריך קליטה": "15/12/2026" },
+        { "מספר עובד": "12", "שם מלא": "ג ד", "דרגה": "סמל", "סוג שירות": "חובה", "גף": "ענן", "תאריך קליטה": "" },
+      ],
+      m,
+    );
+    expect(errors).toEqual([]);
+    expect(rows.map((r) => r.unitJoinDate)).toEqual(["2026-12-15", null]);
+    // an empty cell keeps the stored date
+    const recs = rows.map((r, i) => toRecord(r, `k${i}`));
+    const plan = planImport(recs, [{ ...recs[1], unit_join_date: "2026-01-01", id: "x", is_active: true }], ["ענן"], ["סמל"]);
+    expect(plan.updated).toEqual([]);
+    expect(detectMapping(["תאריך כניסה ליחידה"]).unitJoinDate).toBe("תאריך כניסה ליחידה");
   });
 });
