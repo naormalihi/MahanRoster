@@ -43,6 +43,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { addDaysIso } from "../lib/cycles";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import type { NamedRef, ScoreCorrection } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -274,6 +275,7 @@ function EditDialog(props: {
     home_nightly_override_until: s.home_nightly_override_until,
     tash_level: s.tash_level,
     phone: s.phone ?? null,
+    unit_join_date: s.unit_join_date ?? null,
     is_active: s.is_active,
   });
   const [phoneText, setPhoneText] = useState(formatPhone(s.phone));
@@ -381,6 +383,18 @@ function EditDialog(props: {
           <Divider />
           {full && (
           <>
+          <Box>
+            <Typography variant="h3" gutterBottom>
+              תאריך קליטה
+            </Typography>
+            <DateField
+              label="תאריך קליטה"
+              value={p.unit_join_date}
+              onChange={(v) => set("unit_join_date", v)}
+              helperText="עובד חדש: לא משובץ אוטומטית בתקופת החסד מתאריך הקליטה, ונכנס עם הניקוד הממוצע של הקבוצה שלו. ריק = לא חדש"
+            />
+          </Box>
+          <Divider />
           <Box>
             <Typography variant="h3" gutterBottom>
               דרגת מינוי
@@ -722,6 +736,17 @@ export function SoldiersPage() {
   const [gaf, setGaf] = useState("");
   const [service, setService] = useState("");
   const [range, setRange] = useState("");
+  // תאריך קליטה: new in the unit while the grace period runs
+  const [graceDays, setGraceDays] = useState(90);
+  const [onlyNew, setOnlyNew] = useState(false);
+  useEffect(() => {
+    api?.scoringSettings().then((x) => setGraceDays(x.grace_days), () => undefined);
+  }, [api]);
+  const newUntil = (s: SoldierDetail) => {
+    if (!s.unit_join_date || !graceDays) return null;
+    const last = addDaysIso(s.unit_join_date, graceDays - 1);
+    return last >= todayIso() ? last : null;
+  };
   const [rank, setRank] = useState("");
   const [relief, setRelief] = useState(""); // "" all · "any" · "none" · a load role id
   // exemptions from today on (approved and pending), shown like the relief roles
@@ -919,6 +944,7 @@ export function SoldiersPage() {
           : relief === "none"
             ? activeLoadRoles(s).length === 0
             : activeLoadRoles(s).some((r) => r.load_role_id === relief))) &&
+      (!onlyNew || newUntil(s) !== null) &&
       (!range ||
         (range === "issues"
           ? ["expired", "expiring"].includes(rangeState(s.range_valid_until))
@@ -942,6 +968,7 @@ export function SoldiersPage() {
     { label: "מסגרת", key: "gaf", by: (s) => s.gaf_name },
     { label: "שירות", key: "service", by: (s) => effectiveService(s) },
     { label: "תום שירות", key: "release", by: (s) => s.release_date ?? "9999" },
+    { label: "תאריך קליטה", key: "join", by: (s) => s.unit_join_date ?? "" },
     {
       label: "ת״ש",
       key: "tash",
@@ -1023,8 +1050,10 @@ export function SoldiersPage() {
       rangeIssues: active.filter((s) =>
         ["expired", "expiring"].includes(rangeState(s.range_valid_until)),
       ).length,
+      newcomers: active.filter((s) => newUntil(s) !== null).length,
     };
-  }, [rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, graceDays]);
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -1107,6 +1136,14 @@ export function SoldiersPage() {
               variant={range === "issues" ? "filled" : "outlined"}
               label={`מטווח פג או עומד לפוג: ${counts.rangeIssues}`}
               onClick={() => setRange(range === "issues" ? "" : "issues")}
+            />
+          )}
+          {counts.newcomers > 0 && (
+            <Chip
+              color="info"
+              variant={onlyNew ? "filled" : "outlined"}
+              label={`חדשים ביחידה: ${counts.newcomers}`}
+              onClick={() => setOnlyNew(!onlyNew)}
             />
           )}
         </Stack>
@@ -1426,6 +1463,7 @@ export function SoldiersPage() {
                     <>
                       {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : s.tash_level ? <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} /> : null}
                       {a && a.tone !== "default" && <Chip size="small" variant="outlined" color={a.tone} label={a.text} />}
+                      {newUntil(s) && <Chip size="small" variant="outlined" color="info" label={`חדש עד ${fmt(newUntil(s))}`} />}
                     </>
                   }
                   sub={
@@ -1433,6 +1471,7 @@ export function SoldiersPage() {
                       {s.rank_name}
                       {appointed ? ` (מינוי ${rankName.get(s.appointment_rank_id!)})` : ""} · {s.gaf_name} · {SERVICE[effectiveService(s)]}
                       {s.release_date ? ` · תום שירות ${fmt(s.release_date)}` : ""}
+                      {s.unit_join_date ? ` · נקלט ${fmt(s.unit_join_date)}` : ""}
                     </>
                   }
                   lines={[
@@ -1610,6 +1649,12 @@ export function SoldiersPage() {
                         }}
                       >
                         {fmt(s.release_date)}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {fmt(s.unit_join_date ?? null)}
+                        {newUntil(s) && (
+                          <Chip size="small" color="info" variant="outlined" label={`חדש עד ${fmt(newUntil(s))}`} sx={{ ml: 0.5 }} />
+                        )}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {tashBy(s) ? (
