@@ -62,6 +62,42 @@ describe("ת\"ש 7 column", () => {
   });
 });
 
+describe("הת\"ש column holds its type", () => {
+  const base = { "ת.ז": "123456782", "שם מלא": "א ב", "דרגה": "סמל", "גף": "גף א", "סוג שירות": "חובה" };
+  const m = detectMapping([...Object.keys(base), "התש ימי לינה"]);
+  const one = (v: string) => parseRows([{ ...base, "התש ימי לינה": v }], m);
+
+  it("finds the column", () => expect(m.homeNightly).toBe("התש ימי לינה"));
+
+  it("3–6 is a הת\"ש type, not ת\"ש 7", () => {
+    for (const v of ["3", "4", "5", "6"]) {
+      const r = one(v).rows[0];
+      expect(r.tashLevel).toBe(Number(v));
+      expect(r.homeNightly).toBe(false);
+    }
+  });
+
+  it("7 is ת\"ש 7; empty or 0 is none; כן is 7, as files used to mark it", () => {
+    expect([one("7").rows[0].tashLevel, one("7").rows[0].homeNightly]).toEqual([7, true]);
+    expect([one("").rows[0].tashLevel, one("").rows[0].homeNightly]).toEqual([0, false]);
+    expect(one("0").rows[0].tashLevel).toBe(0);
+    expect(one("כן").rows[0].tashLevel).toBe(7);
+  });
+
+  it("an unknown type stops the row", () => {
+    expect(one("2").errors[0].message).toContain("סוג הת\"ש לא מוכר");
+    expect(one("9").rows).toHaveLength(0);
+  });
+
+  it("an existing soldier with no הת\"ש is not changed by an empty cell, but is by a type", () => {
+    const row = one("").rows[0];
+    const old = { ...toRecord(row, "k"), id: "s1", is_active: true, tash_level: 0 } as ExistingSoldier;
+    expect(planImport([toRecord(row, "k")], [old], ["גף א"], ["סמל"]).unchanged).toBe(1);
+    const p = planImport([toRecord(one("5").rows[0], "k")], [old], ["גף א"], ["סמל"]);
+    expect(p.updated[0].changes).toEqual(["tash_level"]);
+  });
+});
+
 describe("gaf column holding the framework path", () => {
   it("extracts the gaf", () => {
     const base = { "ת.ז": "123456782", "שם מלא": "א ב", "דרגה": "סמל", "סוג שירות": "חובה" };
@@ -101,7 +137,7 @@ describe("phone column", () => {
 describe("plan", () => {
   const rec = (key: string, extra = {}) => ({
     ...toRecord({ line: 2, idNumber: "1", fullName: "א ב", serviceType: "career", gaf: "גף א", rank: "סרן", gender: null,
-      enlistmentDate: null, releaseDate: null, careerStartDate: null, unitJoinDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null, phone: null }, key),
+      enlistmentDate: null, releaseDate: null, careerStartDate: null, unitJoinDate: null, rangeValidUntil: "2027-06-30", parent: false, homeNightly: null, tashLevel: null, phone: null }, key),
     ...extra,
   });
   const existing = (key: string, extra = {}): ExistingSoldier => ({ ...rec(key), id: "id-" + key, is_active: true, gender: "male", ...extra });

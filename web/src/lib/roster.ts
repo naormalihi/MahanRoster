@@ -43,7 +43,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
   { key: "rangeValidUntil", label: "תוקף מטווח", required: false, synonyms: ["תוקף מטווח", "מטווח"] },
   { key: "parent", label: "משרת הורה", required: false, synonyms: ["משרת הורה", "נמצא במשרת הורה", "הורה"] },
   { key: "phone", label: "טלפון נייד", required: false, synonyms: ["טלפון", "נייד", "טלפון נייד", "פלאפון", "מספר טלפון", "מס' טלפון", "מס טלפון", "סלולרי"] },
-  { key: "homeNightly", label: "ת\"ש 7 (לינה בבית)", required: false, synonyms: ["ת\"ש 7", "תש 7", "ת\"ש", "תש", "תנאי שירות", "לינה בבית"] },
+  { key: "homeNightly", label: "הת\"ש (סוג 3–7)", required: false, synonyms: ["הת\"ש ימי לינה", "ת\"ש ימי לינה", "ימי לינה", "הת\"ש", "סוג הת\"ש", "רמת הת\"ש", "ת\"ש 7", "תש 7", "ת\"ש", "תש", "תנאי שירות", "לינה בבית"] },
 ];
 
 export type Mapping = Partial<Record<FieldKey, string>>;
@@ -113,8 +113,10 @@ export interface RosterRow {
   unitJoinDate: string | null;
   rangeValidUntil: string | null;
   parent: boolean;
-  /** ת"ש 7; null when the file has no such column (the stored value is kept) */
+  /** ת"ש 7 (סוג 7); null when the file has no such column (the stored value is kept) */
   homeNightly: boolean | null;
+  /** סוג הת"ש 3–7, 0: none; null when the file has no such column */
+  tashLevel: number | null;
   /** 9725XXXXXXXX; null: no number in the file (the stored one stays) */
   phone: string | null;
 }
@@ -238,6 +240,8 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
     if (!svc) problems.push(`סוג שירות לא מוכר: "${get("serviceType") ?? ""}"`);
     if (!gafName) problems.push(m.gaf ? "מסגרת חסרה" : "לא נמצאה מסגרת בנתיב המסגרת");
     if (!rankName) problems.push("דרגה חסרה");
+    const tash = m.homeNightly ? tashLevel(get("homeNightly")) : null;
+    if (tash === "invalid") problems.push(`סוג הת"ש לא מוכר: "${get("homeNightly")}" (3–7)`);
     const phone = m.phone ? normalizePhone(get("phone")) : null;
     if (phone === "invalid") problems.push(`טלפון נייד לא תקין: "${get("phone")}"`);
     for (const [k, v] of Object.entries(dates)) if (v === "invalid") problems.push(`תאריך לא תקין (${FIELDS.find((f) => f.key === k)?.label})`);
@@ -260,10 +264,26 @@ export function parseRows(records: Record<string, unknown>[], m: Mapping, keep?:
       rangeValidUntil: dates.rangeValidUntil,
       parent: truthy(get("parent")),
       phone: phone as string | null, // "invalid" stopped the row above
-      homeNightly: m.homeNightly ? truthy(get("homeNightly")) || /(^|\D)7(\D|$)/.test(String(get("homeNightly") ?? "")) : null,
+      homeNightly: tash === null ? null : tash === 7,
+      tashLevel: tash as number | null, // "invalid" stopped the row above
     });
   });
   return { rows, errors, outside };
+}
+
+/**
+ * The הת"ש cell holds its type – how many nights a week at home (3–7). Empty, 0 or "לא": none.
+ * "כן" / V with no number: ת"ש 7, as files used to mark it.
+ */
+export function tashLevel(v: unknown): number | "invalid" {
+  const t = String(v ?? "").trim();
+  if (!t || t === "0" || /^(לא|no|false|-|—)$/i.test(t)) return 0;
+  const n = t.match(/\d+/);
+  if (n) {
+    const k = Number(n[0]);
+    return k >= 3 && k <= 7 ? k : "invalid";
+  }
+  return truthy(t) ? 7 : "invalid";
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +304,8 @@ export interface SoldierRecord {
   range_valid_until: string | null;
   parent_status: boolean;
   home_nightly: boolean | null;
+  /** סוג הת"ש 3–7, 0: none; null: not in the file (kept) */
+  tash_level: number | null;
   phone: string | null;
 }
 
@@ -306,6 +328,7 @@ export const RECORD_LABELS: Record<keyof SoldierRecord, string> = {
   range_valid_until: "תוקף מטווח",
   parent_status: "משרת הורה",
   home_nightly: "ת\"ש 7",
+  tash_level: "סוג הת\"ש",
   phone: "טלפון",
 };
 
@@ -335,6 +358,7 @@ export function toRecord(row: RosterRow, key: string): SoldierRecord {
     range_valid_until: row.rangeValidUntil,
     parent_status: row.parent,
     home_nightly: row.homeNightly,
+    tash_level: row.tashLevel,
     phone: row.phone,
   };
 }
@@ -358,7 +382,7 @@ export function planImport(
     }
     byKey.delete(rec.soldier_key);
     // A field the file leaves empty keeps its value (e.g. a manually entered range date).
-    const changes = fields.filter((f) => rec[f] !== null && rec[f] !== old[f]);
+    const changes = fields.filter((f) => rec[f] !== null && rec[f] !== (f === "tash_level" ? (old.tash_level ?? 0) : old[f]));
     if (changes.length || !old.is_active) plan.updated.push({ id: old.id, before: old, after: rec, changes });
     else plan.unchanged++;
   }

@@ -73,6 +73,8 @@ import { formatPhone } from "../lib/phone";
 
 const SERVICE_LABEL = { mandatory: "חובה", career: "קבע" } as const;
 
+const showTash = (v: number | null) => (v ? `הת"ש ${v}` : "ללא");
+
 function show(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   if (v === true) return "כן";
@@ -128,8 +130,8 @@ export function RosterImportPage() {
           key: changeKey(u.id, field),
           field,
           name: u.before.full_name,
-          before: show(u.before[field]),
-          after: show(u.after[field]),
+          before: field === "tash_level" ? showTash(u.before.tash_level) : show(u.before[field]),
+          after: field === "tash_level" ? showTash(u.after.tash_level) : show(u.after[field]),
         })),
       ),
     [plan],
