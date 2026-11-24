@@ -1,4 +1,5 @@
 import AddIcon from "@mui/icons-material/Add";
+import { BulkRemoveDialog } from "../components/BulkRemoveDialog";
 import CheckIcon from "@mui/icons-material/Check";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -640,6 +641,7 @@ export function SoldiersPage() {
     setParams((p) => (p.delete("edit"), p), { replace: true });
   }, [editParam, rows, setParams]);
   const [bulk, setBulk] = useState(false);
+  const [removing, setRemoving] = useState(false);
   // by today's date: the cycle today falls in (current) and the first one after it (next) –
   // points per soldier and who is in it
   type Ref = {
@@ -1139,6 +1141,11 @@ export function SoldiersPage() {
               <Button data-read variant="outlined" onClick={() => setInviting(true)}>
                 קודי הצטרפות
               </Button>
+              {staffUser && (
+                <Button data-read color="error" variant="outlined" onClick={() => setRemoving(true)}>
+                  מחיקת הנבחרים
+                </Button>
+              )}
               <Button data-read onClick={() => setSelected(new Set())}>
                 ניקוי בחירה
               </Button>
@@ -1164,6 +1171,11 @@ export function SoldiersPage() {
             <Button data-read size="small" variant="outlined" onClick={() => setInviting(true)} sx={{ whiteSpace: "nowrap" }}>
               קודי הצטרפות
             </Button>
+            {staffUser && (
+              <Button data-read size="small" color="error" variant="outlined" onClick={() => setRemoving(true)} sx={{ whiteSpace: "nowrap" }}>
+                מחיקה
+              </Button>
+            )}
             <Button data-read size="small" onClick={() => setSelected(new Set())}>
               ניקוי
             </Button>
@@ -1657,6 +1669,19 @@ export function SoldiersPage() {
           hasAccount={(id) => !!accounts.get(id)?.username}
           onClose={() => setInviting(false)}
           onDone={() => void loadAccounts()}
+        />
+      )}
+      {removing && (
+        <BulkRemoveDialog
+          count={selected.size}
+          onClose={(changed) => {
+            setRemoving(false);
+            if (!changed) return;
+            setSelected(new Set());
+            void load();
+          }}
+          onRemove={async (from) => ({ kind: "remove", ...(await api!.removeFromUnitMany([...selected], from)) })}
+          onDelete={async () => ({ kind: "delete", ...(await api!.deleteSoldiers([...selected])) })}
         />
       )}
       {bulk && (

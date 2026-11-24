@@ -192,6 +192,10 @@ export interface Api {
   reactivateSoldier(soldierId: string, joinDate: string): Promise<void>;
   /** inactive from a day; his live duties from it are dropped (slots to fill). Returns how many. */
   removeFromUnit(soldierId: string, fromDay: string): Promise<number>;
+  /** "הוצאה מהיחידה" for several employees; an inactive one is skipped */
+  removeFromUnitMany(soldierIds: string[], fromDay: string): Promise<{ removed: number; duties_dropped: number }>;
+  /** "מחיקה לצמיתות": one with duties on a published board is kept (blocked) */
+  deleteSoldiers(soldierIds: string[]): Promise<{ deleted: number; accounts: number; blocked: { id: string; name: string }[] }>;
   futureDuties(soldierId: string, fromDay: string): Promise<number>;
   setUnitKeyCheck(value: string): Promise<void>;
   /** "מסגרות לטעינה": the frameworks chosen at the last personnel load (null = never chosen) */
