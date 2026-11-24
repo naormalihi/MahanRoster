@@ -1,6 +1,7 @@
 /**
  * Base schedule file (לוח המשימות): one row = one slot, one performer + one reserve.
- * Only two columns are read: the date (מועד) and the duty type (סוג משימה). Everything else is
+ * Only two columns are read: the date (מועד – one day, or a range "18-21/3/2027" from the first
+ * day to the last) and the duty type (סוג משימה). Everything else is
  * derived: the hours from the duty type (by weekday), the Shabbat variant and the holidays from
  * the date, who may do it from the duty type. Any other column in the file is ignored.
  */
@@ -18,6 +19,44 @@ const SYNONYMS: Record<BaseField, string[]> = {
   // optional. Not "הערות": in the base's own file that column holds contacts and phones, and the note is public
   note: ["הערה", "דגשים", "הערהלמשימה"],
 };
+
+/** A range in the date column: the duty runs from the first day to the last. */
+export const RANGE_MAX_DAYS = 31;
+
+const iso = (y: number, mo: number, d: number): string | null => {
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+};
+
+/**
+ * The date column: one date, or a range of days ("18-21/3/2027", "29/4-2/5/2027",
+ * "30/12/2026-2/1/2027", dots too; "26/5-2-6/2027" as a slip for 26/5-2/6). The start takes the month and year of the end when it leaves
+ * them out ("28/12-3/1/2027" starts in December 2026). null = empty.
+ */
+export function readDates(v: unknown): { start: string; end: string } | "invalid" | "too_long" | null {
+  if (typeof v === "string") {
+    const m = v
+      .trim()
+      .match(/^(\d{1,2})(?:[./](\d{1,2})(?:[./](\d{2}|\d{4}))?)?\s*[-–—]\s*(\d{1,2})[./-](\d{1,2})[./](\d{2}|\d{4})$/);
+    if (m) {
+      const year = (y: string) => (y.length === 2 ? 2000 + Number(y) : Number(y));
+      const ey = year(m[6]), em = Number(m[5]), ed = Number(m[4]);
+      const sm = m[2] ? Number(m[2]) : em;
+      let sy = m[3] ? year(m[3]) : ey;
+      if (!m[3] && sm > em) sy = ey - 1; // "28/12-3/1/2027"
+      const start = iso(sy, sm, Number(m[1])), end = iso(ey, em, ed);
+      if (!start || !end || end < start) return "invalid";
+      const days = (Date.parse(end) - Date.parse(start)) / 86_400_000;
+      if (days > RANGE_MAX_DAYS) return "too_long";
+      return { start, end };
+    }
+  }
+  const one = toIsoDate(v);
+  if (one === null) return null;
+  if (one === "invalid") return "invalid";
+  return { start: one, end: one };
+}
 
 /** A note shown on the duty – on the board, in "המשימות שלי", in messages. */
 export const NOTE_MAX = 300;
@@ -175,9 +214,11 @@ export function readRows(rows: unknown[][]): { rows: BaseRow[]; errors: { line: 
     const duty = cleanName(col(r, "duty"));
     const startRaw = col(r, "start");
     if (!duty && String(startRaw ?? "").trim() === "") return; // empty / spacer row
-    const start = toIsoDate(startRaw);
+    const dates = readDates(startRaw);
     if (!duty) return void errors.push({ line, message: "חסר סוג משימה" });
-    if (!start || start === "invalid") return void errors.push({ line, message: `${duty}: מועד לא תקין` });
+    if (dates === "too_long") return void errors.push({ line, message: `${duty}: טווח תאריכים ארוך מ-${RANGE_MAX_DAYS} יום` });
+    if (!dates || dates === "invalid") return void errors.push({ line, message: `${duty}: מועד לא תקין` });
+    const { start, end } = dates;
     const note = String(col(r, "note") ?? "")
       .replace(/\r\n?/g, "\n")
       .split("\n")
@@ -186,7 +227,7 @@ export function readRows(rows: unknown[][]): { rows: BaseRow[]; errors: { line: 
       .join("\n");
     if (note.length > NOTE_MAX) return void errors.push({ line, message: `${duty}: הערה ארוכה מ-${NOTE_MAX} תווים` });
     // the date, the duty type and a note; the rest comes from the duty type and the calendar
-    out.push({ line, duty, start, end: start, population: "", ranksText: "", instructions: note, notes: "", holiday: null });
+    out.push({ line, duty, start, end, population: "", ranksText: "", instructions: note, notes: "", holiday: null });
   });
   return { rows: out, errors, header: true };
 }
