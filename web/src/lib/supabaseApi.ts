@@ -840,6 +840,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("slots").insert({ ...k, cycle_id: cycleId }));
   }
 
+  async setSlotNote(slotId: string, note: string | null) {
+    run(await this.sb.rpc("set_slot_note", { p_slot: slotId, p_note: note }));
+  }
+
   async updateSpecialSlot(slotId: string, name: string, points: number) {
     run(await this.sb.rpc("update_special_slot", { p_slot: slotId, p_name: name, p_points: points }));
   }
@@ -847,7 +851,7 @@ export class SupabaseApi implements Api {
   async slotPeople(slotId: string): Promise<SlotPeople | null> {
     const { data: sl, error } = await this.sb
       .from("slots")
-      .select("id, cycle_id, starts_at, ends_at, special_name, fixed_points, task_types(name), cycles(status)")
+      .select("id, cycle_id, starts_at, ends_at, special_name, fixed_points, instructions, task_types(name), cycles(status)")
       .eq("id", slotId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -855,7 +859,7 @@ export class SupabaseApi implements Api {
     const rows = check(
       await this.sb.from("assignments").select("id, role, status, replaced_assignment_id, is_surprise, soldiers(full_name)").eq("slot_id", slotId).neq("status", "draft"),
     ) as unknown as { id: string; role: "performer" | "reserve"; status: string; replaced_assignment_id: string | null; is_surprise: boolean; soldiers: { full_name: string } | null }[];
-    const s = sl as unknown as { id: string; cycle_id: string; starts_at: string; ends_at: string; special_name: string | null; fixed_points: number | null; task_types: { name: string } | null; cycles: { status: string } | null };
+    const s = sl as unknown as { id: string; cycle_id: string; starts_at: string; ends_at: string; special_name: string | null; fixed_points: number | null; instructions: string | null; task_types: { name: string } | null; cycles: { status: string } | null };
     return {
       slot: {
         id: s.id,
@@ -866,6 +870,7 @@ export class SupabaseApi implements Api {
         special_name: s.special_name,
         fixed_points: s.fixed_points === null ? null : Number(s.fixed_points),
         published: s.cycles?.status === "published",
+        note: s.instructions,
       },
       people: rows.map((r) => ({ id: r.id, name: r.soldiers?.full_name ?? "?", role: r.role, status: r.status, replaced_id: r.replaced_assignment_id, is_surprise: r.is_surprise })),
     };

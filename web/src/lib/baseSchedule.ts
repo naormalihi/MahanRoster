@@ -10,12 +10,17 @@ import { addDaysIso, isoDate } from "./cycles";
 import { TZ } from "./dates";
 import { toIsoDate } from "./roster";
 
-export type BaseField = "start" | "duty";
+export type BaseField = "start" | "duty" | "note";
 
 const SYNONYMS: Record<BaseField, string[]> = {
   start: ["מועד", "תאריך", "תאריךהתחלה", "מתאריך", "התחלה"],
   duty: ["סוגתורנות", "תורנות", "משימה", "סוגמשימה"],  // file headers people already have
+  // optional. Not "הערות": in the base's own file that column holds contacts and phones, and the note is public
+  note: ["הערה", "דגשים", "הערהלמשימה"],
 };
+
+/** A note shown on the duty – on the board, in "המשימות שלי", in messages. */
+export const NOTE_MAX = 300;
 
 /** Quotes and gershayim unified, spaces dropped – for matching names. */
 export const norm = (s: unknown) =>
@@ -173,8 +178,15 @@ export function readRows(rows: unknown[][]): { rows: BaseRow[]; errors: { line: 
     const start = toIsoDate(startRaw);
     if (!duty) return void errors.push({ line, message: "חסר סוג משימה" });
     if (!start || start === "invalid") return void errors.push({ line, message: `${duty}: מועד לא תקין` });
-    // only the date and the duty type; the rest comes from the duty type and the calendar
-    out.push({ line, duty, start, end: start, population: "", ranksText: "", instructions: "", notes: "", holiday: null });
+    const note = String(col(r, "note") ?? "")
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((l) => l.replace(/[ \t]+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n");
+    if (note.length > NOTE_MAX) return void errors.push({ line, message: `${duty}: הערה ארוכה מ-${NOTE_MAX} תווים` });
+    // the date, the duty type and a note; the rest comes from the duty type and the calendar
+    out.push({ line, duty, start, end: start, population: "", ranksText: "", instructions: note, notes: "", holiday: null });
   });
   return { rows: out, errors, header: true };
 }
@@ -318,7 +330,8 @@ export function buildSlots(
     const taskId = weekendVariant(mapped, r.start, ctx.tasks, ctx.weekendIsoDays);
     const task = ctx.tasks.find((t) => t.id === taskId)!;
     const ranks = parseRanks(r.ranksText, ctx.ranks);
-    const briefing = parseBriefing(r.instructions, r.start);
+    // the note is shown as written: no briefing time or gender is read out of it
+    const briefing = { at: null, ignored: false };
     let holidayMismatch: SlotDraft["holidayMismatch"] = null;
     if (r.holiday !== null && ctx.holidays) {
       let onHoliday = false;
@@ -334,7 +347,7 @@ export function buildSlots(
       performers_needed: 1,
       reserves_needed: 1,
       allowed_rank_ids: ranks.rankIds,
-      gender: genderHint(r.instructions),
+      gender: null,
       instructions: r.instructions || null,
       notes: r.notes || null,
       ranksText: r.ranksText,
@@ -386,10 +399,12 @@ export interface NewSlot {
   special_name?: string;
   fixed_points?: number;
   allowed_rank_ids?: string[] | null;
+  /** the note shown on the duty */
+  instructions?: string | null;
 }
 
 /** Template for a base file, for manual preparation or testing. */
-export const BASE_TEMPLATE_HEADERS = ["מועד", "סוג משימה"];
+export const BASE_TEMPLATE_HEADERS = ["מועד", "סוג משימה", "הערה"];
 
 export const dayOf = (isoTs: string) => {
   const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });

@@ -31,7 +31,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { OFFLINE_TEXT, pollFailures } from "../lib/network";
 import type { ExistingSoldier } from "../lib/roster";
 import { useAuth } from "../lib/auth";
-import { slotName, type NewSlot, type RankRef, type SlotRow } from "../lib/baseSchedule";
+import { NOTE_MAX, slotName, type NewSlot, type RankRef, type SlotRow } from "../lib/baseSchedule";
 import type { TaskType } from "../lib/catalog";
 import { useCycle } from "../lib/cycleContext";
 import { dayKey, dayLabel, timeLabel } from "../lib/dates";
@@ -93,6 +93,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
   const [times, setTimes] = useState(() => defaultTimes(active[0], tomorrow));
   const [performers, setPerformers] = useState(1);
   const [reserves, setReserves] = useState(1);
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -129,6 +130,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
           special_name: specialName.trim(),
           fixed_points: Number(specialPoints),
           allowed_rank_ids: specialRanks.length ? specialRanks : null,
+          instructions: note.trim() || null,
         }
       : {
           task_type_id: taskId,
@@ -137,6 +139,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
           performers_needed: performers,
           reserves_needed: reserves,
           is_surprise: false,
+          instructions: note.trim() || null,
         };
     setBusy(true);
     try {
@@ -220,6 +223,14 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
             <TextField type="number" label="מבצעים" value={performers} onChange={(e) => setPerformers(Number(e.target.value))} slotProps={{ htmlInput: { min: 1 } }} fullWidth />
             <TextField type="number" label="עתודות" value={reserves} onChange={(e) => setReserves(Number(e.target.value))} slotProps={{ htmlInput: { min: 0 } }} fullWidth />
           </Stack>
+          <TextField
+            label="הערה למשימה (לא חובה)"
+            value={note}
+            onChange={(e) => setNote(e.target.value.slice(0, NOTE_MAX))}
+            multiline
+            helperText={`מוצגת על המשימה בלוח השיבוצים וב"המשימות שלי" · עד ${NOTE_MAX} תווים`}
+            fullWidth
+          />
           {taskId === SPECIAL ? (
             <Typography variant="body2" color="text.secondary">
               אין מקדם הקפצה – הניקוד שהוזן הוא הניקוד.

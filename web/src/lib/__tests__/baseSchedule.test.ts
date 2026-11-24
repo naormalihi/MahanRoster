@@ -149,6 +149,22 @@ describe("the base file", () => {
     expect(r.errors).toEqual([{ line: 9, message: "שמירות חובה: מועד לא תקין" }]);
     expect(r.rows[0]).toMatchObject({ start: "2026-06-14", end: "2026-06-14", ranksText: "", instructions: "" });
   });
+  it("a note column: kept as written, lines tidied, not read for times or gender", () => {
+    const r = readRows([
+      ["מועד", "סוג משימה", "הערה"],
+      ["05/07/2026", "קצין תורן", "  להגיע   עם נשק אישי \r\n\r\n התייצבות לתדריך ביום שלישי בשעה 13:00, בנים בלבד "],
+      ["06/07/2026", "קצין תורן", ""],
+      ["07/07/2026", "קצין תורן", "א".repeat(301)],
+    ]);
+    expect(findHeader([["מועד", "סוג משימה", "דגשים"]])?.columns).toEqual({ start: 0, duty: 1, note: 2 });
+    // "הערות" in the base's file holds phones – never read as the public note
+    expect(findHeader([["מועד", "סוג משימה", "הערות"]])?.columns).toEqual({ start: 0, duty: 1 });
+    expect(r.rows.map((x) => x.instructions)).toEqual(["להגיע עם נשק אישי\nהתייצבות לתדריך ביום שלישי בשעה 13:00, בנים בלבד", ""]);
+    expect(r.errors).toEqual([{ line: 4, message: "קצין תורן: הערה ארוכה מ-300 תווים" }]);
+    const res = buildSlots(r.rows, { aliases: [], tasks: TASKS, ranks: RANKS, weekendIsoDays: [5, 6], cycle: { start_date: "2026-06-20", end_date: "2026-12-31" } });
+    expect(res.slots[0]).toMatchObject({ instructions: "להגיע עם נשק אישי\nהתייצבות לתדריך ביום שלישי בשעה 13:00, בנים בלבד", briefing_at: null, gender: null });
+    expect(res.slots[1].instructions).toBeNull();
+  });
   it("a two-column file (מועד, סוג משימה)", () => {
     const r = readRows([["מועד", "סוג משימה"], ["05/07/2026", "קצין תורן"], ["", ""], ["13/07/2026", "שמירות חובה"]]);
     expect(r.rows.map((x) => [x.start, x.duty])).toEqual([["2026-07-05", "קצין תורן"], ["2026-07-13", "שמירות חובה"]]);

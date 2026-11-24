@@ -38,6 +38,12 @@ describe("dutyMessageText", () => {
     expect(t.split("\n")).toHaveLength(5);
   });
 
+  it("the duty's note, on one line under the briefing", () => {
+    const t = dutyMessageText({ ...base, duties: [{ ...base.duties[0], note: "להגיע עם נשק אישי\nוכובע" }] }, origin);
+    const lines = t.split("\n");
+    expect(lines[lines.indexOf("התייצבות יום ב׳ 24.11 07:30, שער ראשי") + 1]).toBe("הערה: להגיע עם נשק אישי · וכובע");
+  });
+
   it("several duties: plural greeting, each on its own", () => {
     const t = dutyMessageText({ ...base, duties: [base.duties[0], { ...base.duties[0], assignment_id: "a2", task_name: "שער" }] }, origin);
     expect(t).toContain("שובצת למשימות:");

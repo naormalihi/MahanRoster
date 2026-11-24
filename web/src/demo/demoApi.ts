@@ -257,6 +257,7 @@ export class DemoApi implements Api {
           briefing_place: null,
           updated_at: s.toISOString(),
           changed_after_publish: rand() < 0.04,
+          instructions: t.name === "שמירות חובה" && day.getDay() === 5 ? "להגיע עם נשק אישי וכובע" : null,
         });
       }
     }
@@ -984,6 +985,15 @@ export class DemoApi implements Api {
     return id;
   }
 
+  async setSlotNote(slotId: string, note: string | null) {
+    await delay();
+    const v = note?.trim() || null;
+    if (v && v.length > 300) throw new Error("הערה – עד 300 תווים");
+    for (const list of this.slotsByCycle.values()) for (const k of list) if (k.id === slotId) k.instructions = v;
+    const row = this.boardRows.find((r) => r.slot_id === slotId);
+    if (row) row.instructions = v;
+  }
+
   async updateSpecialSlot(slotId: string, name: string, points: number) {
     await delay();
     for (const rows of this.slotsByCycle.values()) {
@@ -1031,7 +1041,7 @@ export class DemoApi implements Api {
     const row = this.boardRows.find((r) => r.slot_id === slotId);
     if (row) {
       return {
-        slot: { id: row.slot_id, cycle_id: "c1", starts_at: row.starts_at, ends_at: row.ends_at, task_name: row.task_name, published: true },
+        slot: { id: row.slot_id, cycle_id: "c1", starts_at: row.starts_at, ends_at: row.ends_at, task_name: row.task_name, published: true, note: row.instructions ?? null },
         people: this.peopleOf(row).map((p) => ({ ...p })),
       };
     }
@@ -1039,7 +1049,7 @@ export class DemoApi implements Api {
     if (!k) return null;
     const names = new Map(this.soldierList.map((s) => [s.id, s.full_name]));
     return {
-      slot: { id: k.id, cycle_id: k.cycle_id, starts_at: k.starts_at, ends_at: k.ends_at, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "", published: this.cycleList.find((c) => c.id === k.cycle_id)?.status === "published" },
+      slot: { id: k.id, cycle_id: k.cycle_id, starts_at: k.starts_at, ends_at: k.ends_at, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "", published: this.cycleList.find((c) => c.id === k.cycle_id)?.status === "published", note: k.instructions },
       people: this.draft
         .filter((a) => a.slot_id === slotId && a.status !== "draft")
         .map((a) => ({ id: a.id, name: names.get(a.soldier_id) ?? "?", role: a.role, status: a.status, replaced_id: (a as { replaced_id?: string }).replaced_id ?? null })),
@@ -1425,7 +1435,7 @@ export class DemoApi implements Api {
         out.push({
           assignment_id: a.id, cycle_id: c.id, cycle_name: c.name, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "",
           starts_at: k.starts_at, ends_at: k.ends_at, role: a.role, status: a.status, points: a.normalized_points, explanation: a.explanation,
-          report_at: null, report_place: null, briefing_at: null, briefing_place: null, equipment: null,
+          report_at: null, report_place: null, briefing_at: null, briefing_place: null, equipment: null, note: k.instructions,
         });
       }
     }
@@ -1441,7 +1451,8 @@ export class DemoApi implements Api {
       { assignment_id: "demo-d1", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "שמירות חובה", starts_at: at(4, 8), ends_at: at(4, 20),
         role: "performer", status: "assigned", points: 1, explanation: "הניקוד שלך הנמוך בקבוצה", report_at: null, report_place: "שער ראשי",
         briefing_at: at(3, 13), briefing_place: "אבטחה פיזית", equipment: null,
-        contact_name: "שני משיח", contact_phone: "052-0000000", briefing_note: "לא מאושרות החלפות בעת ביצוע המשימה!" },
+        contact_name: "שני משיח", contact_phone: "052-0000000", briefing_note: "לא מאושרות החלפות בעת ביצוע המשימה!",
+        note: "להגיע עם נשק אישי וכובע" },
       { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער | ש.ג קבע", starts_at: at(11, 20), ends_at: at(12, 8),
         role: "reserve", status: "reserve_idle", points: 0, explanation: "עתודה לפי תור", report_at: null, report_place: null,
         briefing_at: null, briefing_place: null, equipment: null },
@@ -1759,7 +1770,7 @@ export class DemoApi implements Api {
       duties: found
         .sort((a, b) => a.row.starts_at.localeCompare(b.row.starts_at))
         .map(({ row, p }) => ({ assignment_id: p.id, task_name: row.task_name, role: p.role, starts_at: row.starts_at, ends_at: row.ends_at,
-                               brief: row.task_name.includes("מטבח") ? "התייצבות באותו יום 07:30, חדר האוכל" : null })),
+                               brief: row.task_name.includes("מטבח") ? "התייצבות באותו יום 07:30, חדר האוכל" : null, note: row.instructions ?? null })),
     };
   }
 
