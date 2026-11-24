@@ -191,7 +191,7 @@ export class DemoApi implements Api {
   private extraOf(id: string): Extra {
     if (!this.extra.has(id))
       this.extra.set(id, {
-        appointment_rank_id: null, appointment_rank_until: null, is_shachar: false, shachar_start_date: null, tash_level: null,
+        appointment_rank_id: null, appointment_rank_until: null, is_shachar: false, shachar_start_date: null,
         parent_override: null, parent_override_reason: null, parent_override_until: null, second_role_signed_at: null,
         home_nightly_override: null, home_nightly_override_reason: null, home_nightly_override_until: null,
         load_roles: [],
@@ -219,6 +219,7 @@ export class DemoApi implements Api {
         range_valid_until: "2027-06-30",
         parent_status: false,
         home_nightly: i === 8 || i === 21,
+        tash_level: 0,
         phone: i % 4 === 3 ? null : `97250555${String(i).padStart(4, "0")}`, // fictitious
         is_active: true,
       });
@@ -441,7 +442,10 @@ export class DemoApi implements Api {
     this.rosterAt = new Date().toISOString();
     for (const g of plan.unknownGafim) this.gafList.push({ id: `g${this.gafList.length}`, name: g });
     let n = this.soldierList.length;
-    for (const a of plan.added) this.soldierList.push({ ...a, home_nightly: !!a.home_nightly, id: `s${n++}`, is_active: true });
+    for (const a of plan.added) {
+      const id = `s${n++}`;
+      this.soldierList.push({ ...a, home_nightly: !!a.home_nightly, tash_level: a.tash_level ?? 0, id, is_active: true });
+    }
     for (const u of plan.updated) {
       const s = this.soldierList.find((x) => x.id === u.id)!;
       for (const [k, v] of Object.entries(u.after)) if (v !== null) (s as unknown as Record<string, unknown>)[k] = v;
@@ -459,6 +463,7 @@ export class DemoApi implements Api {
         ...s,
         gaf_id: this.gafList.find((g) => g.name === s.gaf_name)?.id ?? "",
         home_nightly: !!s.home_nightly,
+        tash_level: s.tash_level || null,
         ...this.extraOf(s.id),
       }))
       .sort((a, b) => a.full_name.localeCompare(b.full_name, "he"));
@@ -1329,9 +1334,9 @@ export class DemoApi implements Api {
       id, soldier_key: row.soldier_key, full_name: row.full_name, service_type: row.service_type as "mandatory" | "career",
       gender: (row.gender as "male" | "female" | null) ?? null, gaf_name: gaf, rank_name: rank, enlistment_date: row.enlistment_date,
       release_date: row.release_date, career_start_date: row.career_start_date, unit_join_date: row.unit_join_date ?? null, range_valid_until: row.range_valid_until,
-      parent_status: row.parent_status, home_nightly: row.home_nightly, phone: row.phone, is_active: true,
+      parent_status: row.parent_status, home_nightly: row.home_nightly, tash_level: row.tash_level ?? 0, phone: row.phone, is_active: true,
     });
-    Object.assign(this.extraOf(id), { is_shachar: row.is_shachar, second_role_signed_at: row.second_role_signed_at, tash_level: row.tash_level });
+    Object.assign(this.extraOf(id), { is_shachar: row.is_shachar, second_role_signed_at: row.second_role_signed_at });
     return { status: "added", id };
   }
 

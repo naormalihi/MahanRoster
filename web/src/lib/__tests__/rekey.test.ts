@@ -4,7 +4,7 @@ import type { ExistingSoldier, SoldierRecord } from "../roster";
 
 const rec = (key: string, name: string, extra: Partial<SoldierRecord> = {}): SoldierRecord => ({
   soldier_key: key, full_name: name, service_type: "mandatory", gaf_name: "גף א", rank_name: "סמל", gender: "male",
-  enlistment_date: "2025-03-01", release_date: null, career_start_date: null, unit_join_date: null, range_valid_until: null, parent_status: false, home_nightly: null, phone: null,
+  enlistment_date: "2025-03-01", release_date: null, career_start_date: null, unit_join_date: null, range_valid_until: null, parent_status: false, home_nightly: null, tash_level: null, phone: null,
   ...extra,
 });
 const old = (id: string, name: string, extra: Partial<SoldierRecord> = {}): ExistingSoldier => ({ ...rec("old-" + id, name, extra), id, is_active: true });

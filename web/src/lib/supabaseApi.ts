@@ -190,10 +190,10 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("soldiers")
         .select(
-          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, unit_join_date, range_valid_until, parent_status, home_nightly, phone, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
+          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, unit_join_date, range_valid_until, parent_status, home_nightly, tash_level, phone, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
         ),
     ) as unknown as (Omit<ExistingSoldier, "gaf_name" | "rank_name"> & { gaf: { name: string }; rank: { name: string } | null })[];
-    const full = rows.map(({ gaf, rank, ...s }) => ({ ...s, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
+    const full = rows.map(({ gaf, rank, ...s }) => ({ ...s, tash_level: s.tash_level ?? 0, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
     // a gaf commander reads the details of his own gaf only; everyone else comes by name
     // (draft, board, potential), with no personal details
     const seen = new Set(full.map((s) => s.id));
@@ -207,7 +207,7 @@ export class SupabaseApi implements Api {
           ({
             id: d.id, soldier_key: "", full_name: d.full_name, service_type: d.service_type, gender: d.gender, is_active: d.is_active,
             gaf_name: d.gaf_name ?? "", rank_name: d.rank_name ?? "", enlistment_date: null, release_date: null,
-            career_start_date: null, range_valid_until: null, parent_status: false, home_nightly: false, phone: null,
+            career_start_date: null, range_valid_until: null, parent_status: false, home_nightly: false, tash_level: 0, phone: null,
           }) as unknown as ExistingSoldier,
       );
     return [...full, ...others];
@@ -314,17 +314,23 @@ export class SupabaseApi implements Api {
       range_valid_until: r.range_valid_until,
       parent_status: r.parent_status,
       home_nightly: r.home_nightly ?? undefined, // no column in the file: keep / default
+      tash_level: r.tash_level === null ? undefined : r.tash_level || null, // 0: none – clears
       phone: r.phone ?? undefined, // an empty cell keeps the stored number
       is_active: true,
     });
     // A bulk insert sends one column list for all rows, so a value missing in one row would be sent
     // as null (not the column default): a new soldier with no ת"ש 7 column in the file is "no".
     if (plan.added.length)
-      maybe(await this.sb.from("soldiers").insert(plan.added.map((r) => ({ ...toRow(r), home_nightly: r.home_nightly ?? false }))));
+      maybe(
+        await this.sb
+          .from("soldiers")
+          .insert(plan.added.map((r) => ({ ...toRow(r), home_nightly: r.home_nightly ?? false, tash_level: r.tash_level || null }))),
+      );
     for (const u of plan.updated) {
       const row = toRow(u.after);
       // keep values the file left empty
-      const patch = Object.fromEntries(Object.entries(row).filter(([, v]) => v !== null && v !== undefined));
+      const patch: Record<string, unknown> = Object.fromEntries(Object.entries(row).filter(([, v]) => v !== null && v !== undefined));
+      if (u.after.tash_level === 0) patch.tash_level = null; // the file says: no הת"ש
       maybe(await this.sb.from("soldiers").update(patch).eq("id", u.id));
     }
     if (plan.removed.length)
