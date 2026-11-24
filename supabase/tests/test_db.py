@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 import pathlib
+import re
 import hashlib
 import json
 from datetime import date, timedelta
@@ -3264,16 +3265,19 @@ def test_bulk_remove_and_delete_employees(conn):
     a = conn.execute("""select a.soldier_id, c.id from assignments a join slots sl on sl.id = a.slot_id
                         join cycles c on c.id = sl.cycle_id where a.soldier_id not in (%s, %s) limit 1""", (sid, other)).fetchone()
     with session_as(conn, None, role="postgres") as c:
-        c.execute("update cycles set status = 'published' where id = %s", (a[1],))
+        if a:
+            c.execute("update cycles set status = 'published' where id = %s", (a[1],))
         sid_kept = c.execute(f"select {on_board} from soldiers s where s.id = %s", (sid,)).fetchone()[0]
         c.execute("set local role authenticated")
         _claims(c, COORD)
-        r = c.execute("select public.delete_soldiers(%s::uuid[])", ([sid, other, a[0]],)).fetchone()[0]
-        assert str(a[0]) in [b["id"] for b in r["blocked"]]
+        r = c.execute("select public.delete_soldiers(%s::uuid[])", ([sid, other] + ([a[0]] if a else []),)).fetchone()[0]
+        if a:
+            assert str(a[0]) in [b["id"] for b in r["blocked"]]
         assert r["deleted"] == (1 if sid_kept else 2) and r["accounts"] == (0 if sid_kept else 1)
         c.execute("reset role")
         assert c.execute("select count(*) from soldiers where id = %s", (other,)).fetchone()[0] == 0
-        assert c.execute("select count(*) from soldiers where id = %s", (a[0],)).fetchone()[0] == 1
+        if a:
+            assert c.execute("select count(*) from soldiers where id = %s", (a[0],)).fetchone()[0] == 1
         if not sid_kept:
             assert c.execute("select count(*) from app_users where id = %s and deleted_at is null", (uid,)).fetchone()[0] == 0
         assert c.execute("select count(*) from audit_log where action = 'delete_soldiers'").fetchone()[0] >= 1
@@ -3283,6 +3287,18 @@ def test_bulk_remove_and_delete_employees(conn):
         _claims(c, COORD)
         r = c.execute("select public.remove_from_unit_many(%s::uuid[], current_date)", ([k[0] for k in keep] * 2,)).fetchone()[0]
         assert r["removed"] == 2
+
+
+def test_pgcrypto_callers_see_the_extensions_schema(conn):
+    # On Supabase pgcrypto (crypt, gen_salt) lives in schema "extensions"; a function calling it
+    # without "extensions" in its search path fails there only (here pgcrypto sits in public).
+    rows = conn.execute("""
+        select p.oid::regprocedure::text, p.prosrc, coalesce(array_to_string(p.proconfig, ','), '')
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname in ('public', 'app')""").fetchall()
+    bad = [name for name, src, cfg in rows
+           if re.search(r"\b(gen_salt|crypt)\s*\(", src) and "extensions" not in cfg]
+    assert bad == []
 def test_score_correction_counts_now_and_later_and_undoes(conn):
     cycle = conn.cycle_id
     sid = conn.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s limit 1", (cycle,)).fetchone()
