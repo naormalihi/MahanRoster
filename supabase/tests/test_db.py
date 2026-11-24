@@ -3339,3 +3339,23 @@ def test_score_correction_counts_now_and_later_and_undoes(conn):
         assert base() == b0 + 250
         call("select public.delete_score_correction(%s)", big)
         assert call("select count(*) from public.score_corrections(%s)", sid)[0][0] == 0
+
+
+def test_qualifying_duty_open_to_all_with_priority(conn):
+    k = conn.execute("""select s.id from slots s join task_types t on t.id = s.task_type_id
+                        where t.qualifying_duty and s.cycle_id = %s limit 1""", (conn.cycle_id,)).fetchone()
+    if k is None:
+        return
+    with session_as(conn, COORD) as c:
+        c.execute("select public.snapshot_cycle(%s)", (conn.cycle_id,))
+        cands = c.execute("select soldier_id, reasons from public.slot_candidates(%s)", (k[0],)).fetchall()
+        assert cands and not any("not_qualifying" in (r or []) for _, r in cands)
+        prio = c.execute("select public.qualifying_priority(%s)", (k[0],)).fetchone()[0]
+        c.execute("reset role")
+        for sid in prio:
+            q, pops = c.execute("""select sn.qualifies_day_only, sn.populations from cycle_soldier_snapshot sn
+                                   join slots s on s.cycle_id = sn.cycle_id where s.id = %s and sn.soldier_id = %s""",
+                                (k[0], sid)).fetchone()
+            assert q or pops is not None
+        # anyone not on the list is still a candidate
+        assert {r[0] for r in cands} - set(prio)

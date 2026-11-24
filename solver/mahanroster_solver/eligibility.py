@@ -140,6 +140,21 @@ class EligibilityIndex:
         for c in problem.personal_constraints:
             self.personal[c.soldier_id].append(c)
 
+    def priority(self, soldier: Soldier, slot: Slot) -> bool:
+        """A qualifying duty (ממלכ"ת יום) goes first to a parent, a holder of a qualifying exemption,
+        one of the populations listed on the type (e.g. רס"ן), or one whose exemption in force
+        permits this duty. Any other duty: everyone alike."""
+        task = self.tasks[slot.task_type_id]
+        if not task.qualifying_duty:
+            return True
+        first_day, last_day = slot.starts_at.date(), (slot.ends_at - timedelta(microseconds=1)).date()
+        listed = bool(task.eligible_populations) and bool(set(task.eligible_populations) & set(soldier.populations))
+        by_exemption = any(
+            task.id in e.qualifies_task_type_ids and e.start_date <= first_day and e.end_date >= last_day
+            for e in self.exemptions.get(soldier.id, ())
+        )
+        return soldier.qualifies_day_only or listed or by_exemption
+
     def check(self, soldier: Soldier, slot: Slot) -> list[str]:
         task = self.tasks[slot.task_type_id]
         settings = self.problem.settings
@@ -154,16 +169,9 @@ class EligibilityIndex:
         if task.service_restriction != "any" and soldier.service_type != task.service_restriction:
             reasons.append("service")
         if task.qualifying_duty:
-            # Open to parents / qualifying-exemption holders, and to any population listed on the type
-            # (e.g. רס"ן). The rank range below still applies to everyone.
-            listed = bool(task.eligible_populations) and bool(set(task.eligible_populations) & set(soldier.populations))
-            # an exemption that permits this duty while it is in force (פטור רפואי → ממלכ"ת יום)
-            by_exemption = any(
-                task.id in e.qualifies_task_type_ids and e.start_date <= first_day and e.end_date >= last_day
-                for e in self.exemptions.get(soldier.id, ())
-            )
-            if not (soldier.qualifies_day_only or listed or by_exemption):
-                reasons.append("not_qualifying")
+            # Open to everyone (decided 24.11): parents, qualifying-exemption holders and the populations
+            # listed on the type come first – see priority(); the others only when none of them can.
+            pass
         else:
             if soldier.qualifies_day_only:
                 reasons.append("qualifying_only")

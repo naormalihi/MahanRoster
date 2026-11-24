@@ -13,6 +13,11 @@ def reasons(s, k, **kw):
     return EligibilityIndex(p).check(s, k)
 
 
+def priority(s, k, **kw):
+    p = problem([s], [k], **kw)
+    return EligibilityIndex(p).priority(s, k)
+
+
 def test_eligible_by_default():
     assert reasons(soldier("A"), slot("k", "guard", *MON)) == []
 
@@ -57,12 +62,12 @@ def test_task_rank_list():
 def test_medical_exemption_permits_the_day_duty_while_in_force():
     day = slot("d", "day", "2027-01-04T08:30", "2027-01-04T16:30", r=0)
     s = soldier("A")
-    assert "not_qualifying" in reasons(s, day)
+    assert reasons(s, day) == [] and not priority(s, day)  # open to him, without priority
     med = Exemption("A", date(2027, 1, 1), date(2027, 1, 10), excluded_task_type_ids=["guard"], qualifies_task_type_ids=["day"])
-    assert reasons(s, day, exemptions=[med]) == []
+    assert reasons(s, day, exemptions=[med]) == [] and priority(s, day, exemptions=[med])
     assert "exemption" in reasons(s, slot("k", "guard", *MON), exemptions=[med])
     later = slot("d2", "day", "2027-01-12T08:30", "2027-01-12T16:30", r=0)
-    assert "not_qualifying" in reasons(s, later, exemptions=[med])  # after the exemption ends
+    assert not priority(s, later, exemptions=[med])  # after the exemption ends
 
 
 def test_briefing_day_must_be_free():
@@ -84,11 +89,13 @@ def test_home_nightly_only_daytime_duties():
     assert "home_nightly" in reasons(s, slot("k", "guard", "2027-01-04T08:00", "2027-01-08T17:00"))
 
 
-def test_qualifying_duty_only_for_qualifying_soldiers():
+def test_qualifying_duty_open_to_all_with_priority_to_the_qualifying():
     parent = soldier("P", qualifies_day_only=True)
-    assert "qualifying_only" in reasons(parent, slot("k", "guard", *MON))
-    assert reasons(parent, slot("d", "day", "2027-01-04T08:30", "2027-01-04T16:30", r=0)) == []
-    assert "not_qualifying" in reasons(soldier("A"), slot("d", "day", "2027-01-04T08:30", "2027-01-04T16:30", r=0))
+    day = slot("d", "day", "2027-01-04T08:30", "2027-01-04T16:30", r=0)
+    assert "qualifying_only" in reasons(parent, slot("k", "guard", *MON))  # he still does only qualifying duties
+    assert reasons(parent, day) == [] and priority(parent, day)
+    assert reasons(soldier("A"), day) == [] and not priority(soldier("A"), day)
+    assert priority(soldier("A"), slot("k", "guard", *MON))  # any other duty: everyone alike
 
 
 def test_shachar_mandatory_only_compatible_types():
@@ -175,7 +182,7 @@ def test_penalty_slot_only_for_named_soldier():
     assert reasons(soldier("B", service_type="career"), k) == []
 
 
-def test_qualifying_duty_also_open_to_listed_population_within_rank_range():
+def test_qualifying_duty_priority_to_listed_population_within_rank_range():
     day = TaskType("day", "ממלכ\"ת יום", 0.75, qualifying_duty=True, eligible_populations=["major"], rank_max=13)
     k = slot("d", "day", "2027-01-04T08:00", "2027-01-04T17:00", r=0)
     major = soldier("M", service_type="career", populations=["career", "officer", "major"], rank_order=13)
@@ -184,8 +191,9 @@ def test_qualifying_duty_also_open_to_listed_population_within_rank_range():
     parent = soldier("P", service_type="career", populations=["career"], rank_order=6, qualifies_day_only=True)
     assert reasons(major, k, tasks=(day,)) == []
     assert "rank" in reasons(colonel, k, tasks=(day,))
-    assert "not_qualifying" in reasons(captain, k, tasks=(day,))
-    assert reasons(parent, k, tasks=(day,)) == []
+    assert reasons(captain, k, tasks=(day,)) == [] and not priority(captain, k, tasks=(day,))
+    assert priority(major, k, tasks=(day,))
+    assert reasons(parent, k, tasks=(day,)) == [] and priority(parent, k, tasks=(day,))
 
 
 def test_removed_from_this_duty_only():

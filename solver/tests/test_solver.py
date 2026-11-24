@@ -40,6 +40,18 @@ def test_tash7_slot_prefers_home_nightly_soldiers():
     assert len(solve(p).assignments) == 1
 
 
+def test_qualifying_duty_goes_first_to_the_qualifying_then_to_anyone():
+    day = ("2027-01-04T08:30", "2027-01-04T16:30")
+    # the parent, despite a much higher score
+    soldiers = [soldier("A", baseline_score=0), soldier("P", baseline_score=50, qualifies_day_only=True)]
+    sol = solve(problem(soldiers, [slot("d", "day", *day, r=0)], settings=FAST))
+    assert [a.soldier_id for a in sol.assignments] == ["P"]
+    # no one qualifying: filled anyway, and the explanation says why
+    sol = solve(problem([soldier("A"), soldier("B", baseline_score=3)], [slot("d", "day", *day, r=0)], settings=FAST))
+    assert [a.soldier_id for a in sol.assignments] == ["A"] and not sol.unfilled
+    assert "אין בעל זכאות פנוי" in sol.assignments[0].explanation
+
+
 def test_tash_level_limits_nights_on_base_a_week():
     # five evening duties in one week; A (הת"ש 5) may sleep on base only 2 nights of it
     evenings = [slot(f"e{i}", "towers", f"2027-01-{3 + i:02d}T20:00", f"2027-01-{3 + i:02d}T23:00", r=0) for i in range(5)]

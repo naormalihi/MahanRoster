@@ -55,6 +55,9 @@ from .scoring import normalized_points, raw_points, weekend_units
 SCALE = 100
 UNFILLED_PERFORMER_PENALTY = 10**9
 UNFILLED_RESERVE_PENALTY = 10**8
+# A qualifying duty (ממלכ"ת יום) given to one without priority: only when no one with priority can –
+# above every fairness term, below leaving the slot empty.
+NON_PRIORITY_PENALTY = 10**7
 
 
 @dataclass
@@ -67,6 +70,8 @@ class Prepared:
     raw: dict[str, float]  # slot_id -> raw points
     wk_units: dict[str, int]  # slot_id -> weekend/holiday units
     warnings: list[str]
+    # (soldier, slot): eligible for a qualifying duty, but without priority
+    non_priority: set[tuple[str, str]] = None  # type: ignore[assignment]
 
 
 def prepare(problem: Problem) -> Prepared:
@@ -80,6 +85,7 @@ def prepare(problem: Problem) -> Prepared:
         fixed_by_slot[f.slot_id].append(f)
 
     eligible, reasons, pts, raw, wk = {}, {}, {}, {}, {}
+    non_priority: set[tuple[str, str]] = set()
     warnings: list[str] = []
     for slot in problem.slots:
         task = tasks[slot.task_type_id]
@@ -114,6 +120,8 @@ def prepare(problem: Problem) -> Prepared:
                 warnings.append(f"משבצת קנס {slot.id} מתנגשת אצל {slot.penalty_soldier_id}: {', '.join(r)}")
         eligible[slot.id] = ok
         reasons[slot.id] = dict(why)
+        if tasks[slot.task_type_id].qualifying_duty and not slot.is_penalty:
+            non_priority.update((sid, slot.id) for sid in ok if not idx.priority(soldiers[sid], slot))
         for sid in ok:
             s = soldiers[sid]
             pts[(sid, slot.id)] = (
@@ -121,7 +129,7 @@ def prepare(problem: Problem) -> Prepared:
                 if slot.is_penalty
                 else round(SCALE * surprise * normalized_points(s, task, slot.starts_at, slot.ends_at, settings, holidays))
             )
-    return Prepared(eligible, reasons, pts, raw, wk, warnings)
+    return Prepared(eligible, reasons, pts, raw, wk, warnings, non_priority)
 
 
 def _personal_conflicts(idx: EligibilityIndex, soldier, slot) -> list[str]:
@@ -557,6 +565,13 @@ def solve(
                 if (sid, k.id) in r:
                     objective.append(coef(w.home_nightly_preference * SCALE) * r[sid, k.id])
 
+    # Qualifying duty: to one without priority only when no one with priority can take it.
+    for sid, kid in prep.non_priority or ():
+        if (sid, kid) in x:
+            objective.append(NON_PRIORITY_PENALTY * x[sid, kid])
+        if (sid, kid) in r:
+            objective.append(NON_PRIORITY_PENALTY // 10 * r[sid, kid])
+
     # Holiday duties: first to those who did none in the past year. Each holiday duty beyond the
     # first in "the past year + this cycle" costs a penalty.
     holidays_set = set(problem.holidays)
@@ -686,6 +701,8 @@ def build_assignments(
         norm = prep.pts[sid, kid] / SCALE if role == ROLE_PERFORMER else 0.0
         if k.is_penalty:
             why = "משבצת קנס שהבסיס הקצה – ללא ניקוד"
+        elif (sid, kid) in (prep.non_priority or ()):
+            why = "משימה מזכה – אין בעל זכאות פנוי" if role == ROLE_PERFORMER else "עתודה למשימה מזכה – אין בעל זכאות פנוי"
         elif role == ROLE_PERFORMER:
             why = f"שובץ כי הניקוד שלו {running[sid]:.1f} לעומת ממוצע האוכלוסייה {avg:.1f}"
         else:

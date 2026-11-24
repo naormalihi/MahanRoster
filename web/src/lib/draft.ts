@@ -38,9 +38,13 @@ export interface Candidate {
 export const ROLE_LABEL: Record<Role, string> = { performer: "מבצע", reserve: "עתודה" };
 
 /** Eligible and free first (lowest score first), then free but breaking a rule, then busy. */
-export function rankCandidates(cs: Candidate[]): Candidate[] {
+/** Fit first, then – on a qualifying duty (ממלכ"ת יום) – those with priority, then the lighter load. */
+export function rankCandidates(cs: Candidate[], priority: Set<string> = new Set()): Candidate[] {
   const tier = (c: Candidate) => (c.in_slot ? 3 : c.reasons.length === 0 && c.conflicts.length === 0 ? 0 : c.reasons.length === 0 ? 1 : 2);
-  return [...cs].sort((a, b) => tier(a) - tier(b) || a.cycle_points - b.cycle_points || a.cycle_duties - b.cycle_duties);
+  const prio = (c: Candidate) => (priority.size && !priority.has(c.soldier_id) ? 1 : 0);
+  return [...cs].sort(
+    (a, b) => tier(a) - tier(b) || prio(a) - prio(b) || a.cycle_points - b.cycle_points || a.cycle_duties - b.cycle_duties,
+  );
 }
 
 export interface SlotView {
