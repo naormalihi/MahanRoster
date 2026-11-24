@@ -3275,14 +3275,16 @@ def test_bulk_remove_and_delete_employees(conn):
         if a:
             c.execute("update cycles set status = 'published' where id = %s", (a[1],))
         sid_kept = c.execute(f"select {on_board} from soldiers s where s.id = %s", (sid,)).fetchone()[0]
+        # "other" may have a duty on the board just published too – then it stays
+        other_kept = c.execute(f"select {on_board} from soldiers s where s.id = %s", (other,)).fetchone()[0]
         c.execute("set local role authenticated")
         _claims(c, COORD)
         r = c.execute("select public.delete_soldiers(%s::uuid[])", ([sid, other] + ([a[0]] if a else []),)).fetchone()[0]
         if a:
             assert str(a[0]) in [b["id"] for b in r["blocked"]]
-        assert r["deleted"] == (1 if sid_kept else 2) and r["accounts"] == (0 if sid_kept else 1)
+        assert r["deleted"] == 2 - sid_kept - other_kept and r["accounts"] == (0 if sid_kept else 1)
         c.execute("reset role")
-        assert c.execute("select count(*) from soldiers where id = %s", (other,)).fetchone()[0] == 0
+        assert c.execute("select count(*) from soldiers where id = %s", (other,)).fetchone()[0] == (1 if other_kept else 0)
         if a:
             assert c.execute("select count(*) from soldiers where id = %s", (a[0],)).fetchone()[0] == 1
         if not sid_kept:
