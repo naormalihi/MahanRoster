@@ -55,7 +55,7 @@ function Gate() {
     <CycleProvider>
       <Layout>
         <Routes>
-          <Route path="/" element={isUnitCommander(me) ? <DashboardPage /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
+          <Route path="/" element={isUnitCommander(me) && !staff ? <DashboardPage /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
           {reader && <Route path="/dashboard" element={<DashboardPage />} />}
           {(isStaff(me) || isUnitCommander(me)) && <Route path="/feedback" element={<FeedbackInbox />} />}
           {reader && <Route path="/spec" element={lazyEl(<SpecPage />)} />}
