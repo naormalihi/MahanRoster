@@ -1,5 +1,6 @@
+import { DateTextField } from "./DateTextField";
 import EditIcon from "@mui/icons-material/EditOutlined";
-import { Alert, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField } from "@mui/material";
+import { Alert, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
 import { useState } from "react";
 import { isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -62,8 +63,7 @@ export function DeadlineEditor({ cycle, onSaved }: { cycle: Cycle; onSaved?: () 
           <DialogTitle>מועד סגירת אילוצים ופטורים</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2}>
-              <TextField
-                type="date"
+              <DateTextField
                 label="היום האחרון להגשה"
                 value={day}
                 onChange={(e) => setDay(e.target.value)}

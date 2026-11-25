@@ -1,3 +1,4 @@
+import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
@@ -99,8 +100,7 @@ function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => 
   }
 
   const date = (label: string, value: string, onChange: (v: string) => void, helper?: string) => (
-    <TextField
-      type="date"
+    <DateTextField
       label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}

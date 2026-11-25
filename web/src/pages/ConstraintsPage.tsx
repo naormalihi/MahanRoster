@@ -1,3 +1,4 @@
+import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
@@ -124,8 +125,7 @@ function ViaSelect(props: { value: ReceivedVia | null; onChange: (v: ReceivedVia
 
 function DateInput(props: { label: string; value: string; onChange: (v: string) => void; min?: string; max?: string }) {
   return (
-    <TextField
-      type="date"
+    <DateTextField
       label={props.label}
       value={props.value}
       onChange={(e) => props.onChange(e.target.value)}

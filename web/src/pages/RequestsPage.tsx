@@ -1,3 +1,4 @@
+import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
@@ -258,16 +259,14 @@ export function RequestsPage() {
                   ))}
                 </TextField>
               )}
-              <TextField
-                type="date"
+              <DateTextField
                 label={form.kind === "block" ? "יום" : "מתאריך"}
                 value={form.from}
                 onChange={(e) => setForm({ ...form, from: e.target.value, to: form.to && form.to < e.target.value ? e.target.value : form.to })}
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: tomorrow() } }}
               />
               {form.kind !== "block" && (
-                <TextField
-                  type="date"
+                <DateTextField
                   label="עד תאריך (כולל)"
                   value={form.to}
                   onChange={(e) => setForm({ ...form, to: e.target.value })}

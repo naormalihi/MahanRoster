@@ -2,6 +2,7 @@
  * Day-to-day work on a published cycle: duties added after publishing (a call-up is set by notice, not here),
  * filled by an engine run that keeps the published board as it is, then approved.
  */
+import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import BoltIcon from "@mui/icons-material/BoltOutlined";
 import {
@@ -216,8 +217,8 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
             </Paper>
           )}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-            <TextField type="datetime-local" label="התחלה" value={times.start} onChange={(e) => setTimes({ ...times, start: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-            <TextField type="datetime-local" label="סיום" value={times.end} onChange={(e) => setTimes({ ...times, end: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <DateTextField withTime label="התחלה" value={times.start} onChange={(e) => setTimes({ ...times, start: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <DateTextField withTime label="סיום" value={times.end} onChange={(e) => setTimes({ ...times, end: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
           </Stack>
           <Stack direction="row" spacing={2}>
             <TextField type="number" label="מבצעים" value={performers} onChange={(e) => setPerformers(Number(e.target.value))} slotProps={{ htmlInput: { min: 1 } }} fullWidth />
