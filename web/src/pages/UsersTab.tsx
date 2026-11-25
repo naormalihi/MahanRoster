@@ -9,6 +9,7 @@ import EditIcon from "@mui/icons-material/EditOutlined";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import LockOpenIcon from "@mui/icons-material/LockOpenOutlined";
 import SearchIcon from "@mui/icons-material/Search";
+import TuneIcon from "@mui/icons-material/Tune";
 import {
   Alert,
   Autocomplete,
@@ -16,6 +17,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   Divider,
   MenuItem,
@@ -187,9 +189,6 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
   );
 }
 
-// one line of chips; on a phone it scrolls sideways instead of wrapping
-const filterRow = { gap: 0.75, flexWrap: { xs: "nowrap", sm: "wrap" }, overflowX: { xs: "auto", sm: "visible" }, pb: { xs: 0.5, sm: 0 }, "& > *": { flexShrink: 0 } } as const;
-
 export function UsersTab() {
   const { api, me } = useAuth();
   const narrow = useNarrow();
@@ -213,6 +212,18 @@ export function UsersTab() {
   const [kind, setKind] = useState<UserKind | null>(null);
   const [state, setState] = useState<UserState | null>(null);
   const [q, setQ] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters = (kind ? 1 : 0) + (state ? 1 : 0);
+  const searchField = (sx: object) => (
+    <TextField
+      size="small"
+      sx={sx}
+      placeholder="חיפוש לפי שם"
+      value={q}
+      onChange={(e) => setQ(e.target.value)}
+      slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+    />
+  );
 
   const load = useCallback(() => {
     api!.listUsers().then(setUsers).catch((e) => setError((e as Error).message));
@@ -267,42 +278,45 @@ export function UsersTab() {
           </Alert>
         ))}
       {users && users.length > 0 && (
-        <Stack spacing={1}>
-          <TextField
-            size="small"
-            placeholder="חיפוש לפי שם משתמש או שם עובד"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            sx={{ maxWidth: { sm: 360 } }}
-            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
-          />
-          <Stack direction="row" sx={filterRow}>
-            <Chip size="small" label={`הכל (${filterUsers(users, { kind: null, state, q }).length})`} color={kind ? "default" : "primary"} variant={kind ? "outlined" : "filled"} onClick={() => setKind(null)} />
-            {USER_KINDS.map(({ kind: k, label }) => {
-              const n = filterUsers(users, { kind: k, state, q }).length;
-              if (!filterUsers(users, { kind: k, state: null, q: "" }).length) return null;
-              return (
-                <Chip key={k} size="small" label={`${label} (${n})`} color={kind === k ? "primary" : "default"} variant={kind === k ? "filled" : "outlined"}
-                  onClick={() => setKind(kind === k ? null : k)} />
-              );
-            })}
-          </Stack>
-          <Stack direction="row" sx={filterRow}>
-            {USER_STATES.map(({ state: st, label }) => (
-              <Chip key={st} size="small" label={`${label} (${filterUsers(users, { kind, state: st, q }).length})`}
-                color={state === st ? "primary" : "default"} variant={state === st ? "filled" : "outlined"}
-                onClick={() => setState(state === st ? null : st)} />
-            ))}
-          </Stack>
+        <Paper sx={{ p: 2 }}>
+          {narrow && (
+            <Stack direction="row" spacing={1} sx={{ mb: filtersOpen ? 1.5 : 0, alignItems: "center" }}>
+              {searchField({ flex: 1 })}
+              <Button variant={activeFilters ? "contained" : "outlined"} startIcon={<TuneIcon />} onClick={() => setFiltersOpen(!filtersOpen)}>
+                סינון{activeFilters ? ` (${activeFilters})` : ""}
+              </Button>
+            </Stack>
+          )}
+          <Collapse in={!narrow || filtersOpen} unmountOnExit={false}>
+            <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "2fr 1fr 1fr" } }}>
+              {!narrow && searchField({})}
+              <TextField select size="small" slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }} label="סוג משתמש" value={kind ?? ""} onChange={(e) => setKind((e.target.value || null) as UserKind | null)}>
+                <MenuItem value="">הכל ({filterUsers(users, { kind: null, state, q }).length})</MenuItem>
+                {USER_KINDS.filter(({ kind: k }) => filterUsers(users, { kind: k, state: null, q: "" }).length > 0).map(({ kind: k, label }) => (
+                  <MenuItem key={k} value={k}>
+                    {label} ({filterUsers(users, { kind: k, state, q }).length})
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField select size="small" slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }} label="מצב" value={state ?? ""} onChange={(e) => setState((e.target.value || null) as UserState | null)}>
+                <MenuItem value="">הכל ({filterUsers(users, { kind, state: null, q }).length})</MenuItem>
+                {USER_STATES.map(({ state: st, label }) => (
+                  <MenuItem key={st} value={st}>
+                    {label} ({filterUsers(users, { kind, state: st, q }).length})
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
+          </Collapse>
           {(kind || state || q.trim()) && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
               מוצגים {shown.length} מתוך {users.length} ·{" "}
               <Link component="button" type="button" sx={{ verticalAlign: "baseline", font: "inherit" }} onClick={() => { setKind(null); setState(null); setQ(""); }}>
                 ניקוי סינון
               </Link>
             </Typography>
           )}
-        </Stack>
+        </Paper>
       )}
       {users && users.length > 0 && shown.length === 0 && (
         <Typography color="text.secondary">אין משתמשים שמתאימים לסינון.</Typography>
