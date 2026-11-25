@@ -8,6 +8,8 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import LockOpenIcon from "@mui/icons-material/LockOpenOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import TuneIcon from "@mui/icons-material/Tune";
 import {
   Alert,
   Autocomplete,
@@ -15,6 +17,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   Divider,
   MenuItem,
@@ -22,6 +25,8 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
+  Link,
   Menu,
   Paper,
   Stack,
@@ -38,7 +43,19 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/auth";
 import type { ExistingSoldier } from "../lib/roster";
-import { GRANTABLE, ROLE_NAME, tempPassword, usernameProblem, type AppUser, type CreatableRole } from "../lib/users";
+import {
+  filterUsers,
+  GRANTABLE,
+  ROLE_NAME,
+  tempPassword,
+  USER_KINDS,
+  USER_STATES,
+  usernameProblem,
+  type AppUser,
+  type CreatableRole,
+  type UserKind,
+  type UserState,
+} from "../lib/users";
 import type { NamedRef } from "../lib/api";
 import { whatsappUrl } from "../lib/invites";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
@@ -192,6 +209,21 @@ export function UsersTab() {
   }, [api]);
   const [revoking, setRevoking] = useState<{ user: AppUser; role: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [kind, setKind] = useState<UserKind | null>(null);
+  const [state, setState] = useState<UserState | null>(null);
+  const [q, setQ] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters = (kind ? 1 : 0) + (state ? 1 : 0);
+  const searchField = (sx: object) => (
+    <TextField
+      size="small"
+      sx={sx}
+      placeholder="חיפוש לפי שם"
+      value={q}
+      onChange={(e) => setQ(e.target.value)}
+      slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+    />
+  );
 
   const load = useCallback(() => {
     api!.listUsers().then(setUsers).catch((e) => setError((e as Error).message));
@@ -201,6 +233,7 @@ export function UsersTab() {
     api!.soldiers().then(setSoldiers).catch(() => setSoldiers([]));
   }, [api, load]);
 
+  const shown = users ? filterUsers(users, { kind, state, q }) : [];
   const gafOf = new Map(soldiers.map((s) => [s.id, s.gaf_name]));
   const act = async (fn: () => Promise<void>) => {
     setError(null);
@@ -244,6 +277,50 @@ export function UsersTab() {
             חשבון הצפייה המשותף <b>{u.username}</b> עדיין פעיל. בגרסה 2.0 לכל עובד חשבון אישי, ולכן מבטלים אותו: אחרי שהעובדים הצטרפו – לנעול.
           </Alert>
         ))}
+      {users && users.length > 0 && (
+        <Paper sx={{ p: 2 }}>
+          {narrow && (
+            <Stack direction="row" spacing={1} sx={{ mb: filtersOpen ? 1.5 : 0, alignItems: "center" }}>
+              {searchField({ flex: 1 })}
+              <Button variant={activeFilters ? "contained" : "outlined"} startIcon={<TuneIcon />} onClick={() => setFiltersOpen(!filtersOpen)}>
+                סינון{activeFilters ? ` (${activeFilters})` : ""}
+              </Button>
+            </Stack>
+          )}
+          <Collapse in={!narrow || filtersOpen} unmountOnExit={false}>
+            <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "2fr 1fr 1fr" } }}>
+              {!narrow && searchField({})}
+              <TextField select size="small" slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }} label="סוג משתמש" value={kind ?? ""} onChange={(e) => setKind((e.target.value || null) as UserKind | null)}>
+                <MenuItem value="">הכל ({filterUsers(users, { kind: null, state, q }).length})</MenuItem>
+                {USER_KINDS.filter(({ kind: k }) => filterUsers(users, { kind: k, state: null, q: "" }).length > 0).map(({ kind: k, label }) => (
+                  <MenuItem key={k} value={k}>
+                    {label} ({filterUsers(users, { kind: k, state, q }).length})
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField select size="small" slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }} label="מצב" value={state ?? ""} onChange={(e) => setState((e.target.value || null) as UserState | null)}>
+                <MenuItem value="">הכל ({filterUsers(users, { kind, state: null, q }).length})</MenuItem>
+                {USER_STATES.map(({ state: st, label }) => (
+                  <MenuItem key={st} value={st}>
+                    {label} ({filterUsers(users, { kind, state: st, q }).length})
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
+          </Collapse>
+          {(kind || state || q.trim()) && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+              מוצגים {shown.length} מתוך {users.length} ·{" "}
+              <Link component="button" type="button" sx={{ verticalAlign: "baseline", font: "inherit" }} onClick={() => { setKind(null); setState(null); setQ(""); }}>
+                ניקוי סינון
+              </Link>
+            </Typography>
+          )}
+        </Paper>
+      )}
+      {users && users.length > 0 && shown.length === 0 && (
+        <Typography color="text.secondary">אין משתמשים שמתאימים לסינון.</Typography>
+      )}
       {!users ? (
         <CircularProgress />
       ) : (
@@ -339,7 +416,7 @@ export function UsersTab() {
           };
           return narrow ? (
             <CardList>
-              {users.map((u) => {
+              {shown.map((u) => {
                 const x = parts(u);
                 const gaf = u.soldier_id ? gafOf.get(u.soldier_id) : null;
                 return (
@@ -377,7 +454,7 @@ export function UsersTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {users.map((u) => {
+              {shown.map((u) => {
                 const x = parts(u);
                 return (
                   <TableRow key={u.user_id} hover sx={{ opacity: u.is_locked ? 0.55 : 1 }}>

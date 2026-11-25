@@ -72,3 +72,45 @@ export function usernameProblem(u: string, taken: string[]): string | null {
   if (taken.includes(v)) return "שם המשתמש כבר קיים";
   return null;
 }
+
+/** Filtering the users list: by kind (a user with several roles is in each of his kinds) and by state. */
+export type UserKind = "staff" | "commander" | "unit" | "viewer" | "soldier";
+export const USER_KINDS: { kind: UserKind; label: string }[] = [
+  { kind: "staff", label: "אחראי שיבוצים / מ\"מ" },
+  { kind: "commander", label: "מפקדי מסגרות" },
+  { kind: "unit", label: "מפקד יחידה" },
+  { kind: "viewer", label: "צפייה משותפת" },
+  { kind: "soldier", label: "עובדים בלבד" },
+];
+export type UserState = "active" | "pending" | "locked";
+export const USER_STATES: { state: UserState; label: string }[] = [
+  { state: "active", label: "פעיל" },
+  { state: "pending", label: "ממתין לכניסה ראשונה" },
+  { state: "locked", label: "נעול" },
+];
+
+export function userKinds(u: AppUser): Set<UserKind> {
+  const out = new Set<UserKind>();
+  for (const r of u.roles) {
+    if (r.role === "coordinator" || r.role === "deputy") out.add("staff");
+    else if (r.role === "gaf_commander" || r.role === "gaf_rep") out.add("commander");
+    else if (r.role === "unit_commander") out.add("unit");
+    else if (r.role === "viewer") out.add("viewer");
+  }
+  if (out.size === 0 && u.roles.some((r) => r.role === "soldier")) out.add("soldier");
+  return out;
+}
+
+export function userState(u: AppUser): UserState {
+  return u.is_locked ? "locked" : u.must_change_password ? "pending" : "active";
+}
+
+export function filterUsers(users: AppUser[], f: { kind: UserKind | null; state: UserState | null; q: string }): AppUser[] {
+  const q = f.q.trim().toLowerCase();
+  return users.filter(
+    (u) =>
+      (!f.kind || userKinds(u).has(f.kind)) &&
+      (!f.state || userState(u) === f.state) &&
+      (!q || u.username.toLowerCase().includes(q) || (u.soldier_name ?? "").toLowerCase().includes(q)),
+  );
+}
