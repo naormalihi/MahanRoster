@@ -3362,3 +3362,17 @@ def test_qualifying_duty_open_to_all_with_priority(conn):
             assert q or pops is not None
         # anyone not on the list is still a candidate
         assert {r[0] for r in cands} - set(prio)
+
+
+def test_tour_opens_by_itself_three_times_or_until_dismissed(conn):
+    with session_as(conn, COORD) as c:
+        c.execute("reset role")
+        c.execute("update app_users set tour_auto_count = 0, tour_dismissed_at = null where id = %s", (COORD,))
+        c.execute("set local role authenticated")
+        assert [c.execute("select public.tour_auto_open()").fetchone()[0] for _ in range(4)] == [True, True, True, False]
+        c.execute("reset role")
+        c.execute("update app_users set tour_auto_count = 0 where id = %s", (COORD,))
+        c.execute("set local role authenticated")
+        assert c.execute("select public.tour_auto_open()").fetchone()[0] is True
+        c.execute("select public.tour_dismiss()")
+        assert c.execute("select public.tour_auto_open()").fetchone()[0] is False
