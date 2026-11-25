@@ -33,7 +33,7 @@ export interface SoldierDetail {
   home_nightly_override: boolean | null;
   home_nightly_override_reason: string | null;
   home_nightly_override_until: string | null;
-  /** הת"ש 3–7: nights a week he must sleep at home */
+  /** הת"ש 1–7: nights a week he must sleep at home */
   tash_level: number | null;
   /** mobile number, 9725XXXXXXXX */
   phone?: string | null;
@@ -130,4 +130,4 @@ export const tashHelp = (level: number | null | undefined) =>
       : `${level} לילות בבית בשבוע – עד ${7 - level} לילות בבסיס`
     : "כמה לילות בשבוע חייב לישון בבית";
 
-export const TASH_LEVELS = [3, 4, 5, 6, 7] as const;
+export const TASH_LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;

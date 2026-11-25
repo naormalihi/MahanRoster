@@ -15,7 +15,7 @@ export interface AddSoldierForm {
   careerStartDate: string;
   rangeValidUntil: string;
   parent: boolean;
-  /** הת"ש 3–7: nights a week he must sleep at home ("" = none) */
+  /** הת"ש 1–7: nights a week he must sleep at home ("" = none) */
   tashLevel: number | "";
   /** שח"ר – mandatory service only */
   shachar: boolean;
