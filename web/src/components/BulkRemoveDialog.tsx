@@ -1,3 +1,4 @@
+import { DateTextField } from "./DateTextField";
 import {
   Alert,
   Button,
@@ -108,8 +109,7 @@ export function BulkRemoveDialog({
               />
             </RadioGroup>
             {mode === "remove" ? (
-              <TextField
-                type="date"
+              <DateTextField
                 label="מתאריך"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}

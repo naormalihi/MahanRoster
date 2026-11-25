@@ -1,3 +1,4 @@
+import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import { BulkRemoveDialog } from "../components/BulkRemoveDialog";
 import CheckIcon from "@mui/icons-material/Check";
@@ -210,8 +211,7 @@ function DateField(props: {
   disabled?: boolean;
 }) {
   return (
-    <TextField
-      type="date"
+    <DateTextField
       disabled={props.disabled}
       label={props.label}
       value={props.value ?? ""}
@@ -629,8 +629,7 @@ function EditDialog(props: {
                         : " אין לו משימות מאותו יום."}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
-                      <TextField
-                        type="date"
+                      <DateTextField
                         size="small"
                         label="תאריך יציאה"
                         value={leaving.from}

@@ -1,3 +1,4 @@
+import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
@@ -976,8 +977,8 @@ function MultiplierDialog(props: {
             )}
           </Box>
           <Stack direction="row" spacing={2}>
-            <TextField type="date" label="מתאריך" value={m.date_from ?? ""} onChange={(e) => set("date_from", e.target.value || null)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-            <TextField type="date" label="עד תאריך" value={m.date_to ?? ""} onChange={(e) => set("date_to", e.target.value || null)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <DateTextField label="מתאריך" value={m.date_from ?? ""} onChange={(e) => set("date_from", e.target.value || null)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <DateTextField label="עד תאריך" value={m.date_to ?? ""} onChange={(e) => set("date_to", e.target.value || null)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
           </Stack>
           <FormGroup>
             <FormControlLabel
@@ -1658,8 +1659,7 @@ function DayDialog(props: { day: CalendarDay | null; types: DayTypeRef[]; onClos
       <DialogTitle>{props.day ? "עריכת יום" : "הוספת יום"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
-          <TextField
-            type="date"
+          <DateTextField
             label="תאריך"
             value={d.day}
             disabled={!!props.day}
