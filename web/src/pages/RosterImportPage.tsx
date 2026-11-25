@@ -463,13 +463,20 @@ export function RosterImportPage() {
                   זיהיתי את העמודות לפי הכותרות. אפשר לתקן ידנית.
                 </Typography>
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" }, gap: 1.5 }}>
-                  {FIELDS.map((f) => (
+                  {FIELDS.filter((f) => f.key !== "framework").map((f) => (
                     <TextField
                       key={f.key}
                       select
                       label={f.label + (f.required ? " *" : "")}
-                      value={mapping[f.key] ?? ""}
-                      onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || undefined })}
+                      // one "מסגרת" field: a column of names, or of paths ("…/גף X/צוות Y") – told by its cells
+                      value={(f.key === "gaf" ? (mapping.gaf ?? mapping.framework) : mapping[f.key]) ?? ""}
+                      onChange={(e) => {
+                        const h = e.target.value || undefined;
+                        if (f.key !== "gaf") return setMapping({ ...mapping, [f.key]: h });
+                        const isPath = !!h && records.some((r) => String(r[h] ?? "").includes("/"));
+                        setMapping({ ...mapping, gaf: isPath ? undefined : h, framework: isPath ? h : undefined });
+                      }}
+                      helperText={f.key === "gaf" ? "שם המסגרת, או הנתיב שהיא מופיעה בו" : undefined}
                     >
                       <MenuItem value="">— לא קיים בקובץ —</MenuItem>
                       {headers.map((h) => (

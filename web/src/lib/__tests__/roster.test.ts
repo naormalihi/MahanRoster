@@ -12,6 +12,8 @@ describe("mapping", () => {
     expect(m.phone).toBe("מספר טלפון נייד עיקרי");
     expect(m.releaseDate).toBe('תאריך תום שירות (תת"ש )');
     expect(m).toMatchObject({ idNumber: "תעודת זהות ", rank: "דרגה מחושבת", firstName: "שם פרטי", lastName: "שם משפחה", framework: "מסגרת", unitJoinDate: "תאריך קליטה" });
+    // the הת"ש column, with a dash in its name
+    expect(m.homeNightly).toBe('הת"ש - ימי לינה');
   });
   it("detects Hebrew headers and their variants", () => {
     const m = detectMapping(headers);

@@ -47,7 +47,8 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean; synonyms
 
 export type Mapping = Partial<Record<FieldKey, string>>;
 
-const clean = (s: string) => s.replace(/["'׳״\s]/g, "").toLowerCase();
+// quotes, spaces, dashes and brackets do not tell headers apart ("הת"ש - ימי לינה", "(תת"ש )")
+const clean = (s: string) => s.replace(/["'׳״\s\-–—_()]/g, "").toLowerCase();
 
 /** Best guess of which column holds which field, by header name. */
 export function detectMapping(headers: string[]): Mapping {
