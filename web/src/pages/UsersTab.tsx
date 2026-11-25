@@ -8,6 +8,7 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import LockOpenIcon from "@mui/icons-material/LockOpenOutlined";
+import SearchIcon from "@mui/icons-material/Search";
 import {
   Alert,
   Autocomplete,
@@ -22,6 +23,8 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
+  Link,
   Menu,
   Paper,
   Stack,
@@ -38,7 +41,19 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/auth";
 import type { ExistingSoldier } from "../lib/roster";
-import { GRANTABLE, ROLE_NAME, tempPassword, usernameProblem, type AppUser, type CreatableRole } from "../lib/users";
+import {
+  filterUsers,
+  GRANTABLE,
+  ROLE_NAME,
+  tempPassword,
+  USER_KINDS,
+  USER_STATES,
+  usernameProblem,
+  type AppUser,
+  type CreatableRole,
+  type UserKind,
+  type UserState,
+} from "../lib/users";
 import type { NamedRef } from "../lib/api";
 import { whatsappUrl } from "../lib/invites";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
@@ -172,6 +187,9 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
   );
 }
 
+// one line of chips; on a phone it scrolls sideways instead of wrapping
+const filterRow = { gap: 0.75, flexWrap: { xs: "nowrap", sm: "wrap" }, overflowX: { xs: "auto", sm: "visible" }, pb: { xs: 0.5, sm: 0 }, "& > *": { flexShrink: 0 } } as const;
+
 export function UsersTab() {
   const { api, me } = useAuth();
   const narrow = useNarrow();
@@ -192,6 +210,9 @@ export function UsersTab() {
   }, [api]);
   const [revoking, setRevoking] = useState<{ user: AppUser; role: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [kind, setKind] = useState<UserKind | null>(null);
+  const [state, setState] = useState<UserState | null>(null);
+  const [q, setQ] = useState("");
 
   const load = useCallback(() => {
     api!.listUsers().then(setUsers).catch((e) => setError((e as Error).message));
@@ -201,6 +222,7 @@ export function UsersTab() {
     api!.soldiers().then(setSoldiers).catch(() => setSoldiers([]));
   }, [api, load]);
 
+  const shown = users ? filterUsers(users, { kind, state, q }) : [];
   const gafOf = new Map(soldiers.map((s) => [s.id, s.gaf_name]));
   const act = async (fn: () => Promise<void>) => {
     setError(null);
@@ -244,6 +266,47 @@ export function UsersTab() {
             חשבון הצפייה המשותף <b>{u.username}</b> עדיין פעיל. בגרסה 2.0 לכל עובד חשבון אישי, ולכן מבטלים אותו: אחרי שהעובדים הצטרפו – לנעול.
           </Alert>
         ))}
+      {users && users.length > 0 && (
+        <Stack spacing={1}>
+          <TextField
+            size="small"
+            placeholder="חיפוש לפי שם משתמש או שם עובד"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            sx={{ maxWidth: { sm: 360 } }}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+          />
+          <Stack direction="row" sx={filterRow}>
+            <Chip size="small" label={`הכל (${filterUsers(users, { kind: null, state, q }).length})`} color={kind ? "default" : "primary"} variant={kind ? "outlined" : "filled"} onClick={() => setKind(null)} />
+            {USER_KINDS.map(({ kind: k, label }) => {
+              const n = filterUsers(users, { kind: k, state, q }).length;
+              if (!filterUsers(users, { kind: k, state: null, q: "" }).length) return null;
+              return (
+                <Chip key={k} size="small" label={`${label} (${n})`} color={kind === k ? "primary" : "default"} variant={kind === k ? "filled" : "outlined"}
+                  onClick={() => setKind(kind === k ? null : k)} />
+              );
+            })}
+          </Stack>
+          <Stack direction="row" sx={filterRow}>
+            {USER_STATES.map(({ state: st, label }) => (
+              <Chip key={st} size="small" label={`${label} (${filterUsers(users, { kind, state: st, q }).length})`}
+                color={state === st ? "primary" : "default"} variant={state === st ? "filled" : "outlined"}
+                onClick={() => setState(state === st ? null : st)} />
+            ))}
+          </Stack>
+          {(kind || state || q.trim()) && (
+            <Typography variant="body2" color="text.secondary">
+              מוצגים {shown.length} מתוך {users.length} ·{" "}
+              <Link component="button" type="button" sx={{ verticalAlign: "baseline", font: "inherit" }} onClick={() => { setKind(null); setState(null); setQ(""); }}>
+                ניקוי סינון
+              </Link>
+            </Typography>
+          )}
+        </Stack>
+      )}
+      {users && users.length > 0 && shown.length === 0 && (
+        <Typography color="text.secondary">אין משתמשים שמתאימים לסינון.</Typography>
+      )}
       {!users ? (
         <CircularProgress />
       ) : (
@@ -339,7 +402,7 @@ export function UsersTab() {
           };
           return narrow ? (
             <CardList>
-              {users.map((u) => {
+              {shown.map((u) => {
                 const x = parts(u);
                 const gaf = u.soldier_id ? gafOf.get(u.soldier_id) : null;
                 return (
@@ -377,7 +440,7 @@ export function UsersTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {users.map((u) => {
+              {shown.map((u) => {
                 const x = parts(u);
                 return (
                   <TableRow key={u.user_id} hover sx={{ opacity: u.is_locked ? 0.55 : 1 }}>
