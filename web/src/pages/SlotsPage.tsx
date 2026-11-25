@@ -8,6 +8,7 @@ import {
   Chip,
   CircularProgress,
   FormControlLabel,
+  Link,
   List,
   ListItem,
   ListSubheader,
@@ -44,6 +45,8 @@ import { HOLIDAY_TYPES, type TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
 import { shortDayLabel, spanLabel, TZ } from "../lib/dates";
 import { useNarrow } from "../components/CardList";
+
+const fmtDay = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
 const tsFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 const dowFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "short" });
@@ -147,6 +150,7 @@ function ImportCard(props: {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [creating, setCreating] = useState<string | null>(null); // an unknown name opened as a new type
+  const [showOutside, setShowOutside] = useState(false);
 
   const result: BuildResult | null = useMemo(
     () => (rows ? buildSlots(rows, { aliases: refs.aliases, tasks: refs.tasks.filter((t) => !t.is_special), ranks: refs.ranks, weekendIsoDays: refs.weekend, cycle, holidays: refs.holidays }) : null),
@@ -320,9 +324,32 @@ function ImportCard(props: {
           <>
             <Alert severity={result.slots.length ? "info" : "warning"}>
               <b>{result.slots.length} משבצות ייקלטו</b> ל{cycle.name}.
-              {result.outside.length > 0 && ` ${result.outside.length} שורות מתחילות מחוץ למחזור ולא ייקלטו.`}
+              {result.outside.length > 0 && (
+                <>
+                  {" "}
+                  <Link component="button" type="button" color="inherit" sx={{ verticalAlign: "baseline", font: "inherit" }}
+                    onClick={() => setShowOutside((v) => !v)}>
+                    {result.outside.length} שורות מתחילות מחוץ למחזור
+                  </Link>{" "}
+                  ולא ייקלטו.
+                </>
+              )}
               {switched > 0 && ` ${switched} משבצות שמתחילות בסוף שבוע הועברו לסוג המשימה של שבת.`}
               {result.unmapped.length > 0 && ` ${result.unmapped.reduce((n, u) => n + u.count, 0)} שורות של שמות שסומנו "לא לקלוט" דולגו.`}
+              {showOutside && result.outside.length > 0 && (
+                <List dense disablePadding sx={{ mt: 1 }}>
+                  {result.outside.map((r) => (
+                    <ListItem key={r.line} disableGutters sx={{ py: 0, display: "block" }}>
+                      שורה {r.line}: {fmtDay(r.start)}{r.end && r.end !== r.start ? ` – ${fmtDay(r.end)}` : ""} · <b>{r.duty}</b>
+                      {r.instructions ? (
+                        <Typography variant="caption" color="text.secondary" component="div">
+                          {r.instructions}
+                        </Typography>
+                      ) : null}
+                    </ListItem>
+                  ))}
+                </List>
+              )}
             </Alert>
             {(errors.length > 0 || unknownRankRows.length > 0) && (
               <Alert severity="warning">
