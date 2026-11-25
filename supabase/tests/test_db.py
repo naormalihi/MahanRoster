@@ -387,6 +387,40 @@ def test_service_type_follows_career_start_date_per_cycle(conn):
     assert by_id[str(past)]["service_type"] == "career" and by_id[str(past)]["balance_population"] == "career"
 
 
+def test_career_start_inside_the_cycle_by_majority(conn):
+    cycle = conn.cycle_id
+    start, end = conn.execute("select start_date, end_date from cycles where id = %s", (cycle,)).fetchone()
+    a, b = conn.execute(
+        "select (array_agg(id order by id))[1], (array_agg(id order by id))[2] from soldiers where service_type = 'mandatory' and is_active"
+    ).fetchone()
+    with conn.transaction():
+        # a: career for most of the cycle; b: mandatory for most of it
+        conn.execute("update soldiers set career_start_date = %s::date + 3, enlistment_date = null, release_date = null, unit_join_date = null where id = %s", (start, a))
+        conn.execute("update soldiers set career_start_date = %s::date - 2, enlistment_date = null, release_date = null, unit_join_date = null where id = %s", (end, b))
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        svc = dict(conn.execute("select soldier_id, service_type::text from cycle_soldier_snapshot where cycle_id = %s and soldier_id in (%s, %s)", (cycle, a, b)).fetchall())
+        assert svc == {a: "career", b: "mandatory"}
+        task = conn.execute("select id from task_types where is_active order by name limit 1").fetchone()[0]
+        def why(sid):
+            with session_as(conn, COORD) as c:
+                rows = c.execute("select cause, from_day, to_day from public.potential_cell_why(%s, %s, %s)", (cycle, sid, task)).fetchall()
+            return [r for r in rows if r[0].endswith("_career")]
+        assert why(a) == [("before_career", start, start + timedelta(days=2))]
+        assert why(b) == [("after_career", end - timedelta(days=2), end)]
+        doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
+        by_id = {x["id"]: x for x in doc["soldiers"]}
+        assert by_id[str(a)]["enlistment_date"] == str(start + timedelta(days=3)) and by_id[str(a)]["release_date"] is None
+        assert by_id[str(b)]["release_date"] == str(end - timedelta(days=3)) and by_id[str(b)]["enlistment_date"] is None
+        assert {"start": str(start), "end": str(start + timedelta(days=2))} in by_id[str(a)]["credit_periods"]
+        # a slot in the first days is closed to a with the reason
+        sl = conn.execute("""select id from slots where cycle_id = %s and cancelled_at is null
+                             and (starts_at at time zone 'Asia/Jerusalem')::date = %s order by starts_at limit 1""", (cycle, start)).fetchone()
+        if sl:
+            reasons = conn.execute("select reasons from app.slot_candidates_for(%s, %s)", (sl[0], a)).fetchone()[0]
+            assert "before_career" in reasons
+        raise psycopg.Rollback()
+
+
 def test_weight_changes_are_recorded(conn):
     tid = conn.execute("select id from task_types order by code limit 1").fetchone()[0]
     count = lambda: conn.execute("select count(*) from weight_history where task_type_id = %s", (tid,)).fetchone()[0]

@@ -58,6 +58,7 @@ export type SoldierPatch = Partial<
     | "parent_override_reason"
     | "parent_override_until"
     | "second_role_signed_at"
+    | "career_start_date"
     | "home_nightly_override"
     | "home_nightly_override_reason"
     | "home_nightly_override_until"
@@ -86,6 +87,24 @@ const addDaysIso = (iso: string, n: number) => {
 export function effectiveService(s: Pick<SoldierDetail, "career_start_date" | "service_type">, today = todayIso()) {
   if (!s.career_start_date) return s.service_type;
   return s.career_start_date <= today ? "career" : "mandatory";
+}
+
+/**
+ * Entering career inside a cycle (app.career_switch): the cycle counts as the service he spends most
+ * of it in (a tie – mandatory), and he serves only in that part. null when the date is not inside.
+ */
+export function careerSwitch(
+  career: string | null | undefined,
+  from: string,
+  to: string,
+): { service: "mandatory" | "career"; offFrom: string; offTo: string | null } | null {
+  if (!career || career <= from || career > to) return null;
+  const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+  const mandatoryDays = days(from, career);
+  const careerDays = days(career, to) + 1;
+  return careerDays > mandatoryDays
+    ? { service: "career", offFrom: from, offTo: addDaysIso(career, -1) }
+    : { service: "mandatory", offFrom: career, offTo: null };
 }
 
 export type RangeState = "missing" | "expired" | "expiring" | "valid";

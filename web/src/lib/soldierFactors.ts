@@ -1,5 +1,5 @@
 import { addDaysIso, type Absence, type AbsenceType, type Exemption, type ExemptionType } from "./cycles";
-import { activeLoadRole, effectiveHomeNightly, effectiveParent, type SoldierDetail } from "./soldiers";
+import { activeLoadRole, careerSwitch, effectiveHomeNightly, effectiveParent, type SoldierDetail } from "./soldiers";
 
 /**
  * What in a soldier's data steers the schedule for him, one line each – for the soldier dialog.
@@ -160,8 +160,16 @@ export function soldierFactors(x: FactorInput): Factor[] {
     out.push({ icon: "service", title: `גיוס ${dm(s.enlistment_date)}`, effect: "לא משובץ לפני תאריך הגיוס." });
   if (s.release_date && s.release_date >= x.cycle.start && s.release_date < x.cycle.end)
     out.push({ icon: "service", title: `שחרור ${dm(s.release_date)}`, effect: "לא משובץ אחרי תאריך השחרור." });
-  if (s.career_start_date && s.career_start_date > x.cycle.start && s.career_start_date <= x.cycle.end)
-    out.push({ icon: "service", title: `מעבר לקבע ${dm(s.career_start_date)}`, effect: "מהתאריך הזה משובץ ונמדד כמשרת קבע." });
+  const sw = careerSwitch(s.career_start_date, x.cycle.start, x.cycle.end);
+  if (sw && s.career_start_date)
+    out.push({
+      icon: "service",
+      title: `מעבר לקבע ${dm(s.career_start_date)}`,
+      effect:
+        sw.service === "career"
+          ? "רוב המחזור בקבע: במחזור הזה נחשב קבע, ומשובץ רק למשימות קבע מתאריך הכניסה לקבע. לפניו – לא זמין."
+          : "רוב המחזור בחובה: במחזור הזה נחשב חובה, ומשובץ רק למשימות חובה עד יום לפני הכניסה לקבע. מהתאריך – לא זמין.",
+    });
 
   return out;
 }

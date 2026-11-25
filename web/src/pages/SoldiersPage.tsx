@@ -57,6 +57,7 @@ import { formatPhone, normalizePhone } from "../lib/phone";
 import {
   activeLoadRole,
   activeLoadRoles,
+  careerSwitch,
   todayIso,
   effectiveHomeNightly,
   effectiveParent,
@@ -270,6 +271,7 @@ function EditDialog(props: {
     parent_override_reason: s.parent_override_reason,
     parent_override_until: s.parent_override_until,
     second_role_signed_at: s.second_role_signed_at,
+    career_start_date: s.career_start_date,
     home_nightly_override: s.home_nightly_override,
     home_nightly_override_reason: s.home_nightly_override_reason,
     home_nightly_override_until: s.home_nightly_override_until,
@@ -473,9 +475,15 @@ function EditDialog(props: {
           <Divider />
           <Box>
             <Typography variant="h3" gutterBottom>
-              תפקיד שני
+              קבע ותפקיד שני
             </Typography>
             <Stack spacing={1.5}>
+              <DateField
+                label="תאריך כניסה לקבע"
+                value={p.career_start_date}
+                onChange={(v) => set("career_start_date", v)}
+                helperText="נכנס לקבע באמצע מחזור: המחזור נחשב לפי רוב הימים (חובה או קבע), והוא משובץ רק בחלק הזה"
+              />
               <DateField
                 label="תאריך חתימה על המשך שירות קבע (תפקיד שני)"
                 value={p.second_role_signed_at}
@@ -782,6 +790,14 @@ export function SoldiersPage() {
   };
   const [cur, setCur] = useState<Ref | null>(null);
   const [nxt, setNxt] = useState<Ref | null>(null);
+  // enters career inside the current or the next cycle
+  const switchTag = (s: SoldierDetail) => {
+    const sw = [cur?.cycle, nxt?.cycle].map((c) => (c ? careerSwitch(s.career_start_date, c.start_date, c.end_date) : null)).find(Boolean);
+    return sw ? (
+      <Chip size="small" variant="outlined" color="secondary" label={`עובר לקבע ${fmt(s.career_start_date)}`}
+        title={sw.service === "career" ? "רוב המחזור בקבע – משובץ רק מהתאריך" : "רוב המחזור בחובה – משובץ רק עד התאריך"} />
+    ) : null;
+  };
 
   const load = useCallback(async () => {
     try {
@@ -1482,6 +1498,7 @@ export function SoldiersPage() {
                       {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : s.tash_level ? <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} /> : null}
                       {a && a.tone !== "default" && <Chip size="small" variant="outlined" color={a.tone} label={a.text} />}
                       {newUntil(s) && <Chip size="small" variant="outlined" color="info" label={`חדש עד ${fmt(newUntil(s))}`} />}
+                      {switchTag(s)}
                     </>
                   }
                   sub={
@@ -1656,7 +1673,9 @@ export function SoldiersPage() {
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {s.gaf_name}
                       </TableCell>
-                      <TableCell>{SERVICE[effectiveService(s)]}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {SERVICE[effectiveService(s)]} {switchTag(s)}
+                      </TableCell>
                       <TableCell
                         sx={{
                           whiteSpace: "nowrap",
