@@ -529,6 +529,17 @@ export class DemoApi implements Api {
     this.corrections = this.corrections.filter((c) => c.id !== id);
   }
 
+  private tour = { count: 0, dismissed: false };
+  async tourAutoOpen() {
+    if (this.tour.dismissed || this.tour.count >= 3) return false;
+    this.tour.count++;
+    return true;
+  }
+
+  async tourDismiss() {
+    this.tour.dismissed = true;
+  }
+
   async myCommandedGafs() {
     if (!this.user?.roles.includes("gaf_commander")) return [];
     const s1 = this.soldierList.find((s) => s.id === "s1");

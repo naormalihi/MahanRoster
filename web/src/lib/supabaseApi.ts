@@ -422,6 +422,14 @@ export class SupabaseApi implements Api {
     run(await this.sb.rpc("delete_score_correction", { p_id: id }));
   }
 
+  async tourAutoOpen() {
+    return !!check(await this.sb.rpc("tour_auto_open"));
+  }
+
+  async tourDismiss() {
+    run(await this.sb.rpc("tour_dismiss"));
+  }
+
   async myCommandedGafs() {
     return ((check(await this.sb.rpc("my_commanded_gafs")) as string[] | null) ?? []).map(String);
   }

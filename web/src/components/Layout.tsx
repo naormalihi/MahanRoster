@@ -245,6 +245,17 @@ function VersionFooter() {
   );
 }
 
+/** True the first time in this browser session (sessionStorage), so a reload does not ask again. */
+function sessionOnce(key: string): boolean {
+  try {
+    if (sessionStorage.getItem(key)) return false;
+    sessionStorage.setItem(key, "1");
+  } catch {
+    /* no storage: ask – the server still counts */
+  }
+  return true;
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const returned = useReturnCounter();
   const { me, api, signOut } = useAuth();
@@ -265,13 +276,19 @@ export function Layout({ children }: { children: ReactNode }) {
     if (!seesFeedback || !api) return;
     api.feedbackNewCount().then(setNewFeedback, () => setNewFeedback(0));
   }, [api, seesFeedback, open]);
-  // the first time this user opens the app on this device
+  // by itself: in the user's first three sign-ins (kept for him on the server), once a sign-in,
+  // until he says "הבנתי, אל תציג לי שוב" or goes through to the end. The owl button opens it any time.
   useEffect(() => {
-    if (me && kind && !me.mustChangePassword && !tourSeen(me.userId)) setTour(true);
-  }, [me, kind]);
-  const closeTour = () => {
+    if (!me || !kind || me.mustChangePassword || tourSeen(me.userId)) return;
+    if (!sessionOnce(`mahan.tour.asked.${me.userId}`)) return;
+    api?.tourAutoOpen().then((yes) => yes && setTour(true), () => {});
+  }, [api, me, kind]);
+  const closeTour = (dismiss = false) => {
     setTour(false);
-    if (me) markTourSeen(me.userId);
+    if (me && dismiss) {
+      markTourSeen(me.userId);
+      void api?.tourDismiss().catch(() => {});
+    }
   };
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
   const links = staff
@@ -350,7 +367,7 @@ export function Layout({ children }: { children: ReactNode }) {
           steps={tourSteps(kind, mine)}
           onClose={closeTour}
           onFeedback={() => {
-            closeTour();
+            closeTour(true);
             setFeedback(true);
           }}
         />

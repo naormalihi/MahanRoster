@@ -236,6 +236,10 @@ export interface Api {
   setSoldierLoadRoles(soldierId: string, roles: Omit<SoldierLoadRole, "name" | "factor">[]): Promise<void>;
   /** The frameworks whose employees a gaf commander updates (phone, range, relief roles, join codes). */
   myCommandedGafs(): Promise<string[]>;
+  /** Whether the tour opens by itself now (first three sign-ins, not dismissed); counts the opening. */
+  tourAutoOpen(): Promise<boolean>;
+  /** "הבנתי, אל תציג לי שוב", or the tour gone through to its end. */
+  tourDismiss(): Promise<void>;
   /** Hand corrections of the score (staff): all, or one employee's. */
   scoreCorrections(soldierId?: string): Promise<ScoreCorrection[]>;
   addScoreCorrection(soldierId: string, cycleId: string, points: number, reason: string): Promise<void>;
