@@ -6,7 +6,7 @@ import { isSoldier } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { dayLabel } from "../lib/dates";
 import type { MyDuty } from "../lib/me";
-import { additionsByValue, buildExamples, num, orList, taskNote, type ScoringRules } from "../lib/scoringRules";
+import { additionsByValue, buildExamples, exampleTask, loadRoleExamples, num, orList, taskNote, type ScoringRules } from "../lib/scoringRules";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -79,6 +79,8 @@ export function ScoringPage() {
       </Box>
     );
   const examples = buildExamples(rules);
+  const roles = loadRoleExamples(rules);
+  const exTask = exampleTask(rules);
   const mine = duties
     .filter((d) => d.role === "performer")
     .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
@@ -104,6 +106,12 @@ export function ScoringPage() {
           <Line b="הקפצה">
             פי {num(rules.surprise_multiplier)} למי ששובץ אחרי הפרסום, פחות מ-{rules.surprise_notice_hours} שעות לפני המשימה.
           </Line>
+          {roles.length > 0 && (
+            <Line b="תפקיד הקלה">
+              למי שבתפקיד מקל ({orList(roles.map((r) => r.name))}) הניקוד של כל משימה מחולק במקדם התפקיד, כך שהוא עושה פחות משימות
+              באותו ניקוד. לשני תפקידים – המקדם הנמוך.
+            </Line>
+          )}
         </Stack>
       </Section>
 
@@ -137,6 +145,30 @@ export function ScoringPage() {
               return <Chip key={t.name} variant="outlined" label={`${t.name} · ${num(t.weight)}${note ? ` (${note})` : ""}`} />;
             })}
         </Stack>
+        {roles.length > 0 && (
+          <>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1.75, mb: 0.75 }}>
+              תפקידי הקלה{exTask ? ` (לדוגמה: ${exTask.name}, ${num(exTask.weight)} נק׳)` : ""}
+            </Typography>
+            <Stack spacing={0.75}>
+              {roles.map((r) => (
+                <Stack key={r.name} direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                  <Typography sx={{ flex: 1, minWidth: 0 }}>
+                    {r.name} · מקדם {num(r.factor)}
+                  </Typography>
+                  {r.calc && (
+                    <>
+                      <Typography variant="body2" dir="ltr" sx={{ unicodeBidi: "isolate", whiteSpace: "nowrap", color: "text.secondary" }}>
+                        = {r.calc}
+                      </Typography>
+                      <Chip label={`${num(r.result)} נק׳`} color="primary" size="small" sx={{ fontWeight: 700, minWidth: 64 }} />
+                    </>
+                  )}
+                </Stack>
+              ))}
+            </Stack>
+          </>
+        )}
         {rules.additions.length > 0 && (
           <>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1.75, mb: 0.75 }}>

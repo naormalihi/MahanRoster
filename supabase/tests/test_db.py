@@ -2352,6 +2352,7 @@ def test_scoring_rules_for_soldiers_without_unit_data(conn):
         assert r["tasks"] and all(set(t) == {"name", "weight", "includes_holidays", "weekend_type", "category"} for t in r["tasks"])
         assert r["surprise_notice_hours"] >= 1 and float(r["surprise_multiplier"]) >= 1 and r["window_months"] >= 1 and r["credit_min_days"] >= 1 and isinstance(r["credit_absences"], list)
         assert all(set(a) == {"name", "value"} for a in r["additions"])
+        assert r["load_roles"] and all(set(l) == {"name", "factor"} and 0 < float(l["factor"]) < 1 for l in r["load_roles"])
         names = {t["name"] for t in r["tasks"]}
         hidden = {n for (n,) in conn.execute("select name from task_types where is_special or not is_active").fetchall()}
         assert not names & hidden
