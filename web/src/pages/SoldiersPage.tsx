@@ -1322,25 +1322,27 @@ export function SoldiersPage() {
           elevation={8}
           sx={{ position: "fixed", insetInline: 0, bottom: 0, zIndex: (t) => t.zIndex.appBar, px: 1.5, pt: 1, pb: "calc(8px + env(safe-area-inset-bottom))", borderRadius: 0 }}
         >
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+          {/* two lines: how many and "ניקוי", then the actions in even widths – they do not fit one line */}
+          <Stack direction="row" sx={{ alignItems: "center", mb: 0.75 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }}>
               נבחרו {selected.size}
             </Typography>
-            <Box sx={{ flex: 1 }} />
-            <Button data-read size="small" variant="contained" onClick={() => setBulk(true)} sx={{ whiteSpace: "nowrap" }}>
+            <Button data-read size="small" onClick={() => setSelected(new Set())}>
+              ניקוי הבחירה
+            </Button>
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ "& > *": { flex: 1, whiteSpace: "nowrap", minWidth: 0 } }}>
+            <Button data-read size="small" variant="contained" onClick={() => setBulk(true)}>
               עדכון מטווח
             </Button>
-            <Button data-read size="small" variant="outlined" onClick={() => setInviting(true)} sx={{ whiteSpace: "nowrap" }}>
+            <Button data-read size="small" variant="outlined" onClick={() => setInviting(true)}>
               קודי הצטרפות
             </Button>
             {staffUser && (
-              <Button data-read size="small" color="error" variant="outlined" onClick={() => setRemoving(true)} sx={{ whiteSpace: "nowrap" }}>
+              <Button data-read size="small" color="error" variant="outlined" onClick={() => setRemoving(true)}>
                 מחיקה
               </Button>
             )}
-            <Button data-read size="small" onClick={() => setSelected(new Set())}>
-              ניקוי
-            </Button>
           </Stack>
         </Paper>
       )}
@@ -1424,6 +1426,22 @@ export function SoldiersPage() {
 
       {rows && rows.length > 0 && narrow && (
         <>
+          {/* the phone's "select all" – as the table's header box: every one shown that can be updated */}
+          {canManage && selectable.length > 0 && (
+            <Box data-read sx={{ display: "flex", alignItems: "center", px: 0.5 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={allSelected}
+                    indeterminate={!allSelected && selectable.some((s) => selected.has(s.id))}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(selectable.map((s) => s.id)))}
+                  />
+                }
+                label={<Typography variant="body2">{allSelected ? `נבחרו כל ${selectable.length}` : `בחירת כל ${selectable.length} המוצגים`}</Typography>}
+              />
+            </Box>
+          )}
           <CardList>
             {shown.map((s) => {
               const lr = activeLoadRole(s);
@@ -1508,7 +1526,7 @@ export function SoldiersPage() {
               );
             })}
           </CardList>
-          {selected.size > 0 && <Box sx={{ height: 64 }} />}
+          {selected.size > 0 && <Box sx={{ height: 110 }} />}
           <Typography variant="caption" color="text.secondary">
             מוצגים {shown.length} מתוך {rows.length}. לחיצה על עובד פותחת עריכה; סימון בתיבה – לפעולות על כמה עובדים.
           </Typography>
