@@ -1102,8 +1102,9 @@ def test_tash_level_and_duty_rule(conn):
         conn.execute("update soldiers set tash_level = 7 where id = %s", (sid,))
         assert "home_nightly" in why()                   # level 7 = ת"ש 7
         with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
-            conn.execute("update soldiers set tash_level = 2 where id = %s", (sid,))
+            conn.execute("update soldiers set tash_level = 8 where id = %s", (sid,))
 
+        conn.execute("update soldiers set tash_level = 1 where id = %s", (sid,))   # 1–2 exist too (at most 6 / 5 nights on base)
         conn.execute("update soldiers set tash_level = 4 where id = %s", (sid,))
         doc = conn.execute("select public.build_solver_input(%s)", (cycle,)).fetchone()[0]
         assert next(s for s in doc["soldiers"] if s["id"] == str(sid))["tash_level"] == 4

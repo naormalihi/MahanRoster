@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.57.3",
+    date: "2026-11-25",
+    items: ["הת\"ש מסוג 1 עד 7 (היה 3–7): סוג 1–2 נקלט מהקובץ ונבחר בכרטיס העובד – עד 6 או 5 לילות בבסיס בשבוע"],
+  },
+  {
     version: "2.57.2",
     date: "2026-11-25",
     items: [

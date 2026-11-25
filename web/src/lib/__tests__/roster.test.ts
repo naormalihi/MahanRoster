@@ -80,8 +80,8 @@ describe("הת\"ש column holds its type", () => {
 
   it("finds the column", () => expect(m.homeNightly).toBe("התש ימי לינה"));
 
-  it("3–6 is a הת\"ש type, not ת\"ש 7", () => {
-    for (const v of ["3", "4", "5", "6"]) {
+  it("1–6 is a הת\"ש type, not ת\"ש 7", () => {
+    for (const v of ["1", "2", "3", "4", "5", "6"]) {
       const r = one(v).rows[0];
       expect(r.tashLevel).toBe(Number(v));
       expect(r.homeNightly).toBe(false);
@@ -96,7 +96,7 @@ describe("הת\"ש column holds its type", () => {
   });
 
   it("an unknown type stops the row", () => {
-    expect(one("2").errors[0].message).toContain("סוג הת\"ש לא מוכר");
+    expect(one("8").errors[0].message).toContain("סוג הת\"ש לא מוכר");
     expect(one("9").rows).toHaveLength(0);
   });
 
