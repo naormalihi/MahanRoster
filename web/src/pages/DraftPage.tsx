@@ -74,6 +74,7 @@ import { effective, REASON_LABEL, reasonText, type PotentialCell, type SnapshotS
 import { eligibilityOf, noWork, noWorkGroups, noWorkText, slotsByCategory, type EligRow } from "../lib/eligibility";
 import type { ExistingSoldier } from "../lib/roster";
 import { poolName, poolNames } from "../lib/schedule";
+import { careerSwitch } from "../lib/soldiers";
 
 const dayFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "long", day: "numeric", month: "numeric" });
 const hm = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
@@ -208,6 +209,9 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
                           </Typography>
                           {c.in_slot && <Chip size="small" label={`כבר ${ROLE_LABEL[c.in_slot]}`} />}
                           {newcomer && <Chip size="small" color="info" variant="outlined" label="חדש ביחידה" />}
+                          {s?.career_start_date && careerSwitch(s.career_start_date, ctx.cycle.start_date, ctx.cycle.end_date) && (
+                            <Chip size="small" color="secondary" variant="outlined" label={`עובר לקבע ${s.career_start_date.slice(8, 10)}/${s.career_start_date.slice(5, 7)}`} />
+                          )}
                           {priority.has(c.soldier_id) && <Chip size="small" color="success" variant="outlined" label="עדיפות – זכאי" />}
                           {bad && !(newcomer && c.reasons.length === 1) && <Chip size="small" color="error" variant="outlined" label="לא זכאי" />}
                           {clash.length > 0 ? (
