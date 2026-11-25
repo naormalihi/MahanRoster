@@ -11,6 +11,8 @@ export interface ScoringRules {
   credit_min_days?: number;
   /** the absence types credited as "not by choice" (קורס, מחלה…), as named in the settings */
   credit_absences?: string[];
+  /** relief roles (כונן, מוביל…): the role's points are divided by its factor (< 1) */
+  load_roles?: { name: string; factor: number }[];
 }
 
 /** "קורס, מחלה או מילואים" */
@@ -82,4 +84,19 @@ export function buildExamples(rules: ScoringRules): ScoringExample[] {
     { title: `${t.name} ב${day}`, calc: `${num(w)} + ${num(top.value)}`, result: round(w + top.value) },
     { title: `${t.name} ב${day}, בהקפצה`, calc: `(${num(w)} + ${num(top.value)}) × ${num(s)}`, result: round((w + top.value) * s) },
   ];
+}
+
+/** One line per relief role, on the example duty: "מטבח" (4) for a factor 0.7 → 4 ÷ 0.7 = 5.71. */
+export function loadRoleExamples(rules: ScoringRules): { name: string; factor: number; calc: string; result: number }[] {
+  const t = exampleTask(rules);
+  return (rules.load_roles ?? [])
+    .filter((r) => r.factor > 0 && r.factor < 1)
+    .slice()
+    .sort((a, b) => a.factor - b.factor || a.name.localeCompare(b.name, "he"))
+    .map((r) => ({
+      name: r.name,
+      factor: r.factor,
+      calc: t ? `${num(t.weight)} ÷ ${num(r.factor)}` : "",
+      result: t ? round(t.weight / r.factor) : 0,
+    }));
 }

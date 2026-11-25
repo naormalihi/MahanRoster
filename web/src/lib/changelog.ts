@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.59.1",
+    date: "2026-11-25",
+    items: ["\"איך מחושב הניקוד\": תפקידי ההקלה (כונן, ראש צוות…) ומקדמיהם – בנוסחה ובמספרים, עם דוגמה"],
+  },
+  {
     version: "2.59.0",
     date: "2026-11-25",
     items: [

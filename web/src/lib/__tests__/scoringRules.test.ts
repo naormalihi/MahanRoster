@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orList, additionLabel, additionsByValue, buildExamples, exampleTask, num, taskNote, type ScoringRules } from "../scoringRules";
+import { orList, additionLabel, additionsByValue, buildExamples, exampleTask, loadRoleExamples, num, taskNote, type ScoringRules } from "../scoringRules";
 
 // the unit's catalog as it is (weights and additions), names included
 const rules: ScoringRules = {
@@ -73,5 +73,14 @@ describe("scoring rules", () => {
 
   it("without additions: a regular day and a call-up", () => {
     expect(buildExamples({ ...rules, additions: [] }).map((e) => e.calc)).toEqual(["4", "4 × 1.3"]);
+  });
+
+  it("relief roles: points divided by the factor, lowest first, a factor of 1 left out", () => {
+    const r = { ...rules, load_roles: [{ name: "כונן מבצעי", factor: 0.7 }, { name: "ראש צוות", factor: 0.5 }, { name: "רגיל", factor: 1 }] };
+    expect(loadRoleExamples(r).map((e) => [e.name, e.calc, e.result])).toEqual([
+      ["ראש צוות", "4 ÷ 0.5", 8],
+      ["כונן מבצעי", "4 ÷ 0.7", 5.71],
+    ]);
+    expect(loadRoleExamples(rules)).toEqual([]);
   });
 });

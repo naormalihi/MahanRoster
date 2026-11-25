@@ -1763,6 +1763,7 @@ export class DemoApi implements Api {
       fairness_tolerance_pct: this.scoring.fairness_tolerance_pct,
       credit_min_days: 7,
       credit_absences: ["מחלה", "קורס"],
+      load_roles: LOAD_ROLES.filter((r) => r.factor < 1).map((r) => ({ name: r.name, factor: r.factor })),
     };
   }
 
