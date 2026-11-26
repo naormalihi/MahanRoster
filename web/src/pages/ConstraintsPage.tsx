@@ -639,7 +639,7 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                       <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setApproving(r)}>
                         אישור
                       </Button>
-                      <Button size="small" color="error" startIcon={<CloseIcon />} onClick={() => setRejecting({ ex: r, action: "reject" })}>
+                      <Button size="small" variant="outlined" color="error" startIcon={<CloseIcon />} onClick={() => setRejecting({ ex: r, action: "reject" })}>
                         דחייה
                       </Button>
                     </>
@@ -650,10 +650,14 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                     </Button>
                   )}
                   {r.status === "approved" && (
-                    <Button size="small" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
+                    <Button size="small" variant="outlined" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
                       ביטול
                     </Button>
                   )}
+                </>
+              }
+              tools={
+                <>
                   {(r.status === "pending" || r.status === "approved") && (
                     <Tooltip title="עריכה">
                       <IconButton size="small" aria-label="עריכת הפטור" onClick={() => setEditing(r)}>
@@ -945,18 +949,18 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
                 sub={`${typeName.get(r.absence_type_id) ?? ""} · ${fmt(d.from)} – ${fmt(d.to)} (${daysBetween(d.from, d.to)} ימים)`}
                 lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
                 actions={
-                  <>
-                    {r.status === "active" && (
-                      <Button size="small" color="inherit" onClick={() => setCancelling(r)}>
-                        ביטול
-                      </Button>
-                    )}
-                    <DeleteRowButton
-                      what={`היעדרות של ${nameOf(ctx, r.soldier_id)} – ${typeName.get(r.absence_type_id) ?? ""}, ${fmt(d.from)} – ${fmt(d.to)}`}
-                      onDelete={() => api!.deleteAbsence(r.id)}
-                      onDone={() => void load()}
-                    />
-                  </>
+                  r.status === "active" ? (
+                    <Button size="small" variant="outlined" color="inherit" onClick={() => setCancelling(r)}>
+                      ביטול
+                    </Button>
+                  ) : undefined
+                }
+                tools={
+                  <DeleteRowButton
+                    what={`היעדרות של ${nameOf(ctx, r.soldier_id)} – ${typeName.get(r.absence_type_id) ?? ""}, ${fmt(d.from)} – ${fmt(d.to)}`}
+                    onDelete={() => api!.deleteAbsence(r.id)}
+                    onDone={() => void load()}
+                  />
                 }
               />
             );
@@ -1118,25 +1122,26 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
               sub={fmt(r.day)}
               lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
               actions={
-                <>
-                  {r.status === "active" && (
-                    <Button
-                      size="small"
-                      color="inherit"
-                      onClick={async () => {
-                        await api!.cancelDateBlock(r.id);
-                        void load();
-                      }}
-                    >
-                      ביטול
-                    </Button>
-                  )}
-                  <DeleteRowButton
-                    what={`חסימה של ${nameOf(ctx, r.soldier_id)} – ${fmt(r.day)}`}
-                    onDelete={() => api!.deleteDateBlock(r.id)}
-                    onDone={() => void load()}
-                  />
-                </>
+                r.status === "active" ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    onClick={async () => {
+                      await api!.cancelDateBlock(r.id);
+                      void load();
+                    }}
+                  >
+                    ביטול
+                  </Button>
+                ) : undefined
+              }
+              tools={
+                <DeleteRowButton
+                  what={`חסימה של ${nameOf(ctx, r.soldier_id)} – ${fmt(r.day)}`}
+                  onDelete={() => api!.deleteDateBlock(r.id)}
+                  onDone={() => void load()}
+                />
               }
             />
           ))}

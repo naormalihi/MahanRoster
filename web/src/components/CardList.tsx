@@ -25,6 +25,7 @@ export function RowCard({
   sub,
   lines,
   actions,
+  tools,
   lead,
   onClick,
   dim,
@@ -34,6 +35,8 @@ export function RowCard({
   sub?: ReactNode;
   lines?: ReactNode[];
   actions?: ReactNode;
+  /** icon buttons – on the far side of the actions' row */
+  tools?: ReactNode;
   lead?: ReactNode;
   onClick?: () => void;
   dim?: boolean;
@@ -63,9 +66,20 @@ export function RowCard({
               {l}
             </Typography>
           ))}
-          {actions && (
-            <Stack direction="row" sx={{ gap: 1, mt: 0.75, flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
-              {actions}
+          {(actions || tools) && (
+            <Stack
+              direction="row"
+              sx={{ gap: 1, mt: 1, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Stack direction="row" sx={{ gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minWidth: 92 } }}>
+                {actions}
+              </Stack>
+              {tools && (
+                <Stack direction="row" sx={{ gap: 0.5, ms: "auto" }}>
+                  {tools}
+                </Stack>
+              )}
             </Stack>
           )}
         </Box>
