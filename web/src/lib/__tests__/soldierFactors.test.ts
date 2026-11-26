@@ -36,6 +36,14 @@ describe("soldier factors", () => {
     expect(f.effect).toContain("זיכוי של 6.0");
   });
 
+  it("days out of the unit (a release) are information, not an absence", () => {
+    const fs = soldierFactors(base({ soldier: soldier({ release_date: "2027-01-27" }), creditDays: 154, credit: 15.2 }));
+    expect(fs.map((f) => f.title)).toEqual(["מחוץ ליחידה בחלק מהמחזור"]);
+    expect(fs[0].tag).toEqual({ text: "154 ימים", tone: "default" });
+    expect(fs[0].effect).toContain("משתחרר 27.1 – 154 ימים אחריו");
+    expect(fs[0].effect).toContain("זיכוי של 15.2");
+  });
+
   it("tells ת״ש 7 by its source and a הת״ש level by its nights", () => {
     expect(titles({ soldier: soldier({ tash_level: 3 }) })).toEqual(['הת"ש 3']);
     expect(soldierFactors(base({ soldier: soldier({ tash_level: 3 }) }))[0].effect).toContain("עד 4 לילות בבסיס");
@@ -51,7 +59,7 @@ describe("soldier factors", () => {
       }),
       holiday: { day: "2027-04-21", task_name: "שמירות חובה" },
     });
-    expect(t).toEqual(["הקלה: ראש צוות ×0.5", "הורה", 'שח"ר', "מטווח בתוקף עד 12.3", "משימת חג", "שחרור 15.5"]);
+    expect(t).toEqual(["הקלה: ראש צוות ×0.5", "הורה", 'שח"ר', "מטווח בתוקף עד 12.3", "משימת חג", "מחוץ ליחידה בחלק מהמחזור"]);
     expect(soldierFactors(base({ soldier: soldier({ load_roles: [{ load_role_id: "r", name: "ראש צוות", factor: 0.5, valid_from: "2026-01-01", valid_to: null }] }) }))[0].effect).toContain("50%");
   });
   it("a range never entered is assumed valid; an entered date that passed blocks", () => {

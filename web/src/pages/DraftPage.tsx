@@ -540,7 +540,15 @@ function useFairness(ctx: Ctx, snapshot: SnapshotSoldier[], cells: PotentialCell
       return v || top;
     };
   }, [ctx.slots, ctx.tasks, ctx.assignments, cells]);
-  const rows = useMemo(() => fairRows(ls, profileOf, tolerance, oneDutyOf), [ls, profileOf, tolerance, oneDutyOf]);
+  // leaving during the cycle: not compared – there is no next cycle to even him out
+  const leaving = useCallback(
+    (id: string) => {
+      const r = ctx.soldiers.get(id)?.release_date;
+      return r && r >= ctx.cycle.start_date && r < ctx.cycle.end_date ? `משתחרר ${Number(r.slice(8, 10))}.${Number(r.slice(5, 7))}` : null;
+    },
+    [ctx.soldiers, ctx.cycle.start_date, ctx.cycle.end_date],
+  );
+  const rows = useMemo(() => fairRows(ls, profileOf, tolerance, oneDutyOf, leaving), [ls, profileOf, tolerance, oneDutyOf, leaving]);
   // duties given out of turn – asked from the server, which checks who was free that day
   const { api } = useAuth();
   const [inversions, setInversions] = useState<Inversion[] | null>(null);
@@ -850,7 +858,7 @@ function LoadTab({
                     variant="caption"
                     sx={{ color: !r.compared ? "text.disabled" : r.outlier ? (r.diff > 0 ? "warning.dark" : "info.dark") : "text.secondary" }}
                   >
-                    {r.compared ? sign(r.diff) : noWork(fair.elig(r.soldier_id)) ? "אין משימה" : "לא נבדק"}
+                    {r.compared ? sign(r.diff) : r.excludedWhy ? r.excludedWhy : noWork(fair.elig(r.soldier_id)) ? "אין משימה" : "לא נבדק"}
                   </Typography>
                 </Box>
               </Box>
@@ -1129,7 +1137,9 @@ function SoldierLoadDialog(props: {
           ) : (
             <Alert severity="info" icon={false}>
               לא נבדק:{" "}
-              {noWork(props.elig)
+              {r.excludedWhy
+                ? `${r.excludedWhy} – אין לו מחזור הבא שבו הפער יתאזן, ולכן הוא לא מושווה לקבוצה ולא נספר בממוצע שלה. בימים שהוא ביחידה הוא משובץ כרגיל`
+                : noWork(props.elig)
                 ? "אין לו אף משימה אפשרית במחזור (פירוט בכשירות למעלה)"
                 : r.profile
                   ? "הוא היחיד בקבוצה עם הצירוף הזה של משימות"

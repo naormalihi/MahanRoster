@@ -133,7 +133,7 @@ export function SoldierFactors(props: {
                       <Chip
                         size="small"
                         label={f.tag.text}
-                        color={f.tag.tone === "warning" ? "warning" : "info"}
+                        color={f.tag.tone === "warning" ? "warning" : f.tag.tone === "info" ? "info" : "default"}
                         variant="outlined"
                         sx={{ height: 20, fontSize: 11, mr: 0.75, verticalAlign: "middle" }}
                       />
