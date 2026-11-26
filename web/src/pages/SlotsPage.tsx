@@ -1,3 +1,4 @@
+import { EvenBar } from "../components/EvenBar";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import UploadIcon from "@mui/icons-material/UploadFile";
 import {
@@ -258,8 +259,10 @@ function ImportCard(props: {
           גלויה לכל מי שרואה את הלוח – בלי טלפונים). שורה = משבצת עם מבצע ועתודה. כל השאר נגזר: השעות מסוג המשימה (לפי יום בשבוע), גרסת השבת והחגים מהתאריך,
           ומי יכול לבצע מסוג המשימה. עמודות אחרות בקובץ לא נקראות. משבצת שייכת למחזור שבו היא מתחילה.
         </Typography>
-        <Box>
-          <Button variant="contained" component="label" startIcon={<UploadIcon />} disabled={busy}>
+        <EvenBar
+          narrow={narrow}
+          items={[
+          <Button key="f" variant="contained" component="label" startIcon={<UploadIcon />} disabled={busy}>
             בחירת קובץ
             <input
               hidden
@@ -271,16 +274,17 @@ function ImportCard(props: {
                 if (f) void read(f);
               }}
             />
-          </Button>
-          <Button sx={{ mr: 1 }} onClick={() => void downloadTemplate()}>
+          </Button>,
+          <Button key="t" variant={narrow ? "outlined" : "text"} sx={{ mr: narrow ? 0 : 1 }} onClick={() => void downloadTemplate()}>
             תבנית ריקה
-          </Button>
-          {file && rows && (
-            <Typography component="span" variant="body2" sx={{ mr: 2 }}>
-              {file}
-            </Typography>
-          )}
-        </Box>
+          </Button>,
+          ]}
+        />
+        {file && rows && (
+          <Typography variant="body2">
+            {file}
+          </Typography>
+        )}
         {busy && <CircularProgress size={24} />}
         {msg && <Alert severity="error">{msg}</Alert>}
 
@@ -494,6 +498,7 @@ function ImportCard(props: {
 // ---------------------------------------------------------------------------
 
 function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; locked?: boolean }) {
+  const narrow = useNarrow();
   const { api } = useAuth();
   const [task, setTask] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -529,21 +534,28 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
   if (!props.slots.length) return <EmptyState title="עוד אין משבצות במחזור" text="קולטים את קובץ לוח המשימות למעלה – ומכאן יוצאים לשיבוץ." />;
   return (
     <Stack spacing={1.5}>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-        <Chip label={`הכל (${props.slots.length})`} color={task ? "default" : "primary"} onClick={() => setTask("")} />
-        {[...counts].map(([id, n]) => (
-          <Chip key={id} label={`${props.refs.tasks.find((t) => t.id === id)?.is_special ? "הקפצה מיוחדת" : (taskName.get(id) ?? "?")} (${n})`} color={task === id ? "primary" : "default"} variant={task === id ? "filled" : "outlined"} onClick={() => setTask(id)} />
-        ))}
-      </Stack>
+      <EvenBar
+        narrow={narrow}
+        chips
+        items={[
+          { node: <Chip label={`הכל (${props.slots.length})`} color={task ? "default" : "primary"} onClick={() => setTask("")} />, wide: true },
+          ...[...counts].map(([id, n]) => (
+            <Chip key={id} label={`${props.refs.tasks.find((t) => t.id === id)?.is_special ? "הקפצה מיוחדת" : (taskName.get(id) ?? "?")} (${n})`} color={task === id ? "primary" : "default"} variant={task === id ? "filled" : "outlined"} onClick={() => setTask(id)} />
+          )),
+        ]}
+      />
       {selected.size > 0 && !props.locked && (
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setConfirming(true)}>
-            מחיקת {selected.size} משבצות
-          </Button>
-          <Button color="inherit" onClick={() => setSelected(new Set())}>
-            ניקוי הבחירה
-          </Button>
-        </Stack>
+        <EvenBar
+          narrow={narrow}
+          items={[
+            <Button key="d" color="error" variant={narrow ? "outlined" : "text"} startIcon={<DeleteIcon />} onClick={() => setConfirming(true)}>
+              מחיקת {selected.size} משבצות
+            </Button>,
+            <Button key="c" color="inherit" variant={narrow ? "outlined" : "text"} onClick={() => setSelected(new Set())}>
+              ניקוי הבחירה
+            </Button>,
+          ]}
+        />
       )}
       <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: "65vh" }}>
         <Table size="small" stickyHeader>

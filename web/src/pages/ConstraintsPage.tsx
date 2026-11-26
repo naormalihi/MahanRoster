@@ -1,3 +1,4 @@
+import { EvenBar } from "../components/EvenBar";
 import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
@@ -292,38 +293,12 @@ function useFilter(ctx: Ctx) {
   return { match, search, gafSelect, gafim };
 }
 
-/**
- * The lists' toolbar. Wide: one row. Phone: two even columns – the search across, the gaf and the
- * tab's own filter side by side, then the "new" button (beside the pending count, when there is one).
- */
+/** The lists' toolbar: search; gaf | the tab's own filter; "new" (| pending count). */
 function FilterBar(p: { narrow: boolean; add: ReactNode; search: ReactNode; gaf: ReactNode; third: ReactNode; extra?: ReactNode }) {
-  if (!p.narrow)
-    return (
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-        {p.add}
-        {p.search}
-        {p.gaf}
-        {p.third}
-        {p.extra}
-      </Stack>
-    );
-  const cell = { minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center" } as const;
-  return (
-    <Box
-      sx={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 1,
-        "& .MuiTextField-root, & .MuiButton-root, & .MuiChip-root": { width: "100%", minWidth: 0 },
-        "& .MuiButton-root, & .MuiChip-root": { height: 40 },
-      }}
-    >
-      <Box sx={{ ...cell, gridColumn: "1 / -1" }}>{p.search}</Box>
-      <Box sx={cell}>{p.gaf}</Box>
-      <Box sx={cell}>{p.third}</Box>
-      <Box sx={{ ...cell, gridColumn: p.extra ? "auto" : "1 / -1" }}>{p.add}</Box>
-      {p.extra && <Box sx={cell}>{p.extra}</Box>}
-    </Box>
+  return p.narrow ? (
+    <EvenBar narrow items={[{ node: p.search, wide: true }, p.gaf, p.third, p.extra ? p.add : { node: p.add, wide: true }, p.extra]} />
+  ) : (
+    <EvenBar narrow={false} items={[p.add, p.search, p.gaf, p.third, p.extra]} />
   );
 }
 
