@@ -1,6 +1,6 @@
 import CheckIcon from "@mui/icons-material/Check";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import HelpIcon from "@mui/icons-material/HelpOutlined";
+import AccountIcon from "@mui/icons-material/ManageAccountsOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
@@ -45,8 +45,6 @@ import { markTourSeen, tourKind, tourSeen, tourSteps } from "../lib/tour";
 import ContactIcon from "@mui/icons-material/ContactPhoneOutlined";
 import { ContactsDialog } from "./ContactCard";
 import { FeedbackDialog } from "./FeedbackDialog";
-import { RenameMeDialog } from "./RenameMeDialog";
-import BadgeIcon from "@mui/icons-material/BadgeOutlined";
 import IdeaIcon from "@mui/icons-material/LightbulbOutlined";
 import InboxIcon from "@mui/icons-material/InboxOutlined";
 import SpecIcon from "@mui/icons-material/DescriptionOutlined";
@@ -178,7 +176,10 @@ function CycleSwitcher({ dark }: { dark?: boolean }) {
   );
 }
 
-function VersionFooter() {
+/** The tour lives in the layout; the account screen asks for it. */
+export const TOUR_EVENT = "toranchik:tour";
+
+export function VersionFooter() {
   const [open, setOpen] = useState(false);
   const built = BUILD_DATE ? new Date(BUILD_DATE).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" }) : "";
   return (
@@ -273,9 +274,14 @@ export function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const kind = tourKind(me);
   const [tour, setTour] = useState(false);
+  // "סיור היכרות" moved to the account screen, which asks for it here
+  useEffect(() => {
+    const start = () => setTour(true);
+    window.addEventListener(TOUR_EVENT, start);
+    return () => window.removeEventListener(TOUR_EVENT, start);
+  }, []);
   const [contacts, setContacts] = useState(false);
   const [feedback, setFeedback] = useState(false);
-  const [renaming, setRenaming] = useState(false);
   // אחראי השיבוצים, מ"מ and the unit commander: how many new messages wait in "הצעות ומשוב"
   const [newFeedback, setNewFeedback] = useState(0);
   const seesFeedback = staff || isUnitCommander(me);
@@ -349,9 +355,9 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
           {/* soldiers, and אחראי השיבוצים for the swaps soldiers made */}
           {(isSoldier(me) || staff) && !me?.viewAs && <NotificationBell />}
-          {kind && !compact && (
-            <IconButton color="inherit" aria-label="סיור היכרות" title="סיור היכרות" onClick={() => setTour(true)}>
-              <HelpIcon />
+          {me && !compact && (
+            <IconButton color="inherit" aria-label="חשבון" title="חשבון" component={RouterLink} to="/account">
+              <AccountIcon />
             </IconButton>
           )}
           {me && !compact && (
@@ -380,7 +386,6 @@ export function Layout({ children }: { children: ReactNode }) {
         />
       )}
       {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
-      {renaming && <RenameMeDialog onClose={() => setRenaming(false)} />}
       {contacts && <ContactsDialog onClose={() => setContacts(false)} />}
       <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
         <Box sx={{ width: 280, minHeight: "100%", display: "flex", flexDirection: "column" }} role="navigation">
@@ -452,26 +457,10 @@ export function Layout({ children }: { children: ReactNode }) {
               <IdeaIcon fontSize="small" sx={{ ml: 1.5 }} />
               <ListItemText primary="הצעה לשיפור" />
             </ListItemButton>
-            {kind && (
-              <ListItemButton
-                onClick={() => {
-                  setOpen(false);
-                  setTour(true);
-                }}
-              >
-                <HelpIcon fontSize="small" sx={{ ml: 1.5 }} />
-                <ListItemText primary="סיור היכרות עם תורנצ׳יק" />
-              </ListItemButton>
-            )}
-            {me && !me.roles.includes("viewer") && (
-              <ListItemButton
-                onClick={() => {
-                  setOpen(false);
-                  setRenaming(true);
-                }}
-              >
-                <BadgeIcon fontSize="small" sx={{ ml: 1.5 }} />
-                <ListItemText primary="שינוי שם משתמש" />
+            {me && (
+              <ListItemButton component={RouterLink} to="/account" onClick={() => setOpen(false)} selected={pathname === "/account"}>
+                <AccountIcon fontSize="small" sx={{ ml: 1.5 }} />
+                <ListItemText primary="חשבון" />
               </ListItemButton>
             )}
             <ListItemButton onClick={signOut}>

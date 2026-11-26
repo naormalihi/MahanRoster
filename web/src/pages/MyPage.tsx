@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { EmptyState, ErrorState, greeting } from "../components/EmptyState";
-import { PushControl } from "../components/NotificationBell";
+import { PushOffLine } from "../components/PushOffLine";
 import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
 import { needsAck, splitDuties, type MyDuty, type MyScore } from "../lib/me";
 import { canAskSwap, type MySwap } from "../lib/swaps";
@@ -243,6 +243,7 @@ export function MyPage() {
           </Typography>
         </Box>
       </Stack>
+      {!me?.viewAs && <PushOffLine />}
 
       {/* on a wide screen: the duties on the main side, the score and the settings beside them */}
       <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 3fr) minmax(0, 2fr)" } }}>
@@ -317,9 +318,6 @@ export function MyPage() {
       <Stack spacing={2} sx={{ minWidth: 0 }}>
       {scores[0] && <ScoreCard s={scores[0]} />}
 
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <PushControl />
-      </Paper>
 
       {scores.length > 1 && (
         <Accordion variant="outlined" disableGutters>

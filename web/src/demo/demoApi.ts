@@ -1723,6 +1723,10 @@ export class DemoApi implements Api {
   private ranges: PlannedRange[] = [];
   private fixes: StaffFixRequest[] = [];
 
+  async sendTestNotification() {
+    await delay();
+  }
+
   async myProfile(): Promise<MyProfile | null> {
     await delay();
     const me = this.soldierList.find((s) => s.id === this.mySoldier());
