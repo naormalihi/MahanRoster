@@ -107,8 +107,8 @@ export function MyProfilePage() {
         <Row label="ת״ש" value={t.value} sub={t.means} />
         <Row label="הורה" value={p.parent ? "כן" : "לא"} sub={p.parent ? "פתוחה לך גם המשימה המזכה, בעדיפות" : undefined} />
         <Row
-          label="הקלה בעומס"
-          value={p.relief ? `${p.relief.name} ×${p.relief.factor}` : "אין"}
+          label="מקדם הקלה"
+          value={p.relief ? `${p.relief.name} · ×${p.relief.factor}` : "אין"}
           sub={p.relief ? `מקבל בערך ${Math.round(p.relief.factor * 100)}% מהעומס${p.relief.until ? ` · עד ${dmy(p.relief.until)}` : ""}` : undefined}
         />
         {p.shachar && <Row label="שח״ר" value="כן" sub="משובץ רק למשימות שמתאימות לשח״ר" />}
@@ -180,7 +180,7 @@ export function MyProfilePage() {
               </Typography>
               <Typography sx={{ fontSize: 20, fontWeight: 700 }}>{s.group_avg != null ? Number(s.group_avg).toFixed(1) : "—"}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {s.group} ({s.group_size})
+                {p.service === "career" ? "עובדי קבע" : "עובדי חובה"} שנמדדים איתך ({s.group_size})
               </Typography>
             </Box>
           </Stack>
