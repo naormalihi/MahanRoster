@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.62.1",
+    date: "2026-11-26",
+    items: ["סוגי פטור: נשארו רק פטור מלא ופטור חלקי. פטורים קיימים מסוגים אחרים ממשיכים לחול ומוצגים בשמם"],
+  },
+  {
     version: "2.62.0",
     date: "2026-11-26",
     items: [

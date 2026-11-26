@@ -589,7 +589,7 @@ export class SupabaseApi implements Api {
 
   async exemptionTypes(): Promise<ExemptionType[]> {
     return check(
-      await this.sb.from("exemption_types").select("id, name, qualifies_day_only, allows_partial_restriction, home_nightly, requires_duty_list").order("name"),
+      await this.sb.from("exemption_types").select("id, name, qualifies_day_only, allows_partial_restriction, home_nightly, requires_duty_list, is_active").order("name"),
     ) as ExemptionType[];
   }
 
