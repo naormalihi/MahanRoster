@@ -1,3 +1,4 @@
+import { EvenBar } from "../components/EvenBar";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import { frameworkName } from "../lib/gafName";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -251,25 +252,29 @@ function MatrixTab(props: {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-        <TextField
-          size="small"
-          placeholder="חיפוש לפי שם"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
-        />
-        <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-          <MenuItem value="">כל המסגרות</MenuItem>
-          {gafim.map((g) => (
-            <MenuItem key={g} value={g}>
-              {frameworkName(g)}
-            </MenuItem>
-          ))}
-        </TextField>
-        <FormControlLabel control={<Switch checked={onlyEligible} onChange={(e) => setOnlyEligible(e.target.checked)} />} label="רק זכאים" />
-        <FormControlLabel control={<Switch checked={onlyMarked} onChange={(e) => setOnlyMarked(e.target.checked)} />} label="רק חלקיים ומתוקנים" />
-      </Stack>
+      <EvenBar
+        narrow={narrow}
+        items={[
+          <TextField
+            key="q"
+            size="small"
+            placeholder="חיפוש לפי שם"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+          />,
+          <TextField key="g" select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
+            <MenuItem value="">כל המסגרות</MenuItem>
+            {gafim.map((g) => (
+              <MenuItem key={g} value={g}>
+                {frameworkName(g)}
+              </MenuItem>
+            ))}
+          </TextField>,
+          <FormControlLabel key="e" control={<Switch checked={onlyEligible} onChange={(e) => setOnlyEligible(e.target.checked)} />} label="רק זכאים" />,
+          <FormControlLabel key="m" control={<Switch checked={onlyMarked} onChange={(e) => setOnlyMarked(e.target.checked)} />} label={narrow ? "חלקיים ומתוקנים" : "רק חלקיים ומתוקנים"} />,
+        ]}
+      />
       <Typography variant="body2" color="text.secondary">
         {narrow
           ? "ירוק = זמין לכל המחזור · כתום = לחלק מהמחזור (השבר) · מסגרת כתומה = תוקן ידנית. לחיצה על קטגוריה פותחת תיקון."
@@ -464,6 +469,7 @@ function HeatTab({ daily, categories }: { daily: DailyAvailability[] | null; cat
 
 export function PotentialPage() {
   const live = useLiveTick();
+  const narrow = useNarrow();
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle, locked } = useCycle();
@@ -587,20 +593,29 @@ export function PotentialPage() {
         </Paper>
       ) : (
         <>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+          <Stack direction={narrow ? "column" : "row"} spacing={1} sx={{ alignItems: narrow ? "stretch" : "center", flexWrap: "wrap", gap: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 220 }}>
               חושב ב-{new Date(cycle.potential_computed_at!).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })}. הדרגות והאוכלוסיות
               נעולות למחזור; היעדרויות ופטורים שנוספו מאז כבר נכללים.
               {locked && " המחזור פורסם, ולכן הפוטנציאל נעול: אין חישוב מחדש ואין תיקון תאים."}
             </Typography>
-            {!locked && (
-              <Button startIcon={<CalculateIcon />} onClick={() => setConfirm(true)} disabled={busy}>
-                חישוב מחדש
-              </Button>
-            )}
-            <Button data-read variant="contained" startIcon={<DownloadIcon />} onClick={exportToBase} disabled={!data}>
-              ייצוא לבסיס
-            </Button>
+            <EvenBar
+              narrow={narrow}
+              items={[
+                !locked && (
+                  <Button key="c" variant="outlined" startIcon={<CalculateIcon />} onClick={() => setConfirm(true)} disabled={busy}>
+                    חישוב מחדש
+                  </Button>
+                ),
+                locked
+                  ? { node: <Button data-read variant="contained" startIcon={<DownloadIcon />} onClick={exportToBase} disabled={!data}>ייצוא לבסיס</Button>, wide: true }
+                  : (
+                    <Button key="x" data-read variant="contained" startIcon={<DownloadIcon />} onClick={exportToBase} disabled={!data}>
+                      ייצוא לבסיס
+                    </Button>
+                  ),
+              ]}
+            />
           </Stack>
           <Tabs value={tab} onChange={(_, v) => setTab(v)}>
             <Tab value="matrix" label="מטריצה" />
