@@ -5,6 +5,10 @@ import {
   Box,
   Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Chip,
   CircularProgress,
   FormControlLabel,
@@ -22,6 +26,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -491,16 +496,33 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
   const { api } = useAuth();
   const [task, setTask] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
   const taskName = new Map(props.refs.tasks.map((t) => [t.id, t.name]));
   const rankName = new Map(props.refs.ranks.map((r) => [r.id, r.name]));
   const shown = props.slots.filter((s) => !task || s.task_type_id === task);
+  // a slot with a duty assigned in it can't be deleted from here
+  const selectable = shown.filter((s) => s.assigned === 0);
+  const allSelected = selectable.length > 0 && selectable.every((s) => selected.has(s.id));
+  const someSelected = selectable.some((s) => selected.has(s.id));
+  const toggleAll = () => {
+    const n = new Set(selected);
+    selectable.forEach((s) => (allSelected ? n.delete(s.id) : n.add(s.id)));
+    setSelected(n);
+  };
   const counts = new Map<string, number>();
   props.slots.forEach((s) => counts.set(s.task_type_id, (counts.get(s.task_type_id) ?? 0) + 1));
 
   async function del() {
-    await api!.deleteSlots([...selected]);
-    setSelected(new Set());
-    props.onDeleted();
+    setBusy(true);
+    try {
+      await api!.deleteSlots([...selected]);
+      setSelected(new Set());
+      props.onDeleted();
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
   }
 
   if (!props.slots.length) return <EmptyState title="עוד אין משבצות במחזור" text="קולטים את קובץ לוח המשימות למעלה – ומכאן יוצאים לשיבוץ." />;
@@ -513,17 +535,35 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
         ))}
       </Stack>
       {selected.size > 0 && !props.locked && (
-        <Box>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={del}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setConfirming(true)}>
             מחיקת {selected.size} משבצות
           </Button>
-        </Box>
+          <Button color="inherit" onClick={() => setSelected(new Set())}>
+            ניקוי הבחירה
+          </Button>
+        </Stack>
       )}
       <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: "65vh" }}>
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              {!props.locked && <TableCell padding="checkbox" />}
+              {!props.locked && (
+                <TableCell padding="checkbox">
+                  <Tooltip title={allSelected ? "ניקוי הבחירה" : `בחירת כל ${selectable.length} המוצגות`}>
+                    <span>
+                      <Checkbox
+                        size="small"
+                        disabled={!selectable.length}
+                        checked={allSelected}
+                        indeterminate={!allSelected && someSelected}
+                        onChange={toggleAll}
+                        slotProps={{ input: { "aria-label": "בחירת הכל" } }}
+                      />
+                    </span>
+                  </Tooltip>
+                </TableCell>
+              )}
               <TableCell>מועד</TableCell>
               <TableCell>משימה</TableCell>
             </TableRow>
@@ -565,6 +605,20 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
           </TableBody>
         </Table>
       </TableContainer>
+      <Dialog open={confirming} onClose={() => !busy && setConfirming(false)}>
+        <DialogTitle>מחיקת {selected.size} משבצות</DialogTitle>
+        <DialogContent>
+          <Typography>המשבצות שנבחרו יימחקו מהמחזור. אפשר לקלוט אותן שוב מקובץ לוח המשימות.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirming(false)} disabled={busy}>
+            ביטול
+          </Button>
+          <Button color="error" variant="contained" onClick={del} disabled={busy}>
+            מחיקה
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Typography variant="caption" color="text.secondary">
         ת״ש 7 = משבצת שהבסיס ייעד קודם לעובדים שלנים בבית; אם אין מהם זמין, ישובץ כל עובד זכאי. משבצת שכבר שובצה בה משימה אי אפשר למחוק מכאן.
       </Typography>

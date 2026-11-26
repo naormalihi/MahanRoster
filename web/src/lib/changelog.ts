@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.61.1",
+    date: "2026-11-26",
+    items: ["טעינת לוח משימות › משבצות במחזור: \"בחירת הכל\" בכותרת הטבלה (לפי הסינון), ואישור לפני מחיקה"],
+  },
+  {
     version: "2.61.0",
     date: "2026-11-26",
     items: [
