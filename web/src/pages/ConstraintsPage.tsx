@@ -5,8 +5,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import DownloadIcon from "@mui/icons-material/Download";
-import UploadIcon from "@mui/icons-material/UploadFile";
 import {
   Alert,
   Autocomplete,
@@ -22,8 +20,6 @@ import {
   DialogTitle,
   FormControlLabel,
   InputAdornment,
-  List,
-  ListItem,
   MenuItem,
   Paper,
   Radio,
@@ -54,11 +50,8 @@ import {
   VIA_LABEL,
   absenceDays,
   blockQuotaProblems,
-  dedupeConstraints,
   exemptionProblems,
   missingDutyList,
-  parseTemplate,
-  templateRows,
   type Absence,
   type AbsenceInput,
   type AbsenceType,
@@ -67,7 +60,6 @@ import {
   type Exemption,
   type ExemptionInput,
   type ExemptionType,
-  type ParsedConstraints,
   type ReceivedVia,
   type RequestStatus,
 } from "../lib/cycles";
@@ -1207,164 +1199,11 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
 }
 
 // ---------------------------------------------------------------------------
-// Gaf template (Excel)
-// ---------------------------------------------------------------------------
-
-function ExcelTab({ ctx }: { ctx: Ctx }) {
-  const { api } = useAuth();
-  const filter = useFilter(ctx);
-  const [gaf, setGaf] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [plan, setPlan] = useState<{ parsed: ParsedConstraints; blocks: ParsedConstraints["blocks"]; absences: ParsedConstraints["absences"]; skipped: number; quota: Map<number, string> } | null>(null);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const templateSoldiers = ctx.soldiers.filter((s) => s.is_active && (!gaf || s.gaf_name === gaf));
-
-  async function download() {
-    const XLSX = await import("xlsx");
-    const ws = XLSX.utils.aoa_to_sheet(templateRows(templateSoldiers));
-    ws["!cols"] = [{ wch: 38, hidden: true }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
-    const types = await api!.absenceTypes();
-    const help = XLSX.utils.aoa_to_sheet([
-      ["הוראות"],
-      [`מחזור: ${ctx.cycle.name} (${fmt(ctx.cycle.start_date)} – ${fmt(ctx.cycle.end_date)})`],
-      ["תאריכים בפורמט יום/חודש/שנה, למשל 15/01/2027."],
-      ["חסימה: תאריך אחד לעובד בחודש."],
-      ["היעדרות: סוג, מתאריך ועד תאריך (כולל). ליותר מהיעדרות אחת – העתיקו את שורת העובד."],
-      ["אין לשנות את העמודה הנסתרת עם מזהה העובד."],
-      [],
-      ["סוגי היעדרות:"],
-      ...types.map((t) => [t.name]),
-    ]);
-    const wb = XLSX.utils.book_new();
-    wb.Workbook = { Views: [{ RTL: true }] };
-    XLSX.utils.book_append_sheet(wb, ws, "אילוצים");
-    XLSX.utils.book_append_sheet(wb, help, "הוראות");
-    XLSX.writeFile(wb, `אילוצים-${gaf || "כל-המסגרות"}-${ctx.cycle.start_date}.xlsx`);
-  }
-
-  async function upload(file: File) {
-    setBusy(true);
-    setMsg(null);
-    setPlan(null);
-    try {
-      const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer());
-      const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" });
-      const [types, blocks, absences, quota] = await Promise.all([
-        api!.absenceTypes(),
-        api!.dateBlocks(ctx.cycle.start_date, ctx.cycle.end_date),
-        api!.absences(ctx.cycle.start_date, ctx.cycle.end_date),
-        api!.blockQuota(),
-      ]);
-      const parsed = parseTemplate(rows, ctx.soldiers, types, { from: ctx.cycle.start_date, to: ctx.cycle.end_date });
-      const d = dedupeConstraints(parsed, blocks, absences);
-      setPlan({ parsed, ...d, quota: blockQuotaProblems(d.blocks, blocks, quota) });
-    } catch (e) {
-      setMsg({ ok: false, text: `לא הצלחתי לקרוא את הקובץ: ${(e as Error).message}` });
-    }
-    setBusy(false);
-  }
-
-  async function apply() {
-    if (!plan) return;
-    setBusy(true);
-    try {
-      const blocks = plan.blocks.filter((_, i) => !plan.quota.has(i));
-      await api!.addAbsences(plan.absences);
-      await api!.addDateBlocks(blocks, ctx.cycle.id);
-      setMsg({ ok: true, text: `נקלטו ${plan.absences.length} היעדרויות ו-${blocks.length} חסימות.` });
-      setPlan(null);
-      ctx.reload();
-    } catch (e) {
-      setMsg({ ok: false, text: (e as Error).message });
-    }
-    setBusy(false);
-  }
-
-  const problems = plan ? [...plan.parsed.errors, ...[...plan.quota].map(([i, m]) => ({ line: plan.blocks[i].line, message: `${plan.blocks[i].name}: ${m}` }))] : [];
-
-  return (
-    <Stack spacing={2} sx={{ maxWidth: 860 }}>
-      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-        <Stack spacing={2}>
-          <Typography variant="h3">1. הורדת תבנית למסגרת</Typography>
-          <Typography variant="body2" color="text.secondary">
-            התבנית כוללת את רשימת העובדים של המסגרת. נציג המסגרת ממלא חסימות והיעדרויות ומחזיר אותה. בלי מספרים אישיים.
-          </Typography>
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-            <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 180 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-              <MenuItem value="">כל המסגרות</MenuItem>
-              {filter.gafim.map((g) => (
-                <MenuItem key={g} value={g}>
-                  {g}
-                </MenuItem>
-              ))}
-            </TextField>
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={download} disabled={!templateSoldiers.length}>
-              הורדת תבנית ({templateSoldiers.length} עובדים)
-            </Button>
-          </Stack>
-        </Stack>
-      </Paper>
-      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-        <Stack spacing={2}>
-          <Typography variant="h3">2. טעינת תבנית מלאה</Typography>
-          <Box>
-            <Button variant="contained" component="label" startIcon={<UploadIcon />} disabled={busy}>
-              בחירת קובץ
-              <input
-                hidden
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) void upload(f);
-                }}
-              />
-            </Button>
-          </Box>
-          {busy && <CircularProgress size={24} />}
-          {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
-          {plan && (
-            <>
-              <Alert severity={plan.absences.length + plan.blocks.length - plan.quota.size > 0 ? "info" : "warning"}>
-                ייקלטו {plan.absences.length} היעדרויות ו-{plan.blocks.length - plan.quota.size} חסימות.
-                {plan.skipped > 0 && ` ${plan.skipped} שורות כבר רשומות במערכת ודולגו.`}
-              </Alert>
-              {problems.length > 0 && (
-                <Alert severity="warning">
-                  <b>{problems.length} שורות לא ייקלטו:</b>
-                  <List dense disablePadding>
-                    {problems.slice(0, 30).map((p, i) => (
-                      <ListItem key={i} disableGutters sx={{ py: 0 }}>
-                        שורה {p.line}: {p.message}
-                      </ListItem>
-                    ))}
-                  </List>
-                </Alert>
-              )}
-              <Stack direction="row" spacing={1}>
-                <Button variant="contained" onClick={apply} disabled={busy || plan.absences.length + plan.blocks.length - plan.quota.size === 0}>
-                  קליטה
-                </Button>
-                <Button onClick={() => setPlan(null)}>ביטול</Button>
-              </Stack>
-            </>
-          )}
-        </Stack>
-      </Paper>
-    </Stack>
-  );
-}
-
-// ---------------------------------------------------------------------------
 
 const TABS = [
   { key: "exemptions", label: "פטורים" },
   { key: "absences", label: "היעדרויות" },
   { key: "blocks", label: "חסימות" },
-  { key: "excel", label: "תבנית למסגרות" },
 ] as const;
 
 export function ConstraintsPage() {
@@ -1411,14 +1250,13 @@ export function ConstraintsPage() {
             sx={narrow ? { "& .MuiTab-root": { minWidth: 0, px: 0.5 } } : undefined}
           >
             {TABS.map((t) => (
-              <Tab key={t.key} value={t.key} label={narrow && t.key === "excel" ? "תבנית" : t.label} />
+              <Tab key={t.key} value={t.key} label={t.label} />
             ))}
           </Tabs>
           <Box key={`${ctx.cycle.id}-${version}`}>
             {tab === "exemptions" && <ExemptionsTab ctx={ctx} />}
             {tab === "absences" && <AbsencesTab ctx={ctx} />}
             {tab === "blocks" && <BlocksTab ctx={ctx} />}
-            {tab === "excel" && <ExcelTab ctx={ctx} />}
           </Box>
         </>
       )}
