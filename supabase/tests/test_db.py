@@ -3512,7 +3512,7 @@ def test_employee_updates_own_range_and_gets_reminders(conn):
         mine = c.execute("select public.my_range()").fetchone()[0]
         assert mine["valid_until"] == until.isoformat() and mine["self_updated_at"] and mine["validity_months"] == 6
         with pytest.raises(psycopg.errors.RaiseException, match="בעתיד"), c.transaction():
-            c.execute("select public.update_my_range(%s)", (today + timedelta(days=1),))
+            c.execute("select public.update_my_range(%s)", (today + timedelta(days=2),))
         c.execute("reset role")
         # expiring within 14 days: one reminder
         assert until <= today + timedelta(days=14)
