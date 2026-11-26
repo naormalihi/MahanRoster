@@ -1005,6 +1005,7 @@ export function SoldiersPage() {
     { label: "שירות", key: "service", by: (s) => effectiveService(s) },
     { label: "תום שירות", key: "release", by: (s) => s.release_date ?? "9999" },
     { label: "תאריך קליטה", key: "join", by: (s) => s.unit_join_date ?? "" },
+    { label: "כניסה לקבע", key: "career", by: (s) => s.career_start_date ?? "" },
     {
       label: "ת״ש",
       key: "tash",
@@ -1532,6 +1533,7 @@ export function SoldiersPage() {
                       {appointed ? ` (מינוי ${rankName.get(s.appointment_rank_id!)})` : ""} · {s.gaf_name} · {SERVICE[effectiveService(s)]}
                       {s.release_date ? ` · תום שירות ${fmt(s.release_date)}` : ""}
                       {s.unit_join_date ? ` · נקלט ${fmt(s.unit_join_date)}` : ""}
+                      {s.career_start_date ? ` · קבע מ-${fmt(s.career_start_date)}` : ""}
                     </>
                   }
                   lines={[
@@ -1738,6 +1740,7 @@ export function SoldiersPage() {
                           <Chip size="small" color="info" variant="outlined" label={`חדש עד ${fmt(newUntil(s))}`} sx={{ ml: 0.5 }} />
                         )}
                       </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{fmt(s.career_start_date ?? null)}</TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {tashBy(s) ? (
                           <Chip size="small" variant="outlined" label="ת״ש 7" />
