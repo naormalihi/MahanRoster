@@ -3690,3 +3690,13 @@ def test_my_profile_and_fix_requests(conn):
         assert c.execute("select status, reply from profile_fix_requests where id = %s", (rid,)).fetchone() == ("fixed", "עודכן לסוג 7")
         assert c.execute("select count(*) from notifications where recipient_user_id = %s and type = 'profile_fix_done'",
                          (uid,)).fetchone()[0] == 1
+
+
+def test_send_test_notification(conn):
+    uid, _ = _soldier_account(conn, "test.push")
+    with session_as(conn, uid, aal="aal1") as c:
+        c.execute("select public.send_test_notification()")
+        with pytest.raises(psycopg.errors.RaiseException, match="בעוד דקה"), c.transaction():
+            c.execute("select public.send_test_notification()")
+        c.execute("reset role")
+        assert c.execute("select count(*) from notifications where recipient_user_id = %s and type = 'test'", (uid,)).fetchone()[0] == 1

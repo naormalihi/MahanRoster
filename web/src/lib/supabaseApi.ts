@@ -175,6 +175,10 @@ export class SupabaseApi implements Api {
     run(await this.sb.rpc("rename_me", { p_username: username, p_password: password }));
   }
 
+  async sendTestNotification() {
+    maybe(await this.sb.rpc("send_test_notification"));
+  }
+
   async changePassword(newPassword: string) {
     const { error } = await this.sb.auth.updateUser({ password: newPassword });
     if (error) throw new Error(error.message);
