@@ -3612,3 +3612,51 @@ def test_live_data_version_moves_on_a_change_only(conn):
         mid = v()
         c.execute("update app_users set last_login_at = now() where id = %s", (COORD,))
         assert v() == mid
+
+
+def test_service_switch_replaces_the_earlier_score_with_the_new_groups_average(conn):
+    """חובה → קבע: the points from the mandatory service don't carry over; the career group's average does."""
+    cycle = conn.cycle_id
+    with conn.transaction():
+        start = conn.execute("select start_date from cycles where id = %s", (cycle,)).fetchone()[0]
+        prev = conn.execute(
+            "insert into cycles (name, start_date, end_date, status) values ('קודם', %s, %s, 'published') returning id",
+            (start - timedelta(days=60), start - timedelta(days=1))).fetchone()[0]
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        sol = conn.execute("""select s.id from soldiers s join cycle_soldier_snapshot sn on sn.soldier_id = s.id
+                              where sn.cycle_id = %s and sn.balance_population = 'mandatory' and (s.release_date is null or s.release_date > %s::date + 400)
+                              order by s.full_name limit 1""", (cycle, start)).fetchone()[0]
+        conn.execute("select public.snapshot_cycle(%s)", (prev,))
+        assert conn.execute("select balance_population from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
+                            (prev, sol)).fetchone()[0] == "mandatory"
+        task = conn.execute("select id from task_types order by code limit 1").fetchone()[0]
+        k = conn.execute("""insert into slots (cycle_id, task_type_id, starts_at, ends_at)
+                            values (%s, %s, (%s::timestamp at time zone 'Asia/Jerusalem'), (%s::timestamp at time zone 'Asia/Jerusalem') + interval '1 day')
+                            returning id""", (prev, task, start - timedelta(days=20), start - timedelta(days=20))).fetchone()[0]
+        conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, points, normalized_points) "
+                     "select %s, id, gaf_id, 'performer', 'assigned', 150, 150 from soldiers where id = %s", (k, sol))
+        # now career, from before this cycle
+        conn.execute("update soldiers set service_type = 'career', career_start_date = %s where id = %s", (start - timedelta(days=1), sol))
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        pop, base, grp = conn.execute("select balance_population, baseline_score, fairness_group from cycle_soldier_snapshot "
+                                      "where cycle_id = %s and soldier_id = %s", (cycle, sol)).fetchone()
+        assert pop == "career"
+        avg = conn.execute("""select round(avg(baseline_score), 2) from cycle_soldier_snapshot
+                              where cycle_id = %s and fairness_group is not distinct from %s and soldier_id <> %s""",
+                           (cycle, grp, sol)).fetchone()[0] or 0
+        assert abs(base - avg) < 0.01 and base < 150
+        at, to = conn.execute("select service_switch_at, service_switch_to from soldiers where id = %s", (sol,)).fetchone()
+        assert at == start and to == "career"
+        # a correction for this cycle still adds on top
+        conn.execute("insert into score_adjustments (soldier_id, points, effective_date, reason, cycle_id) values (%s, 5, %s, 'manual', %s)",
+                     (sol, start - timedelta(days=1), cycle))
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        assert abs(conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
+                                (cycle, sol)).fetchone()[0] - avg - 5) < 0.01
+        # the dates were wrong after all: back to mandatory – the switch is forgotten, the history counts again
+        conn.execute("update soldiers set service_type = 'mandatory', career_start_date = null where id = %s", (sol,))
+        conn.execute("select public.snapshot_cycle(%s)", (cycle,))
+        assert conn.execute("select service_switch_at from soldiers where id = %s", (sol,)).fetchone()[0] is None
+        assert conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
+                            (cycle, sol)).fetchone()[0] >= 150
+        raise psycopg.Rollback()

@@ -43,6 +43,10 @@ export interface SoldierDetail {
   unit_join_date?: string | null;
   /** a new soldier's opening score (his group's mean) */
   opening_score?: number | null;
+  /** חובה ↔ קבע: the cycle start where the service changed, the score it got (its new group's mean) */
+  service_switch_at?: string | null;
+  service_switch_score?: number | null;
+  service_switch_to?: string | null;
   is_active: boolean;
   load_roles: SoldierLoadRole[];
 }
