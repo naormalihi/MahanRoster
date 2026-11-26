@@ -9,6 +9,7 @@ import { useAuth } from "./auth";
 import { planningCycle, type Cycle } from "./cycles";
 import { RETURN_EVENT } from "./refreshOnReturn";
 import { dayKey } from "./dates";
+import { LIVE_EVENT } from "./live";
 
 const KEY = "mahan.cycle";
 
@@ -61,7 +62,11 @@ export function CycleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const on = () => void reload().catch(() => undefined);
     window.addEventListener(RETURN_EVENT, on);
-    return () => window.removeEventListener(RETURN_EVENT, on);
+    window.addEventListener(LIVE_EVENT, on);
+    return () => {
+      window.removeEventListener(RETURN_EVENT, on);
+      window.removeEventListener(LIVE_EVENT, on);
+    };
   }, [reload]);
 
   const setCycleId = useCallback((id: string) => {

@@ -54,6 +54,7 @@ import {
   type ScheduleJob,
   jobErrorText,
 } from "../lib/schedule";
+import { useLiveTick } from "../lib/live";
 
 const tsFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 const fmtDate = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
@@ -299,6 +300,7 @@ function Result({ job, slots, tasks, pools, names }: { job: ScheduleJob; slots: 
  * button with what it does. onDone fires when a run finishes, so the draft below reloads.
  */
 export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle } = useCycle();
@@ -312,12 +314,12 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
   const [names, setNames] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     api!.soldiers().then((s) => setNames(new Map(s.map((x) => [x.id, x.full_name])))).catch(() => setNames(new Map()));
-  }, [api]);
+  }, [api, live]);
 
   useEffect(() => {
     if (!cycleId) return;
     api!.snapshotSoldiers(cycleId).then((sn) => setPools(poolNames(sn))).catch(() => setPools(new Map()));
-  }, [api, cycleId, jobs?.length]);
+  }, [api, cycleId, jobs?.length, live]);
 
   useEffect(() => {
     // whether the automatic start is set up is a staff question; a reader just watches
@@ -328,7 +330,7 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
         setConfigured(conf);
       })
       .catch((e) => setError((e as Error).message));
-  }, [api, me]);
+  }, [api, me, live]);
 
   // a dropped connection during a run is retried quietly; it shows only if it lasts
   const polls = useRef(pollFailures());
@@ -344,13 +346,16 @@ export function SchedulePage({ onDone }: { onDone?: () => void } = {}) {
     }
   }, [api, cycleId]);
 
+  // another cycle: start empty; a live change: load over what is shown
   useEffect(() => {
-    if (!cycleId) return;
     setJobs(null);
     setSlots(null);
+  }, [cycleId]);
+  useEffect(() => {
+    if (!cycleId) return;
     void loadJobs();
     api!.cycleSlots(cycleId).then(setSlots).catch((e) => setError((e as Error).message));
-  }, [api, cycleId, loadJobs]);
+  }, [api, cycleId, loadJobs, live]);
 
   const active = jobs?.find(isActive);
   useEffect(() => {

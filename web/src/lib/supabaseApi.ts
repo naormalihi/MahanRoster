@@ -651,6 +651,10 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.from("exemptions").update({ excluded_task_type_ids: taskTypeIds, kind: "partial" }).eq("id", id));
   }
 
+  async dataVersion() {
+    return Number(check(await this.sb.rpc("data_version")));
+  }
+
   async viewAsStart(soldierId: string) {
     run(await this.sb.rpc("view_as_start", { p_soldier: soldierId }));
   }

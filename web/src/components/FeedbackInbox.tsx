@@ -26,6 +26,7 @@ import {
   type FeedbackItem,
   type FeedbackStatus,
 } from "../lib/feedback";
+import { useLiveTick } from "../lib/live";
 
 const ORDER: FeedbackStatus[] = ["new", "in_progress", "done", "wont"];
 
@@ -146,6 +147,7 @@ function Item({ f, onSaved }: { f: FeedbackItem; onSaved: () => void }) {
  *  On the home screen (`home`): only what still waits – new and in progress – with no filter;
  *  "בוצע" / "לא ייעשה" leave it at once, and with nothing open the box is not shown. */
 export function FeedbackInbox({ home = false }: { home?: boolean }) {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const [items, setItems] = useState<FeedbackItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +157,7 @@ export function FeedbackInbox({ home = false }: { home?: boolean }) {
   const load = useCallback(() => {
     api!.feedbackList().then(setItems, (e) => setError((e as Error).message));
   }, [api]);
-  useEffect(load, [load]);
+  useEffect(load, [load, live]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!items)
@@ -258,11 +260,12 @@ export function FeedbackInbox({ home = false }: { home?: boolean }) {
 
 /** On the home screen: "N new messages in הצעות ומשוב" – a count only, no notice. */
 export function FeedbackCount({ to }: { to: string }) {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [n, setN] = useState(0);
   useEffect(() => {
     api!.feedbackNewCount().then(setN, () => setN(0));
-  }, [api]);
+  }, [api, live]);
   if (!n) return null;
   return (
     <Alert

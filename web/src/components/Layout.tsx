@@ -28,11 +28,12 @@ import {
   DialogContent,
   DialogTitle,
 } from "@mui/material";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { ViewAsScope } from "./ViewAsBanner";
+import { useLivePoller } from "../lib/live";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { useReturnCounter } from "../lib/refreshOnReturn";
@@ -260,6 +261,9 @@ function sessionOnce(key: string): boolean {
 export function Layout({ children }: { children: ReactNode }) {
   const returned = useReturnCounter();
   const { me, api, signOut } = useAuth();
+  // "רענון חי": every open screen follows the server's changes (useCallback: one poller per sign-in)
+  const readVersion = useCallback(() => api!.dataVersion(), [api]);
+  useLivePoller(api && me ? readVersion : null);
   const staff = isStaff(me);
   const reader = canRead(me);
   const compact = useMediaQuery("(max-width:1099.95px)");

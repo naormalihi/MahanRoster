@@ -75,6 +75,7 @@ import {
 } from "../lib/soldiers";
 import type { Cycle, Exemption, ExemptionType } from "../lib/cycles";
 import { currentCycle, currentScore, cycleScores, isPublished, nextCycle, summarize } from "../lib/lastCycle";
+import { useLiveTick } from "../lib/live";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
 const RANGE_CHIP: Record<
@@ -721,6 +722,7 @@ function BulkRangeDialog(props: {
 // ---------------------------------------------------------------------------
 
 export function SoldiersPage() {
+  const live = useLiveTick();
   const { api, me, refresh } = useAuth();
   const navigate = useNavigate();
   // "צפייה כעובד": the app turns into his screens, read only, until "חזרה לחשבון שלי"
@@ -739,7 +741,7 @@ export function SoldiersPage() {
   useEffect(() => {
     if (staffUser) return;
     api!.myCommandedGafs().then((g) => setCommanded(new Set(g)), () => setCommanded(new Set()));
-  }, [api, staffUser]);
+  }, [api, staffUser, live]);
   const manages = (s: { gaf_id: string }) => staffUser || commanded.has(s.gaf_id);
   const canManage = staffUser || commanded.size > 0;
   const [accounts, setAccounts] = useState<Map<string, SoldierAccount>>(new Map());
@@ -753,7 +755,7 @@ export function SoldiersPage() {
   }, [api, canManage]);
   useEffect(() => {
     void loadAccounts();
-  }, [loadAccounts]);
+  }, [loadAccounts, live]);
   const [rows, setRows] = useState<SoldierDetail[] | null>(null);
   const [ranks, setRanks] = useState<NamedRef[]>([]);
   const [loadRoles, setLoadRoles] = useState<LoadRoleRef[]>([]);
@@ -767,7 +769,7 @@ export function SoldiersPage() {
   const [onlyNew, setOnlyNew] = useState(false);
   useEffect(() => {
     api?.scoringSettings().then((x) => setGraceDays(x.grace_days), () => undefined);
-  }, [api]);
+  }, [api, live]);
   const newUntil = (s: SoldierDetail) => {
     if (!s.unit_join_date || !graceDays) return null;
     const last = addDaysIso(s.unit_join_date, graceDays - 1);
@@ -843,7 +845,7 @@ export function SoldiersPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, live]);
 
   useEffect(() => {
     const loadRef = async (c: Cycle | undefined): Promise<Ref | null> => {
@@ -863,14 +865,14 @@ export function SoldiersPage() {
       setCur(null);
       setNxt(null);
     });
-  }, [api]);
+  }, [api, live]);
   // hand corrections (staff): counted in the current score of the cycle they were given for
   const [corrections, setCorrections] = useState<ScoreCorrection[]>([]);
   const loadCorrections = useCallback(() => {
     if (!staffUser) return;
     api!.scoreCorrections().then(setCorrections, () => setCorrections([]));
   }, [api, staffUser]);
-  useEffect(loadCorrections, [loadCorrections]);
+  useEffect(loadCorrections, [loadCorrections, live]);
   const correctionOf = (id: string, cycleId?: string) =>
     cycleId ? corrections.filter((c) => c.soldier_id === id && c.cycle_id === cycleId).reduce((t, c) => t + c.points, 0) : 0;
   // between cycles there is no current one: a correction given for the next cycle is the score to start from

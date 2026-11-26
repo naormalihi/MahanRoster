@@ -59,6 +59,7 @@ import {
 import type { NamedRef } from "../lib/api";
 import { whatsappUrl } from "../lib/invites";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
+import { useLiveTick } from "../lib/live";
 
 function SoldierPicker(props: { soldiers: ExistingSoldier[]; value: string | null; onChange: (id: string | null) => void; autoFocus?: boolean }) {
   const options = useMemo(() => props.soldiers.filter((s) => s.is_active), [props.soldiers]);
@@ -190,6 +191,7 @@ function CreateDialog(props: { soldiers: ExistingSoldier[]; taken: string[]; onC
 }
 
 export function UsersTab() {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const narrow = useNarrow();
   const [users, setUsers] = useState<AppUser[] | null>(null);
@@ -206,7 +208,7 @@ export function UsersTab() {
   const [gafim, setGafim] = useState<NamedRef[]>([]);
   useEffect(() => {
     api!.gafim().then(setGafim, () => setGafim([]));
-  }, [api]);
+  }, [api, live]);
   const [revoking, setRevoking] = useState<{ user: AppUser; role: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<UserKind | null>(null);
@@ -231,7 +233,7 @@ export function UsersTab() {
   useEffect(() => {
     load();
     api!.soldiers().then(setSoldiers).catch(() => setSoldiers([]));
-  }, [api, load]);
+  }, [api, load, live]);
 
   const shown = users ? filterUsers(users, { kind, state, q }) : [];
   const gafOf = new Map(soldiers.map((s) => [s.id, s.gaf_name]));

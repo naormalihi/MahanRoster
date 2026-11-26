@@ -24,12 +24,14 @@ import { useAuth } from "../lib/auth";
 import { scoringProblems, type ScoringSettings } from "../lib/catalog";
 import { plannedRangeProblems, rangeWhen, type PlannedRange, type PlannedRangeInput } from "../lib/range";
 import { DateTextField } from "./DateTextField";
+import { useLiveTick } from "../lib/live";
 
 const todayIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
 const EMPTY: PlannedRangeInput = { day: "", starts: "08:00", ends: null, place: null, note: null };
 
 /** Settings › מטווחים: the planned ranges, and how the validity and the reminders are counted. */
 export function RangesTab() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [list, setList] = useState<PlannedRange[] | null>(null);
   const [s, setS] = useState<ScoringSettings | null>(null);
@@ -48,7 +50,7 @@ export function RangesTab() {
       setError((e as Error).message);
     }
   }, [api]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
 
   async function saveRange() {
     if (!editing) return;

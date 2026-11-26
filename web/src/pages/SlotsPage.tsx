@@ -50,6 +50,7 @@ import { HOLIDAY_TYPES, type TaskType } from "../lib/catalog";
 import type { Cycle } from "../lib/cycles";
 import { shortDayLabel, spanLabel, TZ } from "../lib/dates";
 import { useNarrow } from "../components/CardList";
+import { useLiveTick } from "../lib/live";
 
 const fmtDay = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
@@ -629,6 +630,7 @@ function SlotList(props: { slots: SlotRow[]; refs: Refs; onDeleted: () => void; 
 // ---------------------------------------------------------------------------
 
 export function SlotsPage() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, locked } = useCycle();
@@ -654,18 +656,18 @@ export function SlotsPage() {
         setRefs({ tasks, categories, ranks, aliases, weekend: sc.weekend_weekdays, holidays });
       })
       .catch((e) => setError((e as Error).message));
-  }, [api]);
+  }, [api, live]);
 
   const loadSlots = useCallback(async () => {
     if (!cycleId) return;
-    setSlots(null);
     try {
       setSlots(await api!.cycleSlots(cycleId));
     } catch (e) {
       setError((e as Error).message);
     }
   }, [api, cycleId]);
-  useEffect(() => void loadSlots(), [loadSlots]);
+  useEffect(() => setSlots(null), [cycleId]); // another cycle: start empty
+  useEffect(() => void loadSlots(), [loadSlots, live]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!cycles || !refs) return <Loading />;

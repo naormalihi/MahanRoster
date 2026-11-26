@@ -54,6 +54,7 @@ import {
 import { dayKey } from "../lib/dates";
 import { DeadlineEditor } from "../components/DeadlineEditor";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
+import { useLiveTick } from "../lib/live";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const today = () => dayKey(new Date());
@@ -142,6 +143,7 @@ function CycleDialog(props: { cycle: Cycle | null; all: Cycle[]; onClose: () => 
 }
 
 export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?: boolean }) {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const staff = isStaff(me);
   const navigate = useNavigate();
@@ -156,7 +158,7 @@ export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?:
     return () => {
       live = false;
     };
-  }, [api, cycle.id, cycle.status, cycle.exemption_deadline, cycle.potential_computed_at, cycle.published_at]);
+  }, [api, cycle.id, cycle.status, cycle.exemption_deadline, cycle.potential_computed_at, cycle.published_at, live]);
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
@@ -213,6 +215,7 @@ export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?:
 }
 
 export function CyclesPage() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const narrow = useNarrow();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
@@ -228,7 +231,7 @@ export function CyclesPage() {
       setError((e as Error).message);
     }
   }, [api, reloadContext]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!cycles)

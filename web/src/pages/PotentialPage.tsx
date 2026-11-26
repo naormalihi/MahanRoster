@@ -56,6 +56,7 @@ import {
 } from "../lib/potential";
 import type { ExistingSoldier } from "../lib/roster";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
+import { useLiveTick } from "../lib/live";
 
 const fmt = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const short = (iso: string) => `${Number(iso.slice(8, 10))}.${Number(iso.slice(5, 7))}`;
@@ -78,11 +79,12 @@ interface Data {
 
 /** "שחרור 07.02.2027 · 01.06–30.06 · 30 ימים" – the days a fraction leaves out, cause by cause */
 function WhyDays({ cycleId, cell }: { cycleId: string; cell: PotentialCell }) {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [rows, setRows] = useState<PotentialWhy[] | null>(null);
   useEffect(() => {
     api!.potentialCellWhy(cycleId, cell.soldier_id, cell.best_task_type_id).then(setRows, () => setRows([]));
-  }, [api, cycleId, cell.soldier_id, cell.best_task_type_id]);
+  }, [api, cycleId, cell.soldier_id, cell.best_task_type_id, live]);
   if (!rows) return <CircularProgress size={18} />;
   if (!rows.length) return null;
   const missing = cell.cycle_days - cell.available_days;
@@ -461,6 +463,7 @@ function HeatTab({ daily, categories }: { daily: DailyAvailability[] | null; cat
 // ---------------------------------------------------------------------------
 
 export function PotentialPage() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const { cycleId, reload: reloadCycle, locked } = useCycle();
@@ -491,17 +494,17 @@ export function PotentialPage() {
 
   useEffect(() => {
     loadCycles().catch((e) => setError((e as Error).message));
-  }, [loadCycles]);
+  }, [loadCycles, live]);
 
   const cycle = cycles?.find((c) => c.id === cycleId);
   const computed = !!cycle?.potential_computed_at;
 
   const loadData = useCallback(async () => {
     if (!cycleId) return;
-    setData(null);
     try {
+      // a live reload keeps the daily view shown until the new one is in
       const [cells, snapshot] = await Promise.all([api!.potentialMatrix(cycleId), api!.snapshotSoldiers(cycleId)]);
-      setData({ cells, snapshot, daily: null });
+      setData((d) => ({ cells, snapshot, daily: d?.daily ?? null }));
       const daily = await api!.potentialDaily(cycleId);
       setData((d) => (d ? { ...d, daily } : d));
     } catch (e) {
@@ -509,10 +512,11 @@ export function PotentialPage() {
     }
   }, [api, cycleId]);
 
+  useEffect(() => setData(null), [cycleId]); // another cycle: start empty
   useEffect(() => {
     if (computed) void loadData();
     else setData(null);
-  }, [computed, loadData]);
+  }, [computed, loadData, live]);
 
   // Only categories with at least one active duty show up in the matrix.
   const shownCategories = useMemo(() => {

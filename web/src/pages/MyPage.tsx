@@ -28,6 +28,7 @@ import { DutyNote } from "../components/DutyNote";
 import { SwapDialog, SwapsCard } from "../components/SwapDialog";
 import CloudOffIcon from "@mui/icons-material/CloudOffOutlined";
 import { isOfflineError, OfflineError, readOffline, saveOffline, savedLabel } from "../lib/offline";
+import { useLiveTick } from "../lib/live";
 
 const ROLE: Record<MyDuty["role"], string> = { performer: "מבצע", reserve: "עתודה" };
 
@@ -170,6 +171,7 @@ function ScoreCard({ s }: { s: MyScore }) {
 
 /** The soldier's own screen (version 2.1): his next duty, his score, and all his duties. */
 export function MyPage() {
+  const live = useLiveTick();
   const { api, me, offline } = useAuth();
   // no reception: the copy kept on the device, from this time; actions are off until it is back
   const [stale, setStale] = useState<string | null>(null);
@@ -207,7 +209,7 @@ export function MyPage() {
       })
       .catch(fromCopy);
     api!.mySwaps().then(setSwaps, () => setSwaps([]));
-  }, [api, me, offline, tick]);
+  }, [api, me, offline, tick, live]);
 
   // reception back while a copy is shown: load again
   useEffect(() => {

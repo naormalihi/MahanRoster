@@ -26,6 +26,7 @@ import { DutyNote } from "./DutyNote";
 import { NOTE_MAX } from "../lib/baseSchedule";
 import { useAuth } from "../lib/auth";
 import { dayLabel, timeLabel } from "../lib/dates";
+import { useLiveTick } from "../lib/live";
 
 /** Day units of a duty (24 h each from its start; a remainder is one more). */
 export const dayUnits = (startIso: string, endIso: string) =>
@@ -181,6 +182,7 @@ function NoteEditor({ slot, canEdit, onSaved }: { slot: SlotPeople["slot"]; canE
 }
 
 export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: string; onClose: () => void; onChanged: () => void }) {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const staff = isStaff(me);
   const phone = useMediaQuery(useTheme().breakpoints.down("sm"));
@@ -196,7 +198,7 @@ export function SlotActionsDialog({ slotId, onClose, onChanged }: { slotId: stri
 
   useEffect(() => {
     api!.slotPeople(slotId).then(setData, (e) => setError((e as Error).message));
-  }, [api, slotId, version]);
+  }, [api, slotId, version, live]);
 
   const changed = () => {
     setActivating(null);

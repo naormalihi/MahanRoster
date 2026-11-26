@@ -7,6 +7,7 @@ import { useAuth } from "../lib/auth";
 import { dayLabel } from "../lib/dates";
 import type { MyDuty } from "../lib/me";
 import { additionsByValue, buildExamples, exampleTask, loadRoleExamples, num, orList, taskNote, type ScoringRules } from "../lib/scoringRules";
+import { useLiveTick } from "../lib/live";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -60,6 +61,7 @@ const Line = ({ b, children }: { b: string; children: ReactNode }) => (
 
 /** "איך מחושב הניקוד": short and to the point – the formula, examples, the numbers, fairness, and why I got it. */
 export function ScoringPage() {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const soldier = isSoldier(me);
   const [rules, setRules] = useState<ScoringRules | null>(null);
@@ -69,7 +71,7 @@ export function ScoringPage() {
   useEffect(() => {
     api!.scoringRules().then(setRules, (e) => setError((e as Error).message));
     if (soldier) api!.myDuties().then(setDuties, () => setDuties([]));
-  }, [api, soldier]);
+  }, [api, soldier, live]);
 
   if (error) return <ErrorState text={error} onRetry={() => window.location.reload()} />;
   if (!rules)

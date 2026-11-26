@@ -45,6 +45,7 @@ import { timeWords } from "../lib/printSheet";
 import { useAuth } from "../lib/auth";
 import { daySummaries, type DaySummary, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix } from "../lib/board";
 import { addDays, dayKey, dayLabel, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
+import { useLiveTick } from "../lib/live";
 
 type Range = "week" | "next" | "weekend" | "month";
 
@@ -570,6 +571,7 @@ function CalendarExport({ query }: { query: string }) {
 }
 
 export function BoardPage() {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const staff = isStaff(me);
   const [slotOpen, setSlotOpen] = useState<string | null>(null);
@@ -616,7 +618,7 @@ export function BoardPage() {
       })
       .catch((e) => setError((e as Error).message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, from, to, version]);
+  }, [api, from, to, version, live]);
 
   const jumpTo = (iso: string) => {
     const d = new Date(iso);
