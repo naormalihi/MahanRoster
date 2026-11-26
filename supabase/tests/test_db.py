@@ -3517,3 +3517,27 @@ def test_employee_updates_own_range_and_gets_reminders(conn):
         assert c.execute("select notified_at is not null from planned_ranges where id = %s", (rid,)).fetchone()[0]
         c.execute("update soldiers set range_valid_until = %s where id = %s", (today + timedelta(days=200), sid))
         assert c.execute("select range_self_updated_at from soldiers where id = %s", (sid,)).fetchone()[0] is None
+
+
+def test_exemption_type_set_aside_keeps_old_rows_but_not_new_ones(conn):
+    uid, sid = _soldier_account(conn, "types.in.use")
+    with conn.transaction():
+        old_t = conn.execute("insert into exemption_types (name) values ('סוג ישן לבדיקה') returning id").fetchone()[0]
+        keep = conn.execute("select id from exemption_types where is_active and id <> %s and not requires_duty_list limit 1", (old_t,)).fetchone()[0]
+        ex = conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+                             values (%s, %s, 'full', current_date, current_date + 3, 'approved', now()) returning id""", (sid, old_t)).fetchone()[0]
+        conn.execute("update exemption_types set is_active = false where id = %s", (old_t,))
+        # the saved row still works and can be edited without changing its type
+        conn.execute("update exemptions set end_date = end_date + 1 where id = %s", (ex,))
+        with pytest.raises(psycopg.Error, match="לא בשימוש"):
+            with conn.transaction():
+                conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date)
+                                values (%s, %s, 'full', current_date, current_date + 1)""", (sid, old_t))
+        conn.execute("update exemptions set exemption_type_id = %s where id = %s", (keep, ex))
+        with pytest.raises(psycopg.Error, match="לא בשימוש"):
+            with conn.transaction():
+                conn.execute("update exemptions set exemption_type_id = %s where id = %s", (old_t, ex))
+        with session_as(conn, uid, aal="aal1") as c:
+            names = {t["name"] for t in c.execute("select public.my_input_options()").fetchone()[0]["exemption_types"]}
+        assert "סוג ישן לבדיקה" not in names and names
+        raise psycopg.Rollback()

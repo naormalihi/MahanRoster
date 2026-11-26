@@ -123,7 +123,8 @@ const EXEMPTION_TYPES: ExemptionType[] = [
   { id: "e_shachar", name: "שח\"ר", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_bereaved", name: "משפחה שכולה", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_tash7", name: "ת\"ש 7 – לינה בבית", qualifies_day_only: false, allows_partial_restriction: false, home_nightly: true },
-];
+  // the unit uses only these two (2.62.1)
+].map((t) => ({ ...t, is_active: t.id === "e_full" || t.id === "e_part" }));
 const ABSENCE_TYPES = ["חופשה", "קורס", "יציאה לחו\"ל", "מחלה", "אחר"].map((name, i) => ({ id: `a${i}`, name }));
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
@@ -1655,7 +1656,7 @@ export class DemoApi implements Api {
     await delay();
     const today = new Date().toISOString().slice(0, 10);
     return {
-      exemption_types: EXEMPTION_TYPES.map((t) => ({ id: t.id, name: t.name, requires_duty_list: !!t.requires_duty_list })),
+      exemption_types: EXEMPTION_TYPES.filter((t) => t.is_active).map((t) => ({ id: t.id, name: t.name, requires_duty_list: !!t.requires_duty_list })),
       eligible_tasks: (await this.taskTypes()).filter((t) => t.is_active).map((t) => ({ id: t.id, name: t.name })),
       absence_types: ABSENCE_TYPES.filter((t) => t.name !== "מחלה"),
       block_quota_per_month: 1,

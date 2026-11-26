@@ -389,7 +389,7 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
     <FormDialog title={ed ? `עריכת פטור – ${nameOf(props.ctx, ed.soldier_id)}` : "פטור חדש"} error={error} busy={busy} onClose={props.onClose} onSave={save}>
       {!ed && <SoldierPicker soldiers={props.ctx.soldiers} value={e.soldier_id} onChange={(v) => setE({ ...e, soldier_id: v })} autoFocus />}
       <TextField select label="סוג פטור" value={e.exemption_type_id} onChange={(ev) => setE({ ...e, exemption_type_id: ev.target.value })} fullWidth>
-        {props.types.map((t) => (
+        {props.types.filter((t) => t.is_active !== false || t.id === ed?.exemption_type_id).map((t) => (
           <MenuItem key={t.id} value={t.id}>
             {t.name}
           </MenuItem>

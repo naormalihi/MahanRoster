@@ -181,6 +181,8 @@ export interface ExemptionType {
   home_nightly?: boolean;
   /** פטור חלקי: saved only with the duties the employee can't do */
   requires_duty_list?: boolean;
+  /** false: set aside – kept for the exemptions saved with it, not offered for new ones */
+  is_active?: boolean;
 }
 
 export interface Exemption {
