@@ -66,10 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     forgetUnitKey();
     clearOffline();
+    if (me?.viewAs) await api?.viewAsStop().catch(() => undefined); // signing out ends "צפייה כעובד"
     await api?.signOut();
     setMe(null);
     setStage("signedOut");
-  }, [api]);
+  }, [api, me]);
 
   useEffect(() => {
     refresh().catch(() => setStage("signedOut"));

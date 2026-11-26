@@ -137,7 +137,13 @@ export class SupabaseApi implements Api {
     const active = roles
       .filter((r) => (!r.valid_from || Date.parse(r.valid_from) <= now) && (!r.valid_to || Date.parse(r.valid_to) > now))
       .map((r) => r.role);
-    return { userId: uid, username: user.username, roles: active, mustChangePassword: user.must_change_password, uiTheme: user.ui_theme, requestAlerts: user.request_alerts ?? true };
+    const base = { userId: uid, username: user.username, roles: active, mustChangePassword: user.must_change_password, uiTheme: user.ui_theme, requestAlerts: user.request_alerts ?? true };
+    // viewing the app as one employee (staff, or a gaf commander for his people): his screens only
+    if (active.some((r) => r === "coordinator" || r === "deputy" || r === "gaf_commander")) {
+      const v = maybe(await this.sb.rpc("view_as_current")) as { soldier_id: string; name: string; until: string } | null;
+      if (v) return { ...base, roles: ["soldier"] as Role[], viewAs: { soldierId: v.soldier_id, name: v.name, until: v.until } };
+    }
+    return base;
   }
 
   async mfaState(): Promise<MfaState> {
@@ -643,6 +649,14 @@ export class SupabaseApi implements Api {
 
   async setExemptionDuties(id: string, taskTypeIds: string[]) {
     maybe(await this.sb.from("exemptions").update({ excluded_task_type_ids: taskTypeIds, kind: "partial" }).eq("id", id));
+  }
+
+  async viewAsStart(soldierId: string) {
+    run(await this.sb.rpc("view_as_start", { p_soldier: soldierId }));
+  }
+
+  async viewAsStop() {
+    run(await this.sb.rpc("view_as_stop"));
   }
 
   async updateExemption(u: ExemptionUpdate) {

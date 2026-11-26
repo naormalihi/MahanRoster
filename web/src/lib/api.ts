@@ -51,6 +51,11 @@ export interface Me {
   uiTheme?: string | null;
   /** notices on new exemption requests (staff, gaf commanders); on unless turned off */
   requestAlerts?: boolean;
+  /**
+   * "צפייה כעובד" (2.63): staff, or a gaf commander for his own people, see the app as this
+   * employee – read only. While it is on, roles are just "soldier".
+   */
+  viewAs?: { soldierId: string; name: string; until: string } | null;
 }
 
 export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinator") || me.roles.includes("deputy"));
@@ -295,6 +300,9 @@ export interface Api {
   /** staff-only note ("" clears it) */
   setExemptionNote(id: string, note: string): Promise<void>;
   /** staff edit a pending or approved exemption; a new type on an approved one needs proofRechecked */
+  /** "צפייה כעובד": start (2 hours) / back to my own account */
+  viewAsStart(soldierId: string): Promise<void>;
+  viewAsStop(): Promise<void>;
   updateExemption(u: ExemptionUpdate): Promise<void>;
   /** the duties an employee is eligible for (rank, service, populations…) */
   eligibleTaskTypes(soldierId: string): Promise<string[]>;
