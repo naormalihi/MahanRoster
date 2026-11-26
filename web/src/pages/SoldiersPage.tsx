@@ -770,6 +770,15 @@ export function SoldiersPage() {
   // תאריך קליטה: new in the unit while the grace period runs
   const [graceDays, setGraceDays] = useState(90);
   const [onlyNew, setOnlyNew] = useState(startParams.get("new") === "1");
+  // from the dashboard's tiles – the exact cut of a cycle: entering קבע in it, newcomers in it
+  const [careerSpan, setCareerSpan] = useState<[string, string] | null>(() => {
+    const a = startParams.get("career_from"), b = startParams.get("career_to");
+    return a && b ? [a, b] : null;
+  });
+  const [joinSpan, setJoinSpan] = useState<[string, string] | null>(() => {
+    const a = startParams.get("join_from"), b = startParams.get("join_to");
+    return a && b ? [a, b] : null;
+  });
   useEffect(() => {
     api?.scoringSettings().then((x) => setGraceDays(x.grace_days), () => undefined);
   }, [api, live]);
@@ -1001,6 +1010,9 @@ export function SoldiersPage() {
             ? activeLoadRoles(s).length === 0
             : activeLoadRoles(s).some((r) => r.load_role_id === relief))) &&
       (!onlyNew || newUntil(s) !== null) &&
+      (!careerSpan || (!!s.career_start_date && s.career_start_date >= careerSpan[0] && s.career_start_date <= careerSpan[1])) &&
+      (!joinSpan ||
+        (!!s.unit_join_date && addDaysIso(s.unit_join_date, graceDays) > joinSpan[0] && s.unit_join_date <= joinSpan[1])) &&
       (!range ||
         (range === "issues"
           ? ["expired", "expiring"].includes(rangeState(s.range_valid_until))
@@ -1173,6 +1185,8 @@ export function SoldiersPage() {
               setService("");
               setRange("");
               setShowInactive(false);
+              setCareerSpan(null);
+              setJoinSpan(null);
             }}
           />
           <Chip
@@ -1203,6 +1217,10 @@ export function SoldiersPage() {
               onClick={() => setOnlyNew(!onlyNew)}
             />
           )}
+          {careerSpan && (
+            <Chip color="secondary" label={`נכנסים לקבע ${fmt(careerSpan[0])}–${fmt(careerSpan[1])}`} onDelete={() => setCareerSpan(null)} />
+          )}
+          {joinSpan && <Chip color="info" label={`חדשים במחזור ${fmt(joinSpan[0])}–${fmt(joinSpan[1])}`} onDelete={() => setJoinSpan(null)} />}
         </Stack>
       )}
 

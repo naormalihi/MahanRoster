@@ -90,6 +90,8 @@ export class SupabaseApi implements Api {
     this.sb = createClient(url, anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
   }
 
+  private touched = false;
+
   async signIn(username: string, password: string) {
     const { error } = await this.sb.auth.signInWithPassword({ email: usernameToEmail(username), password });
     if (error) throw new Error(error.status === 400 ? "שם משתמש או סיסמה שגויים" : error.message);
@@ -120,6 +122,11 @@ export class SupabaseApi implements Api {
     if (!data.user && error && isOfflineError(error)) throw new OfflineError();
     if (!data.user) return null;
     const uid = data.user.id;
+    // "active users" on the dashboard: opening the app counts, once a load – not only a password sign-in
+    if (!this.touched) {
+      this.touched = true;
+      void this.sb.rpc("touch_last_login").then(() => undefined, () => undefined);
+    }
     const user = maybe(await this.sb.from("app_users").select("username, must_change_password, ui_theme, request_alerts").eq("id", uid).maybeSingle());
     if (!user) return null;
     // a session opened before his service ended: out, with the reason on the sign-in screen

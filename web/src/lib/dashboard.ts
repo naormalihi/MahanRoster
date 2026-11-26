@@ -18,6 +18,10 @@ export interface UnitKpis {
   range_expired: number;
   range_soon: number;
   in_training: number;
+  /** accounts (not locked), and who opened the app in the last 7 / 30 days */
+  users: number;
+  users_7d: number;
+  users_30d: number;
   new_in_cycle: number | null;
   to_career: number | null;
   cycle?: { id: string; name: string; start_date: string; end_date: string; published: boolean; status: string };

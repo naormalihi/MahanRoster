@@ -1730,6 +1730,7 @@ export class DemoApi implements Api {
     const career = act.filter((s) => s.service_type === "career").length;
     return {
       active: act.length, mandatory: act.length - career, career, range_expired: 2, range_soon: 3, in_training: 1,
+      users: 40, users_7d: 22, users_30d: 31,
       new_in_cycle: 2, to_career: 1,
       cycle: { id: "c1", name: "דצמבר 2026 – מאי 2027", start_date: "2026-12-01", end_date: "2027-05-31", published: false, status: "approving" },
       exemptions_approved: this.exemptionList.filter((e) => e.status === "approved").length,

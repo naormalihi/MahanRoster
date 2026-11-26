@@ -3705,6 +3705,7 @@ def test_send_test_notification(conn):
 def test_unit_kpis(conn):
     k = _as_coord(conn, "select public.unit_kpis()")[0][0]
     assert k["active"] == k["mandatory"] + k["career"] and k["active"] > 0
+    assert k["users"] >= k["users_30d"] >= k["users_7d"] >= 0
     assert all(isinstance(k[x], int) for x in ("range_expired", "range_soon", "in_training"))
     if k.get("cycle"):
         assert k["exemptions_approved"] >= 0 and k["callups_reserve"] >= 0 and k["swaps"] >= 0
