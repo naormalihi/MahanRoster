@@ -2,7 +2,7 @@ import { MyNextDuty } from "../components/MyNextDuty";
 import { UnackedCard } from "../components/UnackedCard";
 import { SwapLogCard } from "../components/SwapDialog";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from "@mui/material";
 import { EmptyState, greeting } from "../components/EmptyState";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
@@ -44,6 +44,20 @@ export function HomePage() {
 
   // requests for days no cycle covers – invisible in the constraints screens until one does
   const [orphans, setOrphans] = useState<Orphan[]>([]);
+  const [dropping, setDropping] = useState<Orphan | null>(null);
+  const [dropError, setDropError] = useState<string | null>(null);
+  async function drop(o: Orphan) {
+    setDropError(null);
+    try {
+      if (o.kind === "exemption") await api!.deleteExemption(o.id);
+      else if (o.kind === "absence") await api!.deleteAbsence(o.id);
+      else await api!.deleteDateBlock(o.id);
+      setOrphans((list) => list.filter((x) => x.id !== o.id));
+      setDropping(null);
+    } catch (e) {
+      setDropError((e as Error).message);
+    }
+  }
   const [names, setNames] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     if (!staff || !cycles) return;
@@ -108,12 +122,39 @@ export function HomePage() {
               <li key={o.id}>
                 {names.get(o.soldier_id) ?? "עובד"} · {ORPHAN_KIND[o.kind]}
                 {o.pending ? " (ממתין)" : ""} · {fmtDay(o.from)}
-                {o.to !== o.from ? `–${fmtDay(o.to)}` : ""}
+                {o.to !== o.from ? `–${fmtDay(o.to)}` : ""}{" "}
+                <Button size="small" color="inherit" sx={{ minWidth: 0, py: 0, textDecoration: "underline" }} onClick={() => setDropping(o)}>
+                  מחיקה
+                </Button>
               </li>
             ))}
             {orphans.length > 6 && <li>ועוד {orphans.length - 6}</li>}
           </Box>
+          <Box sx={{ mt: 0.5, fontSize: "0.85em" }}>
+            מעכשיו עובדים לא יכולים להגיש לתאריכים בלי מחזור. בקשה שכבר נכנסה – מוחקים אותה כאן, או פותחים מחזור (או מאריכים קיים) לתאריכים שלה.
+          </Box>
         </Alert>
+      )}
+      {dropping && (
+        <Dialog open onClose={() => setDropping(null)} fullWidth maxWidth="xs">
+          <DialogTitle>מחיקת בקשה</DialogTitle>
+          <DialogContent dividers>
+            <Typography>
+              {names.get(dropping.soldier_id) ?? "עובד"} · {ORPHAN_KIND[dropping.kind]} · {fmtDay(dropping.from)}
+              {dropping.to !== dropping.from ? `–${fmtDay(dropping.to)}` : ""}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              הבקשה תימחק לגמרי (נרשם ביומן הביקורת). כדאי לעדכן את העובד שיגיש שוב כשייפתח מחזור.
+            </Typography>
+            {dropError && <Alert severity="error" sx={{ mt: 1 }}>{dropError}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDropping(null)}>ביטול</Button>
+            <Button variant="contained" color="error" onClick={() => void drop(dropping)}>
+              מחיקה
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {resetters !== null && resetters <= 1 && (
