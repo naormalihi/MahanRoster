@@ -3486,3 +3486,34 @@ def test_staff_edit_an_approved_exemption(conn):
             (n,) = conn.execute("select payload from notifications where recipient_user_id = %s and type = 'exemption_updated'", (uid,)).fetchall()
             assert n[0]["title"] == "הפטור שלך עודכן" and "הוארך" not in n[0]["body"]
         raise psycopg.Rollback()
+
+
+def test_employee_updates_own_range_and_gets_reminders(conn):
+    from datetime import date, timedelta
+
+    uid, sid = _soldier_account(conn, "range.self")
+    today = date.today()
+    with session_as(conn, uid, aal="aal1") as c:
+        until = c.execute("select public.update_my_range(%s)", (today - timedelta(days=170),)).fetchone()[0]
+        assert until > today  # 6 months by default
+        mine = c.execute("select public.my_range()").fetchone()[0]
+        assert mine["valid_until"] == until.isoformat() and mine["self_updated_at"] and mine["validity_months"] == 6
+        with pytest.raises(psycopg.errors.RaiseException, match="בעתיד"), c.transaction():
+            c.execute("select public.update_my_range(%s)", (today + timedelta(days=1),))
+        c.execute("reset role")
+        # expiring within 14 days: one reminder
+        assert until <= today + timedelta(days=14)
+        c.execute("select app.queue_range_reminders()")
+        c.execute("select app.queue_range_reminders()")
+        assert c.execute("select count(*) from notifications where recipient_user_id = %s and type = 'range_expiring'",
+                         (uid,)).fetchone()[0] == 1
+        # a planned range: they need it, and the coordinator's later fix clears the "self" mark
+        rid = c.execute("insert into planned_ranges (day, starts, place) values (%s, '08:00', 'מטווח צפוני') returning id",
+                        (today + timedelta(days=5),)).fetchone()[0]
+        c.execute("select app.queue_range_reminders()")
+        body = c.execute("select payload->>'body' from notifications where recipient_user_id = %s and type = 'range_planned'",
+                         (uid,)).fetchone()[0]
+        assert "מטווח צפוני" in body and "08:00" in body
+        assert c.execute("select notified_at is not null from planned_ranges where id = %s", (rid,)).fetchone()[0]
+        c.execute("update soldiers set range_valid_until = %s where id = %s", (today + timedelta(days=200), sid))
+        assert c.execute("select range_self_updated_at from soldiers where id = %s", (sid,)).fetchone()[0] is None

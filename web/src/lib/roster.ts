@@ -313,6 +313,8 @@ export interface SoldierRecord {
 export interface ExistingSoldier extends SoldierRecord {
   id: string;
   is_active: boolean;
+  /** the employee updated their own range validity (cleared when anyone else changes it) */
+  range_self_updated_at?: string | null;
 }
 
 export const RECORD_LABELS: Record<keyof SoldierRecord, string> = {

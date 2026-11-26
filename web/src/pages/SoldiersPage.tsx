@@ -1518,6 +1518,11 @@ export function SoldiersPage() {
                     (
                       <Stack direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }} component="span">
                         <RangeChip until={s.range_valid_until} />
+                        {s.range_self_updated_at && (
+                          <Tooltip title={`העובד עדכן בעצמו ב-${fmt(s.range_self_updated_at.slice(0, 10))}`}>
+                            <Chip size="small" variant="outlined" label='עודכן ע"י העובד' sx={{ ms: 0.5 }} />
+                          </Tooltip>
+                        )}
                         {activeLoadRoles(s).map((r) => (
                           <Chip key={r.load_role_id + r.valid_from} size="small" label={`${r.name} ×${r.factor}`} color={r.load_role_id === lr?.load_role_id ? "primary" : "default"} variant={r.load_role_id === lr?.load_role_id ? "filled" : "outlined"} />
                         ))}
@@ -1766,6 +1771,11 @@ export function SoldiersPage() {
                       </TableCell>
                       <TableCell>
                         <RangeChip until={s.range_valid_until} />
+                        {s.range_self_updated_at && (
+                          <Tooltip title={`העובד עדכן בעצמו ב-${fmt(s.range_self_updated_at.slice(0, 10))}`}>
+                            <Chip size="small" variant="outlined" label='עודכן ע"י העובד' sx={{ ms: 0.5 }} />
+                          </Tooltip>
+                        )}
                       </TableCell>
                       <TableCell>
                         {effectiveParent(s) ? "כן" : "—"}
