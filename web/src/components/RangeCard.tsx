@@ -4,12 +4,14 @@ import { useAuth } from "../lib/auth";
 import { isoToDmy } from "../lib/dmy";
 import { rangeWhen, validUntil, type MyRange } from "../lib/range";
 import { DateTextField } from "./DateTextField";
+import { useLiveTick } from "../lib/live";
 
 const todayIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
 const daysTo = (iso: string) => Math.round((Date.parse(iso) - Date.parse(todayIso())) / 86_400_000);
 
 /** מטווח: the employee's validity, the next planned range, and "עדכון" with the date of the last range. */
 export function RangeCard() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [r, setR] = useState<MyRange | null>(null);
   const [open, setOpen] = useState(false);
@@ -24,7 +26,7 @@ export function RangeCard() {
       .then(setR)
       .catch(() => setR(null));
   }, [api]);
-  useEffect(load, [load]);
+  useEffect(load, [load, live]);
   if (!r) return null;
 
   const left = r.valid_until ? daysTo(r.valid_until) : null;

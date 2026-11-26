@@ -30,6 +30,7 @@ import { ContactCard, ContactsDialog } from "../components/ContactCard";
 import { Mascot } from "../components/Mascot";
 import { entryOpen, type InputOptions, type MyRequests } from "../lib/me";
 import { blocksInMonth, closedNotice, cycleOf, KIND_LABEL, requestItems, type RequestItem, type RequestKind } from "../lib/requestList";
+import { useLiveTick } from "../lib/live";
 
 const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "default"> = {
   pending: "warning",
@@ -59,6 +60,7 @@ const CHOICES: { kind: RequestKind; label: string; hint: string }[] = [
  * until the cycle's deadline; an exemption waits for אחראי השיבוצים. After the deadline – through אחראי השיבוצים.
  */
 export function RequestsPage() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [opts, setOpts] = useState<InputOptions | null>(null);
   const [mine, setMine] = useState<MyRequests | null>(null);
@@ -78,7 +80,7 @@ export function RequestsPage() {
       setError((e as Error).message);
     }
   }, [api]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
 
   async function act(fn: () => Promise<void>) {
     setError(null);

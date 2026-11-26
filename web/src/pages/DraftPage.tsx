@@ -75,6 +75,7 @@ import { eligibilityOf, noWork, noWorkGroups, noWorkText, slotsByCategory, type 
 import type { ExistingSoldier } from "../lib/roster";
 import { poolName, poolNames } from "../lib/schedule";
 import { careerSwitch } from "../lib/soldiers";
+import { useLiveTick } from "../lib/live";
 
 const dayFmt = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "long", day: "numeric", month: "numeric" });
 const hm = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
@@ -114,6 +115,7 @@ export interface Ctx {
  * the soldier straight onto the board, and asks for a reason only when a rule is broken.
  */
 export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; current: DraftAssignment | null; onClose: () => void; published?: boolean }) {
+  const live = useLiveTick();
   const { api } = useAuth();
   const { ctx, slot, current } = props;
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
@@ -135,7 +137,7 @@ export function AssignDialog(props: { ctx: Ctx; slot: SlotRow; role: Role; curre
         setCands(rankCandidates(c, set));
       })
       .catch((e) => setError((e as Error).message));
-  }, [api, slot.id]);
+  }, [api, slot.id, live]);
 
   const shown = (cands ?? []).filter((c) => {
     const s = ctx.soldiers.get(c.soldier_id);
@@ -512,6 +514,7 @@ function BoardView({
 
 /** The fairness picture of the draft – shared by the health tile and the soldiers view. */
 function useFairness(ctx: Ctx, snapshot: SnapshotSoldier[], cells: PotentialCell[] | null, categories: Map<string, string>, tolerance: number) {
+  const live = useLiveTick();
   const ls = useMemo(() => loads(snapshot, ctx.assignments), [snapshot, ctx.assignments]);
   const groupName = useMemo(() => poolNames(snapshot), [snapshot]);
   const rank = useMemo(() => new Map(snapshot.map((s) => [s.soldier_id, s.rank_name])), [snapshot]);
@@ -554,7 +557,7 @@ function useFairness(ctx: Ctx, snapshot: SnapshotSoldier[], cells: PotentialCell
       live = false;
       clearTimeout(t);
     };
-  }, [api, ctx.cycle.id, ctx.assignments]);
+  }, [api, ctx.cycle.id, ctx.assignments, live]);
   const verdict = useMemo(() => verdicts(rows), [rows]);
   const outliers = useMemo(() => rows.filter((r) => r.outlier).length, [rows]);
   // what each soldier can be given at all: open categories and the slots the cycle has for them
@@ -1229,6 +1232,7 @@ function DraftBody(props: {
   published: boolean;
   onPublish: () => void;
 }) {
+  const live = useLiveTick();
   const { ctx } = props;
   const navigate = useNavigate();
   const fair = useFairness(ctx, props.snapshot, props.cells, props.categories, props.tolerance);
@@ -1251,7 +1255,7 @@ function DraftBody(props: {
       (r) => setNoAccount({ total: r.length, left: r.filter((x) => !x.sent).length }),
       () => setNoAccount(null),
     );
-  }, [api, canMessage, cycleIdForMsg, noAccountOpen]);
+  }, [api, canMessage, cycleIdForMsg, noAccountOpen, live]);
   const idleCount = fair.idle.reduce((n, g) => n + g.ids.length, 0);
   const manual = ctx.assignments.filter((a) => a.source === "manual").length;
   const gaps = props.missing + props.missingR;
@@ -1403,6 +1407,7 @@ function DraftBody(props: {
 }
 
 export function DraftPage() {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const canEdit = useCanEdit();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
@@ -1430,7 +1435,7 @@ export function DraftPage() {
         setSoldiers(new Map(s.map((x) => [x.id, x])));
       })
       .catch((e) => setMsg({ ok: false, text: (e as Error).message }));
-  }, [api]);
+  }, [api, live]);
 
   const load = useCallback(async () => {
     if (!cycleId) return;
@@ -1444,12 +1449,13 @@ export function DraftPage() {
       setMsg({ ok: false, text: (e as Error).message });
     }
   }, [api, cycleId]);
+  // another cycle: start empty; a live change: load over what is shown
   useEffect(() => {
     setSlots(null);
     setAssignments(null);
     setCells(null);
-    void load();
-  }, [load]);
+  }, [cycleId]);
+  useEffect(() => void load(), [load, live]);
 
   if (!cycles) return msg ? <Alert severity="error">{msg.text}</Alert> : <Loading />;
   const cycle = cycles.find((c) => c.id === cycleId);

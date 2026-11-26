@@ -17,6 +17,7 @@ import { TONE_ICON, useCycleFacts } from "./CycleWorkspace";
 import { ORPHAN_KIND, orphanRequests, type Orphan } from "../lib/orphans";
 import { FeedbackInbox } from "../components/FeedbackInbox";
 import { dayKey } from "../lib/dates";
+import { useLiveTick } from "../lib/live";
 
 const fmtDay = (iso: string) => iso.slice(0, 10).split("-").reverse().slice(0, 2).join("/") + "/" + iso.slice(2, 4);
 
@@ -36,6 +37,7 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
 
 /** אחראי השיבוצים's home: where the cycle stands, what waits, and the coming days. */
 export function HomePage() {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const staff = isStaff(me);
   const { cycle, cycles } = useCycle();
@@ -69,26 +71,26 @@ export function HomePage() {
         setNames(new Map(s.map((x) => [x.id, x.full_name])));
       })
       .catch(() => setOrphans([]));
-  }, [api, staff, cycles]);
+  }, [api, staff, cycles, live]);
 
   // a single אחראי השיבוצים who loses his phone has no one to reset his two-step login
   const [resetters, setResetters] = useState<number | null>(null);
   useEffect(() => {
     if (!staff) return;
     api!.listUsers().then((u) => setResetters(mfaResetters(u).length), () => setResetters(null));
-  }, [api, staff]);
+  }, [api, staff, live]);
 
   // soldiers see "למי לפנות" only once אחראי השיבוצים chose someone
   const [contacts, setContacts] = useState<number | null>(null);
   useEffect(() => {
     if (!staff) return;
     api!.soldierContactsList().then((c) => setContacts(c.length), () => setContacts(null));
-  }, [api, staff]);
+  }, [api, staff, live]);
 
   useEffect(() => {
     const now = new Date();
     api!.board(now.toISOString(), addDays(now, 7).toISOString()).then(setWeek).catch(() => setWeek([]));
-  }, [api]);
+  }, [api, live]);
 
   const states = cycle && facts ? stepStates(cycle, facts) : null;
   const next = cycle && facts ? nextAction(cycle, facts) : null;

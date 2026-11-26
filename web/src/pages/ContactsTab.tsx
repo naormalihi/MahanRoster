@@ -23,6 +23,7 @@ import { useAuth } from "../lib/auth";
 import { contactProblems, ROLE_LABEL, toSave, type ContactEntry } from "../lib/contacts";
 import { formatPhone } from "../lib/phone";
 import type { AppUser } from "../lib/users";
+import { useLiveTick } from "../lib/live";
 
 const CONTACT_ROLES = ["coordinator", "deputy", "gaf_commander"];
 const activeRole = (u: AppUser, now = Date.now()) =>
@@ -36,6 +37,7 @@ const activeRole = (u: AppUser, now = Date.now()) =>
  * The list reads as rows; adding or editing one opens a small window, and every change is saved.
  */
 export function ContactsTab() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [list, setList] = useState<ContactEntry[] | null>(null);
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -49,7 +51,7 @@ export function ContactsTab() {
     api!.soldierContactsList().then(setList, (e) => setMsg({ ok: false, text: (e as Error).message }));
     api!.listUsers().then(setUsers, () => setUsers([]));
   }, [api]);
-  useEffect(load, [load]);
+  useEffect(load, [load, live]);
 
   if (!list) return null;
   const candidates = users.filter((u) => !u.is_locked && activeRole(u) && !list.some((c) => c.user_id === u.user_id));

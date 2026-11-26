@@ -8,6 +8,7 @@ import type { UnackedDuty } from "../lib/me";
 import { formatPhone } from "../lib/phone";
 import { Link as RouterLink } from "react-router-dom";
 import { DutyWhatsAppButton } from "./DutyWhatsApp";
+import { useLiveTick } from "../lib/live";
 
 const HOURS = 72;
 
@@ -16,6 +17,7 @@ const HOURS = 72;
  * אחראי השיבוצים can call and mark "וידאתי בטלפון"; a gaf commander sees his gaf, read only.
  */
 export function UnackedCard() {
+  const live = useLiveTick();
   const { api, me } = useAuth();
   const staff = isStaff(me);
   const [rows, setRows] = useState<UnackedDuty[] | null>(null);
@@ -23,7 +25,7 @@ export function UnackedCard() {
   const load = useCallback(() => {
     api!.unackedDuties(HOURS).then(setRows, () => setRows([]));
   }, [api]);
-  useEffect(load, [load]);
+  useEffect(load, [load, live]);
 
   if (!rows?.length) return null;
   async function confirm(r: UnackedDuty) {

@@ -3598,3 +3598,17 @@ def test_view_as_an_employee_reads_his_screens_and_blocks_actions(conn):
                 c.execute("select public.view_as_start(%s)", (mine,))
     finally:
         _as_coord(conn, "select public.delete_user(%s)", cmd)
+
+
+def test_live_data_version_moves_on_a_change_only(conn):
+    with session_as(conn, COORD) as c:
+        v = lambda: c.execute("select public.data_version()").fetchone()[0]
+        sid = c.execute("select id from soldiers where is_active order by id limit 1").fetchone()[0]
+        c.execute("reset role")
+        before = v()
+        c.execute("update soldiers set phone = '972500000001' where id = %s", (sid,))
+        assert v() > before
+        # a sign-in alone is not a change the screens show
+        mid = v()
+        c.execute("update app_users set last_login_at = now() where id = %s", (COORD,))
+        assert v() == mid

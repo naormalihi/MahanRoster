@@ -300,6 +300,8 @@ export interface Api {
   /** staff-only note ("" clears it) */
   setExemptionNote(id: string, note: string): Promise<void>;
   /** staff edit a pending or approved exemption; a new type on an approved one needs proofRechecked */
+  /** "רענון חי": a counter that grows on every change of the unit's data */
+  dataVersion(): Promise<number>;
   /** "צפייה כעובד": start (2 hours) / back to my own account */
   viewAsStart(soldierId: string): Promise<void>;
   viewAsStop(): Promise<void>;

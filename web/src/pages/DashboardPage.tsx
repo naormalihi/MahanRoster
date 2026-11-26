@@ -22,6 +22,7 @@ import { stageLabel, type CycleStatus } from "../lib/cycles";
 import { ACTION_LABEL, collapseRepeats, ENTITY_LABEL, perSoldier, type UnitDashboard } from "../lib/dashboard";
 import { FeedbackInbox } from "../components/FeedbackInbox";
 import { dayLabel, spanLabel, upcomingWeekend } from "../lib/dates";
+import { useLiveTick } from "../lib/live";
 
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 const POP: Record<string, string> = { mandatory: "חובה", career: "קבע" };
@@ -62,6 +63,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 const pts = (x: number | string) => (Math.abs(Number(x)) < 0.05 ? 0 : Number(x)).toFixed(1);
 
 export function DashboardPage() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [d, setD] = useState<UnitDashboard | null>(null);
   const [weekend, setWeekend] = useState<BoardRow[] | null>(null);
@@ -72,7 +74,7 @@ export function DashboardPage() {
     api!.unitDashboard().then(setD).catch((e) => setError((e as Error).message));
     const [from, to] = upcomingWeekend();
     api!.board(from.toISOString(), to.toISOString()).then(setWeekend).catch(() => setWeekend([]));
-  }, [api]);
+  }, [api, live]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!d)

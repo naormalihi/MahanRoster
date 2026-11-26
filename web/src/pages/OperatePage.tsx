@@ -77,7 +77,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
   const [ranks, setRanks] = useState<RankRef[]>([]);
   useEffect(() => {
     api!.rankRefs().then((r) => setRanks([...r].sort((a, b) => a.sort_order - b.sort_order))).catch(() => setRanks([]));
-  }, [api]);
+  }, [api, live]);
   const [specialName, setSpecialName] = useState("");
   const [specialPoints, setSpecialPoints] = useState<number | "">("");
   const [specialWho, setSpecialWho] = useState<keyof typeof SPECIAL_CODE>("any");
@@ -285,7 +285,7 @@ export function OperatePage() {
         setSoldiers(new Map(s.map((x) => [x.id, x])));
       })
       .catch((e) => setMsg({ ok: false, text: (e as Error).message }));
-  }, [api]);
+  }, [api, live]);
 
   const load = useCallback(async () => {
     if (!cycleId) return;
@@ -299,7 +299,7 @@ export function OperatePage() {
   }, [api, cycleId]);
   useEffect(() => {
     load().catch((e) => setMsg({ ok: false, text: (e as Error).message }));
-  }, [load]);
+  }, [load, live]);
 
   const running = jobs.find(isActive);
   useEffect(() => {
@@ -318,7 +318,7 @@ export function OperatePage() {
       );
     }, 4000);
     return () => clearInterval(t);
-  }, [running, load]);
+  }, [running, load, live]);
 
   const taskName = useMemo(() => new Map(tasks.map((t) => [t.id, t.name])), [tasks]);
   if (!cycle || !slots) return <CircularProgress />;

@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { isStaff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { ago, pushState, subscribePush, unsubscribePush, type AppNotification, type PushState } from "../lib/notifications";
+import { useLiveTick } from "../lib/live";
 
 /** Turning push on for this device, or why it cannot be. */
 export function PushControl() {
@@ -76,6 +77,7 @@ export function PushControl() {
  * notifications – opening it marks them read; a reserve activation waits for "קיבלתי".
  */
 export function NotificationBell() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -91,7 +93,7 @@ export function NotificationBell() {
       clearInterval(t);
       window.removeEventListener("focus", load);
     };
-  }, [load]);
+  }, [load, live]);
   const unread = items.filter((n) => !n.read_at || (n.requires_ack && !n.acked_at)).length;
 
   async function openPanel() {

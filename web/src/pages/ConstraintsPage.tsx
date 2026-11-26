@@ -67,6 +67,7 @@ import type { ExistingSoldier } from "../lib/roster";
 import { DeadlineEditor } from "../components/DeadlineEditor";
 import { EmptyState } from "../components/EmptyState";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
+import { useLiveTick } from "../lib/live";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
@@ -584,6 +585,7 @@ function NoteDialog(props: { ex: Exemption; who: string; onClose: () => void; on
 }
 
 function ExemptionsTab({ ctx }: { ctx: Ctx }) {
+  const live = useLiveTick();
   const narrow = useNarrow();
   const { api } = useAuth();
   const [params] = useSearchParams();
@@ -610,7 +612,7 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
       setError((e as Error).message);
     }
   }, [api, ctx.cycle]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!rows) return <Loading />;
@@ -934,6 +936,7 @@ function AbsenceDialog(props: { ctx: Ctx; types: AbsenceType[]; onClose: () => v
 }
 
 function AbsencesTab({ ctx }: { ctx: Ctx }) {
+  const live = useLiveTick();
   const narrow = useNarrow();
   const { api } = useAuth();
   const [rows, setRows] = useState<Absence[] | null>(null);
@@ -953,7 +956,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
       setError((e as Error).message);
     }
   }, [api, ctx.cycle]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!rows) return <Loading />;
@@ -1093,6 +1096,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
 // ---------------------------------------------------------------------------
 
 function BlocksTab({ ctx }: { ctx: Ctx }) {
+  const live = useLiveTick();
   const narrow = useNarrow();
   const { api } = useAuth();
   const [rows, setRows] = useState<DateBlock[] | null>(null);
@@ -1112,7 +1116,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
       setError((e as Error).message);
     }
   }, [api, ctx.cycle]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
 
   async function save() {
     if (!adding) return;
@@ -1261,6 +1265,7 @@ const TABS = [
 ] as const;
 
 export function ConstraintsPage() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [params, setParams] = useSearchParams();
   const tab = TABS.find((t) => t.key === params.get("tab"))?.key ?? "exemptions";
@@ -1279,7 +1284,7 @@ export function ConstraintsPage() {
         setSoldiers(s);
       })
       .catch((e) => setError((e as Error).message));
-  }, [api, cyclesVersion]);
+  }, [api, cyclesVersion, live]);
 
   const byId = useMemo(() => new Map(soldiers.map((s) => [s.id, s])), [soldiers]);
   if (error) return <Alert severity="error">{error}</Alert>;

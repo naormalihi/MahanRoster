@@ -28,6 +28,7 @@ import { draftFacts, pendingSlots, nextAction, STEPS, stepNav, stepStates, type 
 import { StagePanel } from "./CyclesPage";
 import { announceBoardChange } from "../components/SlotActions";
 import { PagerBar, type PagerItem } from "../components/PagerBar";
+import { useLiveTick } from "../lib/live";
 
 const ConstraintsPage = lazy(() => import("./ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
 const PotentialPage = lazy(() => import("./PotentialPage").then((m) => ({ default: m.PotentialPage })));
@@ -47,6 +48,7 @@ export const TONE_ICON: Record<Tone, ReactNode> = {
 
 /** Pending exemptions, slots and the last run – what the steps show. */
 export function useCycleFacts(cycle: Cycle | undefined) {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [facts, setFacts] = useState<CycleFacts | null>(null);
   const load = useCallback(async () => {
@@ -69,7 +71,7 @@ export function useCycleFacts(cycle: Cycle | undefined) {
   }, [api, cycle]);
   useEffect(() => {
     load().catch(() => setFacts({ pendingExemptions: 0, slots: 0, job: null }));
-  }, [load]);
+  }, [load, live]);
   // a change on the published board (activation, staffing) updates the step marks
   useEffect(() => {
     const on = () => void load().catch(() => undefined);

@@ -297,6 +297,10 @@ export class DemoApi implements Api {
   /** "צפייה כעובד" in the demo: the employee's screens read his data */
   private viewAs: { soldierId: string; until: string } | null = null;
 
+  async dataVersion() {
+    return 0; // the demo lives in this tab: its screens load again after each action anyway
+  }
+
   async viewAsStart(soldierId: string) {
     await delay(150);
     this.viewAs = { soldierId, until: new Date(Date.now() + 2 * 3600_000).toISOString() };

@@ -81,6 +81,7 @@ import {
   briefingLabel,
   cleanBriefing,
 } from "../lib/catalog";
+import { useLiveTick } from "../lib/live";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
 const HEB_WEEKDAY = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -522,6 +523,7 @@ export function TaskDialog(props: {
 }
 
 function CatalogTab() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const narrow = useNarrow();
   const [tasks, setTasks] = useState<TaskType[] | null>(null);
@@ -542,7 +544,7 @@ function CatalogTab() {
       setError((e as Error).message);
     }
   }, [api]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
 
   const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
 
@@ -1179,6 +1181,7 @@ function HolidayMatrix({ list, calendar, onChanged }: { list: ScoreMultiplier[];
 
 /** Relief roles (ראש צוות, כונן מבצעי…): a soldier's points are divided by the factor. */
 function LoadRolesCard() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const [roles, setRoles] = useState<LoadRoleRef[] | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; name: string; factor: string } | null>(null);
@@ -1187,7 +1190,7 @@ function LoadRolesCard() {
   const load = useCallback(async () => setRoles(await api!.loadRoles()), [api]);
   useEffect(() => {
     load().catch((e) => setError((e as Error).message));
-  }, [load]);
+  }, [load, live]);
 
   async function run(f: () => Promise<void>) {
     setBusy(true);
@@ -1873,6 +1876,7 @@ function CalendarTab() {
 // ---------------------------------------------------------------------------
 
 function AliasesTab() {
+  const live = useLiveTick();
   const { api } = useAuth();
   const narrow = useNarrow();
   const [aliases, setAliases] = useState<{ alias: string; task_type_id: string }[] | null>(null);
@@ -1887,7 +1891,7 @@ function AliasesTab() {
       setError((e as Error).message);
     }
   }, [api]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, live]);
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!aliases) return <Loading />;
   return (
