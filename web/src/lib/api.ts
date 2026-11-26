@@ -1,3 +1,4 @@
+import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
 import type { PotentialWhy } from "./potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
@@ -400,6 +401,14 @@ export interface Api {
   myInputOptions(): Promise<InputOptions>;
   myRequests(): Promise<MyRequests>;
   submitExemption(typeId: string, from: string, to: string, taskTypeIds?: string[]): Promise<void>;
+  /** מטווח: the employee's validity and the next planned range (null: not an employee) */
+  myRange(): Promise<MyRange | null>;
+  /** the date of the last range; returns the new validity */
+  updateMyRange(lastIso: string): Promise<string>;
+  /** planned ranges from today (staff) */
+  plannedRanges(): Promise<PlannedRange[]>;
+  savePlannedRange(r: PlannedRangeInput): Promise<void>;
+  deletePlannedRange(id: string): Promise<void>;
   withdrawMyExemption(id: string): Promise<void>;
   addMyDateBlock(day: string): Promise<void>;
   cancelMyDateBlock(id: string): Promise<void>;

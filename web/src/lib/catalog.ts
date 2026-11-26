@@ -146,9 +146,12 @@ export interface ScoringSettings {
   briefing_reminder_hours: number; // the reminder of a briefing goes this many hours before it
   ack_reminder_hours: number; // "עוד לא אישרת" this many hours before the duty (0 = off)
   ack_escalation_hours: number; // the gaf commander hears this many hours before (0 = off)
+  range_validity_months: number; // מטווח: valid this many months after the last range
+  range_warning_days: number; // "עומד לפוג" this many days before the validity ends
+  range_notice_days: number; // a planned range is for those whose validity ends before it + this many days
 }
 
-export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "surprise_notice_hours", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days", "briefing_reminder_hours", "ack_reminder_hours", "ack_escalation_hours"] as const;
+export const SCORING_KEYS = ["night_window", "weekend_weekdays", "surprise_multiplier", "surprise_notice_hours", "exemption_deadline_days", "fairness_tolerance_pct", "grace_days", "briefing_reminder_hours", "ack_reminder_hours", "ack_escalation_hours", "range_validity_months", "range_warning_days", "range_notice_days"] as const;
 
 export const ISO_DAY_LABEL: Record<number, string> = { 7: "ראשון", 1: "שני", 2: "שלישי", 3: "רביעי", 4: "חמישי", 5: "שישי", 6: "שבת" };
 export const ISO_WEEK = [7, 1, 2, 3, 4, 5, 6];
@@ -170,6 +173,12 @@ export function scoringProblems(s: ScoringSettings): string[] {
   if (!Number.isInteger(s.grace_days) || s.grace_days < 0 || s.grace_days > 365) p.push("תקופת הכשרה – בין 0 ל-365 ימים");
   if (!Number.isInteger(s.exemption_deadline_days) || s.exemption_deadline_days < 1 || s.exemption_deadline_days > 180)
     p.push("סגירת אילוצים – בין 1 ל-180 יום לפני המחזור");
+  if (!Number.isInteger(s.range_validity_months) || s.range_validity_months < 1 || s.range_validity_months > 36)
+    p.push("תוקף מטווח – בין 1 ל-36 חודשים");
+  if (!Number.isInteger(s.range_warning_days) || s.range_warning_days < 1 || s.range_warning_days > 90)
+    p.push("תזכורת לפני שהמטווח פג – בין 1 ל-90 ימים");
+  if (!Number.isInteger(s.range_notice_days) || s.range_notice_days < 0 || s.range_notice_days > 180)
+    p.push("מי מוזמן למטווח – בין 0 ל-180 ימים אחריו");
   return p;
 }
 

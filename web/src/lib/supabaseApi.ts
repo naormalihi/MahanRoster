@@ -1,3 +1,4 @@
+import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
 import type { PotentialWhy } from "./potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "./feedback";
@@ -191,7 +192,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("soldiers")
         .select(
-          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, unit_join_date, range_valid_until, parent_status, home_nightly, tash_level, phone, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
+          "id, soldier_key, full_name, service_type, gender, enlistment_date, release_date, career_start_date, unit_join_date, range_valid_until, range_self_updated_at, parent_status, home_nightly, tash_level, phone, is_active, gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name)",
         ),
     ) as unknown as (Omit<ExistingSoldier, "gaf_name" | "rank_name"> & { gaf: { name: string }; rank: { name: string } | null })[];
     const full = rows.map(({ gaf, rank, ...s }) => ({ ...s, tash_level: s.tash_level ?? 0, gaf_name: gaf.name, rank_name: rank?.name ?? "" }));
@@ -362,7 +363,7 @@ export class SupabaseApi implements Api {
         .from("soldiers")
         .select(
           `id, full_name, service_type, gender, gaf_id, appointment_rank_id, appointment_rank_until, enlistment_date, release_date,
-           career_start_date, range_valid_until, is_shachar, shachar_start_date, parent_status, parent_override,
+           career_start_date, range_valid_until, range_self_updated_at, is_shachar, shachar_start_date, parent_status, parent_override,
            parent_override_reason, parent_override_until, second_role_signed_at, is_active,
            home_nightly, home_nightly_override, home_nightly_override_reason, home_nightly_override_until, tash_level, unit_join_date, opening_score, phone,
            gaf:org_units!soldiers_gaf_id_fkey(name), rank:ranks!soldiers_computed_rank_id_fkey(name),
@@ -499,6 +500,9 @@ export class SupabaseApi implements Api {
       briefing_reminder_hours: v.briefing_reminder_hours == null ? 24 : Number(v.briefing_reminder_hours),
       ack_reminder_hours: v.ack_reminder_hours == null ? 48 : Number(v.ack_reminder_hours),
       ack_escalation_hours: v.ack_escalation_hours == null ? 24 : Number(v.ack_escalation_hours),
+      range_validity_months: v.range_validity_months == null ? 6 : Number(v.range_validity_months),
+      range_warning_days: v.range_warning_days == null ? 14 : Number(v.range_warning_days),
+      range_notice_days: v.range_notice_days == null ? 30 : Number(v.range_notice_days),
     };
   }
 
@@ -1171,6 +1175,32 @@ export class SupabaseApi implements Api {
 
   async myRequests(): Promise<MyRequests> {
     return check(await this.sb.rpc("my_requests")) as MyRequests;
+  }
+
+  async myRange(): Promise<MyRange | null> {
+    return (check(await this.sb.rpc("my_range")) as MyRange | null) ?? null;
+  }
+
+  async updateMyRange(lastIso: string): Promise<string> {
+    return check(await this.sb.rpc("update_my_range", { p_last: lastIso })) as string;
+  }
+
+  async plannedRanges(): Promise<PlannedRange[]> {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+    const rows = check(
+      await this.sb.from("planned_ranges").select("id, day, starts, ends, place, note").gte("day", today).order("day").order("starts"),
+    ) as PlannedRange[];
+    return rows.map((r) => ({ ...r, starts: r.starts?.slice(0, 5) ?? null, ends: r.ends?.slice(0, 5) ?? null }));
+  }
+
+  async savePlannedRange(r: PlannedRangeInput) {
+    const row = { day: r.day, starts: r.starts || null, ends: r.ends || null, place: r.place?.trim() || null, note: r.note?.trim() || null };
+    if (r.id) maybe(await this.sb.from("planned_ranges").update(row).eq("id", r.id));
+    else maybe(await this.sb.from("planned_ranges").insert(row));
+  }
+
+  async deletePlannedRange(id: string) {
+    maybe(await this.sb.from("planned_ranges").delete().eq("id", id));
   }
 
   async submitExemption(typeId: string, from: string, to: string, taskTypeIds?: string[]) {

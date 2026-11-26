@@ -22,6 +22,8 @@ export interface SoldierDetail {
   release_date: string | null;
   career_start_date: string | null;
   range_valid_until: string | null;
+  /** the employee updated their own range validity (cleared when anyone else changes it) */
+  range_self_updated_at?: string | null;
   is_shachar: boolean;
   shachar_start_date: string | null;
   parent_status: boolean;

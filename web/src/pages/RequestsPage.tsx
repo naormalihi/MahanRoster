@@ -1,3 +1,4 @@
+import { RangeCard } from "../components/RangeCard";
 import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -183,6 +184,7 @@ export function RequestsPage() {
         {(current.length > 0 || past.length > 0) && newButton}
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
+      <RangeCard />
       {closed && (
         <Alert
           severity="info"

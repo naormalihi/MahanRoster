@@ -1,3 +1,4 @@
+import { validUntil, type MyRange, type PlannedRange, type PlannedRangeInput } from "../lib/range";
 import type { Inversion } from "../lib/fairness";
 import type { PotentialWhy } from "../lib/potential";
 import type { FeedbackDraft, FeedbackItem, FeedbackStatus } from "../lib/feedback";
@@ -152,7 +153,7 @@ export class DemoApi implements Api {
   private boardPeople = new Map<string, SlotPerson[]>();
   private extra = new Map<string, Extra>();
   private tasks: TaskType[] = DEMO_TASKS.map((t) => ({ ...t }));
-  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.3, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24, ack_reminder_hours: 48, ack_escalation_hours: 24 };
+  private scoring: ScoringSettings = { night_window: "22:00-06:00", weekend_weekdays: [5, 6], surprise_multiplier: 1.3, surprise_notice_hours: 72, exemption_deadline_days: 40, fairness_tolerance_pct: 20, grace_days: 90, briefing_reminder_hours: 24, ack_reminder_hours: 48, ack_escalation_hours: 24, range_validity_months: 6, range_warning_days: 14, range_notice_days: 30 };
   // the unit's additions: weekend +3; eves of the big holidays +6, the other holiday days +3
   private multipliers: ScoreMultiplier[] = [
     { id: "m_we", name: "סוף שבוע", value: 3, day_types: [], holidays: [], holiday_kinds: [], weekdays: [5, 6], time_window: null, date_from: null, date_to: null, skip_shabbat_types: true, is_active: true },
@@ -1693,6 +1694,45 @@ export class DemoApi implements Api {
         .map((a) => ({ id: a.id, type: abName.get(a.absence_type_id) ?? "", starts_at: a.starts_at, ends_at: a.ends_at,
           mine: a.received_via === "system", open: this.demoOpen(a.starts_at.slice(0, 10)) })),
     };
+  }
+
+  private ranges: PlannedRange[] = [];
+
+  async myRange(): Promise<MyRange | null> {
+    await delay();
+    const me = this.soldierList.find((s) => s.id === this.mySoldier());
+    if (!me) return null;
+    const today = new Date().toISOString().slice(0, 10);
+    const next = this.ranges.filter((r) => r.day >= today).sort((a, b) => a.day.localeCompare(b.day))[0] ?? null;
+    return { valid_until: me.range_valid_until, self_updated_at: (me as ExistingSoldier).range_self_updated_at ?? null,
+      validity_months: this.scoring.range_validity_months, warning_days: this.scoring.range_warning_days, next };
+  }
+
+  async updateMyRange(lastIso: string) {
+    await delay();
+    const today = new Date().toISOString().slice(0, 10);
+    if (lastIso > today) throw new Error("תאריך המטווח לא יכול להיות בעתיד");
+    const me = this.soldierList.find((s) => s.id === this.mySoldier())!;
+    const until = validUntil(lastIso, this.scoring.range_validity_months);
+    Object.assign(me, { range_valid_until: until, range_self_updated_at: new Date().toISOString() });
+    return until;
+  }
+
+  async plannedRanges() {
+    await delay();
+    const today = new Date().toISOString().slice(0, 10);
+    return this.ranges.filter((r) => r.day >= today).sort((a, b) => a.day.localeCompare(b.day)).map((r) => ({ ...r }));
+  }
+
+  async savePlannedRange(r: PlannedRangeInput) {
+    await delay();
+    if (r.id) Object.assign(this.ranges.find((x) => x.id === r.id)!, r);
+    else this.ranges.push({ ...r, id: this.nextId("rg") });
+  }
+
+  async deletePlannedRange(id: string) {
+    await delay();
+    this.ranges = this.ranges.filter((x) => x.id !== id);
   }
 
   async submitExemption(typeId: string, from: string, to: string, taskTypeIds?: string[]) {
