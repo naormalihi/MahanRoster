@@ -268,27 +268,62 @@ function useFilter(ctx: Ctx) {
     if (!s) return !q && !gaf;
     return (!q || s.full_name.includes(q.trim())) && (!gaf || s.gaf_name === gaf);
   };
-  const controls = (
-    <>
-      <TextField
-        size="small"
-        placeholder="חיפוש לפי שם"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
-        sx={{ minWidth: 180 }}
-      />
-      <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-        <MenuItem value="">כל המסגרות</MenuItem>
-        {gafim.map((g) => (
-          <MenuItem key={g} value={g}>
-            {g}
-          </MenuItem>
-        ))}
-      </TextField>
-    </>
+  const search = (
+    <TextField
+      size="small"
+      placeholder="חיפוש לפי שם"
+      value={q}
+      onChange={(e) => setQ(e.target.value)}
+      slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+      sx={{ minWidth: 180 }}
+    />
   );
-  return { match, controls, gafim };
+  const gafSelect = (
+    <TextField select size="small" label="מסגרת" value={gaf} onChange={(e) => setGaf(e.target.value)} sx={{ minWidth: 140 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
+      <MenuItem value="">כל המסגרות</MenuItem>
+      {gafim.map((g) => (
+        <MenuItem key={g} value={g}>
+          {g}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+  return { match, search, gafSelect, gafim };
+}
+
+/**
+ * The lists' toolbar. Wide: one row. Phone: two even columns – the search across, the gaf and the
+ * tab's own filter side by side, then the "new" button (beside the pending count, when there is one).
+ */
+function FilterBar(p: { narrow: boolean; add: ReactNode; search: ReactNode; gaf: ReactNode; third: ReactNode; extra?: ReactNode }) {
+  if (!p.narrow)
+    return (
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+        {p.add}
+        {p.search}
+        {p.gaf}
+        {p.third}
+        {p.extra}
+      </Stack>
+    );
+  const cell = { minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center" } as const;
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 1,
+        "& .MuiTextField-root, & .MuiButton-root, & .MuiChip-root": { width: "100%", minWidth: 0 },
+        "& .MuiButton-root, & .MuiChip-root": { height: 40 },
+      }}
+    >
+      <Box sx={{ ...cell, gridColumn: "1 / -1" }}>{p.search}</Box>
+      <Box sx={cell}>{p.gaf}</Box>
+      <Box sx={cell}>{p.third}</Box>
+      <Box sx={{ ...cell, gridColumn: p.extra ? "auto" : "1 / -1" }}>{p.add}</Box>
+      {p.extra && <Box sx={cell}>{p.extra}</Box>}
+    </Box>
+  );
 }
 
 const nameOf = (ctx: Ctx, id: string) => ctx.byId.get(id)?.full_name ?? "עובד לא מוכר";
@@ -594,21 +629,27 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-          פטור חדש
-        </Button>
-        {filter.controls}
-        <TextField select size="small" label="סטטוס" value={status} onChange={(e) => setStatus(e.target.value as RequestStatus | "")} sx={{ minWidth: 130 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-          <MenuItem value="">הכל</MenuItem>
-          {(Object.keys(STATUS_LABEL) as RequestStatus[]).map((s) => (
-            <MenuItem key={s} value={s}>
-              {STATUS_LABEL[s]}
-            </MenuItem>
-          ))}
-        </TextField>
-        {pending > 0 && <Chip color="warning" label={`${pending} ממתינים לאישור`} onClick={() => setStatus("pending")} />}
-      </Stack>
+      <FilterBar
+        narrow={narrow}
+        add={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
+            פטור חדש
+          </Button>
+        }
+        search={filter.search}
+        gaf={filter.gafSelect}
+        third={
+          <TextField select size="small" label="סטטוס" value={status} onChange={(e) => setStatus(e.target.value as RequestStatus | "")} sx={{ minWidth: 130 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
+            <MenuItem value="">הכל</MenuItem>
+            {(Object.keys(STATUS_LABEL) as RequestStatus[]).map((s) => (
+              <MenuItem key={s} value={s}>
+                {STATUS_LABEL[s]}
+              </MenuItem>
+            ))}
+          </TextField>
+        }
+        extra={pending > 0 ? <Chip color="warning" label={`${pending} ממתינים לאישור`} onClick={() => setStatus("pending")} /> : undefined}
+      />
       {shown.length === 0 ? (
         <EmptyState size="sm" title="אין פטורים להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
       ) : narrow ? (
@@ -921,13 +962,17 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-          היעדרות חדשה
-        </Button>
-        {filter.controls}
-        <FormControlLabel control={<Switch checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label="הצג מבוטלות" />
-      </Stack>
+      <FilterBar
+        narrow={narrow}
+        add={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
+            היעדרות חדשה
+          </Button>
+        }
+        search={filter.search}
+        gaf={filter.gafSelect}
+        third={<FormControlLabel sx={{ m: 0 }} control={<Switch checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label="הצג מבוטלות" />}
+      />
       {shown.length === 0 ? (
         <EmptyState size="sm" title="אין היעדרויות להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
       ) : narrow ? (
@@ -1091,20 +1136,24 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setFormError(null);
-            setAdding({ soldier_id: "", day: "", received_via: "message" });
-          }}
-        >
-          חסימה חדשה
-        </Button>
-        {filter.controls}
-        <FormControlLabel control={<Switch checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label="הצג מבוטלות" />
-      </Stack>
+      <FilterBar
+        narrow={narrow}
+        add={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setFormError(null);
+              setAdding({ soldier_id: "", day: "", received_via: "message" });
+            }}
+          >
+            חסימה חדשה
+          </Button>
+        }
+        search={filter.search}
+        gaf={filter.gafSelect}
+        third={<FormControlLabel sx={{ m: 0 }} control={<Switch checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label="הצג מבוטלות" />}
+      />
       <Typography variant="body2" color="text.secondary">
         עד {quota} חסימה לעובד בחודש. חסימה לא דורשת אישור ונכנסת כאילוץ קשיח.
         {deadlinePassed && " מועד הסגירה של המחזור עבר: חסימה חדשה עכשיו היא חריגה מהנוהל."}
