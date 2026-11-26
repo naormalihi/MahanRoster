@@ -150,7 +150,7 @@ function BriefingBox(props: { value: Briefing | null | undefined; onChange: (v: 
           <span>
             תדריך והתייצבות
             <Typography component="span" variant="caption" color="text.secondary" sx={{ display: "block" }}>
-              מוצג לעובד ב"המשימות שלי" ובלוח, ונשלחת לו תזכורת לפני. שעה ומקום שנכתבו במשימה עצמה גוברים.
+              מוצג לעובד במסך המשימות שלו ובלוח, ונשלחת לו תזכורת לפני. שעה ומקום שנכתבו במשימה עצמה גוברים.
             </Typography>
           </span>
         }

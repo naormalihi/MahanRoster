@@ -184,7 +184,7 @@ export function RequestsPage() {
     <Stack spacing={2} sx={{ maxWidth: 820, mx: "auto", width: "100%" }}>
       <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
         <Box sx={{ flex: 1, minWidth: 200 }}>
-          <Typography variant="h1">הבקשות שלי</Typography>
+          <Typography variant="h1">בקשות ואילוצים</Typography>
           <Typography variant="body2" color="text.secondary">
             את האסמכתא לפטור מציגים לאחראי השיבוצים – המערכת לא שומרת מסמכים או פרטים רפואיים.
           </Typography>

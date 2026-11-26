@@ -54,9 +54,9 @@ export const deviceOf = (width: number, coarse: boolean): "phone" | "desktop" =>
 /** "/my" → "המשימות שלי" – the screen as people call it; unknown paths as they are */
 const SCREENS: Record<string, string> = {
   "/": "דף הבית",
-  "/my": "המשימות שלי",
-  "/requests": "הבקשות שלי",
-  "/my/profile": "הפרטים שלי",
+  "/my": "משימות",
+  "/requests": "בקשות ואילוצים",
+  "/my/profile": "כרטיס אישי",
   "/board": "לוח השיבוצים",
   "/soldiers": "כוח אדם",
   "/admin": "הגדרות",
