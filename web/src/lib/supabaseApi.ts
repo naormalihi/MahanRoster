@@ -646,7 +646,7 @@ export class SupabaseApi implements Api {
   }
 
   async updateExemption(u: ExemptionUpdate) {
-    check(
+    run(
       await this.sb.rpc("update_exemption", {
         p_id: u.id,
         p_type: u.exemption_type_id,
