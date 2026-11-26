@@ -1856,6 +1856,17 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
     today = date.today()
     far = (today + timedelta(days=800)).replace(day=10)  # beyond every planned cycle: open; mid-month, so +1 day stays in it
     with session_as(conn, uid, aal="aal1") as c:
+        # no cycle for these days yet: nothing goes in
+        for sql, args in (("select public.submit_exemption(%s, %s, %s)", (etype, far, far + timedelta(days=10))),
+                          ("select public.add_my_date_block(%s)", (far,)),
+                          ("select public.add_my_absence(%s, %s, %s)", (atype, far, far + timedelta(days=2)))):
+            with pytest.raises(psycopg.errors.RaiseException, match="אין עדיין מחזור"), c.transaction():
+                c.execute(sql, args)
+        c.execute("reset role")
+        c.execute("insert into cycles (name, start_date, end_date, status) values ('רחוק', %s, %s, 'collecting')",
+                  (far - timedelta(days=5), far + timedelta(days=60)))
+        c.execute("set local role authenticated")
+        _claims(c, uid, "aal1")
         opts = c.execute("select public.my_input_options()").fetchone()[0]
         assert any(t["id"] == str(etype) for t in opts["exemption_types"]) and opts["block_quota_per_month"] >= 1
         eid = c.execute("select public.submit_exemption(%s, %s, %s)", (etype, far, far + timedelta(days=10))).fetchone()[0]
@@ -2805,6 +2816,8 @@ def test_new_exemption_request_alerts_staff_grouped(conn):
             conn.execute("insert into app_users (id, username) values (%s, %s)", (u, n))
             conn.execute("insert into user_roles (user_id, role, gaf_id) values (%s, 'gaf_commander', %s)", (u, g))
         conn.execute("delete from notifications")
+        conn.execute("insert into cycles (name, start_date, end_date, status) values ('רחוק', %s, %s, 'collecting')",
+                     (far, far + timedelta(days=60)))
         # the soldier asks twice within the hour
         conn.execute("set local role authenticated")
         _claims(conn, uid, aal="aal1")

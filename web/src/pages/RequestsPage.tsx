@@ -125,6 +125,12 @@ export function RequestsPage() {
   const formClosed = form && form.from && form.kind !== "exemption" && (!entryOpen(form.from, opts.cycles) || (form.to && !entryOpen(form.to, opts.cycles)));
   const formUrgent = form && form.kind === "exemption" && form.from && (!entryOpen(form.from, opts.cycles) || (form.to && !entryOpen(form.to, opts.cycles)));
   const formCycle = form?.from ? cycleOf(form.from, opts.cycles) : undefined;
+  // no cycle for these days: an absence or a block needs one for every day, an exemption to touch one
+  const noCycle =
+    !!form?.from &&
+    (form.kind === "exemption"
+      ? !opts.cycles.some((c) => c.start_date <= (form.to || form.from) && c.end_date >= form.from)
+      : !formCycle || (!!form.to && form.kind === "absence" && !cycleOf(form.to, opts.cycles)));
   const used = form?.kind === "block" && form.from ? blocksInMonth(mine, form.from.slice(0, 7)) : 0;
   const newForm = (kind: RequestKind) => {
     setChoosing(false);
@@ -301,8 +307,11 @@ export function RequestsPage() {
                   הבקשה ממתינה עד שאחראי השיבוצים יראה את האסמכתא ויחליט{exName(form.type) ? ` על "${exName(form.type)}"` : ""}.
                 </Typography>
               )}
-              {form.from && !formCycle && !formClosed && (
-                <Alert severity="info">עוד אין מחזור לתאריכים האלה – הבקשה נשמרת, ואחראי השיבוצים יראה אותה כשייפתח מחזור.</Alert>
+              {noCycle && (
+                <Alert severity="error">
+                  עוד אין מחזור לתאריכים האלה, אז אי אפשר להגיש עליהם בקשה. אפשר להגיש כשאחראי השיבוצים יפתח מחזור
+                  {opts.cycles.length ? ` – עכשיו פתוח עד ${opts.cycles.map((c) => c.end_date).sort().at(-1)!.split("-").reverse().join("/")}` : ""}.
+                </Alert>
               )}
               {formUrgent && <Alert severity="warning">מועד האילוצים לתאריכים האלה נסגר – הבקשה תסומן דחופה.</Alert>}
               {formClosed && (
@@ -322,7 +331,7 @@ export function RequestsPage() {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setForm(null)}>ביטול</Button>
-            <Button variant="contained" onClick={submit} disabled={busy || !form.from || (form.kind !== "block" && (!form.to || !form.type)) || !!formClosed}>
+            <Button variant="contained" onClick={submit} disabled={busy || !form.from || (form.kind !== "block" && (!form.to || !form.type)) || !!formClosed || noCycle}>
               {form.kind === "exemption" ? "הגשה" : "שמירה"}
             </Button>
           </DialogActions>
