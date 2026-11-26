@@ -203,7 +203,7 @@ export function MyPage() {
         setScores(s);
         setStale(null);
         setError(null);
-        if (me) saveOffline(me, d);
+        if (me && !me.viewAs) saveOffline(me, d); // not while viewing as an employee
       })
       .catch(fromCopy);
     api!.mySwaps().then(setSwaps, () => setSwaps([]));
@@ -236,7 +236,7 @@ export function MyPage() {
           <Typography variant="h1">המשימות שלי</Typography>
           <Typography variant="body2" color="text.secondary">
             {greeting()}
-            {me?.username ? `, ${me.username}` : ""}
+            {me?.viewAs ? `, ${me.viewAs.name.split(" ")[0]}` : me?.username ? `, ${me.username}` : ""}
             {next ? ` · המשימה הבאה ${dayLabel(next.starts_at)}` : ""}
           </Typography>
         </Box>

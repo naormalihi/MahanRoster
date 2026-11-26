@@ -32,6 +32,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
 import { NotificationBell } from "./NotificationBell";
+import { ViewAsScope } from "./ViewAsBanner";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { useReturnCounter } from "../lib/refreshOnReturn";
@@ -341,7 +342,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </Typography>
           )}
           {/* soldiers, and אחראי השיבוצים for the swaps soldiers made */}
-          {(isSoldier(me) || staff) && <NotificationBell />}
+          {(isSoldier(me) || staff) && !me?.viewAs && <NotificationBell />}
           {kind && !compact && (
             <IconButton color="inherit" aria-label="סיור היכרות" title="סיור היכרות" onClick={() => setTour(true)}>
               <HelpIcon />
@@ -486,7 +487,7 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* back to the app after a while: the screen loads its data again */}
       <Container key={returned} maxWidth="lg" sx={{ py: 3, px: { xs: 2, sm: 3 } }}>
         <OfflineStrip />
-        {children}
+        <ViewAsScope>{children}</ViewAsScope>
       </Container>
     </Box>
   );

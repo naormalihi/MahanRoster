@@ -287,7 +287,24 @@ export class DemoApi implements Api {
 
   async me(): Promise<Me | null> {
     if (!this.user) return null;
-    return { userId: this.user.name, username: this.user.username ?? this.user.name, roles: this.user.roles, mustChangePassword: this.user.mustChange };
+    const base = { userId: this.user.name, username: this.user.username ?? this.user.name, roles: this.user.roles, mustChangePassword: this.user.mustChange };
+    const v = this.viewAs && Date.parse(this.viewAs.until) > Date.now() ? this.viewAs : null;
+    if (!v) return base;
+    const name = this.soldierList.find((s) => s.id === v.soldierId)?.full_name ?? "";
+    return { ...base, roles: ["soldier"], viewAs: { soldierId: v.soldierId, name, until: v.until } };
+  }
+
+  /** "צפייה כעובד" in the demo: the employee's screens read his data */
+  private viewAs: { soldierId: string; until: string } | null = null;
+
+  async viewAsStart(soldierId: string) {
+    await delay(150);
+    this.viewAs = { soldierId, until: new Date(Date.now() + 2 * 3600_000).toISOString() };
+  }
+
+  async viewAsStop() {
+    await delay(100);
+    this.viewAs = null;
   }
 
   async mfaState(): Promise<MfaState> {
@@ -1530,6 +1547,7 @@ export class DemoApi implements Api {
   /** The demo soldier "chayal" is the second soldier of the list. */
   private mySoldier() {
     if (!this.user) return null;
+    if (this.viewAs) return this.viewAs.soldierId;
     return this.accounts.get(this.user.name) ?? (this.user.name === "chayal" ? this.soldierList[1]?.id : this.user.name === "cmd" ? this.soldierList[2]?.id : null) ?? null;
   }
 

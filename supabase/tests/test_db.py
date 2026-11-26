@@ -3541,3 +3541,47 @@ def test_exemption_type_set_aside_keeps_old_rows_but_not_new_ones(conn):
             names = {t["name"] for t in c.execute("select public.my_input_options()").fetchone()[0]["exemption_types"]}
         assert "סוג ישן לבדיקה" not in names and names
         raise psycopg.Rollback()
+
+
+def test_view_as_an_employee_reads_his_screens_and_blocks_actions(conn):
+    emp, g1 = conn.execute("select s.id, s.gaf_id from soldiers s where s.gaf_id is not null and s.is_active "
+                           "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by s.id desc limit 1").fetchone()
+    mine = conn.execute("select id from soldiers where gaf_id = %s and is_active and id <> %s order by id limit 1", (g1, emp)).fetchone()[0]
+    other = conn.execute("select id from soldiers where gaf_id <> %s and is_active order by id limit 1", (g1,)).fetchone()[0]
+    cmd = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.viewas", "temp-pass-123", emp)[0][0]
+    def who(c):  # app.my_soldier() is internal: read it as the owner, with the same claims
+        c.execute("reset role")
+        v = c.execute("select app.my_soldier()").fetchone()[0]
+        c.execute("set local role authenticated")
+        return v
+
+    try:
+        with session_as(conn, COORD) as c:
+            own = who(c)
+            c.execute("select public.view_as_start(%s)", (mine,))
+            assert who(c) == mine
+            cur = c.execute("select public.view_as_current()").fetchone()[0]
+            assert cur["soldier_id"] == str(mine) and cur["name"]
+            c.execute("select public.my_requests()")  # his screens read
+            for sql in ("select public.add_my_absence((select id from absence_types limit 1), current_date + 5, current_date + 6)",
+                        "select public.ack_duties(array[gen_random_uuid()])"):
+                with pytest.raises(psycopg.Error, match="צפייה כעובד"):
+                    with c.transaction():
+                        c.execute(sql)
+            c.execute("select public.view_as_stop()")
+            assert who(c) == own
+            assert c.execute("select public.view_as_current()").fetchone()[0] is None
+            c.execute("reset role")
+            assert conn.execute("select count(*) from audit_log where action = 'view_as' and entity_id = %s", (str(mine),)).fetchone()[0] >= 1
+        with session_as(conn, cmd) as c:
+            c.execute("select public.view_as_start(%s)", (mine,))  # his own people
+            assert who(c) == mine
+            with pytest.raises(psycopg.Error, match="not allowed"):
+                with c.transaction():
+                    c.execute("select public.view_as_start(%s)", (other,))
+        uid, _ = _soldier_account(conn, "viewas.emp")
+        with session_as(conn, uid, aal="aal1") as c:
+            with pytest.raises(psycopg.Error, match="not allowed"):
+                c.execute("select public.view_as_start(%s)", (mine,))
+    finally:
+        _as_coord(conn, "select public.delete_user(%s)", cmd)

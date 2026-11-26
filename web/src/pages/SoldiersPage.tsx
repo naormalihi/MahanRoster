@@ -4,6 +4,7 @@ import { BulkRemoveDialog } from "../components/BulkRemoveDialog";
 import CheckIcon from "@mui/icons-material/Check";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
+import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -45,7 +46,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDaysIso } from "../lib/cycles";
-import { Link as RouterLink, useSearchParams } from "react-router-dom";
+import { useNavigate, Link as RouterLink, useSearchParams } from "react-router-dom";
 import type { NamedRef, ScoreCorrection } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { isStaff } from "../lib/api";
@@ -235,6 +236,8 @@ function EditDialog(props: {
   mode: "full" | "admin" | "view";
   /** staff: the current score and its hand corrections */
   score?: { cycleId: string; cycleName: string; now: number; corrections: ScoreCorrection[]; onChanged: () => void };
+  /** "צפייה כעובד": see the app as this employee (staff; a gaf commander – his own people) */
+  onViewAs?: () => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -656,6 +659,11 @@ function EditDialog(props: {
         </Stack>
       </DialogContent>
       <DialogActions>
+        {props.onViewAs && (
+          <Button data-read startIcon={<VisibilityIcon />} onClick={props.onViewAs} sx={{ me: "auto" }}>
+            צפייה כעובד
+          </Button>
+        )}
         <Button onClick={props.onClose}>{ro ? "סגירה" : "ביטול"}</Button>
         {!ro && (
           <Button variant="contained" onClick={save} disabled={busy}>
@@ -713,7 +721,18 @@ function BulkRangeDialog(props: {
 // ---------------------------------------------------------------------------
 
 export function SoldiersPage() {
-  const { api, me } = useAuth();
+  const { api, me, refresh } = useAuth();
+  const navigate = useNavigate();
+  // "צפייה כעובד": the app turns into his screens, read only, until "חזרה לחשבון שלי"
+  const viewAs = async (id: string) => {
+    try {
+      await api!.viewAsStart(id);
+      await refresh();
+      navigate("/");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
   const staffUser = isStaff(me);
   // a gaf commander updates phone, range, relief roles and join codes of his own framework's people
   const [commanded, setCommanded] = useState<Set<string>>(new Set());
@@ -1659,6 +1678,21 @@ export function SoldiersPage() {
                         >
                           <EditIcon sx={{ fontSize: 17 }} />
                         </IconButton>
+                        {manages(s) && (
+                          <IconButton
+                            data-read
+                            size="small"
+                            aria-label={`צפייה כ${s.full_name}`}
+                            title="צפייה כעובד – מה הוא רואה באפליקציה"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void viewAs(s.id);
+                            }}
+                            sx={{ ml: 0.5, p: 0.25 }}
+                          >
+                            <VisibilityIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        )}
                         {s.full_name}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
@@ -1879,6 +1913,7 @@ export function SoldiersPage() {
           ranks={ranks}
           loadRoles={loadRoles}
           mode={staffUser ? "full" : manages(editing) ? "admin" : "view"}
+          onViewAs={manages(editing) ? () => void viewAs(editing.id) : undefined}
           score={
             staffUser && (cur ?? nxt)
               ? {
