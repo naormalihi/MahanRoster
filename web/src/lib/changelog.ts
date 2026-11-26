@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.66.1",
+    date: "2026-11-26",
+    items: ["כוח אדם: עמודת \"כניסה לקבע\" (ממוינת), בין תאריך הקליטה לת\"ש. בטלפון – \"קבע מ-\" בכרטיס העובד"],
+  },
+  {
     version: "2.66.0",
     date: "2026-11-26",
     items: [
