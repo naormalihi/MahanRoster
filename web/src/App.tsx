@@ -1,3 +1,4 @@
+import { MyProfilePage } from "./pages/MyProfilePage";
 import { Alert, Box, CircularProgress } from "@mui/material";
 import { lazy, Suspense, useEffect, type ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -62,6 +63,7 @@ function Gate() {
           <Route path="/board" element={<BoardPage />} />
           <Route path="/scoring" element={lazyEl(<ScoringPage />)} />
           {isSoldier(me) && <Route path="/requests" element={<RequestsPage />} />}
+          {isSoldier(me) && <Route path="/my/profile" element={<MyProfilePage />} />}
           {/* staff and commanders who do duties too: their own duties, next to the unit's home */}
           {isSoldier(me) && <Route path="/my" element={<MyPage />} />}
           {reader && (

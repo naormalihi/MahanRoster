@@ -75,6 +75,7 @@ const STAFF_LINKS = [
 const SOLDIER_LINKS = [
   { to: "/", label: "המשימות שלי", match: (p: string) => p === "/" },
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
+  { to: "/my/profile", label: "הפרטים שלי", match: (p: string) => p === "/my/profile" },
   { to: "/board", label: "לוח השיבוצים", match: (p: string) => p === "/board" },
   { to: "/scoring", label: "איך מחושב הניקוד", match: (p: string) => p === "/scoring" },
 ];
@@ -83,6 +84,7 @@ const SOLDIER_LINKS = [
 const MY_LINKS = [
   { to: "/my", label: "המשימות שלי", match: (p: string) => p === "/my" },
   { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
+  { to: "/my/profile", label: "הפרטים שלי", match: (p: string) => p === "/my/profile" },
 ];
 
 /** The "שלי" menu on a wide screen. */

@@ -56,6 +56,7 @@ const SCREENS: Record<string, string> = {
   "/": "דף הבית",
   "/my": "המשימות שלי",
   "/requests": "הבקשות שלי",
+  "/my/profile": "הפרטים שלי",
   "/board": "לוח השיבוצים",
   "/soldiers": "כוח אדם",
   "/admin": "הגדרות",

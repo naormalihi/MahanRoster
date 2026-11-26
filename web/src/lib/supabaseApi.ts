@@ -1,3 +1,4 @@
+import type { MyProfile, StaffFixRequest } from "./profile";
 import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
 import type { PotentialWhy } from "./potential";
@@ -1193,6 +1194,28 @@ export class SupabaseApi implements Api {
 
   async myRequests(): Promise<MyRequests> {
     return check(await this.sb.rpc("my_requests")) as MyRequests;
+  }
+
+  async myProfile(): Promise<MyProfile | null> {
+    return (check(await this.sb.rpc("my_profile")) as MyProfile | null) ?? null;
+  }
+
+  async requestProfileFix(field: string, current: string | null, text: string) {
+    maybe(await this.sb.rpc("request_profile_fix", { p_field: field, p_current: current, p_text: text }));
+  }
+
+  async profileFixes(soldierId?: string): Promise<StaffFixRequest[]> {
+    let q = this.sb
+      .from("profile_fix_requests")
+      .select("id, soldier_id, field, current, requested, status, reply, created_at, handled_at")
+      .eq("status", "open")
+      .order("created_at");
+    if (soldierId) q = q.eq("soldier_id", soldierId);
+    return check(await q) as StaffFixRequest[];
+  }
+
+  async handleProfileFix(id: string, status: "fixed" | "dismissed", reply: string) {
+    maybe(await this.sb.rpc("handle_profile_fix", { p_id: id, p_status: status, p_reply: reply }));
   }
 
   async myRange(): Promise<MyRange | null> {

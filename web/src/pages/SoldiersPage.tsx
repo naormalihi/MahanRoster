@@ -1,3 +1,4 @@
+import { FixRequestsDialog } from "../components/FixRequests";
 import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import { BulkRemoveDialog } from "../components/BulkRemoveDialog";
@@ -791,6 +792,23 @@ export function SoldiersPage() {
   const [editing, setEditing] = useState<SoldierDetail | null>(null);
   // "?edit=<id>" (from "הוספת טלפון" elsewhere): open that soldier's card once the list is in
   const [params, setParams] = useSearchParams();
+  // "לא נכון?" requests from employees: a chip by the name, and the dialog to handle them
+  const [fixCount, setFixCount] = useState<Map<string, number>>(new Map());
+  const [fixFor, setFixFor] = useState<string | null>(null);
+  const loadFixes = useCallback(() => {
+    if (!staffUser) return;
+    api!
+      .profileFixes()
+      .then((l) => setFixCount(l.reduce((m, f) => m.set(f.soldier_id, (m.get(f.soldier_id) ?? 0) + 1), new Map<string, number>())))
+      .catch(() => undefined);
+  }, [api, staffUser]);
+  useEffect(loadFixes, [loadFixes]);
+  const fixParam = params.get("fix");
+  useEffect(() => {
+    if (!fixParam) return;
+    setFixFor(fixParam);
+    setParams((p) => (p.delete("fix"), p), { replace: true });
+  }, [fixParam, setParams]);
   const editParam = params.get("edit");
   useEffect(() => {
     if (!editParam || !rows) return;
@@ -1519,6 +1537,9 @@ export function SoldiersPage() {
                       {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : s.tash_level ? <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} /> : null}
                       {a && a.tone !== "default" && <Chip size="small" variant="outlined" color={a.tone} label={a.text} />}
                       {newUntil(s) && <Chip size="small" variant="outlined" color="info" label={`חדש עד ${fmt(newUntil(s))}`} />}
+                      {fixCount.get(s.id) ? (
+                        <Chip size="small" color="warning" label="בקשת תיקון" onClick={(e) => (e.stopPropagation(), setFixFor(s.id))} />
+                      ) : null}
                       {s.service_switch_at && (
                         <Tooltip title={`מ-${fmt(s.service_switch_at)} הניקוד הקודם הוא ממוצע ה${s.service_switch_to === "career" ? "קבע" : "חובה"} (${Number(s.service_switch_score ?? 0).toFixed(1)}) – הניקוד מהשירות הקודם לא נספר`}>
                           <Chip size="small" variant="outlined" color="info" label={`עבר ל${s.service_switch_to === "career" ? "קבע" : "חובה"} – ניקוד הותאם`} />
@@ -1703,6 +1724,9 @@ export function SoldiersPage() {
                           </IconButton>
                         )}
                         {s.full_name}
+                        {fixCount.get(s.id) ? (
+                          <Chip size="small" color="warning" label="בקשת תיקון" onClick={() => setFixFor(s.id)} sx={{ ml: 0.5 }} />
+                        ) : null}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {s.rank_name}
@@ -1917,6 +1941,14 @@ export function SoldiersPage() {
         </Paper>
       )}
 
+      {fixFor && (
+        <FixRequestsDialog
+          soldierId={fixFor}
+          names={new Map((rows ?? []).map((r) => [r.id, r.full_name]))}
+          onClose={() => setFixFor(null)}
+          onChanged={loadFixes}
+        />
+      )}
       {editing && (
         <EditDialog
           soldier={editing}
