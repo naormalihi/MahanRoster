@@ -3443,3 +3443,46 @@ def test_partial_exemption_needs_its_duties_and_staff_can_delete(conn):
 def test_internal_note_is_not_in_the_employees_requests(conn):
     src = conn.execute("select pg_get_functiondef('public.my_requests()'::regprocedure)").fetchone()[0]
     assert "internal_note" not in src and "e.*" not in src
+
+
+def test_staff_edit_an_approved_exemption(conn):
+    uid, a = _soldier_account(conn, "edit.exemption")
+    cycle = conn.cycle_id
+    upd = "select public.update_exemption(%s, %s, current_date, current_date + %s, 'full', null, null, %s, %s)"
+    with conn.transaction():
+        conn.execute("update cycles set status = 'published', published_at = now() where id = %s", (cycle,))
+        tid = conn.execute("select task_type_id from slots where cycle_id = %s limit 1", (cycle,)).fetchone()[0]
+        b = conn.execute("select id from soldiers where is_active and id <> %s order by id desc limit 1", (a,)).fetchone()[0]
+        k = conn.execute("insert into slots (cycle_id, task_type_id, starts_at, ends_at) values "
+                         "(%s, %s, now() + interval '10 days', now() + interval '11 days') returning id", (cycle, tid)).fetchone()[0]
+        p = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status) select %s, id, gaf_id, 'performer', 'assigned' from soldiers where id = %s returning id", (k, a)).fetchone()[0]
+        r = conn.execute("insert into assignments (slot_id, soldier_id, gaf_id, role, status, paired_assignment_id) select %s, id, gaf_id, 'reserve', 'reserve_idle', %s from soldiers where id = %s returning id", (k, p, b)).fetchone()[0]
+        t1 = conn.execute("select id from exemption_types where not qualifies_day_only and not requires_duty_list and not home_nightly order by name limit 1").fetchone()[0]
+        t2 = conn.execute("insert into exemption_types (name) values ('פטור לבדיקת עריכה') returning id").fetchone()[0]
+        conn.execute("delete from exemption_type_duties where exemption_type_id in (%s, %s)", (t1, t2))
+        ex = conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date, status, proof_checked_at)
+                             values (%s, %s, 'full', current_date, current_date + 3, 'approved', now() - interval '5 days') returning id""", (a, t1)).fetchone()[0]
+        assert conn.execute("select status from assignments where id = %s", (p,)).fetchone()[0] == "assigned"
+        conn.execute("delete from notifications where recipient_user_id = %s", (uid,))
+        # an employee can't edit
+        with pytest.raises(psycopg.Error):
+            with session_as(conn, uid) as c:
+                c.execute(upd, (ex, t1, 20, None, False))
+        with session_as(conn, COORD) as c:
+            # a new type needs the proof checked again
+            with pytest.raises(psycopg.Error, match="אסמכתא"):
+                with c.transaction():
+                    c.execute(upd, (ex, t2, 3, None, False))
+            with pytest.raises(psycopg.Error, match="לפני"):
+                with c.transaction():
+                    c.execute("select public.update_exemption(%s, %s, current_date, current_date - 1, 'full')", (ex, t1))
+            # widening it over the duty: the reserve takes over; still approved, the note kept for staff
+            c.execute(upd, (ex, t2, 20, "הוארך לפי אישור", True))
+            c.execute("reset role")
+            st, end, note, proof = conn.execute("select status, end_date - current_date, internal_note, proof_checked_at > now() - interval '1 minute' from exemptions where id = %s", (ex,)).fetchone()
+            assert (st, end, note, proof) == ("approved", 20, "הוארך לפי אישור", True)
+            assert conn.execute("select status from assignments where id = %s", (p,)).fetchone()[0] == "dropped"
+            assert conn.execute("select status from assignments where id = %s", (r,)).fetchone()[0] == "reserve_activated"
+            (n,) = conn.execute("select payload from notifications where recipient_user_id = %s and type = 'exemption_updated'", (uid,)).fetchall()
+            assert n[0]["title"] == "הפטור שלך עודכן" and "הוארך" not in n[0]["body"]
+        raise psycopg.Rollback()

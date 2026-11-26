@@ -223,6 +223,20 @@ export type ExemptionInput = Pick<
   | "received_via"
 > & { internal_note?: string | null };
 
+/** Staff edit an exemption (2.61). */
+export interface ExemptionUpdate {
+  id: string;
+  exemption_type_id: string;
+  start_date: string;
+  end_date: string;
+  kind: "full" | "partial";
+  excluded_task_type_ids: string[] | null;
+  restricted_hours: string | null;
+  internal_note: string | null;
+  /** the type changed on an approved exemption: the proof was checked again */
+  proof_rechecked: boolean;
+}
+
 export type ExemptionDecision =
   | { action: "approve" }
   | { action: "reject"; reason: string }

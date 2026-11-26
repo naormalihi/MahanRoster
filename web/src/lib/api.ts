@@ -24,6 +24,7 @@ import type {
   Exemption,
   ExemptionDecision,
   ExemptionInput,
+  ExemptionUpdate,
   ExemptionType,
   StageState,
 } from "./cycles";
@@ -292,6 +293,8 @@ export interface Api {
   setExemptionDuties(id: string, taskTypeIds: string[]): Promise<void>;
   /** staff-only note ("" clears it) */
   setExemptionNote(id: string, note: string): Promise<void>;
+  /** staff edit a pending or approved exemption; a new type on an approved one needs proofRechecked */
+  updateExemption(u: ExemptionUpdate): Promise<void>;
   /** the duties an employee is eligible for (rank, service, populations…) */
   eligibleTaskTypes(soldierId: string): Promise<string[]>;
   /** delete outright (staff) – logged in the audit log */

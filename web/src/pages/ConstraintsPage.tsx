@@ -4,6 +4,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import EditNoteIcon from "@mui/icons-material/EditNote";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import UploadIcon from "@mui/icons-material/UploadFile";
 import {
@@ -313,27 +314,47 @@ const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "def
   cancelled: "default",
 };
 
-function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskType[]; onClose: () => void; onSaved: () => void }) {
+/** A new exemption, or (edit) changing one that is pending or approved. */
+function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskType[]; edit?: Exemption; onClose: () => void; onSaved: () => void }) {
   const { api } = useAuth();
   const { cycle } = props.ctx;
+  const ed = props.edit;
   const deadlinePassed = !!cycle.exemption_deadline && Date.parse(cycle.exemption_deadline) < Date.now();
-  const [e, setE] = useState<ExemptionInput>({
-    soldier_id: "",
-    exemption_type_id: "",
-    kind: "full",
-    start_date: cycle.start_date,
-    end_date: cycle.end_date,
-    excluded_task_type_ids: [],
-    restricted_hours: null,
-    is_urgent: deadlinePassed,
-    received_via: "in_person",
-  });
-  const [hours, setHours] = useState({ on: false, from: "22:00", to: "06:00" });
+  const [e, setE] = useState<ExemptionInput>(
+    ed
+      ? {
+          soldier_id: ed.soldier_id,
+          exemption_type_id: ed.exemption_type_id,
+          kind: ed.kind,
+          start_date: ed.start_date,
+          end_date: ed.end_date,
+          excluded_task_type_ids: ed.excluded_task_type_ids ?? [],
+          restricted_hours: ed.restricted_hours,
+          is_urgent: ed.is_urgent,
+          received_via: ed.received_via,
+        }
+      : {
+          soldier_id: "",
+          exemption_type_id: "",
+          kind: "full",
+          start_date: cycle.start_date,
+          end_date: cycle.end_date,
+          excluded_task_type_ids: [],
+          restricted_hours: null,
+          is_urgent: deadlinePassed,
+          received_via: "in_person",
+        },
+  );
+  const [from0, to0] = (ed?.restricted_hours ?? "").split("-");
+  const [hours, setHours] = useState({ on: !!ed?.restricted_hours, from: from0 || "22:00", to: to0 || "06:00" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const activeTasks = props.tasks.filter((t) => t.is_active);
   const needsList = !!props.types.find((t) => t.id === e.exemption_type_id)?.requires_duty_list;
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(ed?.internal_note ?? "");
+  // a new type on an approved exemption: its proof is checked again
+  const typeChanged = !!ed && ed.status === "approved" && ed.source !== "computed" && e.exemption_type_id !== ed.exemption_type_id;
+  const [rechecked, setRechecked] = useState(false);
 
   async function save() {
     const kind = needsList ? "partial" : e.kind;
@@ -341,9 +362,22 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
     if (needsList && !input.excluded_task_type_ids?.length) return setError("בפטור חלקי צריך לבחור לפחות משימה אחת שהעובד לא יכול לבצע");
     const p = exemptionProblems(input);
     if (p.length) return setError(p[0]);
+    if (typeChanged && !rechecked) return setError("סוג הפטור השתנה – סמן שבדקת את האסמכתא לסוג החדש");
     setBusy(true);
     try {
-      await api!.addExemption({ ...input, internal_note: note.trim() || null });
+      if (ed)
+        await api!.updateExemption({
+          id: ed.id,
+          exemption_type_id: input.exemption_type_id,
+          start_date: input.start_date,
+          end_date: input.end_date,
+          kind: input.kind,
+          excluded_task_type_ids: input.kind === "partial" && input.excluded_task_type_ids?.length ? input.excluded_task_type_ids : null,
+          restricted_hours: input.restricted_hours,
+          internal_note: note.trim() || null,
+          proof_rechecked: typeChanged && rechecked,
+        });
+      else await api!.addExemption({ ...input, internal_note: note.trim() || null });
       props.onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -352,8 +386,8 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
   }
 
   return (
-    <FormDialog title="פטור חדש" error={error} busy={busy} onClose={props.onClose} onSave={save}>
-      <SoldierPicker soldiers={props.ctx.soldiers} value={e.soldier_id} onChange={(v) => setE({ ...e, soldier_id: v })} autoFocus />
+    <FormDialog title={ed ? `עריכת פטור – ${nameOf(props.ctx, ed.soldier_id)}` : "פטור חדש"} error={error} busy={busy} onClose={props.onClose} onSave={save}>
+      {!ed && <SoldierPicker soldiers={props.ctx.soldiers} value={e.soldier_id} onChange={(v) => setE({ ...e, soldier_id: v })} autoFocus />}
       <TextField select label="סוג פטור" value={e.exemption_type_id} onChange={(ev) => setE({ ...e, exemption_type_id: ev.target.value })} fullWidth>
         {props.types.map((t) => (
           <MenuItem key={t.id} value={t.id}>
@@ -406,6 +440,13 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
           </Stack>
         </>
       )}
+      {typeChanged && (
+        <FormControlLabel
+          control={<Checkbox checked={rechecked} onChange={(ev) => setRechecked(ev.target.checked)} />}
+          label="בדקתי את האסמכתא לסוג החדש (מחוץ למערכת)"
+        />
+      )}
+      {!ed && (
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" } }}>
         <ViaSelect value={e.received_via} onChange={(v) => setE({ ...e, received_via: v })} />
         <FormControlLabel
@@ -414,9 +455,12 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
           sx={{ flexShrink: 0 }}
         />
       </Stack>
+      )}
       <NoteField value={note} onChange={setNote} />
       <Typography variant="caption" color="text.secondary">
-        בלי מסמכים ובלי פירוט רפואי: רק סוג הפטור ותאריכים. את האסמכתא בודקים מחוץ למערכת ומסמנים "אסמכתא נבדקה".
+        {ed?.status === "approved"
+          ? "הפטור נשאר מאושר. הרחבה משחררת את המשימות של העובד בטווח החדש גם אחרי הפרסום; צמצום לא מחזיר משימות. בטיוטה – \"חישוב מחדש\" בפוטנציאל. העובד מקבל התראה (בלי ההערה)."
+          : "בלי מסמכים ובלי פירוט רפואי: רק סוג הפטור ותאריכים. את האסמכתא בודקים מחוץ למערכת ומסמנים \"אסמכתא נבדקה\"."}
       </Typography>
     </FormDialog>
   );
@@ -524,6 +568,7 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   const [approving, setApproving] = useState<Exemption | null>(null);
   const [detailing, setDetailing] = useState<Exemption | null>(null);
   const [noting, setNoting] = useState<Exemption | null>(null);
+  const [editing, setEditing] = useState<Exemption | null>(null);
   const [rejecting, setRejecting] = useState<{ ex: Exemption; action: "reject" | "cancel" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const filter = useFilter(ctx);
@@ -617,6 +662,13 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                       ביטול
                     </Button>
                   )}
+                  {(r.status === "pending" || r.status === "approved") && (
+                    <Tooltip title="עריכה">
+                      <IconButton size="small" aria-label="עריכת הפטור" onClick={() => setEditing(r)}>
+                        <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   <Tooltip title="הערה פנימית">
                     <IconButton size="small" aria-label="הערה פנימית" onClick={() => setNoting(r)}>
                       <EditNoteIcon fontSize="small" />
@@ -698,6 +750,13 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                         פירוט משימות
                       </Button>
                     )}
+                    {(r.status === "pending" || r.status === "approved") && (
+                      <Tooltip title="עריכה">
+                        <IconButton size="small" aria-label="עריכת הפטור" onClick={() => setEditing(r)}>
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     {r.status === "approved" && (
                       <Button size="small" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
                         ביטול
@@ -723,6 +782,19 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
           onClose={() => setAdding(false)}
           onSaved={() => {
             setAdding(false);
+            void load();
+          }}
+        />
+      )}
+      {editing && (
+        <ExemptionDialog
+          ctx={ctx}
+          types={types}
+          tasks={tasks}
+          edit={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
             void load();
           }}
         />
