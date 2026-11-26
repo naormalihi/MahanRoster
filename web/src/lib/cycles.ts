@@ -179,6 +179,8 @@ export interface ExemptionType {
   allows_partial_restriction: boolean;
   /** ת"ש 7: no duty that covers night hours, for the exemption's dates */
   home_nightly?: boolean;
+  /** פטור חלקי: saved only with the duties the employee can't do */
+  requires_duty_list?: boolean;
 }
 
 export interface Exemption {
@@ -198,6 +200,14 @@ export interface Exemption {
   decision_reason: string | null;
   received_via: ReceivedVia | null;
   received_at: string | null;
+  /** staff only, no medical details – never shown to the employee */
+  internal_note?: string | null;
+}
+
+/** A פטור חלקי saved before 2.60 without its duties – it excludes every duty. */
+export function missingDutyList(e: Exemption, types: ExemptionType[]): boolean {
+  return (e.status === "pending" || e.status === "approved") && !e.excluded_task_type_ids?.length &&
+    !!types.find((t) => t.id === e.exemption_type_id)?.requires_duty_list;
 }
 
 export type ExemptionInput = Pick<
@@ -211,7 +221,7 @@ export type ExemptionInput = Pick<
   | "restricted_hours"
   | "is_urgent"
   | "received_via"
->;
+> & { internal_note?: string | null };
 
 export type ExemptionDecision =
   | { action: "approve" }

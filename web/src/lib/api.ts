@@ -288,6 +288,16 @@ export interface Api {
   /** Mark the paper proof as seen (outside the system). */
   markProofChecked(id: string): Promise<void>;
   decideExemption(id: string, d: ExemptionDecision): Promise<void>;
+  /** פטור חלקי: the duties the employee can't do */
+  setExemptionDuties(id: string, taskTypeIds: string[]): Promise<void>;
+  /** staff-only note ("" clears it) */
+  setExemptionNote(id: string, note: string): Promise<void>;
+  /** the duties an employee is eligible for (rank, service, populations…) */
+  eligibleTaskTypes(soldierId: string): Promise<string[]>;
+  /** delete outright (staff) – logged in the audit log */
+  deleteExemption(id: string): Promise<void>;
+  deleteAbsence(id: string): Promise<void>;
+  deleteDateBlock(id: string): Promise<void>;
   /** Absences that overlap the range (days, inclusive). */
   absences(fromIso: string, toIso: string): Promise<Absence[]>;
   addAbsences(rows: AbsenceInput[]): Promise<void>;
@@ -386,7 +396,7 @@ export interface Api {
   // stage 2.2 – the soldier's own constraints
   myInputOptions(): Promise<InputOptions>;
   myRequests(): Promise<MyRequests>;
-  submitExemption(typeId: string, from: string, to: string): Promise<void>;
+  submitExemption(typeId: string, from: string, to: string, taskTypeIds?: string[]): Promise<void>;
   withdrawMyExemption(id: string): Promise<void>;
   addMyDateBlock(day: string): Promise<void>;
   cancelMyDateBlock(id: string): Promise<void>;

@@ -2,11 +2,14 @@ import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import EditNoteIcon from "@mui/icons-material/EditNote";
 import DownloadIcon from "@mui/icons-material/Download";
 import UploadIcon from "@mui/icons-material/UploadFile";
 import {
   Alert,
   Autocomplete,
+  IconButton,
   Box,
   Button,
   Checkbox,
@@ -52,6 +55,7 @@ import {
   blockQuotaProblems,
   dedupeConstraints,
   exemptionProblems,
+  missingDutyList,
   parseTemplate,
   templateRows,
   type Absence,
@@ -177,6 +181,90 @@ function ReasonDialog(props: { title: string; label: string; onClose: () => void
   );
 }
 
+/** Delete a row outright (staff) – with a confirmation; the audit log keeps it. */
+function DeleteRowButton(props: { what: string; onDelete: () => Promise<void>; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function confirm() {
+    setBusy(true);
+    try {
+      await props.onDelete();
+      setOpen(false);
+      props.onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  }
+  return (
+    <>
+      <Tooltip title="מחיקה">
+        <IconButton size="small" color="error" aria-label="מחיקה" onClick={() => setOpen(true)}>
+          <DeleteOutlineIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      {open && (
+        <FormDialog title="מחיקת שורה" error={error} busy={busy} onClose={() => setOpen(false)} onSave={confirm} saveLabel="מחיקה">
+          <Typography>{props.what}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            השורה תימחק לגמרי ולא תישאר בהיסטוריה (המחיקה נרשמת ביומן הביקורת). כדי לשמור אותה בהיסטוריה – "ביטול".
+          </Typography>
+        </FormDialog>
+      )}
+    </>
+  );
+}
+
+/** פטור חלקי: the duties the employee can't do, out of those they're eligible for. */
+function DutyListPicker(props: { soldierId: string; tasks: TaskType[]; value: string[]; onChange: (ids: string[]) => void }) {
+  const { api } = useAuth();
+  const [ok, setOk] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    setOk(null);
+    if (!props.soldierId) return;
+    let live = true;
+    api!
+      .eligibleTaskTypes(props.soldierId)
+      .then((ids) => live && setOk(new Set(ids)))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, props.soldierId]);
+  const options = props.tasks.filter((t) => t.is_active && (!ok || ok.has(t.id)));
+  return (
+    <Autocomplete
+      multiple
+      disabled={!props.soldierId}
+      options={options}
+      value={props.tasks.filter((t) => props.value.includes(t.id))}
+      onChange={(_, v) => props.onChange(v.map((t) => t.id))}
+      getOptionLabel={(t) => t.name}
+      noOptionsText="אין משימות שהעובד זכאי להן"
+      renderInput={(p) => (
+        <TextField {...p} required label="לא יכול לבצע" helperText={props.soldierId ? "מתוך המשימות שהעובד זכאי להן" : "קודם בוחרים עובד"} />
+      )}
+    />
+  );
+}
+
+/** The staff-only note on an exemption. */
+function NoteField(props: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
+  return (
+    <TextField
+      label="הערה פנימית"
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value.slice(0, 200))}
+      multiline
+      minRows={2}
+      fullWidth
+      autoFocus={props.autoFocus}
+      helperText={`לסגל בלבד – העובד לא רואה אותה. בלי פרטים רפואיים. ${props.value.length}/200`}
+    />
+  );
+}
+
 /** Name search + gaf filter shared by the lists. */
 function useFilter(ctx: Ctx) {
   const [q, setQ] = useState("");
@@ -244,14 +332,18 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const activeTasks = props.tasks.filter((t) => t.is_active);
+  const needsList = !!props.types.find((t) => t.id === e.exemption_type_id)?.requires_duty_list;
+  const [note, setNote] = useState("");
 
   async function save() {
-    const input = { ...e, restricted_hours: e.kind === "partial" && hours.on ? `${hours.from}-${hours.to}` : null };
+    const kind = needsList ? "partial" : e.kind;
+    const input = { ...e, kind, restricted_hours: kind === "partial" && hours.on ? `${hours.from}-${hours.to}` : null } as ExemptionInput;
+    if (needsList && !input.excluded_task_type_ids?.length) return setError("בפטור חלקי צריך לבחור לפחות משימה אחת שהעובד לא יכול לבצע");
     const p = exemptionProblems(input);
     if (p.length) return setError(p[0]);
     setBusy(true);
     try {
-      await api!.addExemption(input);
+      await api!.addExemption({ ...input, internal_note: note.trim() || null });
       props.onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -278,14 +370,22 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
           ת״ש 7: העובד לן בבית ולא ישובץ בתאריכים האלה למשימה שכוללת שעות לילה. במשבצות שהבסיס סימן "ת״ש 7" הוא מקבל עדיפות.
         </Alert>
       )}
-      {!props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
+      {!props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && !needsList && (
       <RadioGroup row value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value as "full" | "partial" })}>
         <FormControlLabel value="full" control={<Radio />} label="לפי סוג הפטור" />
         <FormControlLabel value="partial" control={<Radio />} label="מצומצם למשימות או לשעות" />
       </RadioGroup>
       )}
-      {e.kind === "partial" && !props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
+      {(e.kind === "partial" || needsList) && !props.types.find((t) => t.id === e.exemption_type_id)?.home_nightly && (
         <>
+          {needsList ? (
+            <DutyListPicker
+              soldierId={e.soldier_id}
+              tasks={props.tasks}
+              value={e.excluded_task_type_ids ?? []}
+              onChange={(v) => setE({ ...e, excluded_task_type_ids: v })}
+            />
+          ) : (
           <Autocomplete
             multiple
             options={activeTasks}
@@ -294,6 +394,7 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
             getOptionLabel={(t) => t.name}
             renderInput={(p) => <TextField {...p} label="פטור מהמשימות" />}
           />
+          )}
           <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
             <FormControlLabel control={<Switch checked={hours.on} onChange={(ev) => setHours({ ...hours, on: ev.target.checked })} />} label="פטור בשעות" />
             {hours.on && (
@@ -313,6 +414,7 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
           sx={{ flexShrink: 0 }}
         />
       </Stack>
+      <NoteField value={note} onChange={setNote} />
       <Typography variant="caption" color="text.secondary">
         בלי מסמכים ובלי פירוט רפואי: רק סוג הפטור ותאריכים. את האסמכתא בודקים מחוץ למערכת ומסמנים "אסמכתא נבדקה".
       </Typography>
@@ -320,16 +422,22 @@ function ExemptionDialog(props: { ctx: Ctx; types: ExemptionType[]; tasks: TaskT
   );
 }
 
-function ApproveDialog(props: { ex: Exemption; who: string; onClose: () => void; onDone: () => void }) {
+function ApproveDialog(props: { ex: Exemption; who: string; types: ExemptionType[]; tasks: TaskType[]; onClose: () => void; onDone: () => void }) {
   const { api } = useAuth();
   const [proof, setProof] = useState(!!props.ex.proof_checked_at || props.ex.source === "computed");
+  const [note, setNote] = useState(props.ex.internal_note ?? "");
+  const needsList = !!props.types.find((t) => t.id === props.ex.exemption_type_id)?.requires_duty_list;
+  const [duties, setDuties] = useState<string[]>(props.ex.excluded_task_type_ids ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function save() {
     if (!proof) return setError("לפני אישור צריך לבדוק את האסמכתא");
+    if (needsList && !duties.length) return setError("בפטור חלקי צריך לבחור לפחות משימה אחת שהעובד לא יכול לבצע");
     setBusy(true);
     try {
       if (!props.ex.proof_checked_at && props.ex.source !== "computed") await api!.markProofChecked(props.ex.id);
+      if (needsList && duties.join() !== (props.ex.excluded_task_type_ids ?? []).join()) await api!.setExemptionDuties(props.ex.id, duties);
+      if (note.trim() !== (props.ex.internal_note ?? "")) await api!.setExemptionNote(props.ex.id, note);
       await api!.decideExemption(props.ex.id, { action: "approve" });
       props.onDone();
     } catch (e) {
@@ -346,6 +454,60 @@ function ApproveDialog(props: { ex: Exemption; who: string; onClose: () => void;
         control={<Checkbox checked={proof} disabled={!!props.ex.proof_checked_at} onChange={(e) => setProof(e.target.checked)} />}
         label="בדקתי את האסמכתא (מחוץ למערכת)"
       />
+      {needsList && <DutyListPicker soldierId={props.ex.soldier_id} tasks={props.tasks} value={duties} onChange={setDuties} />}
+      <NoteField value={note} onChange={setNote} />
+    </FormDialog>
+  );
+}
+
+/** פטור חלקי saved without its duties: name them (it excluded every duty until now). */
+function DutiesDialog(props: { ex: Exemption; who: string; tasks: TaskType[]; onClose: () => void; onDone: () => void }) {
+  const { api } = useAuth();
+  const [duties, setDuties] = useState<string[]>(props.ex.excluded_task_type_ids ?? []);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    if (!duties.length) return setError("צריך לבחור לפחות משימה אחת שהעובד לא יכול לבצע");
+    setBusy(true);
+    try {
+      await api!.setExemptionDuties(props.ex.id, duties);
+      props.onDone();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <FormDialog title={`פירוט משימות – ${props.who}`} error={error} busy={busy} onClose={props.onClose} onSave={save}>
+      <Typography>
+        {fmt(props.ex.start_date)} – {fmt(props.ex.end_date)}
+      </Typography>
+      <DutyListPicker soldierId={props.ex.soldier_id} tasks={props.tasks} value={duties} onChange={setDuties} />
+      <Typography variant="caption" color="text.secondary">
+        אחרי השמירה – "חישוב מחדש" בפוטנציאל, כדי שהעובד יחזור למשימות האחרות.
+      </Typography>
+    </FormDialog>
+  );
+}
+
+function NoteDialog(props: { ex: Exemption; who: string; onClose: () => void; onDone: () => void }) {
+  const { api } = useAuth();
+  const [note, setNote] = useState(props.ex.internal_note ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    try {
+      await api!.setExemptionNote(props.ex.id, note);
+      props.onDone();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <FormDialog title={`הערה פנימית – ${props.who}`} error={error} busy={busy} onClose={props.onClose} onSave={save}>
+      <NoteField value={note} onChange={setNote} autoFocus />
     </FormDialog>
   );
 }
@@ -360,6 +522,8 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   const [status, setStatus] = useState<RequestStatus | "">((params.get("status") as RequestStatus) ?? "");
   const [adding, setAdding] = useState(false);
   const [approving, setApproving] = useState<Exemption | null>(null);
+  const [detailing, setDetailing] = useState<Exemption | null>(null);
+  const [noting, setNoting] = useState<Exemption | null>(null);
   const [rejecting, setRejecting] = useState<{ ex: Exemption; action: "reject" | "cancel" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const filter = useFilter(ctx);
@@ -384,6 +548,7 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   const pending = rows.filter((r) => r.status === "pending").length;
 
   const scope = (r: Exemption) => {
+    if (missingDutyList(r, types)) return "חסר פירוט – פוטר מהכול";
     if (r.kind === "full") return "לפי הסוג";
     const parts = (r.excluded_task_type_ids ?? []).map((id) => taskName.get(id) ?? "?");
     if (r.restricted_hours) parts.push(`שעות ${r.restricted_hours}`);
@@ -428,22 +593,41 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
               lines={[
                 `${gafOf(ctx, r.soldier_id)} · ${fmt(r.start_date)} – ${fmt(r.end_date)}`,
                 r.source === "computed" ? "מחושב" : r.proof_checked_at ? `אסמכתא נבדקה ${fmt(r.proof_checked_at)}` : null,
+                r.internal_note ? `הערה: ${r.internal_note}` : null,
               ]}
               actions={
-                r.status === "pending" ? (
-                  <>
-                    <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setApproving(r)}>
-                      אישור
+                <>
+                  {r.status === "pending" && (
+                    <>
+                      <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setApproving(r)}>
+                        אישור
+                      </Button>
+                      <Button size="small" color="error" startIcon={<CloseIcon />} onClick={() => setRejecting({ ex: r, action: "reject" })}>
+                        דחייה
+                      </Button>
+                    </>
+                  )}
+                  {r.status === "approved" && missingDutyList(r, types) && (
+                    <Button size="small" color="error" variant="outlined" onClick={() => setDetailing(r)}>
+                      פירוט משימות
                     </Button>
-                    <Button size="small" color="error" startIcon={<CloseIcon />} onClick={() => setRejecting({ ex: r, action: "reject" })}>
-                      דחייה
+                  )}
+                  {r.status === "approved" && (
+                    <Button size="small" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
+                      ביטול
                     </Button>
-                  </>
-                ) : r.status === "approved" ? (
-                  <Button size="small" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
-                    ביטול
-                  </Button>
-                ) : undefined
+                  )}
+                  <Tooltip title="הערה פנימית">
+                    <IconButton size="small" aria-label="הערה פנימית" onClick={() => setNoting(r)}>
+                      <EditNoteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <DeleteRowButton
+                    what={`פטור של ${nameOf(ctx, r.soldier_id)} – ${typeName.get(r.exemption_type_id) ?? ""}, ${fmt(r.start_date)} – ${fmt(r.end_date)}`}
+                    onDelete={() => api!.deleteExemption(r.id)}
+                    onDone={() => void load()}
+                  />
+                </>
               }
             />
           ))}
@@ -459,6 +643,7 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                 <TableCell>היקף</TableCell>
                 <TableCell>תאריכים</TableCell>
                 <TableCell>אסמכתא</TableCell>
+                <TableCell>הערה</TableCell>
                 <TableCell>סטטוס</TableCell>
                 <TableCell />
               </TableRow>
@@ -473,11 +658,25 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                   </TableCell>
                   <TableCell>{gafOf(ctx, r.soldier_id)}</TableCell>
                   <TableCell>{typeName.get(r.exemption_type_id)}</TableCell>
-                  <TableCell>{scope(r)}</TableCell>
+                  <TableCell>
+                    {missingDutyList(r, types) ? <Chip size="small" color="error" label="חסר פירוט – פוטר מהכול" /> : scope(r)}
+                  </TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>
                     {fmt(r.start_date)} – {fmt(r.end_date)}
                   </TableCell>
                   <TableCell>{r.source === "computed" ? "מחושב" : r.proof_checked_at ? `נבדקה ${fmt(r.proof_checked_at)}` : "—"}</TableCell>
+                  <TableCell sx={{ maxWidth: 220 }}>
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                        {r.internal_note ?? ""}
+                      </Typography>
+                      <Tooltip title={r.internal_note ? "עריכת ההערה" : "הוספת הערה פנימית"}>
+                        <IconButton size="small" aria-label="הערה פנימית" onClick={() => setNoting(r)}>
+                          <EditNoteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
                   <TableCell>
                     <Tooltip title={r.decision_reason ?? ""}>
                       <Chip size="small" color={STATUS_COLOR[r.status]} label={STATUS_LABEL[r.status]} />
@@ -494,11 +693,21 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                         </Button>
                       </>
                     )}
+                    {r.status === "approved" && missingDutyList(r, types) && (
+                      <Button size="small" color="error" onClick={() => setDetailing(r)}>
+                        פירוט משימות
+                      </Button>
+                    )}
                     {r.status === "approved" && (
                       <Button size="small" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
                         ביטול
                       </Button>
                     )}
+                    <DeleteRowButton
+                      what={`פטור של ${nameOf(ctx, r.soldier_id)} – ${typeName.get(r.exemption_type_id) ?? ""}, ${fmt(r.start_date)} – ${fmt(r.end_date)}`}
+                      onDelete={() => api!.deleteExemption(r.id)}
+                      onDone={() => void load()}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -522,9 +731,34 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
         <ApproveDialog
           ex={approving}
           who={nameOf(ctx, approving.soldier_id)}
+          types={types}
+          tasks={tasks}
           onClose={() => setApproving(null)}
           onDone={() => {
             setApproving(null);
+            void load();
+          }}
+        />
+      )}
+      {detailing && (
+        <DutiesDialog
+          ex={detailing}
+          who={nameOf(ctx, detailing.soldier_id)}
+          tasks={tasks}
+          onClose={() => setDetailing(null)}
+          onDone={() => {
+            setDetailing(null);
+            void load();
+          }}
+        />
+      )}
+      {noting && (
+        <NoteDialog
+          ex={noting}
+          who={nameOf(ctx, noting.soldier_id)}
+          onClose={() => setNoting(null)}
+          onDone={() => {
+            setNoting(null);
             void load();
           }}
         />
@@ -647,11 +881,18 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
                 sub={`${typeName.get(r.absence_type_id) ?? ""} · ${fmt(d.from)} – ${fmt(d.to)} (${daysBetween(d.from, d.to)} ימים)`}
                 lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
                 actions={
-                  r.status === "active" ? (
-                    <Button size="small" color="inherit" onClick={() => setCancelling(r)}>
-                      ביטול
-                    </Button>
-                  ) : undefined
+                  <>
+                    {r.status === "active" && (
+                      <Button size="small" color="inherit" onClick={() => setCancelling(r)}>
+                        ביטול
+                      </Button>
+                    )}
+                    <DeleteRowButton
+                      what={`היעדרות של ${nameOf(ctx, r.soldier_id)} – ${typeName.get(r.absence_type_id) ?? ""}, ${fmt(d.from)} – ${fmt(d.to)}`}
+                      onDelete={() => api!.deleteAbsence(r.id)}
+                      onDone={() => void load()}
+                    />
+                  </>
                 }
               />
             );
@@ -684,7 +925,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
                     </TableCell>
                     <TableCell>{daysBetween(d.from, d.to)}</TableCell>
                     <TableCell>{r.received_via ? VIA_LABEL[r.received_via] : "—"}</TableCell>
-                    <TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {r.status === "active" ? (
                         <Button size="small" color="inherit" onClick={() => setCancelling(r)}>
                           ביטול
@@ -694,6 +935,11 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
                           <Chip size="small" label="בוטלה" />
                         </Tooltip>
                       )}
+                      <DeleteRowButton
+                        what={`היעדרות של ${nameOf(ctx, r.soldier_id)} – ${typeName.get(r.absence_type_id) ?? ""}, ${fmt(d.from)} – ${fmt(d.to)}`}
+                        onDelete={() => api!.deleteAbsence(r.id)}
+                        onDone={() => void load()}
+                      />
                     </TableCell>
                   </TableRow>
                 );
@@ -808,18 +1054,25 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
               sub={fmt(r.day)}
               lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
               actions={
-                r.status === "active" ? (
-                  <Button
-                    size="small"
-                    color="inherit"
-                    onClick={async () => {
-                      await api!.cancelDateBlock(r.id);
-                      void load();
-                    }}
-                  >
-                    ביטול
-                  </Button>
-                ) : undefined
+                <>
+                  {r.status === "active" && (
+                    <Button
+                      size="small"
+                      color="inherit"
+                      onClick={async () => {
+                        await api!.cancelDateBlock(r.id);
+                        void load();
+                      }}
+                    >
+                      ביטול
+                    </Button>
+                  )}
+                  <DeleteRowButton
+                    what={`חסימה של ${nameOf(ctx, r.soldier_id)} – ${fmt(r.day)}`}
+                    onDelete={() => api!.deleteDateBlock(r.id)}
+                    onDone={() => void load()}
+                  />
+                </>
               }
             />
           ))}
@@ -858,6 +1111,11 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
                     ) : (
                       <Chip size="small" label="בוטלה" />
                     )}
+                    <DeleteRowButton
+                      what={`חסימה של ${nameOf(ctx, r.soldier_id)} – ${fmt(r.day)}`}
+                      onDelete={() => api!.deleteDateBlock(r.id)}
+                      onDone={() => void load()}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

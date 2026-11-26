@@ -110,7 +110,9 @@ export interface InputCycle {
 }
 
 export interface InputOptions {
-  exemption_types: { id: string; name: string }[];
+  exemption_types: { id: string; name: string; requires_duty_list?: boolean }[];
+  /** the duties the employee is eligible for – a פטור חלקי names some of them */
+  eligible_tasks?: { id: string; name: string }[];
   absence_types: { id: string; name: string }[];
   block_quota_per_month: number;
   cycles: InputCycle[];
