@@ -1,16 +1,24 @@
 -- =============================================================================
 -- Exemption types in use (2.62.1): a type can be set aside (is_active = false). It stays for the
 -- exemptions already saved with it – they keep working and show its name – but a new exemption,
--- or a change of type, can't use it. Unit decision 26.11: only "פטור מלא" and "פטור חלקי" stay.
+-- or a change of type, can't use it. Unit decision 26.11: only "פטור מלא" and "פטור חלקי" stay;
+-- the other types are deleted (no exemption uses them).
 -- =============================================================================
 
 alter table exemption_types add column if not exists is_active boolean not null default true;
 
--- the unit's catalog: only the two types (when both are there)
-update exemption_types set is_active = false
-where name not in ('פטור מלא', 'פטור חלקי')
-  and exists (select 1 from exemption_types where name = 'פטור מלא')
-  and exists (select 1 from exemption_types where name = 'פטור חלקי');
+-- the unit's catalog: only the two types (when both are there). A type no exemption uses is
+-- deleted (its duty list goes with it); one still in use – if any – is only set aside.
+do $$
+begin
+  if exists (select 1 from exemption_types where name = 'פטור מלא')
+     and exists (select 1 from exemption_types where name = 'פטור חלקי') then
+    delete from exemption_types t
+    where t.name not in ('פטור מלא', 'פטור חלקי')
+      and not exists (select 1 from exemptions e where e.exemption_type_id = t.id);
+    update exemption_types set is_active = false where name not in ('פטור מלא', 'פטור חלקי');
+  end if;
+end $$;
 
 create or replace function app.exemption_type_in_use() returns trigger
 language plpgsql security definer set search_path = public, pg_temp as $$
