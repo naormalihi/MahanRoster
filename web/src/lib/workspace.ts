@@ -25,6 +25,35 @@ export interface CycleFacts {
   job: { status: string; unfilled: number } | null;
   /** published cycle: duties with nothing published on them yet (added after publishing) */
   pendingAdditions?: number;
+  /**
+   * Before publishing – the draft as it is now, not the last run: performers placed, and performer
+   * places still open. A draft that was cleared (or duties reloaded) after a run is not "ready".
+   */
+  draft?: { placed: number; unfilled: number };
+}
+
+/** The draft as it is now: performers placed and performer places still open (any role but reserve). */
+export function draftFacts(
+  slots: { id: string; performers_needed: number }[],
+  assignments: { slot_id: string; role: string; status: string }[],
+): { placed: number; unfilled: number } {
+  const per = new Map<string, number>();
+  for (const a of assignments) if (a.role === "performer" && a.status === "draft") per.set(a.slot_id, (per.get(a.slot_id) ?? 0) + 1);
+  let placed = 0;
+  let unfilled = 0;
+  for (const s of slots) {
+    const n = per.get(s.id) ?? 0;
+    placed += n;
+    unfilled += Math.max(0, s.performers_needed - n);
+  }
+  return { placed, unfilled };
+}
+
+/** The run's result, or – when known – the draft as it is now. */
+function draftState(f: CycleFacts): "none" | "busy" | { unfilled: number } {
+  if (f.job && (f.job.status === "queued" || f.job.status === "running")) return "busy";
+  if (f.draft) return f.draft.placed > 0 ? { unfilled: f.draft.unfilled } : "none";
+  return f.job?.status === "done" ? { unfilled: f.job.unfilled } : "none";
 }
 
 const short = (iso: string) => {
@@ -50,15 +79,13 @@ export function stepStates(cycle: Cycle, f: CycleFacts): Record<Exclude<StepKey,
       ? { tone: "done", text: `חושב ${short(cycle.potential_computed_at)}` }
       : { tone: "todo", text: "לא חושב" },
     slots: f.slots > 0 ? { tone: "done", text: `${f.slots} משימות` } : { tone: "todo", text: "לא נקלט" },
-    schedule: published
-      ? { tone: "done", text: cycle.published_at ? `פורסם ${short(cycle.published_at)}` : "פורסם" }
-      : f.job && (f.job.status === "queued" || f.job.status === "running")
-        ? { tone: "busy", text: "המנוע רץ" }
-        : f.job?.status === "done"
-          ? f.job.unfilled > 0
-            ? { tone: "warn", text: `${f.job.unfilled} לא מאוישות` }
-            : { tone: "done", text: "טיוטה מוכנה לפרסום" }
-          : { tone: "todo", text: "לא שובץ" },
+    schedule: (() => {
+      if (published) return { tone: "done", text: cycle.published_at ? `פורסם ${short(cycle.published_at)}` : "פורסם" };
+      const d = draftState(f);
+      if (d === "busy") return { tone: "busy", text: "המנוע רץ" };
+      if (d === "none") return { tone: "todo", text: "לא שובץ" };
+      return d.unfilled > 0 ? { tone: "warn", text: `${d.unfilled} לא מאוישות` } : { tone: "done", text: "טיוטה מוכנה לפרסום" };
+    })() as StepState,
     operate: !published
       ? { tone: "todo", text: "אחרי הפרסום" }
       : f.pendingAdditions
@@ -111,10 +138,10 @@ function nextActionStep(cycle: Cycle, f: CycleFacts): { text: string; step: Step
     case "scheduling":
     case "review":
       return s.schedule.tone === "warn"
-        ? { text: `לאייש ידנית ${f.job?.unfilled} משימות ולפרסם`, step: "schedule" }
+        ? { text: `לאייש ידנית ${s.schedule.text.split(" ")[0]} משימות ולפרסם`, step: "schedule" }
         : s.schedule.tone === "busy"
           ? { text: "המנוע רץ – הטיוטה תופיע כשיסיים", step: "schedule" }
-          : f.job?.status === "done"
+          : s.schedule.tone === "done"
             ? { text: "לעבור על הטיוטה ולפרסם", step: "schedule" }
             : { text: "להריץ שיבוץ", step: "schedule" };
     default:

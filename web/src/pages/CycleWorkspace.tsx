@@ -24,7 +24,7 @@ import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel, type Cycle } from "../lib/cycles";
-import { pendingSlots, nextAction, STEPS, stepNav, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
+import { draftFacts, pendingSlots, nextAction, STEPS, stepNav, stepStates, type CycleFacts, type StepKey, type StepState, type Tone } from "../lib/workspace";
 import { StagePanel } from "./CyclesPage";
 import { announceBoardChange } from "../components/SlotActions";
 import { PagerBar, type PagerItem } from "../components/PagerBar";
@@ -56,7 +56,7 @@ export function useCycleFacts(cycle: Cycle | undefined) {
       api!.exemptions(cycle.start_date, cycle.end_date),
       api!.cycleSlots(cycle.id),
       api!.scheduleJobs(cycle.id),
-      published ? api!.draftAssignments(cycle.id) : Promise.resolve([]),
+      api!.draftAssignments(cycle.id),
     ]);
     const job = jobs.find((j) => j.kind === "full" || j.kind === "stability" || j.kind === "update") ?? null;
     setFacts({
@@ -64,6 +64,7 @@ export function useCycleFacts(cycle: Cycle | undefined) {
       slots: slots.length,
       job: job && { status: job.status, unfilled: (job.unfilled ?? []).filter((u) => u.role === "performer").reduce((s, u) => s + u.missing, 0) },
       pendingAdditions: published ? pendingSlots(slots, assignments).length : 0,
+      draft: published ? undefined : draftFacts(slots, assignments),
     });
   }, [api, cycle]);
   useEffect(() => {
