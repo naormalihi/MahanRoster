@@ -1,3 +1,4 @@
+import type { MyProfile, StaffFixRequest } from "../lib/profile";
 import { validUntil, type MyRange, type PlannedRange, type PlannedRangeInput } from "../lib/range";
 import type { Inversion } from "../lib/fairness";
 import type { PotentialWhy } from "../lib/potential";
@@ -1720,6 +1721,44 @@ export class DemoApi implements Api {
   }
 
   private ranges: PlannedRange[] = [];
+  private fixes: StaffFixRequest[] = [];
+
+  async myProfile(): Promise<MyProfile | null> {
+    await delay();
+    const me = this.soldierList.find((s) => s.id === this.mySoldier());
+    if (!me) return null;
+    const tasks = (await this.taskTypes()).filter((t) => t.is_active);
+    return {
+      full_name: me.full_name, gaf: me.gaf_name, rank: me.rank_name, appointed: false, phone: me.phone ?? null,
+      service: me.service_type, career_start_date: me.career_start_date ?? null, enlistment_date: me.enlistment_date ?? null,
+      release_date: me.release_date ?? null, unit_join_date: me.unit_join_date ?? null, grace_until: null,
+      tash_level: me.tash_level ?? 0, home_nightly: !!me.home_nightly, parent: !!me.parent_status, shachar: false,
+      second_role_signed_at: null, relief: null, range_valid_until: me.range_valid_until ?? null, away: [],
+      fixes: this.fixes.filter((f) => f.soldier_id === me.id),
+      cycle: { id: "c1", name: "דצמבר 2026 – מאי 2027", start_date: "2026-12-01", end_date: "2027-05-31", published: false },
+      tasks: tasks.map((t, i) => ({ name: t.name, ok: i % 4 !== 3, reason: i % 4 === 3 ? "דרגה" : null })),
+      score: { earlier: 88.1, group: "קבע · מובילים", group_size: 59, group_avg: 83.1, switch: null, opening: null,
+        corrections: [{ points: 5, note: "משימת חג מדצמבר שלא נרשמה", at: "2026-12-20T10:00:00Z", by: "naat" }],
+        cycle_points: null, cycle_duties: null },
+    };
+  }
+
+  async requestProfileFix(field: string, current: string | null, text: string) {
+    await delay();
+    if (!text.trim()) throw new Error("כתוב מה הנכון");
+    this.fixes.push({ id: this.nextId("fx"), soldier_id: this.mySoldier()!, field, current, requested: text.trim(), status: "open",
+      reply: null, created_at: new Date().toISOString(), handled_at: null });
+  }
+
+  async profileFixes(soldierId?: string) {
+    await delay();
+    return this.fixes.filter((f) => f.status === "open" && (!soldierId || f.soldier_id === soldierId)).map((f) => ({ ...f }));
+  }
+
+  async handleProfileFix(id: string, status: "fixed" | "dismissed", reply: string) {
+    await delay();
+    Object.assign(this.fixes.find((f) => f.id === id)!, { status, reply: reply.trim() || null, handled_at: new Date().toISOString() });
+  }
 
   async myRange(): Promise<MyRange | null> {
     await delay();

@@ -3660,3 +3660,33 @@ def test_service_switch_replaces_the_earlier_score_with_the_new_groups_average(c
         assert conn.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s",
                             (cycle, sol)).fetchone()[0] >= 150
         raise psycopg.Rollback()
+
+
+def test_my_profile_and_fix_requests(conn):
+    uid, sid = _soldier_account(conn, "my.profile")
+    with session_as(conn, uid, aal="aal1") as c:
+        p = c.execute("select public.my_profile()").fetchone()[0]
+        assert p["full_name"] and p["service"] in ("mandatory", "career")
+        assert "internal_note" not in str(p) and "soldier_key" not in p
+        c.execute("reset role")
+        cat = c.execute("insert into duty_categories (name) values ('בדיקת פרופיל') returning id").fetchone()[0]
+        c.execute("update task_types set category_id = %s where category_id is null", (cat,))
+        el = c.execute("select ok, reason from app.task_eligibility(%s, current_date, current_date + 30)", (sid,)).fetchall()
+        assert el and all(ok or reason for ok, reason in el) and any(ok for ok, _ in el)
+        c.execute("set local role authenticated")
+        _claims(c, uid, "aal1")
+        rid = c.execute("select public.request_profile_fix('ת״ש', 'סוג 5', 'אני סוג 7')").fetchone()[0]
+        with pytest.raises(psycopg.errors.RaiseException, match="כתוב מה הנכון"), c.transaction():
+            c.execute("select public.request_profile_fix('ת״ש', null, '  ')")
+        p = c.execute("select public.my_profile()").fetchone()[0]
+        assert [f["status"] for f in p["fixes"]] == ["open"]
+        c.execute("reset role")
+        assert c.execute("select count(*) from notifications where type = 'profile_fix' and payload->>'request_id' = %s",
+                         (str(rid),)).fetchone()[0] >= 1
+        c.execute("set local role authenticated")
+        _claims(c, COORD, "aal2")
+        c.execute("select public.handle_profile_fix(%s, 'fixed', 'עודכן לסוג 7')", (rid,))
+        c.execute("reset role")
+        assert c.execute("select status, reply from profile_fix_requests where id = %s", (rid,)).fetchone() == ("fixed", "עודכן לסוג 7")
+        assert c.execute("select count(*) from notifications where recipient_user_id = %s and type = 'profile_fix_done'",
+                         (uid,)).fetchone()[0] == 1

@@ -1,3 +1,4 @@
+import type { MyProfile, StaffFixRequest } from "./profile";
 import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
 import type { PotentialWhy } from "./potential";
@@ -411,6 +412,13 @@ export interface Api {
   myInputOptions(): Promise<InputOptions>;
   myRequests(): Promise<MyRequests>;
   submitExemption(typeId: string, from: string, to: string, taskTypeIds?: string[]): Promise<void>;
+  /** הפרטים שלי (null: not an employee) */
+  myProfile(): Promise<MyProfile | null>;
+  /** "לא נכון?" – to staff */
+  requestProfileFix(field: string, current: string | null, text: string): Promise<void>;
+  /** staff: open fix requests (all, or one employee's) */
+  profileFixes(soldierId?: string): Promise<StaffFixRequest[]>;
+  handleProfileFix(id: string, status: "fixed" | "dismissed", reply: string): Promise<void>;
   /** מטווח: the employee's validity and the next planned range (null: not an employee) */
   myRange(): Promise<MyRange | null>;
   /** the date of the last range; returns the new validity */

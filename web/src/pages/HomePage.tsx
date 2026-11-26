@@ -1,10 +1,12 @@
+import { FixRequestsDialog } from "../components/FixRequests";
+import type { StaffFixRequest } from "../lib/profile";
 import { MyNextDuty } from "../components/MyNextDuty";
 import { UnackedCard } from "../components/UnackedCard";
 import { SwapLogCard } from "../components/SwapDialog";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from "@mui/material";
 import { EmptyState, greeting } from "../components/EmptyState";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { isStaff, type BoardRow } from "../lib/api";
 import { mfaResetters } from "../lib/users";
@@ -46,6 +48,17 @@ export function HomePage() {
 
   // requests for days no cycle covers – invisible in the constraints screens until one does
   const [orphans, setOrphans] = useState<Orphan[]>([]);
+  // employees' "לא נכון?" requests
+  const [fixes, setFixes] = useState<StaffFixRequest[]>([]);
+  const [fixesOpen, setFixesOpen] = useState(false);
+  const loadFixes = useCallback(() => {
+    if (!staff) return;
+    api!
+      .profileFixes()
+      .then(setFixes)
+      .catch(() => setFixes([]));
+  }, [api, staff]);
+  useEffect(loadFixes, [loadFixes]);
   const [dropping, setDropping] = useState<Orphan | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   async function drop(o: Orphan) {
@@ -106,6 +119,27 @@ export function HomePage() {
         </Typography>
       </Box>
 
+      {fixes.length > 0 && (
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" onClick={() => setFixesOpen(true)}>
+              טיפול
+            </Button>
+          }
+        >
+          <b>בקשות תיקון פרטים ({fixes.length})</b>
+          <Box component="ul" sx={{ m: 0, mt: 0.5, pr: 2.5, pl: 0 }}>
+            {fixes.slice(0, 5).map((f) => (
+              <li key={f.id}>
+                {names.get(f.soldier_id) ?? "עובד"} · {f.field}: {f.requested}
+              </li>
+            ))}
+            {fixes.length > 5 && <li>ועוד {fixes.length - 5}</li>}
+          </Box>
+        </Alert>
+      )}
+      {fixesOpen && <FixRequestsDialog names={names} onClose={() => setFixesOpen(false)} onChanged={loadFixes} />}
       {orphans.length > 0 && (
         <Alert
           severity="warning"
