@@ -10,6 +10,25 @@ export interface UnitDashboard {
   settings_changes: { at: string; action: string; entity: string; name: string | null; by: string | null }[];
 }
 
+/** the managers' tiles: the cycle we're in, else the next one */
+export interface UnitKpis {
+  active: number;
+  mandatory: number;
+  career: number;
+  range_expired: number;
+  range_soon: number;
+  in_training: number;
+  new_in_cycle: number | null;
+  to_career: number | null;
+  cycle?: { id: string; name: string; start_date: string; end_date: string; published: boolean; status: string };
+  exemptions_approved?: number;
+  exemptions_pending?: number;
+  callups_reserve?: number;
+  callups_special?: number;
+  manual_changes?: number;
+  swaps?: number;
+}
+
 export const ENTITY_LABEL: Record<string, string> = {
   settings: "הגדרות",
   task_types: "סוג משימה",

@@ -1,3 +1,8 @@
+import BoardIcon from "@mui/icons-material/CalendarMonthOutlined";
+import CyclesIcon from "@mui/icons-material/AutorenewOutlined";
+import PeopleIcon from "@mui/icons-material/GroupsOutlined";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import { alpha } from "@mui/material/styles";
 import { FixRequestsDialog } from "../components/FixRequests";
 import type { StaffFixRequest } from "../lib/profile";
 import { MyNextDuty } from "../components/MyNextDuty";
@@ -306,12 +311,14 @@ export function HomePage() {
       </Box>
 
       <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
-        {[
-          { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי עובדים" },
-          { to: "/board", label: "לוח השיבוצים", hint: "מה שכל היחידה רואה" },
-          { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ומועד סגירת אילוצים" },
-          { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים" },
-        ]
+        {(
+          [
+            { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי עובדים", icon: <PeopleIcon />, tone: "info" },
+            { to: "/board", label: "לוח השיבוצים", hint: "מה שכל היחידה רואה", icon: <BoardIcon />, tone: "success" },
+            { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ומועד סגירת אילוצים", icon: <CyclesIcon />, tone: "warning" },
+            { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים, מטווחים", icon: <SettingsIcon />, tone: "primary" },
+          ] as const
+        )
           .filter((l) => staff || (l.to !== "/cycles" && l.to !== "/admin"))
           .map((l) => (
           <Paper
@@ -319,9 +326,22 @@ export function HomePage() {
             variant="outlined"
             component={RouterLink}
             to={l.to}
-            sx={{ p: 1.75, textDecoration: "none", color: "inherit", "&:hover": { borderColor: "primary.main" } }}
+            sx={{ p: 1.75, borderRadius: 3, textDecoration: "none", color: "inherit", display: "flex", flexDirection: "column", gap: 1, "&:hover": { borderColor: `${l.tone}.main` } }}
           >
-            <Typography sx={{ fontWeight: 700 }}>{l.label}</Typography>
+            <Box
+              sx={(t) => ({
+                width: 44,
+                height: 44,
+                borderRadius: 2.5,
+                display: "grid",
+                placeItems: "center",
+                color: t.palette[l.tone].main,
+                bgcolor: alpha(t.palette[l.tone].main, 0.16),
+              })}
+            >
+              {l.icon}
+            </Box>
+            <Typography sx={{ fontWeight: 700, fontSize: 17 }}>{l.label}</Typography>
             <Typography variant="body2" color="text.secondary">
               {l.hint}
             </Typography>
