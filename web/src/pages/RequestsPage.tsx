@@ -3,6 +3,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   Accordion,
+  Autocomplete,
   AccordionDetails,
   AccordionSummary,
   Alert,
@@ -39,7 +40,7 @@ const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "def
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 const tomorrow = () => dayKey(new Date(Date.now() + 86_400_000));
 
-type Form = { kind: RequestKind; type: string; from: string; to: string };
+type Form = { kind: RequestKind; type: string; from: string; to: string; tasks?: string[] };
 
 const ITEM_TITLE = (r: RequestItem) => (r.kind === "block" ? "חסימת תאריך" : `${KIND_LABEL[r.kind]} · ${r.type}`);
 const dates = (r: RequestItem) => (r.from === r.to ? dayLabel(r.from) : `${fmt(r.from)} – ${fmt(r.to)}`);
@@ -93,7 +94,11 @@ export function RequestsPage() {
     setBusy(true);
     setFormError(null);
     try {
-      if (form.kind === "exemption") await api!.submitExemption(form.type, form.from, form.to);
+      if (form.kind === "exemption") {
+        const needs = !!opts?.exemption_types.find((t) => t.id === form.type)?.requires_duty_list;
+        if (needs && !form.tasks?.length) throw new Error("בפטור חלקי צריך לבחור לפחות משימה אחת שאינך יכול לבצע");
+        await api!.submitExemption(form.type, form.from, form.to, needs ? form.tasks : undefined);
+      }
       else if (form.kind === "block") await api!.addMyDateBlock(form.from);
       else await api!.addMyAbsence(form.type, form.from, form.to);
       setForm(null);
@@ -277,6 +282,17 @@ export function RequestsPage() {
                 <Typography variant="body2" color={used >= opts.block_quota_per_month ? "error" : "text.secondary"}>
                   {used} מתוך {opts.block_quota_per_month} חסימות בחודש הזה
                 </Typography>
+              )}
+              {form.kind === "exemption" && opts.exemption_types.find((t) => t.id === form.type)?.requires_duty_list && (
+                <Autocomplete
+                  multiple
+                  options={opts.eligible_tasks ?? []}
+                  value={(opts.eligible_tasks ?? []).filter((t) => form.tasks?.includes(t.id))}
+                  onChange={(_, v) => setForm({ ...form, tasks: v.map((t) => t.id) })}
+                  getOptionLabel={(t) => t.name}
+                  noOptionsText="אין משימות"
+                  renderInput={(p) => <TextField {...p} required label="משימות שאינך יכול לבצע" helperText="מתוך המשימות שאתה משובץ אליהן" />}
+                />
               )}
               {form.kind === "exemption" && (
                 <Typography variant="body2" color="text.secondary">

@@ -114,7 +114,7 @@ const DEMO_TASKS: TaskType[] = [
 
 const EXEMPTION_TYPES: ExemptionType[] = [
   { id: "e_full", name: "פטור מלא", qualifies_day_only: false, allows_partial_restriction: true },
-  { id: "e_part", name: "פטור חלקי", qualifies_day_only: false, allows_partial_restriction: true },
+  { id: "e_part", name: "פטור חלקי", qualifies_day_only: false, allows_partial_restriction: true, requires_duty_list: true },
   { id: "e_qual", name: "פטור מזכה – ממלכת יום בלבד", qualifies_day_only: true, allows_partial_restriction: true },
   { id: "e_med", name: "רפואי", qualifies_day_only: false, allows_partial_restriction: true },
   { id: "e_kaps", name: "קפ\"ס", qualifies_day_only: false, allows_partial_restriction: true },
@@ -746,6 +746,36 @@ export class DemoApi implements Api {
     e.status = d.action === "approve" ? "approved" : d.action === "reject" ? "rejected" : "cancelled";
     e.decision_reason = d.action === "approve" ? null : d.reason;
     e.decided_at = new Date().toISOString();
+  }
+
+  async setExemptionDuties(id: string, taskTypeIds: string[]) {
+    await delay();
+    if (!taskTypeIds.length) throw new Error("בפטור חלקי צריך לבחור לפחות משימה אחת שהעובד לא יכול לבצע");
+    Object.assign(this.exemptionList.find((x) => x.id === id)!, { excluded_task_type_ids: taskTypeIds, kind: "partial" });
+  }
+
+  async setExemptionNote(id: string, note: string) {
+    await delay();
+    this.exemptionList.find((x) => x.id === id)!.internal_note = note.trim() || null;
+  }
+
+  async eligibleTaskTypes(_soldierId: string) {
+    return (await this.taskTypes()).filter((t) => t.is_active).map((t) => t.id);
+  }
+
+  async deleteExemption(id: string) {
+    await delay();
+    this.exemptionList = this.exemptionList.filter((x) => x.id !== id);
+  }
+
+  async deleteAbsence(id: string) {
+    await delay();
+    this.absenceList = this.absenceList.filter((x) => x.id !== id);
+  }
+
+  async deleteDateBlock(id: string) {
+    await delay();
+    this.blockList = this.blockList.filter((x) => x.id !== id);
   }
 
   async absences(fromIso: string, toIso: string) {
@@ -1608,7 +1638,8 @@ export class DemoApi implements Api {
     await delay();
     const today = new Date().toISOString().slice(0, 10);
     return {
-      exemption_types: EXEMPTION_TYPES.map((t) => ({ id: t.id, name: t.name })),
+      exemption_types: EXEMPTION_TYPES.map((t) => ({ id: t.id, name: t.name, requires_duty_list: !!t.requires_duty_list })),
+      eligible_tasks: (await this.taskTypes()).filter((t) => t.is_active).map((t) => ({ id: t.id, name: t.name })),
       absence_types: ABSENCE_TYPES.filter((t) => t.name !== "מחלה"),
       block_quota_per_month: 1,
       cycles: this.cycleList
@@ -1648,14 +1679,16 @@ export class DemoApi implements Api {
     };
   }
 
-  async submitExemption(typeId: string, from: string, to: string) {
+  async submitExemption(typeId: string, from: string, to: string, taskTypeIds?: string[]) {
     await delay();
     if (to < from) throw new Error("תאריכים לא תקינים");
+    const needs = !!EXEMPTION_TYPES.find((t) => t.id === typeId)?.requires_duty_list;
+    if (needs && !taskTypeIds?.length) throw new Error("בפטור חלקי צריך לבחור לפחות משימה אחת שאינך יכול לבצע");
     const me = this.mySoldier()!;
     const urgent = !this.demoOpen(from) || !this.demoOpen(to);
     this.exemptionList.push({
-      id: `ex${Date.now()}`, soldier_id: me, exemption_type_id: typeId, kind: "full", start_date: from, end_date: to,
-      excluded_task_type_ids: null, restricted_hours: null, is_urgent: urgent, status: "pending", source: "soldier",
+      id: `ex${Date.now()}`, soldier_id: me, exemption_type_id: typeId, kind: needs ? "partial" : "full", start_date: from, end_date: to,
+      excluded_task_type_ids: needs ? taskTypeIds! : null, restricted_hours: null, is_urgent: urgent, status: "pending", source: "soldier",
       proof_checked_at: null, decided_at: null, decision_reason: null, received_via: "system", received_at: new Date().toISOString(),
     } as Exemption);
   }

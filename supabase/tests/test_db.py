@@ -3411,3 +3411,35 @@ def test_tour_opens_by_itself_three_times_or_until_dismissed(conn):
         assert c.execute("select public.tour_auto_open()").fetchone()[0] is True
         c.execute("select public.tour_dismiss()")
         assert c.execute("select public.tour_auto_open()").fetchone()[0] is False
+
+
+def test_partial_exemption_needs_its_duties_and_staff_can_delete(conn):
+    sid = conn.execute("select id from soldiers where release_date is null or release_date > current_date limit 1").fetchone()[0]
+    part = conn.execute("""insert into exemption_types (name, requires_duty_list) values ('פטור חלקי – בדיקה', true)
+                           returning id""").fetchone()[0]
+    # without duties: refused
+    with pytest.raises(psycopg.errors.RaiseException, match="לפחות משימה"):
+        conn.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date)
+                        values (%s, %s, 'full', current_date, current_date + 3)""", (sid, part))
+    with session_as(conn, COORD) as c:
+        ok = c.execute("select public.eligible_task_types(%s)", (sid,)).fetchone()[0]
+        assert ok
+        eid = c.execute("""insert into exemptions (soldier_id, exemption_type_id, kind, start_date, end_date,
+                                                   excluded_task_type_ids, internal_note)
+                           values (%s, %s, 'full', current_date, current_date + 3, %s, 'תואם מול המפקד') returning id""",
+                        (sid, part, ok[:1])).fetchone()[0]
+        # the duties make it partial: only the chosen duty is excluded
+        assert c.execute("select kind from exemptions where id = %s", (eid,)).fetchone()[0] == "partial"
+        c.execute("delete from exemptions where id = %s", (eid,))
+        assert c.execute("select count(*) from exemptions where id = %s", (eid,)).fetchone()[0] == 0
+        assert c.execute("select count(*) from audit_log where entity_type = 'exemptions' and entity_id = %s and action = 'delete'",
+                         (str(eid),)).fetchone()[0] == 1
+    # an employee asks only about themself
+    with session_as(conn, VIEWER) as c:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("select public.eligible_task_types(%s)", (sid,))
+
+
+def test_internal_note_is_not_in_the_employees_requests(conn):
+    src = conn.execute("select pg_get_functiondef('public.my_requests()'::regprocedure)").fetchone()[0]
+    assert "internal_note" not in src and "e.*" not in src

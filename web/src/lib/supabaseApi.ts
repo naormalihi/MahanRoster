@@ -584,7 +584,7 @@ export class SupabaseApi implements Api {
 
   async exemptionTypes(): Promise<ExemptionType[]> {
     return check(
-      await this.sb.from("exemption_types").select("id, name, qualifies_day_only, allows_partial_restriction, home_nightly").order("name"),
+      await this.sb.from("exemption_types").select("id, name, qualifies_day_only, allows_partial_restriction, home_nightly, requires_duty_list").order("name"),
     ) as ExemptionType[];
   }
 
@@ -602,7 +602,7 @@ export class SupabaseApi implements Api {
       await this.sb
         .from("exemptions")
         .select(
-          "id, soldier_id, exemption_type_id, kind, start_date, end_date, excluded_task_type_ids, restricted_hours, is_urgent, status, source, proof_checked_at, decided_at, decision_reason, received_via, received_at",
+          "id, soldier_id, exemption_type_id, kind, start_date, end_date, excluded_task_type_ids, restricted_hours, is_urgent, status, source, proof_checked_at, decided_at, decision_reason, received_via, received_at, internal_note",
         )
         .lte("start_date", toIso)
         .gte("end_date", fromIso)
@@ -634,6 +634,30 @@ export class SupabaseApi implements Api {
         ? { ...base, status: "approved", decision_reason: null }
         : { ...base, status: d.action === "reject" ? "rejected" : "cancelled", decision_reason: d.reason };
     maybe(await this.sb.from("exemptions").update(patch).eq("id", id));
+  }
+
+  async setExemptionDuties(id: string, taskTypeIds: string[]) {
+    maybe(await this.sb.from("exemptions").update({ excluded_task_type_ids: taskTypeIds, kind: "partial" }).eq("id", id));
+  }
+
+  async setExemptionNote(id: string, note: string) {
+    maybe(await this.sb.from("exemptions").update({ internal_note: note.trim() || null }).eq("id", id));
+  }
+
+  async eligibleTaskTypes(soldierId: string): Promise<string[]> {
+    return (check(await this.sb.rpc("eligible_task_types", { p_soldier: soldierId })) as string[] | null) ?? [];
+  }
+
+  async deleteExemption(id: string) {
+    maybe(await this.sb.from("exemptions").delete().eq("id", id));
+  }
+
+  async deleteAbsence(id: string) {
+    maybe(await this.sb.from("absences").delete().eq("id", id));
+  }
+
+  async deleteDateBlock(id: string) {
+    maybe(await this.sb.from("date_blocks").delete().eq("id", id));
   }
 
   async absences(fromIso: string, toIso: string): Promise<Absence[]> {
@@ -1132,8 +1156,8 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("my_requests")) as MyRequests;
   }
 
-  async submitExemption(typeId: string, from: string, to: string) {
-    maybe(await this.sb.rpc("submit_exemption", { p_type: typeId, p_start: from, p_end: to }));
+  async submitExemption(typeId: string, from: string, to: string, taskTypeIds?: string[]) {
+    maybe(await this.sb.rpc("submit_exemption", { p_type: typeId, p_start: from, p_end: to, p_tasks: taskTypeIds?.length ? taskTypeIds : null }));
   }
 
   async withdrawMyExemption(id: string) {
