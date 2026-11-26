@@ -1,4 +1,11 @@
 import { MyNextDuty } from "../components/MyNextDuty";
+import BoltIcon from "@mui/icons-material/BoltOutlined";
+import CareerIcon from "@mui/icons-material/EastOutlined";
+import ApprovedIcon from "@mui/icons-material/TaskAltOutlined";
+import NewIcon from "@mui/icons-material/PersonAddAltOutlined";
+import PendingIcon from "@mui/icons-material/ScheduleOutlined";
+import RangeIcon from "@mui/icons-material/GpsFixedOutlined";
+import { alpha, useTheme } from "@mui/material/styles";
 import {
   Alert,
   Box,
@@ -19,7 +26,7 @@ import { Link as RouterLink } from "react-router-dom";
 import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { stageLabel, type CycleStatus } from "../lib/cycles";
-import { ACTION_LABEL, collapseRepeats, ENTITY_LABEL, perSoldier, type UnitDashboard } from "../lib/dashboard";
+import { ACTION_LABEL, collapseRepeats, ENTITY_LABEL, perSoldier, type UnitDashboard, type UnitKpis } from "../lib/dashboard";
 import { FeedbackInbox } from "../components/FeedbackInbox";
 import { dayLabel, spanLabel, upcomingWeekend } from "../lib/dates";
 import { useLiveTick } from "../lib/live";
@@ -27,18 +34,87 @@ import { useLiveTick } from "../lib/live";
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 const POP: Record<string, string> = { mandatory: "חובה", career: "קבע" };
 
-function Tile({ title, value, note }: { title: string; value: ReactNode; note?: ReactNode }) {
+type Tone = "info" | "secondary" | "success" | "error" | "warning";
+
+/** A managers' tile: icon, a big number, a line – and, with `to`, the filtered list behind it. */
+function Kpi(props: { title: string; value: ReactNode; note?: ReactNode; noteTone?: Tone; icon: ReactNode; tone: Tone; to?: string; alert?: boolean }) {
+  const t = useTheme();
+  const c = t.palette[props.tone].main;
   return (
-    <Paper variant="outlined" sx={{ p: 1.5 }}>
-      <Typography variant="caption" color="text.secondary">
-        {title}
+    <Paper
+      variant="outlined"
+      {...(props.to ? { component: RouterLink, to: props.to } : {})}
+      sx={{
+        p: 1.75,
+        borderRadius: 3,
+        display: "flex",
+        flexDirection: "column",
+        gap: 0.5,
+        minHeight: 128,
+        textDecoration: "none",
+        color: "inherit",
+        borderColor: props.alert ? alpha(t.palette.error.main, 0.5) : undefined,
+        "&:hover": props.to ? { borderColor: c } : undefined,
+      }}
+    >
+      <Box sx={{ width: 32, height: 32, borderRadius: 2, bgcolor: alpha(c, 0.16), color: c, display: "grid", placeItems: "center", "& svg": { fontSize: 19 } }}>
+        {props.icon}
+      </Box>
+      <Typography variant="body2" color="text.secondary">
+        {props.title}
       </Typography>
-      <Typography sx={{ fontSize: 26, fontWeight: 700, lineHeight: 1.3 }}>{value}</Typography>
-      {note && (
-        <Typography variant="caption" color="text.secondary">
-          {note}
+      <Typography sx={{ fontSize: 32, fontWeight: 800, lineHeight: 1.1, color: props.alert ? "error.main" : undefined }}>{props.value}</Typography>
+      {props.note && (
+        <Typography variant="caption" sx={{ color: props.noteTone ? `${props.noteTone}.main` : "text.secondary" }}>
+          {props.note}
         </Typography>
       )}
+    </Paper>
+  );
+}
+
+/** The workforce: active, the חובה / קבע split, and how many have their own account. */
+function Workforce({ k, d }: { k: UnitKpis; d: UnitDashboard }) {
+  const t = useTheme();
+  const pct = d.accounts.soldiers ? Math.round((d.accounts.with_account / d.accounts.soldiers) * 100) : 0;
+  return (
+    <Paper variant="outlined" component={RouterLink} to="/soldiers" sx={{ p: 2, borderRadius: 3, textDecoration: "none", color: "inherit", display: "block" }}>
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-end" }}>
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            עובדים פעילים
+          </Typography>
+          <Typography sx={{ fontSize: 44, fontWeight: 800, lineHeight: 1 }}>{k.active}</Typography>
+        </Box>
+        <Box sx={{ textAlign: "left" }}>
+          <Typography variant="body2" color="text.secondary">
+            עם חשבון אישי
+          </Typography>
+          <Typography sx={{ fontSize: 20, fontWeight: 700 }}>
+            {d.accounts.with_account}{" "}
+            <Typography component="span" variant="body2" color="text.secondary">
+              · {pct}%
+            </Typography>
+          </Typography>
+        </Box>
+      </Stack>
+      <Box role="img" aria-label={`חובה ${k.mandatory}, קבע ${k.career}`} sx={{ display: "flex", gap: "2px", height: 12, borderRadius: 99, overflow: "hidden", mt: 1.5 }}>
+        <Box sx={{ flex: k.mandatory || 0.0001, bgcolor: t.palette.info.main }} />
+        <Box sx={{ flex: k.career || 0.0001, bgcolor: t.palette.secondary.main }} />
+      </Box>
+      <Stack direction="row" spacing={2.5} sx={{ mt: 1 }}>
+        {[
+          ["חובה", k.mandatory, t.palette.info.main],
+          ["קבע", k.career, t.palette.secondary.main],
+        ].map(([l, n, col]) => (
+          <Stack key={l as string} direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: 0.75, bgcolor: col as string }} />
+            <Typography variant="body2">
+              {l} <b>{n}</b>
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
     </Paper>
   );
 }
@@ -66,12 +142,14 @@ export function DashboardPage() {
   const live = useLiveTick();
   const { api } = useAuth();
   const [d, setD] = useState<UnitDashboard | null>(null);
+  const [k, setK] = useState<UnitKpis | null>(null);
   const [weekend, setWeekend] = useState<BoardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [allChanges, setAllChanges] = useState(false);
 
   useEffect(() => {
     api!.unitDashboard().then(setD).catch((e) => setError((e as Error).message));
+    api!.unitKpis().then(setK).catch(() => setK(null));
     const [from, to] = upcomingWeekend();
     api!.board(from.toISOString(), to.toISOString()).then(setWeekend).catch(() => setWeekend([]));
   }, [api, live]);
@@ -100,15 +178,54 @@ export function DashboardPage() {
       </Box>
       <MyNextDuty />
 
-      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
-        <Tile title="בקשות פטור ממתינות" value={d.requests.pending} note={d.requests.urgent ? `${d.requests.urgent} דחופות` : "אין דחופות"} />
-        <Tile title="הגישו בעצמם" value={d.requests.by_soldiers} note="מתוך הממתינות" />
-        <Tile
-          title="עובדים עם חשבון אישי"
-          value={`${d.accounts.with_account}/${d.accounts.soldiers}`}
-          note={d.accounts.soldiers ? `${Math.round((d.accounts.with_account / d.accounts.soldiers) * 100)}%` : ""}
+      {k && <Workforce k={k} d={d} />}
+      {k?.cycle && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: -1 }}>
+          במחזור {k.cycle.name}
+          {k.cycle.published ? "" : " (בתכנון)"}
+        </Typography>
+      )}
+      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(3, 1fr)" } }}>
+        {k && (
+          <>
+            <Kpi title="חדשים במחזור" value={k.new_in_cycle ?? "—"} note={k.in_training ? `${k.in_training} עדיין בהכשרה` : "אף אחד לא בהכשרה"} icon={<NewIcon />} tone="info" to="/soldiers?new=1" />
+            <Kpi title="נכנסים לקבע במחזור" value={k.to_career ?? "—"} note="ניקוד מעבר אוטומטי" icon={<CareerIcon />} tone="secondary" to="/soldiers" />
+            <Kpi
+              title="פטורים מאושרים"
+              value={k.exemptions_approved ?? "—"}
+              note={k.exemptions_pending ? `ועוד ${k.exemptions_pending} ממתינים להחלטה` : "אין ממתינים"}
+              noteTone={k.exemptions_pending ? "warning" : undefined}
+              icon={<ApprovedIcon />}
+              tone="success"
+              to="/cycle/constraints"
+            />
+            <Kpi
+              title="מטווח פג תוקף"
+              value={k.range_expired}
+              note={k.range_soon ? `ועוד ${k.range_soon} יפוגו ב-30 יום` : "אף אחד לא יפוג ב-30 יום"}
+              icon={<RangeIcon />}
+              tone="error"
+              alert={k.range_expired > 0}
+              to="/soldiers?range=expired"
+            />
+            <Kpi
+              title="הקפצות במחזור"
+              value={(k.callups_reserve ?? 0) + (k.callups_special ?? 0)}
+              note={k.cycle?.published ? `${k.callups_reserve ?? 0} מהעתודה · ${k.callups_special ?? 0} מיוחדות` : "נספרות אחרי הפרסום"}
+              icon={<BoltIcon />}
+              tone="warning"
+            />
+          </>
+        )}
+        <Kpi
+          title="בקשות פטור ממתינות"
+          value={d.requests.pending}
+          note={`${d.requests.by_soldiers} הגישו בעצמם · ${d.requests.urgent ? `${d.requests.urgent} דחופות` : "אין דחופות"}`}
+          noteTone={d.requests.urgent ? "error" : undefined}
+          icon={<PendingIcon />}
+          tone="warning"
+          to="/cycle/constraints"
         />
-        <Tile title="שינויי הגדרות בחודש" value={d.settings_changes.length} note="ע״י אחראי השיבוצים" />
       </Box>
 
       {/* two by two, each pair the same height */}
@@ -193,7 +310,20 @@ export function DashboardPage() {
           )}
         </Card>
 
-        <Card title="שינויי הגדרות בחודש האחרון">
+        <Card title="פעילות הסגל">
+          {k?.cycle && (
+            <Stack direction="row" sx={{ gap: 2, flexWrap: "wrap", mb: 1 }}>
+              <Typography variant="body2">
+                שינויים ידניים בשיבוץ: <b>{k.manual_changes ?? 0}</b>
+              </Typography>
+              <Typography variant="body2">
+                החלפות בין עובדים: <b>{k.swaps ?? 0}</b>
+              </Typography>
+              <Typography variant="body2">
+                שינויי הגדרות בחודש: <b>{d.settings_changes.length}</b>
+              </Typography>
+            </Stack>
+          )}
           {d.settings_changes.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               לא שונו הגדרות.

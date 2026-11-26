@@ -1,3 +1,4 @@
+import type { UnitKpis } from "./dashboard";
 import type { MyProfile, StaffFixRequest } from "./profile";
 import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
@@ -173,6 +174,10 @@ export class SupabaseApi implements Api {
 
   async renameMe(username: string, password: string | null) {
     run(await this.sb.rpc("rename_me", { p_username: username, p_password: password }));
+  }
+
+  async unitKpis(): Promise<UnitKpis> {
+    return check(await this.sb.rpc("unit_kpis")) as UnitKpis;
   }
 
   async sendTestNotification() {

@@ -1,3 +1,4 @@
+import type { UnitKpis } from "./dashboard";
 import type { MyProfile, StaffFixRequest } from "./profile";
 import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
@@ -202,6 +203,8 @@ export interface Api {
   specDocument(): Promise<SpecDocument | null>;
   updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void>;
   setMyRequestAlerts(on: boolean): Promise<void>;
+  /** נתוני היחידה: the managers' tiles */
+  unitKpis(): Promise<UnitKpis>;
   /** "שליחת התראת ניסיון": a notice to oneself, pushed now */
   sendTestNotification(): Promise<void>;
   /** "למי לפנות": up to two of אחראי השיבוצים / מ"מ and the commander of my gaf, as אחראי השיבוצים chose */

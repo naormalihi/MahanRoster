@@ -1,3 +1,4 @@
+import type { UnitKpis } from "../lib/dashboard";
 import type { MyProfile, StaffFixRequest } from "../lib/profile";
 import { validUntil, type MyRange, type PlannedRange, type PlannedRangeInput } from "../lib/range";
 import type { Inversion } from "../lib/fairness";
@@ -1722,6 +1723,20 @@ export class DemoApi implements Api {
 
   private ranges: PlannedRange[] = [];
   private fixes: StaffFixRequest[] = [];
+
+  async unitKpis(): Promise<UnitKpis> {
+    await delay();
+    const act = this.soldierList.filter((s) => s.is_active);
+    const career = act.filter((s) => s.service_type === "career").length;
+    return {
+      active: act.length, mandatory: act.length - career, career, range_expired: 2, range_soon: 3, in_training: 1,
+      new_in_cycle: 2, to_career: 1,
+      cycle: { id: "c1", name: "דצמבר 2026 – מאי 2027", start_date: "2026-12-01", end_date: "2027-05-31", published: false, status: "approving" },
+      exemptions_approved: this.exemptionList.filter((e) => e.status === "approved").length,
+      exemptions_pending: this.exemptionList.filter((e) => e.status === "pending").length,
+      callups_reserve: 0, callups_special: 0, manual_changes: 0, swaps: 0,
+    };
+  }
 
   async sendTestNotification() {
     await delay();

@@ -3512,7 +3512,7 @@ def test_employee_updates_own_range_and_gets_reminders(conn):
         mine = c.execute("select public.my_range()").fetchone()[0]
         assert mine["valid_until"] == until.isoformat() and mine["self_updated_at"] and mine["validity_months"] == 6
         with pytest.raises(psycopg.errors.RaiseException, match="בעתיד"), c.transaction():
-            c.execute("select public.update_my_range(%s)", (today + timedelta(days=1),))
+            c.execute("select public.update_my_range(%s)", (today + timedelta(days=2),))
         c.execute("reset role")
         # expiring within 14 days: one reminder
         assert until <= today + timedelta(days=14)
@@ -3700,3 +3700,11 @@ def test_send_test_notification(conn):
             c.execute("select public.send_test_notification()")
         c.execute("reset role")
         assert c.execute("select count(*) from notifications where recipient_user_id = %s and type = 'test'", (uid,)).fetchone()[0] == 1
+
+
+def test_unit_kpis(conn):
+    k = _as_coord(conn, "select public.unit_kpis()")[0][0]
+    assert k["active"] == k["mandatory"] + k["career"] and k["active"] > 0
+    assert all(isinstance(k[x], int) for x in ("range_expired", "range_soon", "in_training"))
+    if k.get("cycle"):
+        assert k["exemptions_approved"] >= 0 and k["callups_reserve"] >= 0 and k["swaps"] >= 0

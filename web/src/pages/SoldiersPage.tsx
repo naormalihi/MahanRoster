@@ -763,11 +763,13 @@ export function SoldiersPage() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [gaf, setGaf] = useState("");
-  const [service, setService] = useState("");
-  const [range, setRange] = useState("");
+  // a link from "נתוני היחידה" opens a filter: ?service=career, ?range=expired, ?new=1
+  const startParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const [service, setService] = useState(startParams.get("service") ?? "");
+  const [range, setRange] = useState(startParams.get("range") ?? "");
   // תאריך קליטה: new in the unit while the grace period runs
   const [graceDays, setGraceDays] = useState(90);
-  const [onlyNew, setOnlyNew] = useState(false);
+  const [onlyNew, setOnlyNew] = useState(startParams.get("new") === "1");
   useEffect(() => {
     api?.scoringSettings().then((x) => setGraceDays(x.grace_days), () => undefined);
   }, [api, live]);
