@@ -11,7 +11,7 @@ export type FactorIcon = "away" | "night" | "relief" | "parent" | "shachar" | "r
 export interface Factor {
   icon: FactorIcon;
   title: string;
-  tag?: { text: string; tone: "warning" | "info" };
+  tag?: { text: string; tone: "warning" | "info" | "default" };
   effect: string;
 }
 
@@ -56,16 +56,32 @@ export function soldierFactors(x: FactorInput): Factor[] {
     ...otherEx.filter((e) => e.kind === "full").map((e) => `${typeOf.get(e.exemption_type_id)?.name ?? "פטור"} ${span(e.start_date, e.end_date)}`),
     ...abs.map((a) => `${absName.get(a.absence_type_id) ?? "היעדרות"} ${span(a.starts_at, a.ends_at)}`),
   ];
-  if (away.length || x.creditDays > 0) {
+  const creditLine = x.creditDays > 0 ? ` בעבור ${x.creditDays} ימים שלא מבחירה קיבל זיכוי של ${x.credit.toFixed(1)} נקודות (העומס היומי הממוצע בקבוצה).` : "";
+  // out of the unit for part of the cycle (release, enlistment, entering career): information, not a problem
+  const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+  // (entering career mid-cycle has a line of its own below)
+  const outside: string[] = [];
+  if (s.release_date && s.release_date >= x.cycle.start && s.release_date < x.cycle.end)
+    outside.push(`משתחרר ${dm(s.release_date)} – ${days(s.release_date, x.cycle.end)} ימים אחריו`);
+  if (s.enlistment_date && s.enlistment_date > x.cycle.start && s.enlistment_date <= x.cycle.end)
+    outside.push(`מתגייס ${dm(s.enlistment_date)} – ${days(x.cycle.start, s.enlistment_date)} ימים לפניו`);
+  if (away.length) {
     out.push({
       icon: "away",
       title: "היעדרות ופטור במחזור",
       tag: x.creditDays > 0 ? { text: `${x.creditDays} ימים`, tone: "warning" } : undefined,
-      effect:
-        (away.length ? `${away.join(" · ")} – לא משובץ בימים האלה.` : "ימים מחוץ ליחידה במחזור.") +
-        (x.creditDays > 0 ? ` בעבור ${x.creditDays} ימים שלא מבחירה קיבל זיכוי של ${x.credit.toFixed(1)} נקודות (העומס היומי הממוצע בקבוצה).` : ""),
+      effect: `${away.join(" · ")} – לא משובץ בימים האלה.` + creditLine,
     });
   }
+  const outsideItem: Factor | null =
+    outside.length || (!away.length && x.creditDays > 0)
+      ? {
+          icon: "service",
+          title: "מחוץ ליחידה בחלק מהמחזור",
+          tag: !away.length && x.creditDays > 0 ? { text: `${x.creditDays} ימים`, tone: "default" } : undefined,
+          effect: (outside.length ? `${outside.join(" · ")}.` : "ימים מחוץ ליחידה במחזור.") + (away.length ? "" : creditLine),
+        }
+      : null;
   for (const e of otherEx.filter((e) => e.kind === "partial")) {
     const what = [
       e.restricted_hours ? `בשעות ${e.restricted_hours}` : "",
@@ -156,10 +172,8 @@ export function soldierFactors(x: FactorInput): Factor[] {
   }
 
   // service dates inside the cycle
-  if (s.enlistment_date && s.enlistment_date > x.cycle.start && s.enlistment_date <= x.cycle.end)
-    out.push({ icon: "service", title: `גיוס ${dm(s.enlistment_date)}`, effect: "לא משובץ לפני תאריך הגיוס." });
-  if (s.release_date && s.release_date >= x.cycle.start && s.release_date < x.cycle.end)
-    out.push({ icon: "service", title: `שחרור ${dm(s.release_date)}`, effect: "לא משובץ אחרי תאריך השחרור." });
+
+  if (outsideItem) out.push(outsideItem);
   const sw = careerSwitch(s.career_start_date, x.cycle.start, x.cycle.end);
   if (sw && s.career_start_date)
     out.push({

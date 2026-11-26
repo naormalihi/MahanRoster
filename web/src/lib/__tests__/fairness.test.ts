@@ -23,6 +23,14 @@ describe("fairness verdict", () => {
     const rows = fairRows([L("a", 0), L("b", 0.4), L("c", 0)], () => "x", 20);
     expect(rows.some((r) => r.outlier)).toBe(false);
   });
+  it("one who leaves during the cycle is not compared, nor counted in the mean", () => {
+    const rows = fairRows([L("a", 10), L("b", 10), L("r", 2)], () => "x", 20, () => 0, (id) => (id === "r" ? "משתחרר 27.1" : null));
+    const by = Object.fromEntries(rows.map((r) => [r.soldier_id, r]));
+    expect(by.r.compared).toBe(false);
+    expect(by.r.outlier).toBe(false);
+    expect(by.r.excludedWhy).toBe("משתחרר 27.1");
+    expect(by.a.ref).toBe(10); // r's 2 is not in the mean
+  });
   it("short group names", () => {
     expect(shortGroupName("קבע · מפקד שער + מפקד תורן + משימות חיליות + קצין תורן")).toBe("קבע · 4 קטגוריות");
     expect(shortGroupName("קבע · ממלכ\"ת")).toBe("קבע · ממלכ\"ת");

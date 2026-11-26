@@ -12,7 +12,8 @@ import type { SoldierLoad } from "./draft";
  *    than one duty open to him is worth (the heaviest one of the cycle, day addition included) –
  *    shown quietly, "יתאזן במחזור הבא";
  *  - "outlier" (a cumulative gap, a real problem): further than both.
- * Soldiers open to no duty are not compared.
+ * Soldiers open to no duty are not compared – nor one who leaves during the cycle (2.65.1): there is
+ * no next cycle to even his gap out, so it is noise; he is left out of his group's mean too.
  */
 
 export interface FairRow extends SoldierLoad {
@@ -28,6 +29,8 @@ export interface FairRow extends SoldierLoad {
   /** beyond the tolerance but within one duty: evens out next cycle */
   small: boolean;
   compared: boolean;
+  /** left out of the comparison on purpose, and why ("משתחרר 27.1") */
+  excludedWhy: string | null;
 }
 
 export interface GroupVerdict {
@@ -48,11 +51,12 @@ export function fairRows(
   profileOf: (soldierId: string) => string,
   tolerancePct: number,
   oneDutyOf: (soldierId: string) => number = () => 0,
+  excluded: (soldierId: string) => string | null = () => null,
 ): FairRow[] {
   const sums = new Map<string, [number, number]>();
   const key = (l: SoldierLoad) => `${l.pool}|${profileOf(l.soldier_id)}`;
   for (const l of ls) {
-    if (!profileOf(l.soldier_id)) continue;
+    if (!profileOf(l.soldier_id) || excluded(l.soldier_id)) continue;
     const [s, n] = sums.get(key(l)) ?? [0, 0];
     sums.set(key(l), [s + l.expected, n + 1]);
   }
@@ -64,10 +68,11 @@ export function fairRows(
     const oneDuty = Math.max(0, oneDutyOf(l.soldier_id) || 0);
     const limit = Math.max(tolLimit, oneDuty);
     const diff = l.expected - ref;
-    const compared = !!profile && n > 1;
+    const excludedWhy = excluded(l.soldier_id);
+    const compared = !!profile && n > 1 && !excludedWhy;
     const outlier = compared && Math.abs(diff) > limit + 1e-9;
     const small = compared && !outlier && Math.abs(diff) > tolLimit + 1e-9;
-    return { ...l, profile, ref, diff, limit, tolLimit, oneDuty, compared, outlier, small };
+    return { ...l, profile, ref, diff, limit, tolLimit, oneDuty, compared, outlier, small, excludedWhy };
   });
 }
 
