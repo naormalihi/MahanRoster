@@ -98,6 +98,32 @@ function Workforce({ k, d }: { k: UnitKpis; d: UnitDashboard }) {
           </Typography>
         </Box>
       </Stack>
+      <Stack direction="row" sx={{ mt: 1.5, gap: 1, flexWrap: "wrap" }}>
+        <Box sx={{ flex: 1, minWidth: 120, bgcolor: "action.hover", borderRadius: 2, px: 1.5, py: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            משתמשים פעילים · 7 ימים
+          </Typography>
+          <Typography sx={{ fontSize: 22, fontWeight: 800 }}>
+            {k.users_7d}
+            <Typography component="span" variant="body2" color="text.secondary">
+              {" "}
+              / {k.users}
+            </Typography>
+          </Typography>
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 120, bgcolor: "action.hover", borderRadius: 2, px: 1.5, py: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            משתמשים פעילים · 30 יום
+          </Typography>
+          <Typography sx={{ fontSize: 22, fontWeight: 800 }}>
+            {k.users_30d}
+            <Typography component="span" variant="body2" color="text.secondary">
+              {" "}
+              / {k.users}
+            </Typography>
+          </Typography>
+        </Box>
+      </Stack>
       <Box role="img" aria-label={`חובה ${k.mandatory}, קבע ${k.career}`} sx={{ display: "flex", gap: "2px", height: 12, borderRadius: 99, overflow: "hidden", mt: 1.5 }}>
         <Box sx={{ flex: k.mandatory || 0.0001, bgcolor: t.palette.info.main }} />
         <Box sx={{ flex: k.career || 0.0001, bgcolor: t.palette.secondary.main }} />
@@ -188,8 +214,10 @@ export function DashboardPage() {
       <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(3, 1fr)" } }}>
         {k && (
           <>
-            <Kpi title="חדשים במחזור" value={k.new_in_cycle ?? "—"} note={k.in_training ? `${k.in_training} עדיין בהכשרה` : "אף אחד לא בהכשרה"} icon={<NewIcon />} tone="info" to="/soldiers?new=1" />
-            <Kpi title="נכנסים לקבע במחזור" value={k.to_career ?? "—"} note="ניקוד מעבר אוטומטי" icon={<CareerIcon />} tone="secondary" to="/soldiers" />
+            <Kpi title="חדשים במחזור" value={k.new_in_cycle ?? "—"} note={k.in_training ? `${k.in_training} עדיין בהכשרה` : "אף אחד לא בהכשרה"} icon={<NewIcon />} tone="info"
+              to={k.cycle ? `/soldiers?join_from=${k.cycle.start_date}&join_to=${k.cycle.end_date}` : "/soldiers?new=1"} />
+            <Kpi title="נכנסים לקבע במחזור" value={k.to_career ?? "—"} note="ניקוד מעבר אוטומטי" icon={<CareerIcon />} tone="secondary"
+              to={k.cycle ? `/soldiers?career_from=${k.cycle.start_date}&career_to=${k.cycle.end_date}` : "/soldiers"} />
             <Kpi
               title="פטורים מאושרים"
               value={k.exemptions_approved ?? "—"}
