@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cycle } from "../cycles";
-import { nextAction, stepNav, stepStates } from "../workspace";
+import { draftFacts, nextAction, stepNav, stepStates } from "../workspace";
 import { defaultCycle } from "../cycleContext";
 
 const cycle = (o: Partial<Cycle> = {}): Cycle => ({
@@ -60,5 +60,24 @@ describe("pending duties after publishing", () => {
     // before the personnel file is loaded the way on leaves the workspace
     expect(nextAction(cycle({ status: "loading" }), facts).path).toBe("/soldiers/import");
     expect(stepNav("overview", cycle({ status: "loading" }), facts).next).toEqual({ label: "טעינת כוח אדם", path: "/soldiers/import" });
+  });
+});
+
+describe("the schedule step follows the draft as it is now", () => {
+  const c = cycle({ status: "review" });
+  const ran = { pendingExemptions: 0, slots: 2, job: { status: "done", unfilled: 0 } };
+  it("a run that finished, but the draft was cleared since: not scheduled", () => {
+    const s = stepStates(c, { ...ran, draft: draftFacts([{ id: "a", performers_needed: 1 }], []) });
+    expect(s.schedule).toEqual({ tone: "todo", text: "לא שובץ" });
+    expect(nextAction(c, { ...ran, draft: { placed: 0, unfilled: 1 } }).text).toBe("להריץ שיבוץ");
+  });
+  it("open places counted from the draft", () => {
+    const d = draftFacts(
+      [{ id: "a", performers_needed: 2 }, { id: "b", performers_needed: 1 }],
+      [{ slot_id: "a", role: "performer", status: "draft" }, { slot_id: "a", role: "reserve", status: "draft" }],
+    );
+    expect(d).toEqual({ placed: 1, unfilled: 2 });
+    expect(stepStates(c, { ...ran, draft: d }).schedule).toEqual({ tone: "warn", text: "2 לא מאוישות" });
+    expect(nextAction(c, { ...ran, draft: d }).text).toBe("לאייש ידנית 2 משימות ולפרסם");
   });
 });
