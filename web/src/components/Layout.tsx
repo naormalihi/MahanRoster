@@ -73,18 +73,18 @@ const STAFF_LINKS = [
 
 /** A soldier with his own account: his duties and the published board. */
 const SOLDIER_LINKS = [
-  { to: "/", label: "המשימות שלי", match: (p: string) => p === "/" },
-  { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
-  { to: "/my/profile", label: "הפרטים שלי", match: (p: string) => p === "/my/profile" },
+  { to: "/", label: "משימות", match: (p: string) => p === "/" },
+  { to: "/requests", label: "בקשות ואילוצים", match: (p: string) => p === "/requests" },
+  { to: "/my/profile", label: "כרטיס אישי", match: (p: string) => p === "/my/profile" },
   { to: "/board", label: "לוח השיבוצים", match: (p: string) => p === "/board" },
   { to: "/scoring", label: "איך מחושב הניקוד", match: (p: string) => p === "/scoring" },
 ];
 
 /** Staff and commanders who do duties too: their own corner, next to the unit's screens. */
 const MY_LINKS = [
-  { to: "/my", label: "המשימות שלי", match: (p: string) => p === "/my" },
-  { to: "/requests", label: "הבקשות שלי", match: (p: string) => p === "/requests" },
-  { to: "/my/profile", label: "הפרטים שלי", match: (p: string) => p === "/my/profile" },
+  { to: "/my", label: "משימות", match: (p: string) => p === "/my" },
+  { to: "/requests", label: "בקשות ואילוצים", match: (p: string) => p === "/requests" },
+  { to: "/my/profile", label: "כרטיס אישי", match: (p: string) => p === "/my/profile" },
 ];
 
 /** The "שלי" menu on a wide screen. */

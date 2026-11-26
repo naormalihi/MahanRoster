@@ -229,7 +229,7 @@ function AddSlotDialog(props: { tasks: TaskType[]; onClose: () => void; onSaved:
             value={note}
             onChange={(e) => setNote(e.target.value.slice(0, NOTE_MAX))}
             multiline
-            helperText={`מוצגת על המשימה בלוח השיבוצים וב"המשימות שלי" · עד ${NOTE_MAX} תווים`}
+            helperText={`מוצגת על המשימה בלוח השיבוצים ובמסך המשימות של העובד · עד ${NOTE_MAX} תווים`}
             fullWidth
           />
           {taskId === SPECIAL ? (

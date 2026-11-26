@@ -1,27 +1,11 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Link,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, CircularProgress, Link, Paper, Stack, Typography } from "@mui/material";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import { ContactCard } from "../components/ContactCard";
 import { RangeCard } from "../components/RangeCard";
 import { useAuth } from "../lib/auth";
-import { dmy, FIX_FIELDS, tashText, type MyProfile } from "../lib/profile";
-
-type Fix = { field: string; current: string | null };
+import { dmy, tashText, type MyProfile } from "../lib/profile";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
 
@@ -37,7 +21,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** one fact, with "לא נכון?" beside it */
-function Row(props: { label: string; value: ReactNode; sub?: ReactNode; fix?: Fix; onFix: (f: Fix) => void; action?: ReactNode }) {
+function Row(props: { label: string; value: ReactNode; sub?: ReactNode; action?: ReactNode }) {
   return (
     <Stack direction="row" sx={{ py: 1.25, gap: 1.5, alignItems: "center", borderBottom: 1, borderColor: "divider", "&:last-of-type": { borderBottom: 0 } }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -51,83 +35,27 @@ function Row(props: { label: string; value: ReactNode; sub?: ReactNode; fix?: Fi
           </Typography>
         )}
       </Box>
-      {props.action ??
-        (props.fix && (
-          <Button size="small" sx={{ minWidth: 0, textDecoration: "underline", whiteSpace: "nowrap" }} onClick={() => props.onFix(props.fix!)}>
-            לא נכון?
-          </Button>
-        ))}
+      {props.action}
     </Stack>
   );
 }
 
-function FixDialog(props: { fix: Fix; onClose: () => void; onSent: () => void }) {
-  const { api } = useAuth();
-  const [field, setField] = useState(props.fix.field);
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function send() {
-    if (!text.trim()) return setError("כתוב מה הנכון");
-    setBusy(true);
-    try {
-      await api!.requestProfileFix(field, field === props.fix.field ? props.fix.current : null, text);
-      props.onSent();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  }
-  return (
-    <Dialog open onClose={props.onClose} fullWidth maxWidth="xs">
-      <DialogTitle>משהו לא נכון?</DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={2}>
-          <TextField select label="מה לא נכון" value={field} onChange={(e) => setField(e.target.value)} fullWidth>
-            {[...new Set([props.fix.field, ...FIX_FIELDS])].map((f) => (
-              <MenuItem key={f} value={f}>
-                {f}
-              </MenuItem>
-            ))}
-          </TextField>
-          {field === props.fix.field && props.fix.current && (
-            <Typography variant="body2" sx={{ bgcolor: "action.hover", p: 1.25, borderRadius: 2 }}>
-              <span style={{ opacity: 0.7 }}>רשום היום: </span>
-              <b>{props.fix.current}</b>
-            </Typography>
-          )}
-          <TextField
-            label="מה הנכון?"
-            value={text}
-            onChange={(e) => setText(e.target.value.slice(0, 200))}
-            multiline
-            minRows={3}
-            fullWidth
-            autoFocus
-            helperText={`עד 200 תווים · בלי מידע רפואי · ${text.length}/200`}
-          />
-          <Typography variant="body2" color="text.secondary">
-            אחראי השיבוצים יקבל התראה ויבדוק. השינוי לא נכנס לבד – תקבל הודעה כשיטופל.
-          </Typography>
-          {error && <Alert severity="error">{error}</Alert>}
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={props.onClose}>ביטול</Button>
-        <Button variant="contained" onClick={send} disabled={busy}>
-          שליחה
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
+/** why the employee isn't assigned to some duties – a friendly line per reason */
+const WHY: Record<string, string> = {
+  "רק לקבע": "מיועדות לעובדי קבע",
+  "רק לחובה": "מיועדות לעובדי חובה",
+  "דרגה": "לא בטווח הדרגות שלך",
+  "לא באוכלוסייה של המשימה": "מיועדות לקבוצה אחרת",
+  "רק לגברים": "מיועדות לגברים",
+  "רק לנשים": "מיועדות לנשים",
+  "שח״ר": "לא מתאימות לשח״ר",
+  "רק לשח״ר": "מיועדות לשח״ר",
+};
 
 export function MyProfilePage() {
   const { api } = useAuth();
   const [p, setP] = useState<MyProfile | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
-  const [fix, setFix] = useState<Fix | null>(null);
-  const [sent, setSent] = useState(false);
   const load = useCallback(() => {
     api!
       .myProfile()
@@ -142,105 +70,56 @@ export function MyProfilePage() {
 
   const t = tashText(p.tash_level, p.home_nightly);
   const s = p.score;
-  const open = p.fixes.filter((f) => f.status === "open");
-  const done = p.fixes.filter((f) => f.status !== "open");
-  const onFix = (f: Fix) => (setSent(false), setFix(f));
   const can = (p.tasks ?? []).filter((x) => x.ok);
-  const cannot = (p.tasks ?? []).filter((x) => !x.ok);
+  // the duties they're not assigned to, grouped by reason – the reason once, the duties as chips
+  const notFor = new Map<string, string[]>();
+  for (const x of (p.tasks ?? []).filter((x) => !x.ok)) {
+    const why = WHY[x.reason ?? ""] ?? x.reason ?? "";
+    notFor.set(why, [...(notFor.get(why) ?? []), x.name]);
+  }
+  const notCount = [...notFor.values()].reduce((n, l) => n + l.length, 0);
 
   return (
     <Stack spacing={2} sx={{ maxWidth: 720, mx: "auto", width: "100%" }}>
       <Box>
-        <Typography variant="h1">הפרטים שלי</Typography>
+        <Typography variant="h1">כרטיס אישי</Typography>
         <Typography variant="body2" color="text.secondary">
-          כך המערכת רואה אותך – ועל זה מבוסס השיבוץ שלך. פרט לא נכון? לחץ "לא נכון?" לידו, ואחראי השיבוצים יבדוק.
+          כך המערכת רואה אותך – ועל זה מבוסס השיבוץ שלך.
         </Typography>
       </Box>
-      {sent && (
-        <Alert severity="success" onClose={() => setSent(false)}>
-          הבקשה נשלחה לאחראי השיבוצים.
-        </Alert>
-      )}
-      {(open.length > 0 || done.length > 0) && (
-        <Section title="בקשות התיקון שלך">
-          {[...open, ...done].map((f) => (
-            <Row
-              key={f.id}
-              label={f.field}
-              value={f.requested}
-              sub={f.reply ? `תשובה: ${f.reply}` : undefined}
-              onFix={onFix}
-              action={
-                <Chip
-                  size="small"
-                  color={f.status === "open" ? "warning" : f.status === "fixed" ? "success" : "default"}
-                  label={f.status === "open" ? "ממתינה" : f.status === "fixed" ? "תוקן" : "נבדק – לא שונה"}
-                />
-              }
-            />
-          ))}
-        </Section>
-      )}
+      <Alert severity="info">זיהית פער בנתונים? פנה לאחראי השיבוצים – הפרטים למטה, ב"למי לפנות".</Alert>
 
       <Section title="פרטים מקובץ כוח האדם">
-        <Row label="שם" value={p.full_name} fix={{ field: "שם", current: p.full_name }} onFix={onFix} />
-        <Row label="מסגרת" value={p.gaf ?? "—"} fix={{ field: "מסגרת", current: p.gaf }} onFix={onFix} />
-        <Row label="דרגה" value={`${p.rank ?? "—"}${p.appointed ? " (מינוי)" : ""}`} fix={{ field: "דרגה", current: p.rank }} onFix={onFix} />
-        <Row
-          label="טלפון"
-          value={<span dir="ltr">{p.phone ? p.phone.replace(/^972/, "0") : "—"}</span>}
-          fix={{ field: "טלפון", current: p.phone }}
-          onFix={onFix}
-        />
-        <Row
-          label="סוג שירות"
-          value={`${SERVICE[p.service]}${p.career_start_date ? ` · כניסה לקבע ${dmy(p.career_start_date)}` : ""}`}
-          fix={{ field: "סוג שירות · כניסה לקבע", current: `${SERVICE[p.service]}${p.career_start_date ? ` · ${dmy(p.career_start_date)}` : ""}` }}
-          onFix={onFix}
-        />
-        <Row
-          label="גיוס · תום שירות"
-          value={`גיוס ${dmy(p.enlistment_date)} · תום ${dmy(p.release_date)}`}
-          fix={{ field: "גיוס · תום שירות", current: `${dmy(p.enlistment_date)} · ${dmy(p.release_date)}` }}
-          onFix={onFix}
-        />
+        <Row label="שם" value={p.full_name} />
+        <Row label="מסגרת" value={p.gaf ?? "—"} />
+        <Row label="דרגה" value={`${p.rank ?? "—"}${p.appointed ? " (מינוי)" : ""}`} />
+        <Row label="טלפון" value={<span dir="ltr">{p.phone ? p.phone.replace(/^972/, "0") : "—"}</span>} />
+        <Row label="סוג שירות" value={`${SERVICE[p.service]}${p.career_start_date ? ` · כניסה לקבע ${dmy(p.career_start_date)}` : ""}`} />
+        <Row label="גיוס · תום שירות" value={`גיוס ${dmy(p.enlistment_date)} · תום ${dmy(p.release_date)}`} />
         <Row
           label="תאריך קליטה ביחידה"
           value={dmy(p.unit_join_date)}
           sub={p.grace_until ? `בהכשרה עד ${dmy(p.grace_until)} – בלי שיבוץ אוטומטי` : undefined}
-          fix={{ field: "תאריך קליטה", current: dmy(p.unit_join_date) }}
-          onFix={onFix}
         />
       </Section>
 
       <Section title="מה משפיע על השיבוץ שלך">
-        <Row label="ת״ש" value={t.value} sub={t.means} fix={{ field: "ת״ש", current: t.value }} onFix={onFix} />
-        <Row
-          label="הורה"
-          value={p.parent ? "כן" : "לא"}
-          sub={p.parent ? "פתוחה לך גם המשימה המזכה, בעדיפות" : undefined}
-          fix={{ field: "הורה", current: p.parent ? "כן" : "לא" }}
-          onFix={onFix}
-        />
+        <Row label="ת״ש" value={t.value} sub={t.means} />
+        <Row label="הורה" value={p.parent ? "כן" : "לא"} sub={p.parent ? "פתוחה לך גם המשימה המזכה, בעדיפות" : undefined} />
         <Row
           label="הקלה בעומס"
           value={p.relief ? `${p.relief.name} ×${p.relief.factor}` : "אין"}
           sub={p.relief ? `מקבל בערך ${Math.round(p.relief.factor * 100)}% מהעומס${p.relief.until ? ` · עד ${dmy(p.relief.until)}` : ""}` : undefined}
-          fix={{ field: "הקלה בעומס", current: p.relief ? p.relief.name : "אין" }}
-          onFix={onFix}
         />
-        {p.shachar && <Row label="שח״ר" value="כן" sub="משובץ רק למשימות שמתאימות לשח״ר" onFix={onFix} />}
-        {p.second_role_signed_at && (
-          <Row label="תפקיד שני" value={`נחתם ${dmy(p.second_role_signed_at)}`} fix={{ field: "תפקיד שני", current: dmy(p.second_role_signed_at) }} onFix={onFix} />
-        )}
+        {p.shachar && <Row label="שח״ר" value="כן" sub="משובץ רק למשימות שמתאימות לשח״ר" />}
+        {p.second_role_signed_at && <Row label="תפקיד שני" value={`נחתם ${dmy(p.second_role_signed_at)}`} />}
         <Row
           label="פטורים והיעדרויות"
           value={p.away.length ? p.away.map((a) => `${a.name ?? (a.kind === "absence" ? "היעדרות" : "פטור")}${a.status === "pending" ? " (ממתין)" : ""}`).join(" · ") : "אין"}
           sub={p.away.length ? p.away.map((a) => `${dmy(a.from)} – ${dmy(a.to)}`).join(" · ") : undefined}
-          onFix={onFix}
           action={
             <Link component={RouterLink} to="/requests" variant="body2" sx={{ whiteSpace: "nowrap" }}>
-              לבקשות שלי
+              לבקשות
             </Link>
           }
         />
@@ -251,29 +130,36 @@ export function MyProfilePage() {
       {p.cycle && (
         <Section title={`המשימות שלך – ${p.cycle.name}`}>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            יכול לבצע
+            {can.length ? `אפשר לשבץ אותך ל-${can.length} סוגי משימות:` : "אין משימות שמתאימות לך במחזור הזה."}
           </Typography>
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, my: 1 }}>
-            {can.length ? can.map((x) => <Chip key={x.name} size="small" color="success" variant="outlined" label={x.name} />) : <Typography>—</Typography>}
+            {can.map((x) => (
+              <Chip key={x.name} size="small" color="success" variant="outlined" label={x.name} />
+            ))}
           </Stack>
-          {cannot.length > 0 && (
-            <>
-              <Typography variant="body2" color="text.secondary">
-                לא משובץ אליהן – ולמה
-              </Typography>
-              {cannot.map((x) => (
-                <Stack key={x.name} direction="row" sx={{ justifyContent: "space-between", py: 0.5 }}>
-                  <Typography variant="body2">{x.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {x.reason}
-                  </Typography>
+          {notCount > 0 && (
+            <Accordion disableGutters elevation={0} sx={{ bgcolor: "transparent", border: 0, "&:before": { display: "none" } }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0 }}>
+                <Typography variant="body2">למה לא משבצים אותי לעוד {notCount} משימות?</Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ px: 0, pt: 0 }}>
+                <Stack spacing={1.5}>
+                  {[...notFor].map(([why, names]) => (
+                    <Box key={why}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {why}
+                      </Typography>
+                      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 0.5 }}>
+                        {names.map((n) => (
+                          <Chip key={n} size="small" variant="outlined" label={n} sx={{ color: "text.secondary" }} />
+                        ))}
+                      </Stack>
+                    </Box>
+                  ))}
                 </Stack>
-              ))}
-            </>
+              </AccordionDetails>
+            </Accordion>
           )}
-          <Button size="small" sx={{ mt: 1, textDecoration: "underline" }} onClick={() => onFix({ field: "המשימות שלי", current: null })}>
-            משהו כאן לא נכון?
-          </Button>
         </Section>
       )}
 
@@ -303,48 +189,30 @@ export function MyProfilePage() {
               label={`ניקוד מעבר ל${s.switch.to === "career" ? "קבע" : "חובה"}`}
               value={Number(s.switch.score).toFixed(1)}
               sub={`עברת ל${s.switch.to === "career" ? "קבע" : "חובה"} – הניקוד מהשירות הקודם לא נספר, ומתחילים מהממוצע`}
-              onFix={onFix}
             />
           )}
-          {s.opening != null && <Row label="ניקוד פתיחה" value={Number(s.opening).toFixed(1)} sub="ממוצע הקבוצה, כשנקלטת ביחידה" onFix={onFix} />}
+          {s.opening != null && <Row label="ניקוד פתיחה" value={Number(s.opening).toFixed(1)} sub="ממוצע הקבוצה, כשנקלטת ביחידה" />}
           {s.corrections.map((c, i) => (
             <Row
               key={i}
               label="תיקון ידני"
               value={<bdi dir="ltr">{`${c.points > 0 ? "+" : ""}${Number(c.points).toFixed(1)}`}</bdi>}
               sub={`סיבה: ${c.note ?? "—"}${c.by ? ` · ${c.by}` : ""}, ${dmy(c.at)}`}
-              onFix={onFix}
             />
           ))}
           {p.cycle.published && (
-            <Row label="משימות במחזור" value={<bdi dir="ltr">{`+${Number(s.cycle_points ?? 0).toFixed(1)}`}</bdi>} sub={`${s.cycle_duties ?? 0} משימות על הלוח`} onFix={onFix} />
+            <Row label="משימות במחזור" value={<bdi dir="ltr">{`+${Number(s.cycle_points ?? 0).toFixed(1)}`}</bdi>} sub={`${s.cycle_duties ?? 0} משימות על הלוח`} />
           )}
-          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", pt: 1 }}>
-            <Link component={RouterLink} to="/scoring" variant="body2">
-              איך מחושב הניקוד?
-            </Link>
-            <Button size="small" sx={{ textDecoration: "underline" }} onClick={() => onFix({ field: "הניקוד", current: (Number(s.earlier) + Number(s.cycle_points ?? 0)).toFixed(1) })}>
-              לא נכון?
-            </Button>
-          </Stack>
+          <Link component={RouterLink} to="/scoring" variant="body2" sx={{ display: "inline-block", pt: 1 }}>
+            איך מחושב הניקוד?
+          </Link>
         </Section>
       )}
 
+      <ContactCard />
       <Typography variant="body2" color="text.secondary">
         מספר העובד שלך לא שמור במערכת בגלוי, והמערכת לא שומרת מידע רפואי. הערות פנימיות של הסגל לא מוצגות כאן.
       </Typography>
-
-      {fix && (
-        <FixDialog
-          fix={fix}
-          onClose={() => setFix(null)}
-          onSent={() => {
-            setFix(null);
-            setSent(true);
-            load();
-          }}
-        />
-      )}
     </Stack>
   );
 }

@@ -235,7 +235,7 @@ export function MyPage() {
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
         <Box component="img" src="/brand/owl/head-96.png" alt="" sx={{ width: 48, height: 48, flexShrink: 0 }} />
         <Box>
-          <Typography variant="h1">המשימות שלי</Typography>
+          <Typography variant="h1">משימות</Typography>
           <Typography variant="body2" color="text.secondary">
             {greeting()}
             {me?.viewAs ? `, ${me.viewAs.name.split(" ")[0]}` : me?.username ? `, ${me.username}` : ""}
@@ -340,7 +340,7 @@ export function MyPage() {
       </Box>
 
       <Typography variant="caption" color="text.secondary">
-        פטור, חסימת תאריך או היעדרות – ב"הבקשות שלי". החלפה – בלחיצה על המשימה, עד 24 שעות לפניה; אחר כך פונים לאחראי השיבוצים.
+        פטור, חסימת תאריך או היעדרות – ב"בקשות ואילוצים". החלפה – בלחיצה על המשימה, עד 24 שעות לפניה; אחר כך פונים לאחראי השיבוצים.
       </Typography>
       <ContactCard />
       {swapping && (
