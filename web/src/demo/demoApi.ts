@@ -31,6 +31,7 @@ import {
   type Exemption,
   type ExemptionDecision,
   type ExemptionInput,
+  type ExemptionUpdate,
   type ExemptionType,
   autoStatus,
   stageStates,
@@ -752,6 +753,21 @@ export class DemoApi implements Api {
     await delay();
     if (!taskTypeIds.length) throw new Error("בפטור חלקי צריך לבחור לפחות משימה אחת שהעובד לא יכול לבצע");
     Object.assign(this.exemptionList.find((x) => x.id === id)!, { excluded_task_type_ids: taskTypeIds, kind: "partial" });
+  }
+
+  async updateExemption(u: ExemptionUpdate) {
+    await delay();
+    const e = this.exemptionList.find((x) => x.id === u.id)!;
+    if (u.end_date < u.start_date) throw new Error("תאריך הסיום לפני תאריך ההתחלה");
+    if (e.status === "approved" && u.exemption_type_id !== e.exemption_type_id && !u.proof_rechecked)
+      throw new Error("סוג הפטור השתנה – צריך לבדוק את האסמכתא לסוג החדש");
+    Object.assign(e, {
+      exemption_type_id: u.exemption_type_id, start_date: u.start_date, end_date: u.end_date, kind: u.kind,
+      excluded_task_type_ids: u.kind === "partial" && u.excluded_task_type_ids?.length ? u.excluded_task_type_ids : null,
+      restricted_hours: u.kind === "partial" ? u.restricted_hours : null,
+      internal_note: u.internal_note?.trim() || null,
+      ...(u.proof_rechecked ? { proof_checked_at: new Date().toISOString() } : {}),
+    });
   }
 
   async setExemptionNote(id: string, note: string) {

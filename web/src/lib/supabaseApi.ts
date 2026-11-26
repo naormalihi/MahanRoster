@@ -29,6 +29,7 @@ import {
   type Exemption,
   type ExemptionDecision,
   type ExemptionInput,
+  type ExemptionUpdate,
   type ExemptionType,
   type StageState,
 } from "./cycles";
@@ -638,6 +639,22 @@ export class SupabaseApi implements Api {
 
   async setExemptionDuties(id: string, taskTypeIds: string[]) {
     maybe(await this.sb.from("exemptions").update({ excluded_task_type_ids: taskTypeIds, kind: "partial" }).eq("id", id));
+  }
+
+  async updateExemption(u: ExemptionUpdate) {
+    check(
+      await this.sb.rpc("update_exemption", {
+        p_id: u.id,
+        p_type: u.exemption_type_id,
+        p_start: u.start_date,
+        p_end: u.end_date,
+        p_kind: u.kind,
+        p_tasks: u.excluded_task_type_ids,
+        p_hours: u.restricted_hours,
+        p_note: u.internal_note,
+        p_proof_rechecked: u.proof_rechecked,
+      }),
+    );
   }
 
   async setExemptionNote(id: string, note: string) {
