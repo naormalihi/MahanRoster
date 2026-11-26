@@ -1518,6 +1518,11 @@ export function SoldiersPage() {
                       {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : s.tash_level ? <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} /> : null}
                       {a && a.tone !== "default" && <Chip size="small" variant="outlined" color={a.tone} label={a.text} />}
                       {newUntil(s) && <Chip size="small" variant="outlined" color="info" label={`חדש עד ${fmt(newUntil(s))}`} />}
+                      {s.service_switch_at && (
+                        <Tooltip title={`מ-${fmt(s.service_switch_at)} הניקוד הקודם הוא ממוצע ה${s.service_switch_to === "career" ? "קבע" : "חובה"} (${Number(s.service_switch_score ?? 0).toFixed(1)}) – הניקוד מהשירות הקודם לא נספר`}>
+                          <Chip size="small" variant="outlined" color="info" label={`עבר ל${s.service_switch_to === "career" ? "קבע" : "חובה"} – ניקוד הותאם`} />
+                        </Tooltip>
+                      )}
                       {switchTag(s)}
                     </>
                   }

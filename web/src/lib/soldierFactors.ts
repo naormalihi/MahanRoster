@@ -142,6 +142,17 @@ export function soldierFactors(x: FactorInput): Factor[] {
     }
   }
 
+  // חובה ↔ קבע: the earlier service's points don't carry over
+  if (s.service_switch_at && s.service_switch_at === x.cycle.start && s.service_switch_score != null) {
+    const to = s.service_switch_to === "career" ? "קבע" : "חובה";
+    out.push({
+      icon: "service",
+      title: `עבר ל${to} – ניקוד הותאם`,
+      tag: { text: "ניקוד", tone: "info" },
+      effect: `הניקוד מה${to === "קבע" ? "חובה" : "קבע"} לא נספר מול ה${to}. הניקוד הקודם שלו הוא ממוצע ה${to} בקבוצה שלו: ${Number(s.service_switch_score).toFixed(1)}.`,
+    });
+  }
+
   // weapon range: no date entered = assumed valid; only an entered date can block
   if (!s.range_valid_until) {
     // nothing to show
