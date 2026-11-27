@@ -214,3 +214,29 @@ export function stepNav(step: StepKey, cycle: Cycle, f: CycleFacts | null): Step
       return { prev, next: null, note: null };
   }
 }
+
+/**
+ * Which of the five steps the cycle is in, by its stage: 1 constraints … 5 operate; 0 before the
+ * constraints (setting up, loading the personnel file), 6 once closed – every step behind it.
+ */
+export function currentStep(status: Cycle["status"]): number {
+  switch (status) {
+    case "draft":
+    case "loading":
+      return 0;
+    case "collecting":
+    case "approving":
+      return 1;
+    case "potential":
+      return 2;
+    case "slots":
+      return 3;
+    case "scheduling":
+    case "review":
+      return 4;
+    case "published":
+      return 5;
+    case "closed":
+      return 6;
+  }
+}

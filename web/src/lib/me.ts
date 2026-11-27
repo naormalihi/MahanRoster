@@ -39,6 +39,8 @@ export interface MyDuty {
   briefing_note?: string | null;
   /** the duty's own note (third column of the duties file, or written by hand) */
   note?: string | null;
+  /** the duty type's color (the catalog), for the stripe beside it; null: none chosen */
+  task_color?: string | null;
   /** when he pressed "ראיתי" (or אחראי השיבוצים marked a phone call); null: still waiting */
   acked_at?: string | null;
 }

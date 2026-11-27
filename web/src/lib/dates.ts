@@ -46,3 +46,14 @@ export function weekOf(now = new Date()): [Date, Date] {
   const sunday = addDays(startOfDay(now), -startOfDay(now).getDay());
   return [sunday, addDays(sunday, 7)];
 }
+
+const partFmt = {
+  weekday: new Intl.DateTimeFormat("he-IL", { weekday: "narrow", timeZone: TZ }),
+  day: new Intl.DateTimeFormat("he-IL", { day: "numeric", timeZone: TZ }),
+  month: new Intl.DateTimeFormat("he-IL", { month: "short", timeZone: TZ }),
+};
+/** A day in three parts, for a date block: "ש׳", "19", "דצמ׳". */
+export function dateParts(iso: string) {
+  const d = new Date(iso);
+  return { weekday: partFmt.weekday.format(d), day: partFmt.day.format(d), month: partFmt.month.format(d) };
+}

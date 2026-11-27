@@ -1569,6 +1569,7 @@ export class DemoApi implements Api {
         if (!k) continue;
         out.push({
           assignment_id: a.id, cycle_id: c.id, cycle_name: c.name, task_name: this.tasks.find((t) => t.id === k.task_type_id)?.name ?? "",
+          task_color: this.tasks.find((t) => t.id === k.task_type_id)?.color ?? null,
           starts_at: k.starts_at, ends_at: k.ends_at, role: a.role, status: a.status, points: a.normalized_points, explanation: a.explanation,
           report_at: null, report_place: null, briefing_at: null, briefing_place: null, equipment: null, note: k.instructions,
         });
@@ -1587,10 +1588,10 @@ export class DemoApi implements Api {
         role: "performer", status: "assigned", points: 1, explanation: "הניקוד שלך הנמוך בקבוצה", report_at: null, report_place: "שער ראשי",
         briefing_at: at(3, 13), briefing_place: "אבטחה פיזית", equipment: null,
         contact_name: "שני משיח", contact_phone: "052-0000000", briefing_note: "לא מאושרות החלפות בעת ביצוע המשימה!",
-        note: "להגיע עם נשק אישי וכובע" },
+        note: "להגיע עם נשק אישי וכובע", task_color: "#3b6ea8" },
       { assignment_id: "demo-d2", cycle_id: "demo", cycle_name: "מחזור הדגמה", task_name: "מפקד שער | ש.ג קבע", starts_at: at(11, 20), ends_at: at(12, 8),
         role: "reserve", status: "reserve_idle", points: 0, explanation: "עתודה לפי תור", report_at: null, report_place: null,
-        briefing_at: null, briefing_place: null, equipment: null },
+        briefing_at: null, briefing_place: null, equipment: null, task_color: "#c77d2e" },
     ];
     return this.demoDutyList.filter((d) => d.status === "assigned" || d.status === "reserve_idle");
   }

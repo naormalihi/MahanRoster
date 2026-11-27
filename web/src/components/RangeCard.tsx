@@ -1,3 +1,4 @@
+import RangeIcon from "@mui/icons-material/TrackChangesOutlined";
 import { Alert, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
@@ -5,6 +6,7 @@ import { isoToDmy } from "../lib/dmy";
 import { rangeWhen, validUntil, type MyRange } from "../lib/range";
 import { DateTextField } from "./DateTextField";
 import { useLiveTick } from "../lib/live";
+import { IconBadge, TONE } from "./IconBadge";
 
 const todayIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
 const daysTo = (iso: string) => Math.round((Date.parse(iso) - Date.parse(todayIso())) / 86_400_000);
@@ -57,16 +59,17 @@ export function RangeCard() {
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1.25 }}>
+        <IconBadge icon={<RangeIcon />} tone={TONE.range} />
+        <Typography variant="h3" sx={{ fontSize: 16, fontWeight: 700, flex: 1 }}>
           מטווח
         </Typography>
         {chip}
-        <Button size="small" variant="outlined" sx={{ ms: "auto" }} onClick={() => (setLast(""), setError(null), setOpen(true))}>
-          עדכון תאריך מטווח
-        </Button>
       </Stack>
+      <Button size="small" variant="outlined" sx={{ mt: 1.25 }} onClick={() => (setLast(""), setError(null), setOpen(true))}>
+        עדכון תאריך מטווח
+      </Button>
       {r.next && (
         <Typography variant="body2" sx={{ mt: 1 }}>
           המטווח הקרוב: {rangeWhen(r.next)}

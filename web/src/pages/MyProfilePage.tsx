@@ -1,26 +1,21 @@
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, CircularProgress, Link, Paper, Stack, Typography } from "@mui/material";
+import DetailsIcon from "@mui/icons-material/BadgeOutlined";
+import AffectsIcon from "@mui/icons-material/TuneOutlined";
+import TasksIcon from "@mui/icons-material/TaskAltOutlined";
+import ScoreIcon from "@mui/icons-material/InsightsOutlined";
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, CircularProgress, Link, Stack, Typography } from "@mui/material";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { ContactCard } from "../components/ContactCard";
 import { RangeCard } from "../components/RangeCard";
+import { IconSection, TONE } from "../components/IconBadge";
+import type { MyScore } from "../lib/me";
 import { useAuth } from "../lib/auth";
-import { dmy, tashText, type MyProfile } from "../lib/profile";
+import { dmy, scoreWords, tashText, type MyProfile } from "../lib/profile";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-      <Typography variant="h3" sx={{ fontSize: 16, fontWeight: 700, mb: 0.5 }}>
-        {title}
-      </Typography>
-      {children}
-    </Paper>
-  );
-}
-
-/** one fact, with "לא נכון?" beside it */
+/** one fact; `action` beside it */
 function Row(props: { label: string; value: ReactNode; sub?: ReactNode; action?: ReactNode }) {
   return (
     <Stack direction="row" sx={{ py: 1.25, gap: 1.5, alignItems: "center", borderBottom: 1, borderColor: "divider", "&:last-of-type": { borderBottom: 0 } }}>
@@ -28,7 +23,7 @@ function Row(props: { label: string; value: ReactNode; sub?: ReactNode; action?:
         <Typography variant="body2" color="text.secondary">
           {props.label}
         </Typography>
-        <Typography sx={{ fontWeight: 500 }}>{props.value}</Typography>
+        <Typography component="div" sx={{ fontWeight: 500 }}>{props.value}</Typography>
         {props.sub && (
           <Typography variant="body2" color="text.secondary">
             {props.sub}
@@ -52,15 +47,85 @@ const WHY: Record<string, string> = {
   "רק לשח״ר": "מיועדות לשח״ר",
 };
 
+/** The score, a bar with the average marked on it, and a sentence. */
+function ScoreBar({ total, avg, label, group }: { total: number; avg: number | null; label: string; group: string }) {
+  const top = Math.max(total, avg ?? 0, 1) * 1.15;
+  const pct = (n: number) => `${Math.max(0, Math.min(100, (n / top) * 100))}%`;
+  const words = scoreWords(total, avg);
+  return (
+    <Box sx={{ my: 1 }}>
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-end", gap: 2 }}>
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            {label}
+          </Typography>
+          <Typography sx={{ fontSize: 30, fontWeight: 800, lineHeight: 1.1, color: "primary.main" }}>{total.toFixed(1)}</Typography>
+        </Box>
+        <Box sx={{ textAlign: "end" }}>
+          <Typography variant="body2" color="text.secondary">
+            ממוצע: <b>{avg != null ? avg.toFixed(1) : "—"}</b>
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {group}
+          </Typography>
+        </Box>
+      </Stack>
+      {avg != null && (
+        <>
+          <Box sx={{ position: "relative", height: 10, mt: 1.5, mb: 0.75, bgcolor: "action.selected", borderRadius: 5 }} role="img" aria-label={words ?? undefined}>
+            <Box sx={{ position: "absolute", insetInlineStart: 0, top: 0, bottom: 0, width: pct(total), bgcolor: "primary.main", borderRadius: 5 }} />
+            <Box sx={{ position: "absolute", insetInlineStart: pct(avg), top: -5, bottom: -5, width: 2, bgcolor: "text.primary" }} />
+          </Box>
+          <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+            <Typography variant="caption" color="text.secondary">
+              פחות משימות
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              יותר משימות
+            </Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {words}
+          </Typography>
+        </>
+      )}
+    </Box>
+  );
+}
+
+/** The points of each cycle against its group's mean – compact rows, folded. */
+function ByCycle({ rows }: { rows: MyScore[] }) {
+  return (
+    <Accordion disableGutters elevation={0} sx={{ bgcolor: "transparent", border: 0, "&:before": { display: "none" } }}>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0 }}>
+        <Typography variant="body2">הניקוד לפי מחזור ({rows.length})</Typography>
+      </AccordionSummary>
+      <AccordionDetails sx={{ px: 0, pt: 0 }}>
+        {rows.map((r) => (
+          <Row
+            key={r.cycle_id}
+            label={r.cycle_name}
+            value={`${r.points.toFixed(1)} נק׳ ב-${r.duties} משימות`}
+            sub={r.group_mean != null ? `ממוצע ${r.group_mean.toFixed(1)}${r.group_label ? ` · ${r.group_label}` : ""} · ${r.group_size} עובדים` : undefined}
+          />
+        ))}
+      </AccordionDetails>
+    </Accordion>
+  );
+}
+
 export function MyProfilePage() {
   const { api } = useAuth();
   const [p, setP] = useState<MyProfile | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [cycles, setCycles] = useState<MyScore[]>([]);
   const load = useCallback(() => {
     api!
       .myProfile()
       .then(setP)
       .catch((e) => setError((e as Error).message));
+    // the score per cycle, for "לפי מחזור" (moved here from "משימות", 2.73)
+    api!.myScores().then(setCycles, () => setCycles([]));
   }, [api]);
   useEffect(load, [load]);
 
@@ -89,46 +154,80 @@ export function MyProfilePage() {
       </Box>
       <Alert severity="info">זיהית פער בנתונים? פנה לאחראי השיבוצים – הפרטים למטה, ב"למי לפנות".</Alert>
 
-      <Section title="פרטים מקובץ כוח האדם">
-        <Row label="שם" value={p.full_name} />
-        <Row label="מסגרת" value={p.gaf ?? "—"} />
-        <Row label="דרגה" value={`${p.rank ?? "—"}${p.appointed ? " (מינוי)" : ""}`} />
-        <Row label="טלפון" value={<span dir="ltr">{p.phone ? p.phone.replace(/^972/, "0") : "—"}</span>} />
-        <Row label="סוג שירות" value={`${SERVICE[p.service]}${p.career_start_date ? ` · כניסה לקבע ${dmy(p.career_start_date)}` : ""}`} />
-        <Row label="גיוס · תום שירות" value={`גיוס ${dmy(p.enlistment_date)} · תום ${dmy(p.release_date)}`} />
+      <IconSection title="פרטים מקובץ כוח האדם" icon={<DetailsIcon />} tone="info">
+        <Row label="שם · מסגרת" value={`${p.full_name} · ${p.gaf ?? "—"}`} />
         <Row
-          label="תאריך קליטה ביחידה"
-          value={dmy(p.unit_join_date)}
+          label="דרגה · טלפון"
+          value={
+            <>
+              {`${p.rank ?? "—"}${p.appointed ? " (מינוי)" : ""} · `}
+              <span dir="ltr">{p.phone ? p.phone.replace(/^972/, "0") : "—"}</span>
+            </>
+          }
+        />
+        <Row
+          label="סוג שירות"
+          value={
+            <Stack direction="row" component="span" sx={{ gap: 1, alignItems: "center" }}>
+              <Chip size="small" color={TONE[p.service]} variant="outlined" label={SERVICE[p.service]} />
+              {p.career_start_date ? `כניסה לקבע ${dmy(p.career_start_date)}` : null}
+            </Stack>
+          }
+        />
+        <Row
+          label="גיוס · תום שירות · קליטה ביחידה"
+          value={`${dmy(p.enlistment_date)} · ${dmy(p.release_date)} · ${dmy(p.unit_join_date)}`}
           sub={p.grace_until ? `בהכשרה עד ${dmy(p.grace_until)} – בלי שיבוץ אוטומטי` : undefined}
         />
-      </Section>
+      </IconSection>
 
-      <Section title="מה משפיע על השיבוץ שלך">
+      <IconSection title="מה משפיע על השיבוץ שלך" icon={<AffectsIcon />} tone="primary">
         <Row label="ת״ש" value={t.value} sub={t.means} />
-        <Row label="הורה" value={p.parent ? "כן" : "לא"} sub={p.parent ? "פתוחה לך גם המשימה המזכה, בעדיפות" : undefined} />
         <Row
-          label="מקדם הקלה"
-          value={p.relief ? `${p.relief.name} · ×${p.relief.factor}` : "אין"}
-          sub={p.relief ? `מקבל בערך ${Math.round(p.relief.factor * 100)}% מהעומס${p.relief.until ? ` · עד ${dmy(p.relief.until)}` : ""}` : undefined}
+          label="הורה · מקדם הקלה"
+          value={`${p.parent ? "כן" : "לא"} · ${p.relief ? `${p.relief.name} ×${p.relief.factor}` : "אין הקלה"}`}
+          sub={
+            [
+              p.parent && "פתוחה לך גם המשימה המזכה, בעדיפות",
+              p.relief && `מקבל בערך ${Math.round(p.relief.factor * 100)}% מהעומס${p.relief.until ? ` · עד ${dmy(p.relief.until)}` : ""}`,
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
         />
         {p.shachar && <Row label="שח״ר" value="כן" sub="משובץ רק למשימות שמתאימות לשח״ר" />}
         {p.second_role_signed_at && <Row label="תפקיד שני" value={`נחתם ${dmy(p.second_role_signed_at)}`} />}
         <Row
           label="פטורים והיעדרויות"
-          value={p.away.length ? p.away.map((a) => `${a.name ?? (a.kind === "absence" ? "היעדרות" : "פטור")}${a.status === "pending" ? " (ממתין)" : ""}`).join(" · ") : "אין"}
-          sub={p.away.length ? p.away.map((a) => `${dmy(a.from)} – ${dmy(a.to)}`).join(" · ") : undefined}
+          value={
+            p.away.length ? (
+              <Stack direction="row" component="span" sx={{ gap: 0.75, flexWrap: "wrap", mt: 0.25 }}>
+                {p.away.map((a, i) => (
+                  <Chip
+                    key={i}
+                    size="small"
+                    variant="outlined"
+                    color={a.status === "pending" ? TONE.pending : a.kind === "absence" ? TONE.absence : TONE.exemption}
+                    label={`${a.name ?? (a.kind === "absence" ? "היעדרות" : "פטור")} · ${dmy(a.from)}–${dmy(a.to)}${a.status === "pending" ? " · ממתין" : ""}`}
+                  />
+                ))}
+              </Stack>
+            ) : (
+              "אין"
+            )
+          }
           action={
             <Link component={RouterLink} to="/requests" variant="body2" sx={{ whiteSpace: "nowrap" }}>
               לבקשות
             </Link>
           }
         />
-      </Section>
+      </IconSection>
 
       <RangeCard />
 
       {p.cycle && (
-        <Section title={`המשימות שלך – ${p.cycle.name}`}>
+        <IconSection title={`המשימות שלך – ${p.cycle.name}`} icon={<TasksIcon />} tone="success">
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             {can.length ? `אפשר לשבץ אותך ל-${can.length} סוגי משימות:` : "אין משימות שמתאימות לך במחזור הזה."}
           </Typography>
@@ -160,30 +259,17 @@ export function MyProfilePage() {
               </AccordionDetails>
             </Accordion>
           )}
-        </Section>
+        </IconSection>
       )}
 
       {s && p.cycle && (
-        <Section title="הניקוד שלך">
-          <Stack direction="row" sx={{ bgcolor: "action.hover", borderRadius: 2, p: 1.5, my: 1, justifyContent: "space-between", alignItems: "center" }}>
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                {p.cycle.published ? "הניקוד שלך" : "הניקוד שלך לפני המחזור"}
-              </Typography>
-              <Typography sx={{ fontSize: 28, fontWeight: 700, color: "primary.main" }}>
-                {(Number(s.earlier) + Number(s.cycle_points ?? 0)).toFixed(1)}
-              </Typography>
-            </Box>
-            <Box sx={{ textAlign: "left" }}>
-              <Typography variant="body2" color="text.secondary">
-                ממוצע הקבוצה
-              </Typography>
-              <Typography sx={{ fontSize: 20, fontWeight: 700 }}>{s.group_avg != null ? Number(s.group_avg).toFixed(1) : "—"}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {p.service === "career" ? "עובדי קבע" : "עובדי חובה"} שנמדדים איתך ({s.group_size})
-              </Typography>
-            </Box>
-          </Stack>
+        <IconSection title="הניקוד שלך" icon={<ScoreIcon />} tone="warning">
+          <ScoreBar
+            total={Number(s.earlier) + Number(s.cycle_points ?? 0)}
+            avg={s.group_avg != null ? Number(s.group_avg) : null}
+            label={p.cycle.published ? "הניקוד שלך" : "הניקוד שלך לפני המחזור"}
+            group={`${p.service === "career" ? "עובדי קבע" : "עובדי חובה"} שנמדדים איתך (${s.group_size})`}
+          />
           {s.switch && (
             <Row
               label={`ניקוד מעבר ל${s.switch.to === "career" ? "קבע" : "חובה"}`}
@@ -203,10 +289,11 @@ export function MyProfilePage() {
           {p.cycle.published && (
             <Row label="משימות במחזור" value={<bdi dir="ltr">{`+${Number(s.cycle_points ?? 0).toFixed(1)}`}</bdi>} sub={`${s.cycle_duties ?? 0} משימות על הלוח`} />
           )}
+          {cycles.length > 0 && <ByCycle rows={cycles} />}
           <Link component={RouterLink} to="/scoring" variant="body2" sx={{ display: "inline-block", pt: 1 }}>
             איך מחושב הניקוד?
           </Link>
-        </Section>
+        </IconSection>
       )}
 
       <ContactCard />

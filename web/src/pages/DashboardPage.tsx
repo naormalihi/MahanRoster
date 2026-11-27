@@ -29,6 +29,7 @@ import { useAuth } from "../lib/auth";
 import { stageLabel, type CycleStatus } from "../lib/cycles";
 import { ACTION_LABEL, collapseRepeats, ENTITY_LABEL, perSoldier, type UnitDashboard, type UnitKpis } from "../lib/dashboard";
 import { FeedbackInbox } from "../components/FeedbackInbox";
+import { IconBadge } from "../components/IconBadge";
 import { dayLabel, spanLabel, upcomingWeekend } from "../lib/dates";
 import { useLiveTick } from "../lib/live";
 
@@ -72,9 +73,7 @@ function Kpi(props: {
         "&:hover": props.open ? { borderColor: c } : undefined,
       }}
     >
-      <Box sx={{ width: 32, height: 32, borderRadius: 2, bgcolor: alpha(c, 0.16), color: c, display: "grid", placeItems: "center", "& svg": { fontSize: 19 } }}>
-        {props.icon}
-      </Box>
+      <IconBadge icon={props.icon} tone={props.tone} />
       <Typography variant="body2" color="text.secondary">
         {props.title}
       </Typography>

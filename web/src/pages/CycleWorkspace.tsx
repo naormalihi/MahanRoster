@@ -29,6 +29,8 @@ import { StagePanel } from "./CyclesPage";
 import { announceBoardChange } from "../components/SlotActions";
 import { PagerBar, type PagerItem } from "../components/PagerBar";
 import { useLiveTick } from "../lib/live";
+import { IconBadge } from "../components/IconBadge";
+import { STEP_LOOK } from "../components/StageIcons";
 
 const ConstraintsPage = lazy(() => import("./ConstraintsPage").then((m) => ({ default: m.ConstraintsPage })));
 const PotentialPage = lazy(() => import("./PotentialPage").then((m) => ({ default: m.PotentialPage })));
@@ -95,6 +97,8 @@ function StepTabs({ step, states }: { step: StepKey; states: ReturnType<typeof s
             component={RouterLink}
             to={s.path}
             label={
+              <Stack direction="row" sx={{ gap: 1, alignItems: "flex-start" }}>
+              {s.key !== "overview" && <IconBadge icon={STEP_LOOK[s.key].icon} tone={STEP_LOOK[s.key].tone} size={26} />}
               <Box>
                 <Typography sx={{ fontWeight: 700, fontSize: 14 }}>
                   {i > 0 ? `${i}. ` : ""}
@@ -109,6 +113,7 @@ function StepTabs({ step, states }: { step: StepKey; states: ReturnType<typeof s
                   <Box sx={{ fontSize: 12, color: "text.secondary" }}>שלב ומה הלאה</Box>
                 )}
               </Box>
+              </Stack>
             }
           />
         );
