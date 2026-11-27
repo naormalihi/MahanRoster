@@ -4,7 +4,7 @@ import { Alert, Box, CircularProgress } from "@mui/material";
 import { lazy, Suspense, useEffect, type ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { canRead, isSoldier, isStaff, isUnitCommander } from "./lib/api";
+import { isFrameCommander, canRead, isSoldier, isStaff, isUnitCommander } from "./lib/api";
 import { ReadOnlyScope } from "./components/ReadOnly";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { isStaleBuild, showUpdate } from "./lib/staleBuild";
@@ -57,7 +57,12 @@ function Gate() {
     <CycleProvider>
       <Layout>
         <Routes>
-          <Route path="/" element={isUnitCommander(me) && !staff ? <DashboardPage /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />} />
+          <Route
+            path="/"
+            element={
+              isUnitCommander(me) && !staff ? <DashboardPage /> : isFrameCommander(me) ? <DashboardPage mine /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />
+            }
+          />
           {reader && <Route path="/dashboard" element={<DashboardPage />} />}
           {(isStaff(me) || isUnitCommander(me)) && <Route path="/feedback" element={<FeedbackInbox />} />}
           {reader && <Route path="/spec" element={lazyEl(<SpecPage />)} />}

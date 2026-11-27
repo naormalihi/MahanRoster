@@ -69,6 +69,7 @@ import { DeadlineEditor } from "../components/DeadlineEditor";
 import { EmptyState } from "../components/EmptyState";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
 import { useLiveTick } from "../lib/live";
+import { readDashboardSet } from "../lib/dashboardSet";
 
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
@@ -571,6 +572,12 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   // ?urgent=1 / ?by=soldier (from "נתוני היחידה"): only those
   const [urgentOnly, setUrgentOnly] = useState(params.get("urgent") === "1");
   const [bySoldier, setBySoldier] = useState(params.get("by") === "soldier");
+  // ?set=1 ("נתוני המסגרת"): only a gaf commander's people – the list his number counted
+  const [peopleSet, setPeopleSet] = useState<{ label: string; ids: Set<string> } | null>(() => {
+    if (params.get("set") !== "1") return null;
+    const s = readDashboardSet();
+    return s ? { label: s.label, ids: new Set(s.ids) } : null;
+  });
   const [adding, setAdding] = useState(false);
   const [approving, setApproving] = useState<Exemption | null>(null);
   const [detailing, setDetailing] = useState<Exemption | null>(null);
@@ -597,7 +604,12 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   const typeName = new Map(types.map((t) => [t.id, t.name]));
   const taskName = new Map(tasks.map((t) => [t.id, t.name]));
   const shown = rows.filter(
-    (r) => (!status || r.status === status) && (!urgentOnly || r.is_urgent) && (!bySoldier || r.source === "soldier") && filter.match(r.soldier_id),
+    (r) =>
+      (!status || r.status === status) &&
+      (!urgentOnly || r.is_urgent) &&
+      (!bySoldier || r.source === "soldier") &&
+      (!peopleSet || peopleSet.ids.has(r.soldier_id)) &&
+      filter.match(r.soldier_id),
   );
   const pending = rows.filter((r) => r.status === "pending").length;
 
@@ -631,11 +643,12 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
           </TextField>
         }
         extra={
-          pending > 0 || urgentOnly || bySoldier ? (
+          pending > 0 || urgentOnly || bySoldier || peopleSet ? (
             <Stack direction="row" spacing={1}>
               {pending > 0 && <Chip color="warning" label={`${pending} ממתינים לאישור`} onClick={() => setStatus("pending")} />}
               {urgentOnly && <Chip color="error" label="רק דחופות" onDelete={() => setUrgentOnly(false)} />}
               {bySoldier && <Chip color="info" label="רק שהגישו בעצמם" onDelete={() => setBySoldier(false)} />}
+              {peopleSet && <Chip color="primary" label={peopleSet.label} onDelete={() => setPeopleSet(null)} />}
             </Stack>
           ) : undefined
         }

@@ -3729,3 +3729,30 @@ def test_every_dashboard_number_opens_exactly_its_people(conn):
     with session_as(conn, COORD) as c:
         with pytest.raises(psycopg.Error):
             c.execute("select public.dashboard_ids('active', true)")
+
+
+def test_frame_dashboard_is_the_commanders_own_people(conn):
+    emp, g1 = conn.execute("select s.id, s.gaf_id from soldiers s where s.gaf_id is not null and s.is_active "
+                           "and not exists (select 1 from app_users u where u.soldier_id = s.id) order by s.id limit 1").fetchone()
+    cmd = _as_coord(conn, "select public.create_user(%s, %s, 'gaf_commander', %s)", "cmd.frame", "temp-pass-123", emp)[0][0]
+    try:
+        with session_as(conn, cmd) as c:
+            k = c.execute("select public.unit_kpis(true)").fetchone()[0]
+            d = c.execute("select public.unit_dashboard(true)").fetchone()[0]
+            ids = lambda key: c.execute("select public.dashboard_ids(%s, true)", (key,)).fetchone()[0]
+            act = ids("active")
+            assert len(act) == k["active"] == d["accounts"]["soldiers"] > 0
+            for key in ("mandatory", "career", "range_expired", "range_soon", "in_training"):
+                assert len(ids(key)) == k[key], key
+            assert all(g["gaf_id"] == str(g1) for g in d["by_gaf"])
+            assert d["settings_changes"] == []
+            c.execute("reset role")
+            gafs = {r[0] for r in conn.execute("select gaf_id from soldiers where id = any(%s::uuid[])", (act,)).fetchall()}
+            assert gafs == {g1}
+            if k.get("cycle"):
+                n = conn.execute("""select count(*) from exemptions e, cycles cy where cy.id = %s and e.status = 'pending'
+                                    and e.start_date <= cy.end_date and e.end_date >= cy.start_date
+                                    and e.soldier_id = any(%s::uuid[])""", (k["cycle"]["id"], ids("all"))).fetchone()[0]
+                assert n == k["exemptions_pending"]
+    finally:
+        _as_coord(conn, "select public.delete_user(%s)", cmd)

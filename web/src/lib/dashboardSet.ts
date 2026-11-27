@@ -9,6 +9,12 @@ export interface DashboardSet {
   ids: string[];
 }
 
+/** A gaf commander's frameworks, by name (the board and the weekend list carry names). */
+export async function myGafNames(api: { myCommandedGafs(): Promise<string[]>; gafim(): Promise<{ id: string; name: string }[]> }) {
+  const [ids, all] = await Promise.all([api.myCommandedGafs(), api.gafim()]);
+  return all.filter((g) => ids.includes(g.id)).map((g) => g.name);
+}
+
 export function saveDashboardSet(s: DashboardSet) {
   try {
     sessionStorage.setItem(KEY, JSON.stringify(s));

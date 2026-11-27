@@ -46,6 +46,7 @@ import { useAuth } from "../lib/auth";
 import { daySummaries, type DaySummary, dutiesIcs, groupByDay, isWeekend, matchingNames, mentions, monthGrid, people, span, weekDays, weekMatrix } from "../lib/board";
 import { addDays, dayKey, dayLabel, timeLabel, upcomingWeekend, weekOf } from "../lib/dates";
 import { useLiveTick } from "../lib/live";
+import { myGafNames } from "../lib/dashboardSet";
 
 type Range = "week" | "next" | "weekend" | "month";
 
@@ -586,6 +587,12 @@ export function BoardPage() {
   // ?from=…&to=… (dates) and ?callups=1: a cycle's call-ups – what the dashboard counted
   const span = params.get("from") && params.get("to") ? [params.get("from")!, params.get("to")!] : null;
   const callupsOnly = params.get("callups") === "1";
+  // ?mine=1 ("נתוני המסגרת"): duties of a gaf commander's people only
+  const mineOnly = params.get("mine") === "1";
+  const [myGafs, setMyGafs] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (mineOnly) myGafNames(api!).then(setMyGafs, () => setMyGafs([]));
+  }, [api, mineOnly]);
   const [next, setNext] = useState<string | null>(null);
   const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -646,7 +653,12 @@ export function BoardPage() {
   const q = query.trim();
   const isCallup = (r: BoardRow) => (r.activated?.length ?? 0) > 0 || r.special_points != null;
   const shown = (rows ?? []).filter(
-    (r) => (!gaf || gafOf(r).includes(gaf)) && (!category || r.category_name === category) && mentions(r, q) && (!callupsOnly || isCallup(r)),
+    (r) =>
+      (!gaf || gafOf(r).includes(gaf)) &&
+      (!category || r.category_name === category) &&
+      mentions(r, q) &&
+      (!callupsOnly || isCallup(r)) &&
+      (!mineOnly || [...(r.performer_gafim ?? r.gafim ?? []), ...(r.reserve_gafim ?? [])].some((g) => (myGafs ?? []).includes(g))),
   );
   const days = groupByDay(shown);
   const unstaffed = shown.filter((r) => !r.performers.length).length;
@@ -693,7 +705,7 @@ export function BoardPage() {
               size="small"
               color="warning"
               sx={{ mt: 0.5 }}
-              label={`${callupsOnly ? "הקפצות" : "משימות"}${span ? ` ${span[0].split("-").reverse().join("/")}–${span[1].split("-").reverse().join("/")}` : ""}`}
+              label={`${callupsOnly ? "הקפצות" : "משימות"}${mineOnly ? " של אנשיך" : ""}${span ? ` ${span[0].split("-").reverse().join("/")}–${span[1].split("-").reverse().join("/")}` : ""}`}
               onDelete={() => setParams({}, { replace: true })}
             />
           )}
