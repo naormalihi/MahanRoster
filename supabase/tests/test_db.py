@@ -3754,6 +3754,12 @@ def test_frame_dashboard_is_the_commanders_own_people(conn):
                                     and e.start_date <= cy.end_date and e.end_date >= cy.start_date
                                     and e.soldier_id = any(%s::uuid[])""", (k["cycle"]["id"], ids("all"))).fetchone()[0]
                 assert n == k["exemptions_pending"]
+        # the unit's numbers are not his – "נתוני המסגרת" is
+        with session_as(conn, cmd) as c:
+            for sql in ("select public.unit_kpis()", "select public.unit_dashboard()", "select public.dashboard_ids('active')"):
+                with pytest.raises(psycopg.Error, match="permission denied"):
+                    with c.transaction():
+                        c.execute(sql)
         # staff viewing as this commander see his "נתוני המסגרת", not their own
         with session_as(conn, COORD) as c:
             c.execute("select public.view_as_start(%s)", (emp,))

@@ -307,8 +307,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const links = staff
     ? STAFF_LINKS
     : isFrameCommander(me)
-      ? // his home is "נתוני המסגרת"; the unit's numbers stay one click away
-        STAFF_LINKS.filter((l) => l.to !== "/admin").map((l) => (l.to === "/" ? { ...l, label: "נתוני המסגרת" } : l))
+      ? // his home is "נתוני המסגרת" – his frameworks' numbers, not the unit's
+        STAFF_LINKS.filter((l) => l.to !== "/admin" && l.to !== "/dashboard").map((l) => (l.to === "/" ? { ...l, label: "נתוני המסגרת" } : l))
       : reader
       ? STAFF_LINKS.filter((l) => l.to !== "/admin" && !(isUnitCommander(me) && l.to === "/dashboard"))
       : isSoldier(me)
