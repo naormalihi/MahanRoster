@@ -568,6 +568,9 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   const [types, setTypes] = useState<ExemptionType[]>([]);
   const [tasks, setTasks] = useState<TaskType[]>([]);
   const [status, setStatus] = useState<RequestStatus | "">((params.get("status") as RequestStatus) ?? "");
+  // ?urgent=1 / ?by=soldier (from "נתוני היחידה"): only those
+  const [urgentOnly, setUrgentOnly] = useState(params.get("urgent") === "1");
+  const [bySoldier, setBySoldier] = useState(params.get("by") === "soldier");
   const [adding, setAdding] = useState(false);
   const [approving, setApproving] = useState<Exemption | null>(null);
   const [detailing, setDetailing] = useState<Exemption | null>(null);
@@ -593,7 +596,9 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   if (!rows) return <Loading />;
   const typeName = new Map(types.map((t) => [t.id, t.name]));
   const taskName = new Map(tasks.map((t) => [t.id, t.name]));
-  const shown = rows.filter((r) => (!status || r.status === status) && filter.match(r.soldier_id));
+  const shown = rows.filter(
+    (r) => (!status || r.status === status) && (!urgentOnly || r.is_urgent) && (!bySoldier || r.source === "soldier") && filter.match(r.soldier_id),
+  );
   const pending = rows.filter((r) => r.status === "pending").length;
 
   const scope = (r: Exemption) => {
@@ -625,7 +630,15 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
             ))}
           </TextField>
         }
-        extra={pending > 0 ? <Chip color="warning" label={`${pending} ממתינים לאישור`} onClick={() => setStatus("pending")} /> : undefined}
+        extra={
+          pending > 0 || urgentOnly || bySoldier ? (
+            <Stack direction="row" spacing={1}>
+              {pending > 0 && <Chip color="warning" label={`${pending} ממתינים לאישור`} onClick={() => setStatus("pending")} />}
+              {urgentOnly && <Chip color="error" label="רק דחופות" onDelete={() => setUrgentOnly(false)} />}
+              {bySoldier && <Chip color="info" label="רק שהגישו בעצמם" onDelete={() => setBySoldier(false)} />}
+            </Stack>
+          ) : undefined
+        }
       />
       {shown.length === 0 ? (
         <EmptyState size="sm" title="אין פטורים להצגה" text="במחזור הזה, לפי הסינון שנבחר." />
@@ -1247,7 +1260,15 @@ export function ConstraintsPage() {
   const narrow = useNarrow();
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
   const [soldiers, setSoldiers] = useState<ExistingSoldier[]>([]);
-  const { cycleId } = useCycle();
+  const { cycleId, setCycleId } = useCycle();
+  // a link from "נתוני היחידה": the cycle its number counted
+  const cycleParam = params.get("cycle");
+  useEffect(() => {
+    if (!cycleParam) return;
+    if (cycleParam !== cycleId) setCycleId(cycleParam);
+    // once: the cycle picker works as usual after it
+    setParams((p) => (p.delete("cycle"), p), { replace: true });
+  }, [cycleParam, cycleId, setCycleId, setParams]);
   const [version, setVersion] = useState(0);
   const [cyclesVersion, setCyclesVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);

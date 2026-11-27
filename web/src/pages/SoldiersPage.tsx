@@ -77,6 +77,7 @@ import {
 import type { Cycle, Exemption, ExemptionType } from "../lib/cycles";
 import { currentCycle, currentScore, cycleScores, isPublished, nextCycle, summarize } from "../lib/lastCycle";
 import { useLiveTick } from "../lib/live";
+import { readDashboardSet } from "../lib/dashboardSet";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
 const RANGE_CHIP: Record<
@@ -775,6 +776,12 @@ export function SoldiersPage() {
     const a = startParams.get("career_from"), b = startParams.get("career_to");
     return a && b ? [a, b] : null;
   });
+  // a dashboard number: exactly the people it counts (?set=1, the list in session storage)
+  const [dashSet, setDashSet] = useState<{ label: string; ids: Set<string> } | null>(() => {
+    if (startParams.get("set") !== "1") return null;
+    const s = readDashboardSet();
+    return s ? { label: s.label, ids: new Set(s.ids) } : null;
+  });
   const [joinSpan, setJoinSpan] = useState<[string, string] | null>(() => {
     const a = startParams.get("join_from"), b = startParams.get("join_to");
     return a && b ? [a, b] : null;
@@ -997,6 +1004,7 @@ export function SoldiersPage() {
     (s) =>
       (showInactive || s.is_active) &&
       (!q || s.full_name.includes(q.trim())) &&
+      (!dashSet || dashSet.ids.has(s.id)) &&
       (!gaf || s.gaf_name === gaf) &&
       (!service || effectiveService(s) === service) &&
       (!rank ||
@@ -1187,6 +1195,7 @@ export function SoldiersPage() {
               setShowInactive(false);
               setCareerSpan(null);
               setJoinSpan(null);
+              setDashSet(null);
             }}
           />
           <Chip
@@ -1221,6 +1230,14 @@ export function SoldiersPage() {
             <Chip color="secondary" label={`נכנסים לקבע ${fmt(careerSpan[0])}–${fmt(careerSpan[1])}`} onDelete={() => setCareerSpan(null)} />
           )}
           {joinSpan && <Chip color="info" label={`חדשים במחזור ${fmt(joinSpan[0])}–${fmt(joinSpan[1])}`} onDelete={() => setJoinSpan(null)} />}
+          {dashSet && (
+            <Chip
+              color="primary"
+              label={`${dashSet.label}: ${dashSet.ids.size}`}
+              onDelete={() => setDashSet(null)}
+              title="מנתוני היחידה – בדיוק מי שנספר במספר. ✕ מציג את כולם"
+            />
+          )}
         </Stack>
       )}
 

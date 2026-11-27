@@ -22,7 +22,8 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useState, type ReactNode } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { saveDashboardSet } from "../lib/dashboardSet";
 import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { stageLabel, type CycleStatus } from "../lib/cycles";
@@ -36,14 +37,27 @@ const POP: Record<string, string> = { mandatory: "חובה", career: "קבע" };
 
 type Tone = "info" | "secondary" | "success" | "error" | "warning";
 
-/** A managers' tile: icon, a big number, a line – and, with `to`, the filtered list behind it. */
-function Kpi(props: { title: string; value: ReactNode; note?: ReactNode; noteTone?: Tone; icon: ReactNode; tone: Tone; to?: string; alert?: boolean }) {
+/**
+ * A managers' tile: icon, a big number, a line. `open` shows exactly what the number counts, and
+ * `noteOpen` what the line under it counts (2.70).
+ */
+function Kpi(props: {
+  title: string;
+  value: ReactNode;
+  note?: ReactNode;
+  noteTone?: Tone;
+  icon: ReactNode;
+  tone: Tone;
+  open?: () => void;
+  noteOpen?: () => void;
+  alert?: boolean;
+}) {
   const t = useTheme();
   const c = t.palette[props.tone].main;
   return (
     <Paper
       variant="outlined"
-      {...(props.to ? { component: RouterLink, to: props.to } : {})}
+      {...(props.open ? clickable(props.open) : {})}
       sx={{
         p: 1.75,
         borderRadius: 3,
@@ -54,7 +68,8 @@ function Kpi(props: { title: string; value: ReactNode; note?: ReactNode; noteTon
         textDecoration: "none",
         color: "inherit",
         borderColor: props.alert ? alpha(t.palette.error.main, 0.5) : undefined,
-        "&:hover": props.to ? { borderColor: c } : undefined,
+        cursor: props.open ? "pointer" : undefined,
+        "&:hover": props.open ? { borderColor: c } : undefined,
       }}
     >
       <Box sx={{ width: 32, height: 32, borderRadius: 2, bgcolor: alpha(c, 0.16), color: c, display: "grid", placeItems: "center", "& svg": { fontSize: 19 } }}>
@@ -65,7 +80,14 @@ function Kpi(props: { title: string; value: ReactNode; note?: ReactNode; noteTon
       </Typography>
       <Typography sx={{ fontSize: 32, fontWeight: 800, lineHeight: 1.1, color: props.alert ? "error.main" : undefined }}>{props.value}</Typography>
       {props.note && (
-        <Typography variant="caption" sx={{ color: props.noteTone ? `${props.noteTone}.main` : "text.secondary" }}>
+        <Typography
+          variant="caption"
+          {...(props.noteOpen ? clickable(props.noteOpen, true) : {})}
+          sx={{
+            color: props.noteTone ? `${props.noteTone}.main` : "text.secondary",
+            ...(props.noteOpen ? { textDecoration: "underline", textUnderlineOffset: 3, cursor: "pointer", alignSelf: "flex-start" } : {}),
+          }}
+        >
           {props.note}
         </Typography>
       )}
@@ -73,12 +95,29 @@ function Kpi(props: { title: string; value: ReactNode; note?: ReactNode; noteTon
   );
 }
 
+/** A click (and Enter) that opens something; `inner` – inside a clickable tile, without opening it too. */
+function clickable(open: () => void, inner = false) {
+  return {
+    role: "link",
+    tabIndex: 0,
+    onClick: (e: React.MouseEvent) => {
+      if (inner) e.stopPropagation();
+      open();
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      if (inner) e.stopPropagation();
+      open();
+    },
+  };
+}
+
 /** The workforce: active, the חובה / קבע split, and how many have their own account. */
-function Workforce({ k, d }: { k: UnitKpis; d: UnitDashboard }) {
+function Workforce({ k, d, show }: { k: UnitKpis; d: UnitDashboard; show: (key: string, label: string) => void }) {
   const t = useTheme();
   const pct = d.accounts.soldiers ? Math.round((d.accounts.with_account / d.accounts.soldiers) * 100) : 0;
   return (
-    <Paper variant="outlined" component={RouterLink} to="/soldiers" sx={{ p: 2, borderRadius: 3, textDecoration: "none", color: "inherit", display: "block" }}>
+    <Paper variant="outlined" {...clickable(() => show("active", "עובדים פעילים"))} sx={{ p: 2, borderRadius: 3, color: "inherit", display: "block", cursor: "pointer" }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-end" }}>
         <Box>
           <Typography variant="body2" color="text.secondary">
@@ -86,8 +125,8 @@ function Workforce({ k, d }: { k: UnitKpis; d: UnitDashboard }) {
           </Typography>
           <Typography sx={{ fontSize: 44, fontWeight: 800, lineHeight: 1 }}>{k.active}</Typography>
         </Box>
-        <Box sx={{ textAlign: "left" }}>
-          <Typography variant="body2" color="text.secondary">
+        <Box sx={{ textAlign: "left", cursor: "pointer" }} {...clickable(() => show("with_account", "עם חשבון אישי"), true)}>
+          <Typography variant="body2" color="text.secondary" sx={{ textDecoration: "underline", textUnderlineOffset: 3 }}>
             עם חשבון אישי
           </Typography>
           <Typography sx={{ fontSize: 20, fontWeight: 700 }}>
@@ -130,10 +169,10 @@ function Workforce({ k, d }: { k: UnitKpis; d: UnitDashboard }) {
       </Box>
       <Stack direction="row" spacing={2.5} sx={{ mt: 1 }}>
         {[
-          ["חובה", k.mandatory, t.palette.info.main],
-          ["קבע", k.career, t.palette.secondary.main],
-        ].map(([l, n, col]) => (
-          <Stack key={l as string} direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+          ["חובה", k.mandatory, t.palette.info.main, "mandatory"],
+          ["קבע", k.career, t.palette.secondary.main, "career"],
+        ].map(([l, n, col, key]) => (
+          <Stack key={l as string} direction="row" spacing={0.75} sx={{ alignItems: "center", cursor: "pointer" }} {...clickable(() => show(key as string, l as string), true)}>
             <Box sx={{ width: 10, height: 10, borderRadius: 0.75, bgcolor: col as string }} />
             <Typography variant="body2">
               {l} <b>{n}</b>
@@ -164,9 +203,21 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 /** Points with one decimal, without a "-0.0". */
 const pts = (x: number | string) => (Math.abs(Number(x)) < 0.05 ? 0 : Number(x)).toFixed(1);
 
-export function DashboardPage() {
+export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
   const live = useLiveTick();
   const { api } = useAuth();
+  const navigate = useNavigate();
+  // a number opens exactly the people it counts (the server's list) in כוח אדם
+  const show = (key: string, label: string) =>
+    void api!
+      .dashboardIds(key, mine)
+      .then((ids) => {
+        saveDashboardSet({ label, ids });
+        navigate("/soldiers?set=1");
+      })
+      .catch((e) => setError((e as Error).message));
+  // the exemptions of the tiles' cycle, as אילוצים › פטורים shows them
+  const exemptionsOf = (q: string) => k?.cycle && navigate(`/cycle/constraints?tab=exemptions&cycle=${k.cycle.id}&${q}`);
   const [d, setD] = useState<UnitDashboard | null>(null);
   const [k, setK] = useState<UnitKpis | null>(null);
   const [weekend, setWeekend] = useState<BoardRow[] | null>(null);
@@ -174,11 +225,11 @@ export function DashboardPage() {
   const [allChanges, setAllChanges] = useState(false);
 
   useEffect(() => {
-    api!.unitDashboard().then(setD).catch((e) => setError((e as Error).message));
-    api!.unitKpis().then(setK).catch(() => setK(null));
+    api!.unitDashboard(mine).then(setD).catch((e) => setError((e as Error).message));
+    api!.unitKpis(mine).then(setK).catch(() => setK(null));
     const [from, to] = upcomingWeekend();
     api!.board(from.toISOString(), to.toISOString()).then(setWeekend).catch(() => setWeekend([]));
-  }, [api, live]);
+  }, [api, live, mine]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!d)
@@ -204,7 +255,7 @@ export function DashboardPage() {
       </Box>
       <MyNextDuty />
 
-      {k && <Workforce k={k} d={d} />}
+      {k && <Workforce k={k} d={d} show={show} />}
       {k?.cycle && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: -1 }}>
           במחזור {k.cycle.name}
@@ -215,9 +266,10 @@ export function DashboardPage() {
         {k && (
           <>
             <Kpi title="חדשים במחזור" value={k.new_in_cycle ?? "—"} note={k.in_training ? `${k.in_training} עדיין בהכשרה` : "אף אחד לא בהכשרה"} icon={<NewIcon />} tone="info"
-              to={k.cycle ? `/soldiers?join_from=${k.cycle.start_date}&join_to=${k.cycle.end_date}` : "/soldiers?new=1"} />
+              open={k.new_in_cycle ? () => show("new_in_cycle", "חדשים במחזור") : undefined}
+              noteOpen={k.in_training ? () => show("in_training", "בהכשרה") : undefined} />
             <Kpi title="נכנסים לקבע במחזור" value={k.to_career ?? "—"} note="ניקוד מעבר אוטומטי" icon={<CareerIcon />} tone="secondary"
-              to={k.cycle ? `/soldiers?career_from=${k.cycle.start_date}&career_to=${k.cycle.end_date}` : "/soldiers"} />
+              open={k.to_career ? () => show("to_career", "נכנסים לקבע במחזור") : undefined} />
             <Kpi
               title="פטורים מאושרים"
               value={k.exemptions_approved ?? "—"}
@@ -225,7 +277,8 @@ export function DashboardPage() {
               noteTone={k.exemptions_pending ? "warning" : undefined}
               icon={<ApprovedIcon />}
               tone="success"
-              to="/cycle/constraints"
+              open={k.cycle ? () => exemptionsOf("status=approved") : undefined}
+              noteOpen={k.exemptions_pending ? () => exemptionsOf("status=pending") : undefined}
             />
             <Kpi
               title="מטווח פג תוקף"
@@ -234,7 +287,8 @@ export function DashboardPage() {
               icon={<RangeIcon />}
               tone="error"
               alert={k.range_expired > 0}
-              to="/soldiers?range=expired"
+              open={k.range_expired ? () => show("range_expired", "מטווח פג תוקף") : undefined}
+              noteOpen={k.range_soon ? () => show("range_soon", "מטווח יפוג ב-30 יום") : undefined}
             />
             <Kpi
               title="הקפצות במחזור"
@@ -242,18 +296,30 @@ export function DashboardPage() {
               note={k.cycle?.published ? `${k.callups_reserve ?? 0} מהעתודה · ${k.callups_special ?? 0} מיוחדות` : "נספרות אחרי הפרסום"}
               icon={<BoltIcon />}
               tone="warning"
+              open={
+                k.cycle && (k.callups_reserve ?? 0) + (k.callups_special ?? 0) > 0
+                  ? () => navigate(`/board?from=${k.cycle!.start_date}&to=${k.cycle!.end_date}&callups=1`)
+                  : undefined
+              }
+            />
+            <Kpi
+              title="בקשות פטור ממתינות"
+              value={k.exemptions_pending ?? "—"}
+              note={`${k.exemptions_by_soldiers ?? 0} הגישו בעצמם · ${k.exemptions_urgent ? `${k.exemptions_urgent} דחופות` : "אין דחופות"}`}
+              noteTone={k.exemptions_urgent ? "error" : undefined}
+              icon={<PendingIcon />}
+              tone="warning"
+              open={k.cycle ? () => exemptionsOf("status=pending") : undefined}
+              noteOpen={
+                k.exemptions_urgent
+                  ? () => exemptionsOf("status=pending&urgent=1")
+                  : k.exemptions_by_soldiers
+                    ? () => exemptionsOf("status=pending&by=soldier")
+                    : undefined
+              }
             />
           </>
         )}
-        <Kpi
-          title="בקשות פטור ממתינות"
-          value={d.requests.pending}
-          note={`${d.requests.by_soldiers} הגישו בעצמם · ${d.requests.urgent ? `${d.requests.urgent} דחופות` : "אין דחופות"}`}
-          noteTone={d.requests.urgent ? "error" : undefined}
-          icon={<PendingIcon />}
-          tone="warning"
-          to="/cycle/constraints"
-        />
       </Box>
 
       {/* two by two, each pair the same height */}
@@ -261,7 +327,7 @@ export function DashboardPage() {
         <Card title="העומס לפי מסגרת">
           <Stack spacing={1}>
             {d.by_gaf.map((g) => (
-              <Box key={g.gaf}>
+              <Box key={g.gaf} {...(g.gaf_id ? clickable(() => show(`gaf:${g.gaf_id}`, g.gaf)) : {})} sx={{ cursor: g.gaf_id ? "pointer" : undefined, borderRadius: 1, "&:hover": { bgcolor: "action.hover" } }}>
                 <Stack direction="row" sx={{ justifyContent: "space-between" }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {g.gaf}
@@ -294,7 +360,7 @@ export function DashboardPage() {
               </TableHead>
               <TableBody>
                 {d.by_population.map((p) => (
-                  <TableRow key={p.population}>
+                  <TableRow key={p.population} hover sx={{ cursor: "pointer" }} {...clickable(() => show(`pop:${p.population}`, `${POP[p.population] ?? p.population} במחזור`))}>
                     <TableCell sx={{ fontWeight: 600 }}>{POP[p.population] ?? p.population}</TableCell>
                     <TableCell>{p.soldiers}</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>{pts(p.mean)}</TableCell>
@@ -303,7 +369,12 @@ export function DashboardPage() {
                         {pts(p.min)}–{pts(p.max)}
                       </span>
                     </TableCell>
-                    <TableCell>{p.without}</TableCell>
+                    <TableCell
+                      {...(p.without ? clickable(() => show(`pop0:${p.population}`, `${POP[p.population] ?? p.population} בלי משימה`), true) : {})}
+                      sx={p.without ? { textDecoration: "underline", textUnderlineOffset: 3 } : undefined}
+                    >
+                      {p.without}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -324,7 +395,11 @@ export function DashboardPage() {
           ) : (
             <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
               {weekend.map((r) => (
-                <Box key={r.slot_id} sx={{ py: 0.75 }}>
+                <Box
+                  key={r.slot_id}
+                  {...clickable(() => navigate(`/board?view=week&day=${new Date(r.starts_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" })}`))}
+                  sx={{ py: 0.75, cursor: "pointer", borderRadius: 1, "&:hover": { bgcolor: "action.hover" } }}
+                >
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {r.task_name} · {r.performers.length ? r.performers.join(", ") : <Chip size="small" color="error" label="לא מאויש" />}
                   </Typography>

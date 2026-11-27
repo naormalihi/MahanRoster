@@ -581,7 +581,11 @@ export function BoardPage() {
   const setView = (v: View) => setParams(v === "list" ? {} : { view: v }, { replace: true });
   const [range, setRange] = useState<Range>("week");
   const [month, setMonth] = useState<Date>(() => monthStartOf(new Date()));
-  const [sunday, setSunday] = useState<Date>(() => weekOf()[0]);
+  // ?day=YYYY-MM-DD (a link from "נתוני היחידה"): the week of that day
+  const [sunday, setSunday] = useState<Date>(() => weekOf(params.get("day") ? new Date(`${params.get("day")}T12:00:00`) : undefined)[0]);
+  // ?from=…&to=… (dates) and ?callups=1: a cycle's call-ups – what the dashboard counted
+  const span = params.get("from") && params.get("to") ? [params.get("from")!, params.get("to")!] : null;
+  const callupsOnly = params.get("callups") === "1";
   const [next, setNext] = useState<string | null>(null);
   const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -592,13 +596,15 @@ export function BoardPage() {
   const [printing, setPrinting] = useState(false);
 
   const [from, to] = useMemo((): [Date, Date] => {
+    if (span) return [new Date(`${span[0]}T00:00:00`), addDays(new Date(`${span[1]}T00:00:00`), 1)];
     if (view === "month") {
       const g = monthGrid(month.getFullYear(), month.getMonth() + 1);
       return [localDay(g[0][0]), addDays(localDay(g[g.length - 1][6]), 1)];
     }
     if (view === "week") return [sunday, addDays(sunday, 7)];
     return rangeOf(range, month);
-  }, [view, range, month, sunday]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, range, month, sunday, span?.[0], span?.[1]]);
 
   // a new range shows a spinner; a change made on the board refreshes in place (no jump)
   const rangeKey = `${from.toISOString()}|${to.toISOString()}`;
@@ -638,7 +644,10 @@ export function BoardPage() {
   }, [from, to]);
 
   const q = query.trim();
-  const shown = (rows ?? []).filter((r) => (!gaf || gafOf(r).includes(gaf)) && (!category || r.category_name === category) && mentions(r, q));
+  const isCallup = (r: BoardRow) => (r.activated?.length ?? 0) > 0 || r.special_points != null;
+  const shown = (rows ?? []).filter(
+    (r) => (!gaf || gafOf(r).includes(gaf)) && (!category || r.category_name === category) && mentions(r, q) && (!callupsOnly || isCallup(r)),
+  );
   const days = groupByDay(shown);
   const unstaffed = shown.filter((r) => !r.performers.length).length;
   const active = (gaf ? 1 : 0) + (category ? 1 : 0);
@@ -679,6 +688,15 @@ export function BoardPage() {
               </Box>
             )}
           </Typography>
+          {(span || callupsOnly) && (
+            <Chip
+              size="small"
+              color="warning"
+              sx={{ mt: 0.5 }}
+              label={`${callupsOnly ? "הקפצות" : "משימות"}${span ? ` ${span[0].split("-").reverse().join("/")}–${span[1].split("-").reverse().join("/")}` : ""}`}
+              onDelete={() => setParams({}, { replace: true })}
+            />
+          )}
         </Box>
         <IconButton aria-label="הדפסה" onClick={() => setPrinting(true)} sx={{ display: { sm: "none" }, "@media print": { display: "none" } }}>
           <PrintIcon />

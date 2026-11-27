@@ -183,8 +183,12 @@ export class SupabaseApi implements Api {
     run(await this.sb.rpc("rename_me", { p_username: username, p_password: password }));
   }
 
-  async unitKpis(): Promise<UnitKpis> {
-    return check(await this.sb.rpc("unit_kpis")) as UnitKpis;
+  async unitKpis(mine = false): Promise<UnitKpis> {
+    return check(await this.sb.rpc("unit_kpis", { p_mine: mine })) as UnitKpis;
+  }
+
+  async dashboardIds(key: string, mine = false): Promise<string[]> {
+    return (check(await this.sb.rpc("dashboard_ids", { p_key: key, p_mine: mine })) as string[]) ?? [];
   }
 
   async sendTestNotification() {
@@ -1284,8 +1288,8 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("cancel_my_absence", { p_id: id }));
   }
 
-  async unitDashboard(): Promise<UnitDashboard> {
-    return check(await this.sb.rpc("unit_dashboard")) as UnitDashboard;
+  async unitDashboard(mine = false): Promise<UnitDashboard> {
+    return check(await this.sb.rpc("unit_dashboard", { p_mine: mine })) as UnitDashboard;
   }
 
   async myNotifications(): Promise<AppNotification[]> {

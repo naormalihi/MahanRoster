@@ -204,7 +204,10 @@ export interface Api {
   updateFeedback(id: string, status: FeedbackStatus, note: string | null, reply: string | null): Promise<void>;
   setMyRequestAlerts(on: boolean): Promise<void>;
   /** נתוני היחידה: the managers' tiles */
-  unitKpis(): Promise<UnitKpis>;
+  /** mine: a gaf commander's own people ("נתוני המסגרת") */
+  unitKpis(mine?: boolean): Promise<UnitKpis>;
+  /** the people behind a dashboard number – exactly the ones it counts (keys: app.dashboard_set) */
+  dashboardIds(key: string, mine?: boolean): Promise<string[]>;
   /** "שליחת התראת ניסיון": a notice to oneself, pushed now */
   sendTestNotification(): Promise<void>;
   /** "למי לפנות": up to two of אחראי השיבוצים / מ"מ and the commander of my gaf, as אחראי השיבוצים chose */
@@ -438,7 +441,7 @@ export interface Api {
   addMyAbsence(typeId: string, from: string, to: string): Promise<void>;
   cancelMyAbsence(id: string): Promise<void>;
   // stage 2.6 – the unit commander's dashboard
-  unitDashboard(): Promise<UnitDashboard>;
+  unitDashboard(mine?: boolean): Promise<UnitDashboard>;
   // stage 2.5 – notifications
   myNotifications(): Promise<AppNotification[]>;
   markNotificationsRead(ids: string[] | null): Promise<void>;
