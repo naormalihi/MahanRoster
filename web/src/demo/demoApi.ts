@@ -1724,17 +1724,51 @@ export class DemoApi implements Api {
   private ranges: PlannedRange[] = [];
   private fixes: StaffFixRequest[] = [];
 
-  async unitKpis(): Promise<UnitKpis> {
+  /** the demo's dashboard lists – the numbers are their lengths, as on the server */
+  private demoSet(key: string, mine = false): string[] {
+    const mineGaf = this.soldierList.find((s) => s.id === this.mySoldier())?.gaf_name;
+    const act = this.soldierList.filter((s) => s.is_active && (!mine || s.gaf_name === mineGaf));
+    const today = new Date().toISOString().slice(0, 10);
+    const soon = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const [kind, arg] = key.split(":");
+    const c = this.cycleList.filter((x) => x.status === "published" || x.status === "closed").sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+    const live = this.draft.filter((a) => c && a.cycle_id === c.id && a.role === "performer" && !["draft", "dropped", "swapped_out", "cancelled_approved"].includes(a.status));
+    const pick = (f: (s: (typeof act)[number]) => boolean) => act.filter(f).map((s) => s.id);
+    switch (kind) {
+      case "active": return pick(() => true);
+      case "mandatory": case "career": return pick((s) => s.service_type === kind);
+      case "range_expired": return pick((s) => !!s.range_valid_until && s.range_valid_until < today);
+      case "range_soon": return pick((s) => !!s.range_valid_until && s.range_valid_until >= today && s.range_valid_until <= soon);
+      case "with_account": return pick((s) => this.accounts.has(s.id));
+      case "gaf": return pick((s) => s.gaf_name === arg);
+      case "pop": return pick((s) => s.service_type === arg);
+      case "pop0": return pick((s) => s.service_type === arg && !live.some((a) => a.soldier_id === s.id));
+      default: return pick((s) => !!s.unit_join_date && s.unit_join_date >= "2026-11-01").slice(0, kind === "to_career" ? 1 : 2);
+    }
+  }
+
+  async dashboardIds(key: string, mine = false) {
+    await delay(150);
+    return this.demoSet(key, mine);
+  }
+
+  async unitKpis(mine = false): Promise<UnitKpis> {
     await delay();
-    const act = this.soldierList.filter((s) => s.is_active);
-    const career = act.filter((s) => s.service_type === "career").length;
+    const n = (k: string) => this.demoSet(k, mine).length;
+    this.seedConstraints();
+    const today = new Date().toISOString().slice(0, 10);
+    const kc = this.cycleList.filter((c) => c.end_date >= today).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+    const inK = kc ? this.exemptionList.filter((e) => e.start_date <= kc.end_date && e.end_date >= kc.start_date) : [];
     return {
-      active: act.length, mandatory: act.length - career, career, range_expired: 2, range_soon: 3, in_training: 1,
+      active: n("active"), mandatory: n("mandatory"), career: n("career"), range_expired: n("range_expired"), range_soon: n("range_soon"), in_training: n("in_training"),
       users: 40, users_7d: 22, users_30d: 31,
-      new_in_cycle: 2, to_career: 1,
-      cycle: { id: "c1", name: "דצמבר 2026 – מאי 2027", start_date: "2026-12-01", end_date: "2027-05-31", published: false, status: "approving" },
-      exemptions_approved: this.exemptionList.filter((e) => e.status === "approved").length,
-      exemptions_pending: this.exemptionList.filter((e) => e.status === "pending").length,
+      new_in_cycle: n("new_in_cycle"), to_career: n("to_career"),
+      cycle: kc ? { id: kc.id, name: kc.name, start_date: kc.start_date, end_date: kc.end_date, published: kc.status === "published" || kc.status === "closed", status: kc.status } : undefined,
+      // what אילוצים › פטורים shows for that cycle, by status
+      exemptions_approved: inK.filter((e) => e.status === "approved").length,
+      exemptions_pending: inK.filter((e) => e.status === "pending").length,
+      exemptions_urgent: inK.filter((e) => e.status === "pending" && e.is_urgent).length,
+      exemptions_by_soldiers: inK.filter((e) => e.status === "pending" && e.source === "soldier").length,
       callups_reserve: 0, callups_special: 0, manual_changes: 0, swaps: 0,
     };
   }
@@ -1865,7 +1899,7 @@ export class DemoApi implements Api {
     if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי העובד" });
   }
 
-  async unitDashboard(): Promise<UnitDashboard> {
+  async unitDashboard(_mine = false): Promise<UnitDashboard> {
     await delay();
     this.seedConstraints();
     const c = this.cycleList.filter((x) => x.status === "published" || x.status === "closed").sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
@@ -1876,7 +1910,7 @@ export class DemoApi implements Api {
     const pops = (["career", "mandatory"] as const).map((pop) => {
       const v = active.filter((s) => s.service_type === pop).map((s) => pts(s.id));
       return { population: pop, soldiers: v.length, mean: v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : 0,
-        min: v.length ? Math.min(...v) : 0, max: v.length ? Math.max(...v) : 0, without: v.filter((x) => x === 0).length };
+        min: v.length ? Math.min(...v) : 0, max: v.length ? Math.max(...v) : 0, without: this.demoSet(`pop0:${pop}`).length };
     });
     const planning = this.cycleList.find((x) => x.status !== "published" && x.status !== "closed");
     return {
@@ -1884,12 +1918,12 @@ export class DemoApi implements Api {
       planning: planning ? { name: planning.name, status: planning.status, deadline: planning.exemption_deadline } : null,
       by_gaf: gafs.map((g) => {
         const ss = active.filter((s) => s.gaf_name === g);
-        return { gaf: g, soldiers: ss.length, duties: live.filter((a) => ss.some((s) => s.id === a.soldier_id)).length, points: ss.reduce((n, s) => n + pts(s.id), 0) };
+        return { gaf: g, gaf_id: g, soldiers: ss.length, duties: live.filter((a) => ss.some((s) => s.id === a.soldier_id)).length, points: ss.reduce((n, s) => n + pts(s.id), 0) };
       }),
       by_population: pops,
       requests: { pending: this.exemptionList.filter((e) => e.status === "pending").length, urgent: this.exemptionList.filter((e) => e.status === "pending" && e.is_urgent).length,
         by_soldiers: this.exemptionList.filter((e) => e.status === "pending" && e.source === "soldier").length },
-      accounts: { soldiers: active.length, with_account: this.accounts.size + 1 },
+      accounts: { soldiers: active.length, with_account: this.demoSet("with_account").length },
       settings_changes: [
         { at: new Date(Date.now() - 2 * 86_400_000).toISOString(), action: "update", entity: "score_multipliers", name: "סוף שבוע", by: "naat" },
         { at: new Date(Date.now() - 9 * 86_400_000).toISOString(), action: "update", entity: "task_types", name: "קצין תורן", by: "naat" },

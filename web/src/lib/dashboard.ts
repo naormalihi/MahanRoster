@@ -3,7 +3,7 @@
 export interface UnitDashboard {
   cycle: { id: string; name: string; start_date: string; end_date: string } | null;
   planning: { name: string; status: string; deadline: string | null } | null;
-  by_gaf: { gaf: string; soldiers: number; duties: number; points: number }[];
+  by_gaf: { gaf: string; gaf_id?: string; soldiers: number; duties: number; points: number }[];
   by_population: { population: "mandatory" | "career"; soldiers: number; mean: number; min: number; max: number; without: number }[];
   requests: { pending: number; urgent: number; by_soldiers: number };
   accounts: { soldiers: number; with_account: number };
@@ -27,6 +27,9 @@ export interface UnitKpis {
   cycle?: { id: string; name: string; start_date: string; end_date: string; published: boolean; status: string };
   exemptions_approved?: number;
   exemptions_pending?: number;
+  /** pending in the tiles' cycle: urgent, and sent by the employees themselves */
+  exemptions_urgent?: number;
+  exemptions_by_soldiers?: number;
   callups_reserve?: number;
   callups_special?: number;
   manual_changes?: number;

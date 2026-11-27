@@ -3709,3 +3709,23 @@ def test_unit_kpis(conn):
     assert all(isinstance(k[x], int) for x in ("range_expired", "range_soon", "in_training"))
     if k.get("cycle"):
         assert k["exemptions_approved"] >= 0 and k["callups_reserve"] >= 0 and k["swaps"] >= 0
+
+
+def test_every_dashboard_number_opens_exactly_its_people(conn):
+    k = _as_coord(conn, "select public.unit_kpis()")[0][0]
+    d = _as_coord(conn, "select public.unit_dashboard()")[0][0]
+    ids = lambda key: _as_coord(conn, "select public.dashboard_ids(%s)", key)[0][0]
+    for key in ("active", "mandatory", "career", "range_expired", "range_soon", "in_training", "new_in_cycle", "to_career"):
+        if k.get(key) is not None:
+            assert len(ids(key)) == k[key], key
+    assert len(ids("with_account")) == d["accounts"]["with_account"]
+    assert len(ids("active")) == d["accounts"]["soldiers"]
+    for g in d["by_gaf"]:
+        assert len(ids("gaf:" + g["gaf_id"])) == g["soldiers"], g["gaf"]
+    for p in d["by_population"]:
+        assert len(ids("pop:" + p["population"])) == p["soldiers"]
+        assert len(ids("pop0:" + p["population"])) == p["without"]
+    # a gaf commander may ask only for his own people
+    with session_as(conn, COORD) as c:
+        with pytest.raises(psycopg.Error):
+            c.execute("select public.dashboard_ids('active', true)")
