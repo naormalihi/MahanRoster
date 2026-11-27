@@ -64,7 +64,8 @@ export function RequestsPage() {
   const [opts, setOpts] = useState<InputOptions | null>(null);
   const [mine, setMine] = useState<MyRequests | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [choosing, setChoosing] = useState(false);
+  // ?new=1 ("בקשה חדשה" on the home's "המחזור הבא" card): straight to the choice
+  const [choosing, setChoosing] = useState(() => new URLSearchParams(window.location.search).get("new") === "1");
   const [contacts, setContacts] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
   const [formError, setFormError] = useState<string | null>(null);

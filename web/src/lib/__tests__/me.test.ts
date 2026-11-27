@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountLabel, normalizeCode, splitDuties, type MyDuty } from "../me";
+import { accountLabel, nextCycleInfo, normalizeCode, splitDuties, type InputCycle, type MyDuty } from "../me";
 
 describe("soldier accounts", () => {
   it("says how an account stands", () => {
@@ -77,5 +77,37 @@ describe("requests by cycle – which cycles", () => {
     const cycles = [c("now", "2026-06-01", "2026-11-30"), c("next", "2026-12-01", "2027-05-31"), c("later", "2027-06-01", "2027-11-30"), c("far", "2027-12-01", "2028-05-31")];
     const g = requestsByCycle({ exemptions: [], blocks: [{ id: "b", day: "2027-12-10", mine: true, open: true }], absences: [] }, cycles, "2026-11-16");
     expect(g.map((x) => x.cycle?.id)).toEqual(["now", "next", "far"]);
+  });
+});
+
+describe("המחזור הבא", () => {
+  const cy = (id: string, start: string, end: string, o: Partial<InputCycle> = {}): InputCycle => ({
+    id, name: id, start_date: start, end_date: end, deadline: null, open: true, published: false, published_at: null, ...o,
+  });
+  const cycles = [
+    cy("now", "2026-06-01", "2026-12-31", { open: false, published: true }),
+    cy("next", "2027-01-01", "2027-06-30", { deadline: "2026-12-10T21:00:00Z" }),
+    cy("far", "2027-07-01", "2027-12-31"),
+  ];
+  it("only the one after today's", () => {
+    expect(nextCycleInfo(cycles, null, "2026-11-27")?.name).toBe("next");
+    expect(nextCycleInfo([cycles[0]], null, "2026-11-27")).toBeNull();
+  });
+  it("its step: open, being prepared, published", () => {
+    expect(nextCycleInfo(cycles, null, "2026-11-27")?.stage).toBe("open");
+    expect(nextCycleInfo([cy("n", "2027-01-01", "2027-06-30", { open: false })], null, "2026-11-27")?.stage).toBe("preparing");
+    expect(nextCycleInfo([cy("n", "2027-01-01", "2027-06-30", { open: false, published: true })], null, "2026-11-27")?.stage).toBe("published");
+  });
+  it("his requests for it", () => {
+    const req = {
+      exemptions: [
+        { id: "1", type: "פטור מלא", start_date: "2027-02-01", end_date: "2027-02-10", status: "pending" as const, is_urgent: false, mine: true, decision_reason: null },
+        { id: "2", type: "פטור מלא", start_date: "2026-12-20", end_date: "2027-01-05", status: "approved" as const, is_urgent: false, mine: true, decision_reason: null },
+        { id: "3", type: "פטור מלא", start_date: "2026-08-01", end_date: "2026-08-05", status: "rejected" as const, is_urgent: false, mine: true, decision_reason: null },
+      ],
+      blocks: [{ id: "b", day: "2027-03-03", mine: true, open: true }],
+      absences: [],
+    };
+    expect(nextCycleInfo(cycles, req, "2026-11-27")?.mine).toEqual({ pending: 1, approved: 2, rejected: 0 });
   });
 });
