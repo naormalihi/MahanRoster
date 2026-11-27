@@ -61,11 +61,12 @@ const ROLE_LABEL: Record<string, string> = {
 
 /** Four areas instead of a link per screen; the cycle steps live inside "מחזור". */
 const STAFF_LINKS = [
+  // the unit's numbers first (2.72.1)
+  { to: "/dashboard", label: "נתוני היחידה", match: (p: string) => p === "/dashboard" },
   { to: "/", label: "תמונת מצב", match: (p: string) => p === "/" },
   { to: "/cycle", label: "תכנון ושיבוץ", match: (p: string) => p.startsWith("/cycle") },
   { to: "/soldiers", label: "כוח אדם", match: (p: string) => p.startsWith("/soldiers") },
   { to: "/board", label: "לוח השיבוצים", match: (p: string) => p === "/board" },
-  { to: "/dashboard", label: "נתוני היחידה", match: (p: string) => p === "/dashboard" },
   { to: "/admin", label: "הגדרות", match: (p: string) => p === "/admin" },
 ];
 
@@ -310,7 +311,10 @@ export function Layout({ children }: { children: ReactNode }) {
       ? // his home is "נתוני המסגרת" – his frameworks' numbers, not the unit's
         STAFF_LINKS.filter((l) => l.to !== "/admin" && l.to !== "/dashboard").map((l) => (l.to === "/" ? { ...l, label: "נתוני המסגרת" } : l))
       : reader
-      ? STAFF_LINKS.filter((l) => l.to !== "/admin" && !(isUnitCommander(me) && l.to === "/dashboard"))
+      ? // the unit commander's home is "נתוני היחידה": it stays first, by that name
+        STAFF_LINKS.filter((l) => l.to !== "/admin" && !(isUnitCommander(me) && l.to === "/dashboard")).map((l) =>
+          isUnitCommander(me) && l.to === "/" ? { ...l, label: "נתוני היחידה" } : l,
+        )
       : isSoldier(me)
         ? SOLDIER_LINKS
         : [];
