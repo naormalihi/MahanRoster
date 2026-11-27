@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.72.1",
+    date: "2026-11-27",
+    items: ["\"נתוני היחידה\" ראשון בתפריט של אחראי השיבוצים ומפקד היחידה"],
+  },
+  {
     version: "2.72.0",
     date: "2026-11-27",
     items: [
