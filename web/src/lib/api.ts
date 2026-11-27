@@ -55,7 +55,8 @@ export interface Me {
   requestAlerts?: boolean;
   /**
    * "צפייה כעובד" (2.63): staff, or a gaf commander for his own people, see the app as this
-   * employee – read only. While it is on, roles are just "soldier".
+   * employee – read only. While it is on, roles are just "soldier" (and "gaf_commander" when his
+   * account is one – then the numbers are his frameworks', 2.71.1).
    */
   viewAs?: { soldierId: string; name: string; until: string } | null;
 }

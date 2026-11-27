@@ -3754,5 +3754,12 @@ def test_frame_dashboard_is_the_commanders_own_people(conn):
                                     and e.start_date <= cy.end_date and e.end_date >= cy.start_date
                                     and e.soldier_id = any(%s::uuid[])""", (k["cycle"]["id"], ids("all"))).fetchone()[0]
                 assert n == k["exemptions_pending"]
+        # staff viewing as this commander see his "נתוני המסגרת", not their own
+        with session_as(conn, COORD) as c:
+            c.execute("select public.view_as_start(%s)", (emp,))
+            assert c.execute("select public.view_as_current()").fetchone()[0]["commander"] is True
+            assert c.execute("select public.unit_kpis(true)").fetchone()[0]["active"] == k["active"]
+            assert sorted(c.execute("select public.dashboard_ids('active', true)").fetchone()[0]) == sorted(act)
+            assert [str(g) for g in c.execute("select public.my_commanded_gafs()").fetchone()[0]] == [str(g1)]
     finally:
         _as_coord(conn, "select public.delete_user(%s)", cmd)

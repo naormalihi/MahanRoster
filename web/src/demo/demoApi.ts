@@ -293,7 +293,8 @@ export class DemoApi implements Api {
     const v = this.viewAs && Date.parse(this.viewAs.until) > Date.now() ? this.viewAs : null;
     if (!v) return base;
     const name = this.soldierList.find((s) => s.id === v.soldierId)?.full_name ?? "";
-    return { ...base, roles: ["soldier"], viewAs: { soldierId: v.soldierId, name, until: v.until } };
+    // s1 is the demo's gaf commander: viewing him shows his "נתוני המסגרת"
+    return { ...base, roles: v.soldierId === "s1" ? ["soldier", "gaf_commander"] : ["soldier"], viewAs: { soldierId: v.soldierId, name, until: v.until } };
   }
 
   /** "צפייה כעובד" in the demo: the employee's screens read his data */
@@ -567,7 +568,7 @@ export class DemoApi implements Api {
   }
 
   async myCommandedGafs() {
-    if (!this.user?.roles.includes("gaf_commander")) return [];
+    if (!this.user?.roles.includes("gaf_commander") && this.viewAs?.soldierId !== "s1") return [];
     const s1 = this.soldierList.find((s) => s.id === "s1");
     const g = this.gafList.find((x) => x.name === s1?.gaf_name)?.id;
     return g ? [g] : [];
