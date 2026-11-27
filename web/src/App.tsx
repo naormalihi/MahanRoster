@@ -63,7 +63,7 @@ function Gate() {
               isUnitCommander(me) && !staff ? <DashboardPage /> : isFrameCommander(me) ? <DashboardPage mine /> : reader ? <HomePage /> : isSoldier(me) ? <MyPage /> : <BoardPage />
             }
           />
-          {reader && <Route path="/dashboard" element={<DashboardPage />} />}
+          {reader && !isFrameCommander(me) && <Route path="/dashboard" element={<DashboardPage />} />}
           {(isStaff(me) || isUnitCommander(me)) && <Route path="/feedback" element={<FeedbackInbox />} />}
           {reader && <Route path="/spec" element={lazyEl(<SpecPage />)} />}
           <Route path="/board" element={<BoardPage />} />
