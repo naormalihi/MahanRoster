@@ -11,6 +11,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.71.1",
+    date: "2026-11-27",
+    items: ["צפייה כעובד במפקד מסגרת: מוצגים התפריט שלו ו\"נתוני המסגרת\" על המסגרות שלו, כפי שהוא רואה אותם"],
+  },
+  {
     version: "2.71.0",
     date: "2026-11-27",
     items: [

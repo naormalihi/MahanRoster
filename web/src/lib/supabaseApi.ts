@@ -149,8 +149,14 @@ export class SupabaseApi implements Api {
     const base = { userId: uid, username: user.username, roles: active, mustChangePassword: user.must_change_password, uiTheme: user.ui_theme, requestAlerts: user.request_alerts ?? true };
     // viewing the app as one employee (staff, or a gaf commander for his people): his screens only
     if (active.some((r) => r === "coordinator" || r === "deputy" || r === "gaf_commander")) {
-      const v = maybe(await this.sb.rpc("view_as_current")) as { soldier_id: string; name: string; until: string } | null;
-      if (v) return { ...base, roles: ["soldier"] as Role[], viewAs: { soldierId: v.soldier_id, name: v.name, until: v.until } };
+      const v = maybe(await this.sb.rpc("view_as_current")) as { soldier_id: string; name: string; until: string; commander?: boolean } | null;
+      // a gaf commander viewed: his menu and his "נתוני המסגרת" too (2.71.1)
+      if (v)
+        return {
+          ...base,
+          roles: (v.commander ? ["soldier", "gaf_commander"] : ["soldier"]) as Role[],
+          viewAs: { soldierId: v.soldier_id, name: v.name, until: v.until },
+        };
     }
     return base;
   }
