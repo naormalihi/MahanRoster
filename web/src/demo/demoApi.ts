@@ -1690,6 +1690,7 @@ export class DemoApi implements Api {
         .map((c) => ({
           id: c.id, name: c.name, start_date: c.start_date, end_date: c.end_date, deadline: c.exemption_deadline,
           open: c.status !== "published" && c.status !== "closed" && (!c.exemption_deadline || Date.parse(c.exemption_deadline) > Date.now()),
+          published: c.status === "published" || c.status === "closed", published_at: c.published_at ?? null,
         })),
     };
   }

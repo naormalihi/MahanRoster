@@ -3769,3 +3769,27 @@ def test_frame_dashboard_is_the_commanders_own_people(conn):
             assert [str(g) for g in c.execute("select public.my_commanded_gafs()").fetchone()[0]] == [str(g1)]
     finally:
         _as_coord(conn, "select public.delete_user(%s)", cmd)
+
+
+def test_deadline_reminders_once_per_cycle(conn):
+    uid, sid = _soldier_account(conn, "deadline.rem")
+    with conn.transaction():
+        cy = conn.execute("select id from cycles order by start_date desc limit 1").fetchone()[0]
+        conn.execute("update cycles set status = 'collecting', exemption_deadline = now() + interval '2 days 1 hour', "
+                     "deadline_reminded_3d = null, deadline_reminded_day = null where id = %s", (cy,))
+        hour = conn.execute("select extract(hour from now() at time zone app.tz())::int").fetchone()[0]
+        conn.execute("select app.queue_deadline_reminders()")
+        sent = lambda: conn.execute("select count(*) from notifications where recipient_user_id = %s and type = 'deadline_reminder' "
+                                    "and payload->>'cycle_id' = %s", (uid, str(cy))).fetchone()[0]
+        if 9 <= hour < 21:
+            assert sent() == 1
+            assert conn.execute("select deadline_reminded_3d is not null from cycles where id = %s", (cy,)).fetchone()[0]
+            conn.execute("select app.queue_deadline_reminders()")
+            assert sent() == 1  # once
+        else:
+            assert sent() == 0  # not at night
+        # the employee's options say whether a cycle is published
+        with session_as(conn, uid, aal="aal1") as c:
+            cs = c.execute("select public.my_input_options()").fetchone()[0]["cycles"]
+            assert all("published" in x and "published_at" in x for x in cs)
+        raise psycopg.Rollback()

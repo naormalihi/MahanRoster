@@ -107,6 +107,9 @@ export interface InputCycle {
   deadline: string | null;
   /** self-entry of blocks and absences still open (before the deadline, not published) */
   open: boolean;
+  /** the board is out (2.72) */
+  published?: boolean;
+  published_at?: string | null;
 }
 
 export interface InputOptions {
@@ -186,4 +189,29 @@ export function requestsByCycle(mine: MyRequests, cycles: InputCycle[], today: s
   const sorted = groups.sort((x, y) => x.cycle!.start_date.localeCompare(y.cycle!.start_date));
   const shown = sorted.filter((g, i) => i < 2 || g.exemptions.length + g.blocks.length + g.absences.length > 0);
   return orphan.exemptions.length + orphan.blocks.length + orphan.absences.length ? [...shown, orphan] : shown;
+}
+
+/**
+ * "המחזור הבא" (2.72): the one cycle after today's – the only one whose stage still changes. Its
+ * step for the employee, and where his requests for it stand (pending / in force / rejected).
+ */
+export function nextCycleInfo(cycles: InputCycle[], req: MyRequests | null, today: string) {
+  const c = [...cycles].sort((a, b) => a.start_date.localeCompare(b.start_date)).find((x) => x.start_date > today);
+  if (!c) return null;
+  const stage: "open" | "preparing" | "published" = c.published ? "published" : c.open ? "open" : "preparing";
+  const touches = (from: string, to: string) => from.slice(0, 10) <= c.end_date && to.slice(0, 10) >= c.start_date;
+  const ex = (req?.exemptions ?? []).filter((e) => touches(e.start_date, e.end_date));
+  const blocks = (req?.blocks ?? []).filter((b) => touches(b.day, b.day)).length;
+  const absences = (req?.absences ?? []).filter((a) => touches(a.starts_at, a.ends_at)).length;
+  return {
+    name: c.name,
+    stage,
+    deadline: c.deadline,
+    published_at: c.published_at ?? null,
+    mine: {
+      pending: ex.filter((e) => e.status === "pending").length,
+      approved: ex.filter((e) => e.status === "approved").length + blocks + absences,
+      rejected: ex.filter((e) => e.status === "rejected").length,
+    },
+  };
 }

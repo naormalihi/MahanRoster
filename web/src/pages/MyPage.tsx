@@ -29,6 +29,9 @@ import { SwapDialog, SwapsCard } from "../components/SwapDialog";
 import CloudOffIcon from "@mui/icons-material/CloudOffOutlined";
 import { isOfflineError, OfflineError, readOffline, saveOffline, savedLabel } from "../lib/offline";
 import { useLiveTick } from "../lib/live";
+import { NextCycleCard, type NextCycleInfo } from "../components/NextCycleCard";
+import { nextCycleInfo } from "../lib/me";
+import { todayIso } from "../lib/soldiers";
 
 const ROLE: Record<MyDuty["role"], string> = { performer: "מבצע", reserve: "עתודה" };
 
@@ -189,6 +192,7 @@ export function MyPage() {
   const [swaps, setSwaps] = useState<MySwap[]>([]);
   const [swapping, setSwapping] = useState<MyDuty | null>(null);
   const [tick, setTick] = useState(0);
+  const [nextCycle, setNextCycle] = useState<NextCycleInfo | null>(null);
   const reload = () => setTick((t) => t + 1);
 
   useEffect(() => {
@@ -209,6 +213,11 @@ export function MyPage() {
       })
       .catch(fromCopy);
     api!.mySwaps().then(setSwaps, () => setSwaps([]));
+    // "המחזור הבא": the cycle after today's, and his requests for it
+    if (!offline)
+      Promise.all([api!.myInputOptions(), api!.myRequests()])
+        .then(([o, r]) => setNextCycle(nextCycleInfo(o?.cycles ?? [], r, todayIso())))
+        .catch(() => setNextCycle(null));
   }, [api, me, offline, tick, live]);
 
   // reception back while a copy is shown: load again
@@ -316,6 +325,7 @@ export function MyPage() {
 
       </Stack>
       <Stack spacing={2} sx={{ minWidth: 0 }}>
+      {nextCycle && <NextCycleCard info={nextCycle} />}
       {scores[0] && <ScoreCard s={scores[0]} />}
 
 
