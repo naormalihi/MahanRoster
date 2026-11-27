@@ -23,7 +23,7 @@ import {
 } from "@mui/material";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
-import { saveDashboardSet } from "../lib/dashboardSet";
+import { myGafNames, saveDashboardSet } from "../lib/dashboardSet";
 import type { BoardRow } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { stageLabel, type CycleStatus } from "../lib/cycles";
@@ -216,8 +216,24 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
         navigate("/soldiers?set=1");
       })
       .catch((e) => setError((e as Error).message));
-  // the exemptions of the tiles' cycle, as אילוצים › פטורים shows them
-  const exemptionsOf = (q: string) => k?.cycle && navigate(`/cycle/constraints?tab=exemptions&cycle=${k.cycle.id}&${q}`);
+  // the exemptions of the tiles' cycle, as אילוצים › פטורים shows them (a gaf commander: of his people)
+  const exemptionsOf = (q: string) => {
+    if (!k?.cycle) return;
+    const go = () => navigate(`/cycle/constraints?tab=exemptions&cycle=${k.cycle!.id}&${q}${mine ? "&set=1" : ""}`);
+    if (!mine) return go();
+    void api!
+      .dashboardIds("all", true)
+      .then((ids) => {
+        saveDashboardSet({ label: "אנשי המסגרת שלי", ids });
+        go();
+      })
+      .catch((e) => setError((e as Error).message));
+  };
+  // "נתוני המסגרת": the frameworks he commands, by name
+  const [myGafs, setMyGafs] = useState<string[]>([]);
+  useEffect(() => {
+    if (mine) myGafNames(api!).then(setMyGafs, () => setMyGafs([]));
+  }, [api, mine]);
   const [d, setD] = useState<UnitDashboard | null>(null);
   const [k, setK] = useState<UnitKpis | null>(null);
   const [weekend, setWeekend] = useState<BoardRow[] | null>(null);
@@ -239,6 +255,12 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
       </Box>
     );
   const maxLoad = Math.max(0.01, ...d.by_gaf.map(perSoldier));
+  // a gaf commander's weekend: duties his people are in (performing or in reserve)
+  const weekendShown = !weekend
+    ? null
+    : mine
+      ? weekend.filter((r) => [...(r.performer_gafim ?? r.gafim ?? []), ...(r.reserve_gafim ?? [])].some((g) => myGafs.includes(g)))
+      : weekend;
   const changes = collapseRepeats(d.settings_changes);
 
   return (
@@ -247,7 +269,12 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
         <Button component={RouterLink} to="/scoring" size="small" sx={{ float: "inline-end" }}>
           איך מחושב הניקוד?
         </Button>
-        <Typography variant="h1">נתוני היחידה</Typography>
+        <Typography variant="h1">{mine ? "נתוני המסגרת" : "נתוני היחידה"}</Typography>
+        {mine && myGafs.length > 0 && (
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {myGafs.join(" · ")}
+          </Typography>
+        )}
         <Typography variant="body2" color="text.secondary">
           {d.cycle ? `המחזור בתוקף: ${d.cycle.name} (${fmt(d.cycle.start_date)}–${fmt(d.cycle.end_date)})` : "עוד אין מחזור שפורסם"}
           {d.planning ? ` · בתכנון: ${d.planning.name} – ${stageLabel(d.planning.status as CycleStatus)}` : ""}
@@ -298,7 +325,7 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
               tone="warning"
               open={
                 k.cycle && (k.callups_reserve ?? 0) + (k.callups_special ?? 0) > 0
-                  ? () => navigate(`/board?from=${k.cycle!.start_date}&to=${k.cycle!.end_date}&callups=1`)
+                  ? () => navigate(`/board?from=${k.cycle!.start_date}&to=${k.cycle!.end_date}&callups=1${mine ? "&mine=1" : ""}`)
                   : undefined
               }
             />
@@ -386,15 +413,15 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
         </Card>
 
         <Card title='הסופ"ש הקרוב'>
-          {!weekend ? (
+          {!weekendShown ? (
             <CircularProgress size={20} />
-          ) : weekend.length === 0 ? (
+          ) : weekendShown.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              אין משימות מפורסמות בסופ"ש הקרוב.
+              {mine ? 'לאנשים שלך אין משימות מפורסמות בסופ"ש הקרוב.' : 'אין משימות מפורסמות בסופ"ש הקרוב.'}
             </Typography>
           ) : (
             <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-              {weekend.map((r) => (
+              {weekendShown.map((r) => (
                 <Box
                   key={r.slot_id}
                   {...clickable(() => navigate(`/board?view=week&day=${new Date(r.starts_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" })}`))}
@@ -413,7 +440,7 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
           )}
         </Card>
 
-        <Card title="פעילות הסגל">
+        <Card title={mine ? "שינויים בשיבוץ של אנשיך" : "פעילות הסגל"}>
           {k?.cycle && (
             <Stack direction="row" sx={{ gap: 2, flexWrap: "wrap", mb: 1 }}>
               <Typography variant="body2">
@@ -422,12 +449,14 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
               <Typography variant="body2">
                 החלפות בין עובדים: <b>{k.swaps ?? 0}</b>
               </Typography>
-              <Typography variant="body2">
-                שינויי הגדרות בחודש: <b>{d.settings_changes.length}</b>
-              </Typography>
+              {!mine && (
+                <Typography variant="body2">
+                  שינויי הגדרות בחודש: <b>{d.settings_changes.length}</b>
+                </Typography>
+              )}
             </Stack>
           )}
-          {d.settings_changes.length === 0 ? (
+          {mine ? null : d.settings_changes.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               לא שונו הגדרות.
             </Typography>
@@ -456,12 +485,14 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
             </Button>
           )}
           <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-            מיומן הביקורת, שאי אפשר למחוק ממנו. שינויים זהים ברצף מוצגים פעם אחת.
+            {mine
+              ? "שינויים ידניים של אחראי השיבוצים בשיבוץ של אנשיך, והחלפות שאושרו להם."
+              : "מיומן הביקורת, שאי אפשר למחוק ממנו. שינויים זהים ברצף מוצגים פעם אחת."}
           </Typography>
         </Card>
       </Box>
 
-      <FeedbackInbox home />
+      {!mine && <FeedbackInbox home />}
     </Stack>
   );
 }

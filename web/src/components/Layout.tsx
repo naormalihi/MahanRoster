@@ -30,7 +30,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
+import { isFrameCommander, canRead, isSoldier, isStaff, isUnitCommander } from "../lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { ViewAsScope } from "./ViewAsBanner";
 import { useLivePoller } from "../lib/live";
@@ -306,7 +306,10 @@ export function Layout({ children }: { children: ReactNode }) {
   const who = me ? `${me.username} · ${me.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}` : "";
   const links = staff
     ? STAFF_LINKS
-    : reader
+    : isFrameCommander(me)
+      ? // his home is "נתוני המסגרת"; the unit's numbers stay one click away
+        STAFF_LINKS.filter((l) => l.to !== "/admin").map((l) => (l.to === "/" ? { ...l, label: "נתוני המסגרת" } : l))
+      : reader
       ? STAFF_LINKS.filter((l) => l.to !== "/admin" && !(isUnitCommander(me) && l.to === "/dashboard"))
       : isSoldier(me)
         ? SOLDIER_LINKS

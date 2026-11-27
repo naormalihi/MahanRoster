@@ -65,6 +65,8 @@ export const isStaff = (me: Me | null) => !!me && (me.roles.includes("coordinato
 export const isCommander = (me: Me | null) => !!me && (me.roles.includes("gaf_commander") || me.roles.includes("unit_commander"));
 /** The unit commander (version 2.0, stage 2.6): reads everything, and has the dashboard as his home. */
 export const isUnitCommander = (me: Me | null) => !!me && me.roles.includes("unit_commander");
+/** A gaf commander who is not staff or the unit commander: "נתוני המסגרת" is his home (2.71). */
+export const isFrameCommander = (me: Me | null) => !!me && me.roles.includes("gaf_commander") && !isStaff(me) && !isUnitCommander(me);
 /** Sees the planning screens (staff edit, commanders only read). */
 export const canRead = (me: Me | null) => isStaff(me) || isCommander(me);
 /** A soldier with his own account (version 2.1): his duties and the published board. */

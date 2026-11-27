@@ -1726,7 +1726,7 @@ export class DemoApi implements Api {
 
   /** the demo's dashboard lists – the numbers are their lengths, as on the server */
   private demoSet(key: string, mine = false): string[] {
-    const mineGaf = this.soldierList.find((s) => s.id === this.mySoldier())?.gaf_name;
+    const mineGaf = this.soldierList.find((s) => s.id === "s1")?.gaf_name; // the demo commander's framework
     const act = this.soldierList.filter((s) => s.is_active && (!mine || s.gaf_name === mineGaf));
     const today = new Date().toISOString().slice(0, 10);
     const soon = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
@@ -1899,18 +1899,20 @@ export class DemoApi implements Api {
     if (a) Object.assign(a, { status: "cancelled", cancel_reason: "בוטל על ידי העובד" });
   }
 
-  async unitDashboard(_mine = false): Promise<UnitDashboard> {
+  async unitDashboard(mine = false): Promise<UnitDashboard> {
     await delay();
     this.seedConstraints();
+    const myGafIds = mine ? await this.myCommandedGafs() : [];
+    const myGafNames = new Set(this.gafList.filter((g) => myGafIds.includes(g.id)).map((g) => g.name));
     const c = this.cycleList.filter((x) => x.status === "published" || x.status === "closed").sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
     const live = this.draft.filter((a) => c && a.cycle_id === c.id && a.role === "performer" && !["draft", "dropped", "swapped_out", "cancelled_approved"].includes(a.status));
     const pts = (id: string) => live.filter((a) => a.soldier_id === id).reduce((n, a) => n + a.normalized_points, 0);
-    const active = this.soldierList.filter((s) => s.is_active);
+    const active = this.soldierList.filter((s) => s.is_active && (!mine || myGafNames.has(s.gaf_name)));
     const gafs = [...new Set(active.map((s) => s.gaf_name))].sort();
     const pops = (["career", "mandatory"] as const).map((pop) => {
       const v = active.filter((s) => s.service_type === pop).map((s) => pts(s.id));
       return { population: pop, soldiers: v.length, mean: v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : 0,
-        min: v.length ? Math.min(...v) : 0, max: v.length ? Math.max(...v) : 0, without: this.demoSet(`pop0:${pop}`).length };
+        min: v.length ? Math.min(...v) : 0, max: v.length ? Math.max(...v) : 0, without: this.demoSet(`pop0:${pop}`, mine).length };
     });
     const planning = this.cycleList.find((x) => x.status !== "published" && x.status !== "closed");
     return {
@@ -1923,8 +1925,8 @@ export class DemoApi implements Api {
       by_population: pops,
       requests: { pending: this.exemptionList.filter((e) => e.status === "pending").length, urgent: this.exemptionList.filter((e) => e.status === "pending" && e.is_urgent).length,
         by_soldiers: this.exemptionList.filter((e) => e.status === "pending" && e.source === "soldier").length },
-      accounts: { soldiers: active.length, with_account: this.demoSet("with_account").length },
-      settings_changes: [
+      accounts: { soldiers: active.length, with_account: this.demoSet("with_account", mine).length },
+      settings_changes: mine ? [] : [
         { at: new Date(Date.now() - 2 * 86_400_000).toISOString(), action: "update", entity: "score_multipliers", name: "סוף שבוע", by: "naat" },
         { at: new Date(Date.now() - 9 * 86_400_000).toISOString(), action: "update", entity: "task_types", name: "קצין תורן", by: "naat" },
         { at: new Date(Date.now() - 20 * 86_400_000).toISOString(), action: "insert", entity: "calendar_days", name: "2027-04-22", by: "naat" },
