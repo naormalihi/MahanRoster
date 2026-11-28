@@ -34,6 +34,7 @@ import { SwapDialog, SwapsCard } from "../components/SwapDialog";
 import CloudOffIcon from "@mui/icons-material/CloudOffOutlined";
 import { isOfflineError, OfflineError, readOffline, saveOffline, savedLabel } from "../lib/offline";
 import { useLiveTick } from "../lib/live";
+import { FrameRotaDuty, FrameRotaLine, useMyFrameRotas } from "../components/FrameRotaCard";
 import { NextCycleCard, type NextCycleInfo } from "../components/NextCycleCard";
 import { nextCycleInfo } from "../lib/me";
 import { todayIso } from "../lib/soldiers";
@@ -241,6 +242,7 @@ function DutyRow({ d, open, onToggle, onSwap, onAck }: { d: MyDuty; open: boolea
 /** The employee's own screen: his next duty and all his duties (the score is in "כרטיס אישי", 2.73). */
 export function MyPage() {
   const live = useLiveTick();
+  const rotas = useMyFrameRotas();
   const { api, me, offline } = useAuth();
   // no reception: the copy kept on the device, from this time; actions are off until it is back
   const [stale, setStale] = useState<string | null>(null);
@@ -349,6 +351,7 @@ export function MyPage() {
           {ackError}
         </Alert>
       )}
+      <FrameRotaDuty rotas={rotas} />
       {next ? (
         <NextDuty d={next} onSwap={stale ? undefined : setSwapping} onAck={stale ? undefined : ack} />
       ) : (
@@ -394,6 +397,7 @@ export function MyPage() {
       <Typography variant="caption" color="text.secondary">
         פטור, חסימת תאריך או היעדרות – ב"בקשות ואילוצים". החלפה – בלחיצה על המשימה, עד 24 שעות לפניה; אחר כך פונים לאחראי השיבוצים.
       </Typography>
+      <FrameRotaLine rotas={rotas} />
       <ContactCard />
       {swapping && (
         <SwapDialog

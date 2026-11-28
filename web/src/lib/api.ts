@@ -1,4 +1,5 @@
 import type { UnitKpis } from "./dashboard";
+import type { FrameRotaInput, FrameRotasAdmin, FrameRotaStatus, MyFrameRota } from "./frameRota";
 import type { MyProfile, StaffFixRequest } from "./profile";
 import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
@@ -317,6 +318,14 @@ export interface Api {
   /** "צפייה כעובד": start (2 hours) / back to my own account */
   viewAsStart(soldierId: string): Promise<void>;
   viewAsStop(): Promise<void>;
+  /** "תורנויות מסגרת": settings (staff), what an employee sees, the unit's line */
+  frameRotasAdmin(): Promise<FrameRotasAdmin>;
+  saveFrameRota(r: FrameRotaInput): Promise<string>;
+  deleteFrameRota(id: string): Promise<void>;
+  /** gafId null: back to the order */
+  overrideFrameRota(rotaId: string, month: string, gafId: string | null): Promise<void>;
+  myFrameRotas(): Promise<MyFrameRota[]>;
+  frameRotasStatus(): Promise<FrameRotaStatus[]>;
   updateExemption(u: ExemptionUpdate): Promise<void>;
   /** the duties an employee is eligible for (rank, service, populations…) */
   eligibleTaskTypes(soldierId: string): Promise<string[]>;

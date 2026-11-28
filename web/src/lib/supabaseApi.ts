@@ -1,4 +1,5 @@
 import type { UnitKpis } from "./dashboard";
+import type { FrameRotaInput, FrameRotasAdmin, FrameRotaStatus, MyFrameRota } from "./frameRota";
 import type { MyProfile, StaffFixRequest } from "./profile";
 import type { MyRange, PlannedRange, PlannedRangeInput } from "./range";
 import type { Inversion } from "./fairness";
@@ -684,6 +685,30 @@ export class SupabaseApi implements Api {
 
   async viewAsStart(soldierId: string) {
     run(await this.sb.rpc("view_as_start", { p_soldier: soldierId }));
+  }
+
+  async frameRotasAdmin(): Promise<FrameRotasAdmin> {
+    return check(await this.sb.rpc("frame_rotas_admin")) as FrameRotasAdmin;
+  }
+
+  async saveFrameRota(r: FrameRotaInput): Promise<string> {
+    return check(await this.sb.rpc("frame_rota_save", { p: r })) as string;
+  }
+
+  async deleteFrameRota(id: string) {
+    run(await this.sb.rpc("frame_rota_delete", { p_id: id }));
+  }
+
+  async overrideFrameRota(rotaId: string, month: string, gafId: string | null) {
+    run(await this.sb.rpc("frame_rota_override", { p_rota: rotaId, p_month: month, p_gaf: gafId }));
+  }
+
+  async myFrameRotas(): Promise<MyFrameRota[]> {
+    return (check(await this.sb.rpc("my_frame_rotas")) ?? []) as MyFrameRota[];
+  }
+
+  async frameRotasStatus(): Promise<FrameRotaStatus[]> {
+    return (check(await this.sb.rpc("frame_rotas_status")) ?? []) as FrameRotaStatus[];
   }
 
   async viewAsStop() {

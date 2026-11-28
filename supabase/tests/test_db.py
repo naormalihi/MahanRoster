@@ -3813,3 +3813,73 @@ def test_deadline_reminders_once_per_cycle(conn):
             cs = c.execute("select public.my_input_options()").fetchone()[0]["cycles"]
             assert all("published" in x and "published_at" in x for x in cs)
         raise psycopg.Rollback()
+
+
+def test_frame_rota_order_holidays_and_reminders(conn):
+    from datetime import date
+    uid, sid = _soldier_account(conn, "rota.cmd")
+    other_uid, _ = _soldier_account(conn, "rota.plain")
+    try:
+        gafs = [r[0] for r in conn.execute("select id from org_units where kind = 'gaf' order by name")]
+        mine = conn.execute("select gaf_id from soldiers where id = %s", (sid,)).fetchone()[0]
+        conn.execute("insert into user_roles (user_id, role, gaf_id) values (%s, 'gaf_commander', null)", (uid,))
+        # staff only
+        with session_as(conn, uid) as c, pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("select public.frame_rotas_admin()")
+        rid = _as_coord(conn, "select public.frame_rota_save(%s)", json.dumps({
+            "name": "איסוף לדוגמה", "weekday": 0, "at_time": "08:00", "place": "מחסן", "details": "פרטים",
+            "gaf_order": [str(g) for g in gafs], "start_month": "2027-01-01"}))[0][0]
+        n = len(gafs)
+        gaf_at = lambda m: conn.execute("select app.frame_rota_gaf(%s, %s)", (rid, m)).fetchone()[0]
+        assert gaf_at(date(2027, 1, 1)) == gafs[0]
+        assert gaf_at(date(2027, 1 + n, 1)) == gafs[0]          # repeats every N months
+        assert gaf_at(date(2026, 12, 1)) == gafs[-1]             # and backwards
+        _as_coord(conn, "select public.frame_rota_override(%s, '2027-02-01', %s)", rid, gafs[-1])
+        assert gaf_at(date(2027, 2, 1)) == gafs[-1]
+        _as_coord(conn, "select public.frame_rota_override(%s, '2027-02-01', null)", rid)
+        assert gaf_at(date(2027, 2, 1)) == gafs[1 % n]
+        # a Sunday that is a holiday moves to the next working day; a holiday eve too
+        conn.execute("insert into calendar_days (day, day_type, note) values ('2040-01-01', 'holiday', 'ראש השנה ב׳'), "
+                     "('2040-01-08', 'holiday_eve', 'ערב יום כיפור'), ('2040-01-09', 'holiday', 'יום כיפור') "
+                     "on conflict (day) do update set day_type = excluded.day_type, note = excluded.note")
+        days = conn.execute("select app.frame_rota_days(%s, '2040-01-01')", (rid,)).fetchone()[0]
+        assert [(d["planned"], d["actual"]) for d in days[:3]] == [("2040-01-01", "2040-01-02"), ("2040-01-08", "2040-01-10"), ("2040-01-15", "2040-01-15")]
+        assert days[1]["why"] == "ערב יום כיפור, יום כיפור"
+        # what employees see: everyone the line, the frame's commander "mine" and the details
+        this_month = conn.execute("select date_trunc('month', (now() at time zone app.tz())::date)::date").fetchone()[0]
+        _as_coord(conn, "select public.frame_rota_override(%s, %s, %s)", rid, this_month, mine)
+        with session_as(conn, uid, aal="aal1") as c:
+            r = c.execute("select public.my_frame_rotas()").fetchone()[0][0]
+            assert r["current"]["mine"] and r["details"] == "פרטים" and r["current"]["gaf_id"] == str(mine)
+        other_mine = conn.execute("select gaf_id from soldiers s join app_users u on u.soldier_id = s.id where u.id = %s", (other_uid,)).fetchone()[0]
+        with session_as(conn, other_uid, aal="aal1") as c:
+            r = c.execute("select public.my_frame_rotas()").fetchone()[0][0]
+            if other_mine != mine:
+                assert not r["current"]["mine"] and r["details"] is None
+            assert r["current"]["gaf_name"]
+        # the evening before: once, to the frame's people only; a moved day says so
+        conn.execute("update frame_rotas set weekday = extract(dow from (now() at time zone app.tz())::date + 1)::int where id = %s", (rid,))
+        tomorrow = conn.execute("select (now() at time zone app.tz())::date + 1").fetchone()[0]
+        _as_coord(conn, "select public.frame_rota_override(%s, %s, %s)", rid, tomorrow.replace(day=1), mine)
+        conn.execute("delete from calendar_days where day = %s", (tomorrow,))
+        hour = conn.execute("select extract(hour from now() at time zone app.tz())::int").fetchone()[0]
+        conn.execute("select app.queue_frame_rota_reminders()")
+        conn.execute("select app.queue_frame_rota_reminders()")
+        got = lambda u, k: conn.execute("select count(*) from notifications where recipient_user_id = %s and type = 'frame_rota' "
+                                        "and payload->>'kind' = %s", (u, k)).fetchone()[0]
+        work = conn.execute("select app.is_work_day(%s)", (tomorrow,)).fetchone()[0]
+        if hour >= 20 and work:
+            assert got(uid, "eve") == 1
+        else:
+            assert got(uid, "eve") == 0
+        if other_mine != mine:
+            assert got(other_uid, "eve") == 0
+        # the unit's line
+        with session_as(conn, uid) as c, pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("select public.frame_rotas_status()")
+        assert _as_coord(conn, "select public.frame_rotas_status()")[0][0][0]["current"]["gaf_id"]
+    finally:
+        conn.execute("delete from frame_rotas")
+        conn.execute("delete from user_roles where user_id = %s", (uid,))
+        conn.execute("delete from notifications where type = 'frame_rota'")
+        conn.execute("delete from calendar_days where day between '2040-01-01' and '2040-01-31'")

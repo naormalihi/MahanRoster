@@ -1,4 +1,5 @@
 import { MyNextDuty } from "../components/MyNextDuty";
+import { FrameRotaStatusLine } from "../components/FrameRotaCard";
 import BoltIcon from "@mui/icons-material/BoltOutlined";
 import CareerIcon from "@mui/icons-material/EastOutlined";
 import ApprovedIcon from "@mui/icons-material/TaskAltOutlined";
@@ -280,6 +281,7 @@ export function DashboardPage({ mine = false }: { mine?: boolean } = {}) {
         </Typography>
       </Box>
       <MyNextDuty />
+      {!mine && <FrameRotaStatusLine />}
 
       {k && <Workforce k={k} d={d} show={show} />}
       {k?.cycle && (
