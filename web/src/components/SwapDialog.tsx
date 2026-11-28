@@ -1,3 +1,5 @@
+import SwapIcon from "@mui/icons-material/SwapHoriz";
+import { IconBadge } from "./IconBadge";
 import {
   Alert,
   Autocomplete,
@@ -236,23 +238,27 @@ export function SwapLogCard() {
   }, [api]);
   if (!rows?.length) return null;
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-      <Typography variant="h3" sx={{ mb: 0.5 }}>
-        החלפות בין עובדים
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        עובדים מתחלפים בעצמם עד 24 שעות לפני משימה, בלי אישור. כאן רואים מה השתנה; אפשר לתקן בתפעול השוטף כרגיל.
-      </Typography>
-      <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+    <Paper variant="outlined" sx={{ p: 2, pb: 1, borderRadius: 3 }}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1.25, mb: 0.75, flexWrap: "wrap", rowGap: 0.5 }}>
+        <IconBadge icon={<SwapIcon />} tone="info" size={30} />
+        <Typography variant="h3" sx={{ flex: 1, whiteSpace: "nowrap" }}>
+          החלפות בין עובדים
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          מתחלפים לבד עד 24 שעות לפני · אפשר לתקן בתפעול
+        </Typography>
+      </Stack>
+      {/* two columns on a wide screen – a short line each (2.75) */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "repeat(2, minmax(0, 1fr))" }, columnGap: 3 }}>
         {rows.slice(0, 12).map((r) => {
           const label = swapStatusLabel({ status: r.status, expired: false, mine: true });
           return (
-            <Stack key={r.id} direction="row" spacing={1} sx={{ py: 0.75, alignItems: "center" }}>
+            <Stack key={r.id} direction="row" spacing={1} sx={{ py: 0.75, alignItems: "center", borderTop: 1, borderColor: "divider" }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {r.requester} {r.kind === "mutual" ? "⇄" : "→"} {r.target}
+                  {r.requester} {r.kind === "mutual" ? "⇄" : "←"} {r.target}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" noWrap component="div">
                   {r.give_task} · {dayLabel(r.give_starts_at)}
                   {r.take_task && r.take_starts_at ? ` ⇄ ${r.take_task} · ${dayLabel(r.take_starts_at)}` : ""}
                 </Typography>
@@ -261,7 +267,7 @@ export function SwapLogCard() {
             </Stack>
           );
         })}
-      </Stack>
+      </Box>
     </Paper>
   );
 }
