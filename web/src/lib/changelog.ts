@@ -11,6 +11,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "2.74.1",
+    date: "2026-11-28",
+    items: [
+      "טבלת הפטורים: כל שורה בשורה אחת – רשימת המשימות של פטור חלקי בתג שנפתח בלחיצה, הערה מקוצרת, והפעולות כאייקונים",
+    ],
+  },
+  {
     version: "2.74.0",
     date: "2026-11-28",
     items: [
