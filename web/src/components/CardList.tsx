@@ -53,7 +53,7 @@ export function RowCard({
         {lead}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" sx={{ alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-            <Typography sx={{ fontWeight: 700 }}>{title}</Typography>
+            <Typography component="div" sx={{ fontWeight: 700 }}>{title}</Typography>
             {chips}
           </Stack>
           {sub && (

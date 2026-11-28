@@ -30,6 +30,8 @@ import { Mascot } from "../components/Mascot";
 import { entryOpen, type InputOptions, type MyRequests } from "../lib/me";
 import { blocksInMonth, closedNotice, cycleOf, KIND_LABEL, requestItems, type RequestItem, type RequestKind } from "../lib/requestList";
 import { useLiveTick } from "../lib/live";
+import { IconBadge } from "../components/IconBadge";
+import { KIND_LOOK } from "../components/RequestIcons";
 
 const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "default"> = {
   pending: "warning",
@@ -152,6 +154,7 @@ export function RequestsPage() {
 
   const row = (r: RequestItem) => (
     <Stack key={r.key} direction="row" spacing={1} sx={{ alignItems: "center", py: 1 }}>
+      <IconBadge icon={KIND_LOOK[r.kind].icon} tone={KIND_LOOK[r.kind].tone} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography sx={{ fontWeight: 600 }}>{ITEM_TITLE(r)}</Typography>
         <Typography variant="body2" color="text.secondary">
@@ -243,11 +246,14 @@ export function RequestsPage() {
           <DialogContent dividers>
             <Stack spacing={1}>
               {CHOICES.map((c) => (
-                <Button key={c.kind} variant="outlined" onClick={() => newForm(c.kind)} sx={{ justifyContent: "flex-start", textAlign: "start", py: 1.25, display: "block" }}>
-                  <Typography sx={{ fontWeight: 700 }}>{c.label}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {c.hint}
-                  </Typography>
+                <Button key={c.kind} variant="outlined" onClick={() => newForm(c.kind)} sx={{ justifyContent: "flex-start", textAlign: "start", py: 1.25, gap: 1.5 }}>
+                  <IconBadge icon={KIND_LOOK[c.kind].icon} tone={KIND_LOOK[c.kind].tone} size={36} />
+                  <Box>
+                    <Typography sx={{ fontWeight: 700 }}>{c.label}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {c.hint}
+                    </Typography>
+                  </Box>
                 </Button>
               ))}
             </Stack>
