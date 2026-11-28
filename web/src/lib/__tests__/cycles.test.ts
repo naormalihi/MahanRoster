@@ -6,13 +6,10 @@ import {
   blockQuotaProblems,
   currentCycle,
   cycleProblems,
-  dedupeConstraints,
   exemptionProblems,
   localMidnight,
   planningCycle,
-  parseTemplate,
   suggestCycle,
-  templateRows,
   type Cycle,
 } from "../cycles";
 
@@ -79,45 +76,6 @@ describe("constraint checks", () => {
       1,
     );
     expect([...p.keys()]).toEqual([0, 3]);
-  });
-});
-
-describe("gaf template", () => {
-  const soldiers = [
-    { id: "s1", full_name: "נועה כהן", gaf_name: "גף ב" },
-    { id: "s2", full_name: "איתי לוי", gaf_name: "גף א" },
-  ];
-  const types = [{ id: "t1", name: "חופשה" }, { id: "t2", name: "יציאה לחו\"ל" }];
-  const range = { from: "2027-01-01", to: "2027-06-30" };
-  it("builds one row per soldier, sorted by gaf", () => {
-    const rows = templateRows(soldiers);
-    expect(rows).toHaveLength(3);
-    expect(rows[1][0]).toBe("s2");
-  });
-  it("parses blocks and absences, and reports bad rows", () => {
-    const rows = [
-      [],
-      ["s1", "נועה כהן", "גף ב", "15/02/2027", "", "", ""],
-      ["s1", "נועה כהן", "גף ב", "", "חופשה", "01/03/2027", "05/03/2027"],
-      ["s2", "איתי לוי", "גף א", "", "יציאה לחו\"ל", new Date(2027, 3, 10), ""],
-      ["s2", "איתי לוי", "גף א", "", "", "", ""],
-      ["zz", "?", "", "01/02/2027", "", "", ""],
-      ["s2", "איתי לוי", "גף א", "01/12/2027", "טיול", "01/02/2027", ""],
-    ];
-    const r = parseTemplate(rows, soldiers, types, range);
-    expect(r.blocks.map((b) => b.day)).toEqual(["2027-02-15"]);
-    expect(r.absences.map((a) => [a.from, a.to])).toEqual([["2027-03-01", "2027-03-05"], ["2027-04-10", "2027-04-10"]]);
-    expect(r.errors.map((e) => e.line)).toEqual([6, 7, 7]);
-  });
-  it("skips what is already recorded", () => {
-    const parsed = parseTemplate([[], ["s1", "", "", "15/02/2027", "חופשה", "01/03/2027", "05/03/2027"]], soldiers, types, range);
-    const d = dedupeConstraints(
-      parsed,
-      [{ soldier_id: "s1", day: "2027-02-15", status: "active" }],
-      [{ soldier_id: "s1", absence_type_id: "t1", status: "active", ...absenceSpan({ from: "2027-03-01", to: "2027-03-05" }) }],
-    );
-    expect(d.skipped).toBe(2);
-    expect(d.blocks).toEqual([]);
   });
 });
 

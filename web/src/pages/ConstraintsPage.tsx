@@ -930,6 +930,7 @@ function AbsenceDialog(props: { ctx: Ctx; types: AbsenceType[]; onClose: () => v
     if (!a.absence_type_id) return setError("בחר סוג היעדרות");
     if (!a.from || !a.to) return setError("חסרים תאריכים");
     if (a.to < a.from) return setError("תאריך הסיום לפני תאריך ההתחלה");
+    if (props.types.find((t) => t.id === a.absence_type_id)?.requires_reason && !a.reason?.trim()) return setError('בהיעדרות מסוג "אחר" צריך לכתוב נימוק');
     setBusy(true);
     try {
       await api!.addAbsences([a]);
@@ -953,6 +954,9 @@ function AbsenceDialog(props: { ctx: Ctx; types: AbsenceType[]; onClose: () => v
         <DateInput label="מתאריך" value={a.from} onChange={(v) => setA({ ...a, from: v, to: a.to || v })} />
         <DateInput label="עד תאריך (כולל)" value={a.to} min={a.from} onChange={(v) => setA({ ...a, to: v })} />
       </Stack>
+      {props.types.find((t) => t.id === a.absence_type_id)?.requires_reason && (
+        <TextField required label="נימוק של העובד" value={a.reason ?? ""} onChange={(e) => setA({ ...a, reason: e.target.value })} fullWidth slotProps={{ htmlInput: { maxLength: 200 } }} />
+      )}
       <ViaSelect value={a.received_via} onChange={(v) => setA({ ...a, received_via: v })} />
       <Typography variant="caption" color="text.secondary">
         היעדרות לא דורשת אישור. העובד לא ישובץ בימים האלה, והיא מורידה את הזמינות שלו במטריצת הפוטנציאל.
@@ -1021,7 +1025,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
                   )
                 }
                 sub={`${typeName.get(r.absence_type_id) ?? ""} · ${fmt(d.from)} – ${fmt(d.to)} (${daysBetween(d.from, d.to)} ימים)`}
-                lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
+                lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`, r.reason ? <ReasonLine key="r" text={r.reason} /> : null]}
                 actions={
                   r.status === "active" ? (
                     <Button size="small" variant="outlined" color="inherit" onClick={() => setCancelling(r)}>
@@ -1048,6 +1052,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
                 <TableCell>עובד</TableCell>
                 <TableCell>מסגרת</TableCell>
                 <TableCell>סוג</TableCell>
+                <TableCell>נימוק</TableCell>
                 <TableCell>תאריכים</TableCell>
                 <TableCell>ימים</TableCell>
                 <TableCell>התקבל ב</TableCell>
@@ -1062,6 +1067,9 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
                     <TableCell>{nameOf(ctx, r.soldier_id)}</TableCell>
                     <TableCell>{gafOf(ctx, r.soldier_id)}</TableCell>
                     <TableCell>{typeName.get(r.absence_type_id)}</TableCell>
+                    <TableCell>
+                      <ReasonCell text={r.reason} />
+                    </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {fmt(d.from)} – {fmt(d.to)}
                     </TableCell>
@@ -1127,7 +1135,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
   const { api } = useAuth();
   const [rows, setRows] = useState<DateBlock[] | null>(null);
   const [quota, setQuota] = useState(1);
-  const [adding, setAdding] = useState<{ soldier_id: string; day: string; received_via: ReceivedVia } | null>(null);
+  const [adding, setAdding] = useState<{ soldier_id: string; day: string; reason: string; received_via: ReceivedVia } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1147,6 +1155,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
   async function save() {
     if (!adding) return;
     if (!adding.soldier_id || !adding.day) return setFormError("בחר עובד ותאריך");
+    if (!adding.reason.trim()) return setFormError("בחסימת תאריך צריך לכתוב נימוק");
     if (adding.day < ctx.cycle.start_date || adding.day > ctx.cycle.end_date) return setFormError("התאריך מחוץ למחזור");
     const over = blockQuotaProblems([adding], rows ?? [], quota).get(0);
     if (over) return setFormError(over);
@@ -1174,7 +1183,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
             startIcon={<AddIcon />}
             onClick={() => {
               setFormError(null);
-              setAdding({ soldier_id: "", day: "", received_via: "message" });
+              setAdding({ soldier_id: "", day: "", reason: "", received_via: "message" });
             }}
           >
             חסימה חדשה
@@ -1199,7 +1208,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
               title={nameOf(ctx, r.soldier_id)}
               chips={r.status === "active" ? undefined : <Chip size="small" label="בוטלה" />}
               sub={fmt(r.day)}
-              lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`]}
+              lines={[`${gafOf(ctx, r.soldier_id)}${r.received_via ? ` · התקבל: ${VIA_LABEL[r.received_via]}` : ""}`, r.reason ? <ReasonLine key="r" text={r.reason} /> : null]}
               actions={
                 r.status === "active" ? (
                   <Button
@@ -1233,6 +1242,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
                 <TableCell>עובד</TableCell>
                 <TableCell>מסגרת</TableCell>
                 <TableCell>תאריך</TableCell>
+                <TableCell>נימוק</TableCell>
                 <TableCell>התקבל ב</TableCell>
                 <TableCell />
               </TableRow>
@@ -1243,6 +1253,9 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
                   <TableCell>{nameOf(ctx, r.soldier_id)}</TableCell>
                   <TableCell>{gafOf(ctx, r.soldier_id)}</TableCell>
                   <TableCell>{fmt(r.day)}</TableCell>
+                  <TableCell>
+                    <ReasonCell text={r.reason} />
+                  </TableCell>
                   <TableCell>{r.received_via ? VIA_LABEL[r.received_via] : "—"}</TableCell>
                   <TableCell>
                     {r.status === "active" ? (
@@ -1275,6 +1288,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
         <FormDialog title="חסימת תאריך" error={formError} busy={false} onClose={() => setAdding(null)} onSave={save}>
           <SoldierPicker soldiers={ctx.soldiers} value={adding.soldier_id} onChange={(v) => setAdding({ ...adding, soldier_id: v })} autoFocus />
           <DateInput label="תאריך" value={adding.day} min={ctx.cycle.start_date} max={ctx.cycle.end_date} onChange={(v) => setAdding({ ...adding, day: v })} />
+          <TextField required label="נימוק של העובד" value={adding.reason} onChange={(e) => setAdding({ ...adding, reason: e.target.value })} fullWidth slotProps={{ htmlInput: { maxLength: 200 } }} />
           <ViaSelect value={adding.received_via} onChange={(v) => setAdding({ ...adding, received_via: v })} />
         </FormDialog>
       )}
@@ -1318,6 +1332,27 @@ function ScopeChip({ names, hours }: { names: string[]; hours: string | null }) 
         </Box>
       </Popover>
     </>
+  );
+}
+
+/** The employee's reason on a card: "נימוק: …" (2.76). */
+function ReasonLine({ text }: { text: string }) {
+  return (
+    <span>
+      <b>נימוק:</b> {text}
+    </span>
+  );
+}
+
+/** The reason in a table: one line, in full on hover. */
+function ReasonCell({ text }: { text?: string | null }) {
+  if (!text) return <>—</>;
+  return (
+    <Tooltip title={text} enterTouchDelay={0}>
+      <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+        {text}
+      </Typography>
+    </Tooltip>
   );
 }
 

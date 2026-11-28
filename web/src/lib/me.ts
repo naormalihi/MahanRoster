@@ -118,7 +118,7 @@ export interface InputOptions {
   exemption_types: { id: string; name: string; requires_duty_list?: boolean }[];
   /** the duties the employee is eligible for – a פטור חלקי names some of them */
   eligible_tasks?: { id: string; name: string }[];
-  absence_types: { id: string; name: string }[];
+  absence_types: { id: string; name: string; requires_reason?: boolean }[];
   block_quota_per_month: number;
   cycles: InputCycle[];
 }
@@ -134,8 +134,8 @@ export interface MyRequests {
     mine: boolean;
     decision_reason: string | null;
   }[];
-  blocks: { id: string; day: string; mine: boolean; open: boolean }[];
-  absences: { id: string; type: string; starts_at: string; ends_at: string; mine: boolean; open: boolean }[];
+  blocks: { id: string; day: string; reason?: string | null; mine: boolean; open: boolean }[];
+  absences: { id: string; type: string; reason?: string | null; starts_at: string; ends_at: string; mine: boolean; open: boolean }[];
 }
 
 /** Is self-entry open on this day? Closed when a cycle that holds it is past its deadline or published. */

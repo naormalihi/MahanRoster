@@ -439,9 +439,9 @@ export interface Api {
   savePlannedRange(r: PlannedRangeInput): Promise<void>;
   deletePlannedRange(id: string): Promise<void>;
   withdrawMyExemption(id: string): Promise<void>;
-  addMyDateBlock(day: string): Promise<void>;
+  addMyDateBlock(day: string, reason: string): Promise<void>;
   cancelMyDateBlock(id: string): Promise<void>;
-  addMyAbsence(typeId: string, from: string, to: string): Promise<void>;
+  addMyAbsence(typeId: string, from: string, to: string, reason?: string): Promise<void>;
   cancelMyAbsence(id: string): Promise<void>;
   // stage 2.6 – the unit commander's dashboard
   unitDashboard(mine?: boolean): Promise<UnitDashboard>;

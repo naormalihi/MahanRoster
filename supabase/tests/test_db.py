@@ -149,7 +149,7 @@ def seed(c):
              values (%s,%s,(%s::timestamp at time zone 'Asia/Jerusalem'),(%s::timestamp at time zone 'Asia/Jerusalem'),'message',now())""",
           (soldier_id[a.soldier_id], vacation, a.starts_at, a.ends_at))
     for b in p.date_blocks:
-        q("insert into date_blocks (soldier_id, cycle_id, day, received_via) values (%s,%s,%s,'excel') on conflict do nothing",
+        q("insert into date_blocks (soldier_id, cycle_id, day, reason, received_via) values (%s,%s,%s,'אירוע משפחתי','excel') on conflict do nothing",
           (soldier_id[b.soldier_id], cycle, b.date))
 
     users = [(COORD, "naat"), (DEPUTY_ACTIVE, "deputy"), (DEPUTY_EXPIRED, "old.deputy"), (VIEWER, "board"), (OUTSIDER, "nobody")]
@@ -1852,33 +1852,44 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
 
     uid, sid = _soldier_account(conn, "self.input")
     etype = conn.execute("select id from exemption_types where auto_rule is null order by name limit 1").fetchone()[0]
-    atype = conn.execute("select id from absence_types where not requires_approval order by name limit 1").fetchone()[0]
+    atype = conn.execute("select id from absence_types where not requires_approval and not requires_reason order by name limit 1").fetchone()[0]
     today = date.today()
     far = (today + timedelta(days=800)).replace(day=10)  # beyond every planned cycle: open; mid-month, so +1 day stays in it
     with session_as(conn, uid, aal="aal1") as c:
         # no cycle for these days yet: nothing goes in
         for sql, args in (("select public.submit_exemption(%s, %s, %s)", (etype, far, far + timedelta(days=10))),
-                          ("select public.add_my_date_block(%s)", (far,)),
+                          ("select public.add_my_date_block(%s, 'אירוע משפחתי')", (far,)),
                           ("select public.add_my_absence(%s, %s, %s)", (atype, far, far + timedelta(days=2)))):
             with pytest.raises(psycopg.errors.RaiseException, match="אין עדיין מחזור"), c.transaction():
                 c.execute(sql, args)
         c.execute("reset role")
         c.execute("insert into cycles (name, start_date, end_date, status) values ('רחוק', %s, %s, 'collecting')",
                   (far - timedelta(days=5), far + timedelta(days=60)))
+        c.execute("insert into absence_types (name, requires_reason) values ('אחר', true) on conflict (name) do update set requires_reason = true")
         c.execute("set local role authenticated")
         _claims(c, uid, "aal1")
         opts = c.execute("select public.my_input_options()").fetchone()[0]
         assert any(t["id"] == str(etype) for t in opts["exemption_types"]) and opts["block_quota_per_month"] >= 1
         eid = c.execute("select public.submit_exemption(%s, %s, %s)", (etype, far, far + timedelta(days=10))).fetchone()[0]
-        b1 = c.execute("select public.add_my_date_block(%s)", (far,)).fetchone()[0]
+        # a block needs a reason; an absence of type "אחר" too (2.76)
+        with pytest.raises(psycopg.Error, match="נימוק"), c.transaction():
+            c.execute("select public.add_my_date_block(%s, '  ')", (far,))
+        other, = [t["id"] for t in opts["absence_types"] if t["name"] == "אחר" and t["requires_reason"]]
+        with pytest.raises(psycopg.Error, match="אחר"), c.transaction():
+            c.execute("select public.add_my_absence(%s, %s, %s)", (other, far + timedelta(days=50), far + timedelta(days=51)))
+        oid = c.execute("select public.add_my_absence(%s, %s, %s, ' חתונה של אח ')", (other, far + timedelta(days=50), far + timedelta(days=51))).fetchone()[0]
+        b1 = c.execute("select public.add_my_date_block(%s, 'אירוע משפחתי')", (far,)).fetchone()[0]
         with pytest.raises(psycopg.Error, match="כבר יש לך חסימה"):
             with c.transaction():
-                c.execute("select public.add_my_date_block(%s)", (far + timedelta(days=1),))
+                c.execute("select public.add_my_date_block(%s, 'אירוע משפחתי')", (far + timedelta(days=1),))
         aid = c.execute("select public.add_my_absence(%s, %s, %s)", (atype, far + timedelta(days=40), far + timedelta(days=42))).fetchone()[0]
         mine = c.execute("select public.my_requests()").fetchone()[0]
         assert [e["status"] for e in mine["exemptions"] if e["mine"]] == ["pending"]
         own = lambda k: [x for x in mine[k] if x["mine"]]
-        assert len(own("blocks")) == 1 and len(own("absences")) == 1
+        assert len(own("blocks")) == 1 and len(own("absences")) == 2
+        assert own("blocks")[0]["reason"] == "אירוע משפחתי"
+        assert [a["reason"] for a in own("absences") if a["id"] == str(oid)] == ["חתונה של אח"]
+        c.execute("select public.cancel_my_absence(%s)", (oid,))
         c.execute("select public.withdraw_my_exemption(%s)", (eid,))
         c.execute("select public.cancel_my_date_block(%s)", (b1,))
         c.execute("select public.cancel_my_absence(%s)", (aid,))
@@ -1895,7 +1906,7 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
         _claims(conn, uid, aal="aal1")
         with pytest.raises(psycopg.Error, match="נסגר"):
             with conn.transaction():
-                conn.execute("select public.add_my_date_block(%s)", (day,))
+                conn.execute("select public.add_my_date_block(%s, 'אירוע משפחתי')", (day,))
         with pytest.raises(psycopg.Error, match="נסגר"):
             with conn.transaction():
                 conn.execute("select public.add_my_absence(%s, %s, %s)", (atype, day, day))
@@ -1907,7 +1918,7 @@ def test_soldier_enters_his_own_constraints_until_the_deadline(conn):
     # not a soldier: no self-entry
     with session_as(conn, COORD) as c:
         with pytest.raises(psycopg.Error, match="רק עובד"):
-            c.execute("select public.add_my_date_block(%s)", (far,))
+            c.execute("select public.add_my_date_block(%s, 'אירוע משפחתי')", (far,))
 
 
 def test_soldier_is_notified_of_his_board_changes_and_decisions(conn):

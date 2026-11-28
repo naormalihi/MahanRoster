@@ -43,7 +43,7 @@ const STATUS_COLOR: Record<RequestStatus, "warning" | "success" | "error" | "def
 const fmt = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 const tomorrow = () => dayKey(new Date(Date.now() + 86_400_000));
 
-type Form = { kind: RequestKind; type: string; from: string; to: string; tasks?: string[] };
+type Form = { kind: RequestKind; type: string; from: string; to: string; tasks?: string[]; reason?: string };
 
 const ITEM_TITLE = (r: RequestItem) => (r.kind === "block" ? "חסימת תאריך" : `${KIND_LABEL[r.kind]} · ${r.type}`);
 const dates = (r: RequestItem) => (r.from === r.to ? dayLabel(r.from) : `${fmt(r.from)} – ${fmt(r.to)}`);
@@ -104,8 +104,8 @@ export function RequestsPage() {
         if (needs && !form.tasks?.length) throw new Error("בפטור חלקי צריך לבחור לפחות משימה אחת שאינך יכול לבצע");
         await api!.submitExemption(form.type, form.from, form.to, needs ? form.tasks : undefined);
       }
-      else if (form.kind === "block") await api!.addMyDateBlock(form.from);
-      else await api!.addMyAbsence(form.type, form.from, form.to);
+      else if (form.kind === "block") await api!.addMyDateBlock(form.from, form.reason ?? "");
+      else await api!.addMyAbsence(form.type, form.from, form.to, form.reason);
       setForm(null);
       await load();
     } catch (e) {
@@ -136,6 +136,8 @@ export function RequestsPage() {
       ? !opts.cycles.some((c) => c.start_date <= (form.to || form.from) && c.end_date >= form.from)
       : !formCycle || (!!form.to && form.kind === "absence" && !cycleOf(form.to, opts.cycles)));
   const used = form?.kind === "block" && form.from ? blocksInMonth(mine, form.from.slice(0, 7)) : 0;
+  // a block always says why; an absence when its type says nothing ("אחר") – 2.76
+  const needsReason = !!form && (form.kind === "block" || (form.kind === "absence" && !!opts.absence_types.find((t) => t.id === form.type)?.requires_reason));
   const newForm = (kind: RequestKind) => {
     setChoosing(false);
     setFormError(null);
@@ -298,6 +300,17 @@ export function RequestsPage() {
                   {used} מתוך {opts.block_quota_per_month} חסימות בחודש הזה
                 </Typography>
               )}
+              {needsReason && (
+                <TextField
+                  required
+                  label="נימוק"
+                  value={form.reason ?? ""}
+                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                  placeholder={form.kind === "block" ? "למשל: חתונה של אח" : "במה מדובר?"}
+                  helperText="קצר – אחראי השיבוצים יראה אותו ליד הבקשה"
+                  slotProps={{ htmlInput: { maxLength: 200 } }}
+                />
+              )}
               {form.kind === "exemption" && opts.exemption_types.find((t) => t.id === form.type)?.requires_duty_list && (
                 <Autocomplete
                   multiple
@@ -338,7 +351,7 @@ export function RequestsPage() {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setForm(null)}>ביטול</Button>
-            <Button variant="contained" onClick={submit} disabled={busy || !form.from || (form.kind !== "block" && (!form.to || !form.type)) || !!formClosed || noCycle}>
+            <Button variant="contained" onClick={submit} disabled={busy || !form.from || (form.kind !== "block" && (!form.to || !form.type)) || (needsReason && !form.reason?.trim()) || !!formClosed || noCycle}>
               {form.kind === "exemption" ? "הגשה" : "שמירה"}
             </Button>
           </DialogActions>
