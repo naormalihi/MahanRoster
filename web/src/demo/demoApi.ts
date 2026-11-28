@@ -695,7 +695,13 @@ export class DemoApi implements Api {
       proof_checked_at: proof ? "2026-11-01T09:00:00Z" : null, decided_at: status === "pending" ? null : "2026-11-02T09:00:00Z",
       decision_reason: null, received_via: "in_person", received_at: "2026-11-01T09:00:00Z",
     });
-    this.exemptionList.push(ex(0, "e_med", "2026-12-01", "2027-02-28", "pending", false), ex(1, "e_kaps", "2026-12-01", "2027-05-31", "pending", true), ex(2, "e_bereaved", "2026-12-01", "2027-05-31", "approved", true));
+    this.exemptionList.push(ex(0, "e_med", "2026-12-01", "2027-02-28", "pending", false), ex(1, "e_kaps", "2026-12-01", "2027-05-31", "pending", true), ex(2, "e_bereaved", "2026-12-01", "2027-05-31", "approved", true), {
+      ...ex(5, "e_med", "2026-12-01", "2027-03-31", "approved", true),
+      kind: "partial",
+      excluded_task_type_ids: this.tasks.slice(0, 4).map((t) => t.id),
+      restricted_hours: "22:00–06:00",
+      internal_note: "לפי מכתב מהמרפאה – לבדוק שוב בפברואר, ואז לעדכן את רשימת המשימות",
+    });
     this.absenceList.push({ id: this.nextId("ab"), soldier_id: s[3].id, absence_type_id: "a1", ...absenceSpan({ from: "2027-01-10", to: "2027-02-20" }), status: "active", cancel_reason: null, received_via: "excel" });
     this.blockList.push({ id: this.nextId("b"), soldier_id: s[4].id, cycle_id: "c2", day: "2026-12-24", status: "active", received_via: "excel" });
   }

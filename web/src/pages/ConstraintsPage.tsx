@@ -5,6 +5,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import EditNoteIcon from "@mui/icons-material/EditNote";
+import CancelIcon from "@mui/icons-material/DoNotDisturbOnOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import {
   Alert,
@@ -35,6 +36,7 @@ import {
   TableRow,
   Tabs,
   TextField,
+  Popover,
   Tooltip,
   Typography,
   useMediaQuery,
@@ -616,11 +618,9 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
   const pending = rows.filter((r) => r.status === "pending").length;
 
   const scope = (r: Exemption) => {
-    if (missingDutyList(r, types)) return "חסר פירוט – פוטר מהכול";
+    if (missingDutyList(r, types)) return <Chip size="small" color="error" label="חסר פירוט – פוטר מהכול" />;
     if (r.kind === "full") return "לפי הסוג";
-    const parts = (r.excluded_task_type_ids ?? []).map((id) => taskName.get(id) ?? "?");
-    if (r.restricted_hours) parts.push(`שעות ${r.restricted_hours}`);
-    return parts.join(", ");
+    return <ScopeChip names={(r.excluded_task_type_ids ?? []).map((id) => taskName.get(id) ?? "?")} hours={r.restricted_hours ?? null} />;
   };
 
   return (
@@ -672,7 +672,13 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                   {r.source === "soldier" && <Chip size="small" color="info" variant="outlined" label="הגיש בעצמו" />}
                 </>
               }
-              sub={`${typeName.get(r.exemption_type_id) ?? ""} · ${scope(r)}`}
+              sub={
+                <Stack component="span" direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                  {typeName.get(r.exemption_type_id) ?? ""}
+                  <span>·</span>
+                  {scope(r)}
+                </Stack>
+              }
               lines={[
                 `${gafOf(ctx, r.soldier_id)} · ${fmt(r.start_date)} – ${fmt(r.end_date)}`,
                 r.source === "computed" ? "מחושב" : r.proof_checked_at ? `אסמכתא נבדקה ${fmt(r.proof_checked_at)}` : null,
@@ -728,7 +734,8 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
         </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
+          {/* one line per row – long lists in a chip, long notes cut (2.74.1) */}
+          <Table size="small" sx={{ "& td, & th": { whiteSpace: "nowrap" } }}>
             <TableHead>
               <TableRow>
                 <TableCell>עובד</TableCell>
@@ -752,18 +759,28 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                   </TableCell>
                   <TableCell>{gafOf(ctx, r.soldier_id)}</TableCell>
                   <TableCell>{typeName.get(r.exemption_type_id)}</TableCell>
-                  <TableCell>
-                    {missingDutyList(r, types) ? <Chip size="small" color="error" label="חסר פירוט – פוטר מהכול" /> : scope(r)}
-                  </TableCell>
+                  <TableCell>{scope(r)}</TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>
                     {fmt(r.start_date)} – {fmt(r.end_date)}
                   </TableCell>
-                  <TableCell>{r.source === "computed" ? "מחושב" : r.proof_checked_at ? `נבדקה ${fmt(r.proof_checked_at)}` : "—"}</TableCell>
-                  <TableCell sx={{ maxWidth: 220 }}>
+                  <TableCell>
+                    {r.source === "computed" ? (
+                      "מחושב"
+                    ) : r.proof_checked_at ? (
+                      <Tooltip title={`נבדקה ${fmt(r.proof_checked_at)}`} enterTouchDelay={0}>
+                        <Chip size="small" variant="outlined" color="success" label="נבדקה" />
+                      </Tooltip>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 200 }}>
                     <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                        {r.internal_note ?? ""}
-                      </Typography>
+                      <Tooltip title={r.internal_note ?? ""} enterTouchDelay={0}>
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 110 }}>
+                          {r.internal_note ?? ""}
+                        </Typography>
+                      </Tooltip>
                       <Tooltip title={r.internal_note ? "עריכת ההערה" : "הוספת הערה פנימית"}>
                         <IconButton size="small" aria-label="הערה פנימית" onClick={() => setNoting(r)}>
                           <EditNoteIcon fontSize="small" />
@@ -779,12 +796,16 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                   <TableCell sx={{ whiteSpace: "nowrap" }}>
                     {r.status === "pending" && (
                       <>
-                        <Button size="small" startIcon={<CheckIcon />} onClick={() => setApproving(r)}>
-                          אישור
-                        </Button>
-                        <Button size="small" color="error" startIcon={<CloseIcon />} onClick={() => setRejecting({ ex: r, action: "reject" })}>
-                          דחייה
-                        </Button>
+                        <Tooltip title="אישור">
+                          <IconButton size="small" color="primary" aria-label="אישור" onClick={() => setApproving(r)}>
+                            <CheckIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="דחייה">
+                          <IconButton size="small" color="error" aria-label="דחייה" onClick={() => setRejecting({ ex: r, action: "reject" })}>
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </>
                     )}
                     {r.status === "approved" && missingDutyList(r, types) && (
@@ -800,9 +821,11 @@ function ExemptionsTab({ ctx }: { ctx: Ctx }) {
                       </Tooltip>
                     )}
                     {r.status === "approved" && (
-                      <Button size="small" color="inherit" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
-                        ביטול
-                      </Button>
+                      <Tooltip title="ביטול הפטור">
+                        <IconButton size="small" aria-label="ביטול הפטור" onClick={() => setRejecting({ ex: r, action: "cancel" })}>
+                          <CancelIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     )}
                     <DeleteRowButton
                       what={`פטור של ${nameOf(ctx, r.soldier_id)} – ${typeName.get(r.exemption_type_id) ?? ""}, ${fmt(r.start_date)} – ${fmt(r.end_date)}`}
@@ -1019,7 +1042,7 @@ function AbsencesTab({ ctx }: { ctx: Ctx }) {
         </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
+          <Table size="small" sx={{ "& td, & th": { whiteSpace: "nowrap" } }}>
             <TableHead>
               <TableRow>
                 <TableCell>עובד</TableCell>
@@ -1204,7 +1227,7 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
         </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
+          <Table size="small" sx={{ "& td, & th": { whiteSpace: "nowrap" } }}>
             <TableHead>
               <TableRow>
                 <TableCell>עובד</TableCell>
@@ -1260,6 +1283,43 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
 }
 
 // ---------------------------------------------------------------------------
+
+/** A partial exemption's duties as one short chip – "3 משימות · שעות"; tap for the full list (2.74.1). */
+function ScopeChip({ names, hours }: { names: string[]; hours: string | null }) {
+  const [at, setAt] = useState<HTMLElement | null>(null);
+  const label = [names.length ? `${names.length} ${names.length === 1 ? "משימה" : "משימות"}` : null, hours ? "בשעות" : null].filter(Boolean).join(" · ") || "חלקי";
+  return (
+    <>
+      <Chip
+        size="small"
+        variant="outlined"
+        label={label}
+        onClick={(e) => {
+          e.stopPropagation();
+          setAt(e.currentTarget);
+        }}
+        sx={{ maxWidth: "100%" }}
+      />
+      <Popover open={!!at} anchorEl={at} onClose={() => setAt(null)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }} transformOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Box sx={{ p: 1.5, maxWidth: 280 }}>
+          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+            פטור מ:
+          </Typography>
+          {names.map((n) => (
+            <Typography key={n} variant="body2">
+              {n}
+            </Typography>
+          ))}
+          {hours && (
+            <Typography variant="body2" sx={{ mt: names.length ? 0.5 : 0 }}>
+              בשעות {hours}
+            </Typography>
+          )}
+        </Box>
+      </Popover>
+    </>
+  );
+}
 
 const TABS = [
   { key: "exemptions", label: "פטורים", kind: "exemption" },
