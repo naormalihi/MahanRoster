@@ -36,7 +36,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { NamedRef, RankItem } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -577,13 +577,6 @@ function CatalogTab() {
       {!t.is_active && <Chip size="small" label="לא פעילה" />}
     </>
   );
-  // the catalog by category, each under its own heading (2.75.1)
-  const groups: { name: string; tasks: TaskType[] }[] = [];
-  for (const t of shown) {
-    const name = catName.get(t.category_id ?? "") ?? "בלי קטגוריה";
-    if (groups.at(-1)?.name !== name) groups.push({ name, tasks: [] });
-    groups.at(-1)!.tasks.push(t);
-  }
   const dot = (t: TaskType) => <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: t.color ?? "grey.400", flexShrink: 0 }} />;
   const weight = (t: TaskType) => <Chip size="small" color="secondary" variant="outlined" label={`משקל ${t.weight}`} />;
 
@@ -604,43 +597,35 @@ function CatalogTab() {
         )}
       </Stack>
       {narrow ? (
-        <Stack spacing={2}>
-          {groups.map((g) => (
-            <Box key={g.name}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.75, px: 0.5 }}>
-                {g.name} · {g.tasks.length}
-              </Typography>
-              <CardList>
-                {g.tasks.map((t) => (
-                  <RowCard
-                    key={t.id}
-                    dim={!t.is_active}
-                    onClick={() => setEditing(t)}
-                    lead={<Box sx={{ mt: 0.9 }}>{dot(t)}</Box>}
-                    title={t.name}
-                    chips={weight(t)}
-                    sub={
-                      <>
-                        <span dir={/^\d/.test(hoursLabel(t)) ? "ltr" : undefined}>{hoursLabel(t)}</span> · {who(t)}
-                      </>
-                    }
-                    lines={[
-                      t.briefing ? (
-                        <Stack key="b" component="span" direction="row" sx={{ gap: 0.75, alignItems: "center", color: "text.secondary" }}>
-                          <BriefingIcon sx={{ fontSize: 16 }} />
-                          {briefingLabel(t.briefing)}
-                        </Stack>
-                      ) : null,
-                      <Stack key="f" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }}>
-                        {flags(t)}
-                      </Stack>,
-                    ]}
-                  />
-                ))}
-              </CardList>
-            </Box>
+        <CardList>
+          {shown.map((t) => (
+            <RowCard
+              key={t.id}
+              dim={!t.is_active}
+              onClick={() => setEditing(t)}
+              lead={<Box sx={{ mt: 0.9 }}>{dot(t)}</Box>}
+              title={t.name}
+              chips={weight(t)}
+              sub={
+                <>
+                  {catName.get(t.category_id ?? "") ?? "בלי קטגוריה"} · <span dir={/^\d/.test(hoursLabel(t)) ? "ltr" : undefined}>{hoursLabel(t)}</span>
+                </>
+              }
+              lines={[
+                `מי מבצע: ${who(t)}`,
+                t.briefing ? (
+                  <Stack key="b" component="span" direction="row" sx={{ gap: 0.75, alignItems: "center", color: "text.secondary" }}>
+                    <BriefingIcon sx={{ fontSize: 16 }} />
+                    {briefingLabel(t.briefing)}
+                  </Stack>
+                ) : null,
+                <Stack key="f" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }}>
+                  {flags(t)}
+                </Stack>,
+              ]}
+            />
           ))}
-        </Stack>
+        </CardList>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: "auto", borderRadius: 3 }}>
           {/* one line per duty: long lists cut, in full on hover (2.75.1) */}
@@ -648,6 +633,7 @@ function CatalogTab() {
             <TableHead>
               <TableRow>
                 <TableCell>משימה</TableCell>
+                <TableCell>קטגוריה</TableCell>
                 <TableCell align="center">משקל</TableCell>
                 <TableCell>שעות</TableCell>
                 <TableCell>מי מבצע</TableCell>
@@ -657,20 +643,7 @@ function CatalogTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {groups.map((g) => (
-                <Fragment key={g.name}>
-                  <TableRow>
-                    <TableCell colSpan={7} sx={{ bgcolor: "action.hover", py: 0.75 }}>
-                      <Typography variant="subtitle2" component="span">
-                        {g.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" component="span">
-                        {" "}
-                        · {g.tasks.length} משימות
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  {g.tasks.map((t) => (
+              {shown.map((t) => (
                     <TableRow key={t.id} hover onClick={() => setEditing(t)} sx={{ opacity: t.is_active ? 1 : 0.5, cursor: "pointer" }}>
                       <TableCell>
                         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -680,6 +653,7 @@ function CatalogTab() {
                           </Typography>
                         </Stack>
                       </TableCell>
+                      <TableCell>{catName.get(t.category_id ?? "") ?? "—"}</TableCell>
                       <TableCell align="center">{t.weight}</TableCell>
                       <TableCell>
                         <span dir={/^\d/.test(hoursLabel(t)) ? "ltr" : undefined}>{hoursLabel(t)}</span>
@@ -709,8 +683,6 @@ function CatalogTab() {
                         </IconButton>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </Fragment>
               ))}
             </TableBody>
           </Table>

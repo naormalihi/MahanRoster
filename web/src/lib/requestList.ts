@@ -37,11 +37,11 @@ export function requestItems(mine: MyRequests, today: string): { current: Reques
     })),
     ...mine.blocks.map((b) => ({
       key: `b${b.id}`, id: b.id, kind: "block" as const, type: "", from: b.day, to: b.day, status: "active" as const, urgent: false,
-      byStaff: !b.mine, reason: null, cancellable: b.mine && b.open, past: false,
+      byStaff: !b.mine, reason: b.reason ?? null, cancellable: b.mine && b.open, past: false,
     })),
     ...mine.absences.map((a) => ({
       key: `a${a.id}`, id: a.id, kind: "absence" as const, type: a.type, from: dayKey(a.starts_at), to: dayKey(new Date(Date.parse(a.ends_at) - 1)),
-      status: "active" as const, urgent: false, byStaff: !a.mine, reason: null, cancellable: a.mine && a.open, past: false,
+      status: "active" as const, urgent: false, byStaff: !a.mine, reason: a.reason ?? null, cancellable: a.mine && a.open, past: false,
     })),
   ].map((r) => ({ ...r, past: r.to < today }));
   const current = all.filter((r) => !r.past).sort((a, b) => a.from.localeCompare(b.from) || a.kind.localeCompare(b.kind));

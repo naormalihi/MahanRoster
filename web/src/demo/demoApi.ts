@@ -127,7 +127,12 @@ const EXEMPTION_TYPES: ExemptionType[] = [
   { id: "e_tash7", name: "ת\"ש 7 – לינה בבית", qualifies_day_only: false, allows_partial_restriction: false, home_nightly: true },
   // the unit uses only these two (2.62.1)
 ].map((t) => ({ ...t, is_active: t.id === "e_full" || t.id === "e_part" }));
-const ABSENCE_TYPES = ["חופשה", "קורס", "יציאה לחו\"ל", "מחלה", "אחר"].map((name, i) => ({ id: `a${i}`, name }));
+const ABSENCE_TYPES = ["חופשה", "קורס", "יציאה לחו\"ל", "מחלה", "אחר"].map((name, i) => ({ id: `a${i}`, name, requires_reason: name === "אחר" }));
+/** the database's rule (2.76): a reason on every block, and on an absence of a type that says nothing */
+const needReason = (reason: string | null | undefined, msg: string) => {
+  if (!reason?.trim()) throw new Error(msg);
+  return reason.trim();
+};
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -703,7 +708,7 @@ export class DemoApi implements Api {
       internal_note: "לפי מכתב מהמרפאה – לבדוק שוב בפברואר, ואז לעדכן את רשימת המשימות",
     });
     this.absenceList.push({ id: this.nextId("ab"), soldier_id: s[3].id, absence_type_id: "a1", ...absenceSpan({ from: "2027-01-10", to: "2027-02-20" }), status: "active", cancel_reason: null, received_via: "excel" });
-    this.blockList.push({ id: this.nextId("b"), soldier_id: s[4].id, cycle_id: "c2", day: "2026-12-24", status: "active", received_via: "excel" });
+    this.blockList.push({ id: this.nextId("b"), soldier_id: s[4].id, cycle_id: "c2", day: "2026-12-24", status: "active", reason: "חתונה של חבר", received_via: "excel" });
   }
 
   async cycles() {
@@ -836,7 +841,9 @@ export class DemoApi implements Api {
   async addAbsences(rows: AbsenceInput[]) {
     await delay();
     for (const a of rows)
-      this.absenceList.push({ id: this.nextId("ab"), soldier_id: a.soldier_id, absence_type_id: a.absence_type_id, ...absenceSpan(a), status: "active", cancel_reason: null, received_via: a.received_via });
+      this.absenceList.push({ id: this.nextId("ab"), soldier_id: a.soldier_id, absence_type_id: a.absence_type_id, ...absenceSpan(a), status: "active", cancel_reason: null,
+        reason: ABSENCE_TYPES.find((t) => t.id === a.absence_type_id)?.requires_reason ? needReason(a.reason, 'בהיעדרות מסוג "אחר" צריך לכתוב נימוק') : a.reason?.trim() || null,
+        received_via: a.received_via });
   }
 
   async cancelAbsence(id: string, reason: string) {
@@ -855,7 +862,7 @@ export class DemoApi implements Api {
     for (const b of rows) {
       if (this.blockList.some((x) => x.status === "active" && x.soldier_id === b.soldier_id && x.day.slice(0, 7) === b.day.slice(0, 7)))
         throw new Error("לעובד כבר יש חסימה בחודש הזה");
-      this.blockList.push({ ...b, id: this.nextId("b"), cycle_id: cycleId, status: "active" });
+      this.blockList.push({ ...b, reason: needReason(b.reason, "בחסימת תאריך צריך לכתוב נימוק"), id: this.nextId("b"), cycle_id: cycleId, status: "active" });
     }
   }
 
@@ -1722,10 +1729,10 @@ export class DemoApi implements Api {
           is_urgent: e.is_urgent, mine: e.source === "soldier", decision_reason: e.decision_reason })),
       blocks: this.blockList
         .filter((b) => b.soldier_id === me && b.status === "active")
-        .map((b) => ({ id: b.id, day: b.day, mine: b.received_via === "system", open: this.demoOpen(b.day) })),
+        .map((b) => ({ id: b.id, day: b.day, reason: b.reason ?? null, mine: b.received_via === "system", open: this.demoOpen(b.day) })),
       absences: this.absenceList
         .filter((a) => a.soldier_id === me && a.status === "active")
-        .map((a) => ({ id: a.id, type: abName.get(a.absence_type_id) ?? "", starts_at: a.starts_at, ends_at: a.ends_at,
+        .map((a) => ({ id: a.id, type: abName.get(a.absence_type_id) ?? "", reason: a.reason ?? null, starts_at: a.starts_at, ends_at: a.ends_at,
           mine: a.received_via === "system", open: this.demoOpen(a.starts_at.slice(0, 10)) })),
     };
   }
@@ -1880,13 +1887,14 @@ export class DemoApi implements Api {
     Object.assign(e, { status: "cancelled", decision_reason: "בוטל על ידי העובד" });
   }
 
-  async addMyDateBlock(day: string) {
+  async addMyDateBlock(day: string, reason: string) {
     await delay();
+    const why = needReason(reason, "בחסימת תאריך צריך לכתוב נימוק");
     const me = this.mySoldier()!;
     if (!this.demoOpen(day)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לאחראי השיבוצים");
     if (this.blockList.some((b) => b.soldier_id === me && b.status === "active" && b.day.slice(0, 7) === day.slice(0, 7)))
       throw new Error("כבר יש לך חסימה בחודש הזה (מכסה: 1 בחודש). בטל אותה כדי לבחור יום אחר");
-    this.blockList.push({ id: `b${Date.now()}`, soldier_id: me, cycle_id: null, day, status: "active", received_via: "system" });
+    this.blockList.push({ id: `b${Date.now()}`, soldier_id: me, cycle_id: null, day, status: "active", reason: why, received_via: "system" });
   }
 
   async cancelMyDateBlock(id: string) {
@@ -1894,13 +1902,14 @@ export class DemoApi implements Api {
     if (b) b.status = "cancelled";
   }
 
-  async addMyAbsence(typeId: string, from: string, to: string) {
+  async addMyAbsence(typeId: string, from: string, to: string, reason?: string) {
     await delay();
     if (to < from) throw new Error("תאריכים לא תקינים");
+    const why = ABSENCE_TYPES.find((t) => t.id === typeId)?.requires_reason ? needReason(reason, 'בהיעדרות מסוג "אחר" צריך לכתוב נימוק') : reason?.trim() || null;
     if (!this.demoOpen(from)) throw new Error("איסוף האילוצים למחזור הזה נסגר. לשינוי פנה לאחראי השיבוצים");
     const end = new Date(Date.parse(to) + 86_400_000).toISOString().slice(0, 10);
     this.absenceList.push({ id: `ab${Date.now()}`, soldier_id: this.mySoldier()!, absence_type_id: typeId, starts_at: `${from}T00:00:00+02:00`,
-      ends_at: `${end}T00:00:00+02:00`, status: "active", cancel_reason: null, received_via: "system" });
+      ends_at: `${end}T00:00:00+02:00`, status: "active", cancel_reason: null, reason: why, received_via: "system" });
   }
 
   async cancelMyAbsence(id: string) {

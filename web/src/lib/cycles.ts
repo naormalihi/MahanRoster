@@ -1,7 +1,6 @@
 /** Cycles and the constraints collected for them (exemptions, absences, date blocks). */
 
 import { TZ, dayKey } from "./dates";
-import { toIsoDate } from "./roster";
 
 // ---------------------------------------------------------------------------
 // Cycles
@@ -259,6 +258,8 @@ export function exemptionProblems(e: ExemptionInput): string[] {
 export interface AbsenceType {
   id: string;
   name: string;
+  /** a type that says nothing ("אחר"): the absence needs a reason (2.76) */
+  requires_reason?: boolean;
 }
 
 export interface Absence {
@@ -269,6 +270,8 @@ export interface Absence {
   ends_at: string;
   status: "active" | "cancelled";
   cancel_reason: string | null;
+  /** the employee's reason – required when the type requires it (2.76) */
+  reason?: string | null;
   received_via: ReceivedVia | null;
 }
 
@@ -278,6 +281,7 @@ export interface AbsenceInput {
   absence_type_id: string;
   from: string;
   to: string;
+  reason?: string | null;
   received_via: ReceivedVia | null;
 }
 
@@ -300,12 +304,15 @@ export interface DateBlock {
   cycle_id: string | null;
   day: string;
   status: "active" | "cancelled";
+  /** the employee's reason – required on every block (2.76) */
+  reason?: string | null;
   received_via: ReceivedVia | null;
 }
 
 export interface DateBlockInput {
   soldier_id: string;
   day: string;
+  reason: string;
   received_via: ReceivedVia | null;
 }
 
@@ -328,96 +335,6 @@ export function blockQuotaProblems(
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Gaf constraint template (Excel): absences and date blocks
-// ---------------------------------------------------------------------------
-
-/**
- * The template is generated per gaf, one row per soldier, with the system id in
- * the first column, so it needs no personal numbers. A soldier with more than one
- * absence gets the row copied.
- */
-export const TEMPLATE_HEADERS = ["מזהה (לא לשנות)", "שם מלא", "מסגרת", "תאריך חסימה", "סוג היעדרות", "היעדרות מתאריך", "היעדרות עד תאריך"];
-
-export interface TemplateSoldier {
-  id: string;
-  full_name: string;
-  gaf_name: string;
-}
-
-export function templateRows(soldiers: TemplateSoldier[]): (string | null)[][] {
-  return [
-    TEMPLATE_HEADERS,
-    ...[...soldiers]
-      .sort((a, b) => a.gaf_name.localeCompare(b.gaf_name, "he") || a.full_name.localeCompare(b.full_name, "he"))
-      .map((s) => [s.id, s.full_name, s.gaf_name, null, null, null, null]),
-  ];
-}
-
-export interface ParsedConstraints {
-  blocks: (DateBlockInput & { line: number; name: string })[];
-  absences: (AbsenceInput & { line: number; name: string })[];
-  errors: { line: number; message: string }[];
-}
-
-export function parseTemplate(
-  rows: unknown[][],
-  soldiers: TemplateSoldier[],
-  absenceTypes: AbsenceType[],
-  range: { from: string; to: string },
-): ParsedConstraints {
-  const out: ParsedConstraints = { blocks: [], absences: [], errors: [] };
-  const byId = new Map(soldiers.map((s) => [s.id, s]));
-  const typeByName = new Map(absenceTypes.map((t) => [t.name.replace(/\s/g, ""), t.id]));
-  const cell = (r: unknown[], i: number) => (r[i] === undefined || r[i] === null ? "" : r[i]);
-  const blank = (v: unknown) => String(v ?? "").trim() === "";
-  const inRange = (d: string) => d >= range.from && d <= range.to;
-  rows.slice(1).forEach((r, i) => {
-    const line = i + 2;
-    const [idCell, , , blockCell, typeCell, fromCell, toCell] = [0, 1, 2, 3, 4, 5, 6].map((k) => cell(r, k));
-    if ([blockCell, typeCell, fromCell, toCell].every(blank)) return; // nothing filled in
-    const s = byId.get(String(idCell).trim());
-    if (!s) return void out.errors.push({ line, message: "מזהה העובד לא מוכר. אל תשנה את העמודה הראשונה" });
-    if (!blank(blockCell)) {
-      const d = toIsoDate(blockCell);
-      if (!d || d === "invalid") out.errors.push({ line, message: `${s.full_name}: תאריך חסימה לא תקין` });
-      else if (!inRange(d)) out.errors.push({ line, message: `${s.full_name}: תאריך החסימה מחוץ למחזור` });
-      else out.blocks.push({ line, name: s.full_name, soldier_id: s.id, day: d, received_via: "excel" });
-    }
-    if (![typeCell, fromCell, toCell].every(blank)) {
-      const typeId = typeByName.get(String(typeCell).replace(/\s/g, ""));
-      const from = toIsoDate(fromCell);
-      const to = blank(toCell) ? from : toIsoDate(toCell);
-      if (!typeId) out.errors.push({ line, message: `${s.full_name}: סוג היעדרות לא מוכר ("${String(typeCell)}")` });
-      else if (!from || from === "invalid" || !to || to === "invalid")
-        out.errors.push({ line, message: `${s.full_name}: תאריכי היעדרות לא תקינים` });
-      else if (to < from) out.errors.push({ line, message: `${s.full_name}: ההיעדרות מסתיימת לפני שהיא מתחילה` });
-      else if (to < range.from || from > range.to) out.errors.push({ line, message: `${s.full_name}: ההיעדרות מחוץ למחזור` });
-      else out.absences.push({ line, name: s.full_name, soldier_id: s.id, absence_type_id: typeId, from, to, received_via: "excel" });
-    }
-  });
-  return out;
-}
-
-/** Drop rows that repeat what is already recorded (same soldier and day / same span). */
-export function dedupeConstraints(
-  parsed: ParsedConstraints,
-  existingBlocks: Pick<DateBlock, "soldier_id" | "day" | "status">[],
-  existingAbsences: Pick<Absence, "soldier_id" | "starts_at" | "ends_at" | "status" | "absence_type_id">[],
-) {
-  const bk = new Set(existingBlocks.filter((b) => b.status === "active").map((b) => `${b.soldier_id}|${b.day}`));
-  const ak = new Set(
-    existingAbsences
-      .filter((a) => a.status === "active")
-      .map((a) => {
-        const d = absenceDays(a);
-        return `${a.soldier_id}|${a.absence_type_id}|${d.from}|${d.to}`;
-      }),
-  );
-  const blocks = parsed.blocks.filter((b) => !bk.has(`${b.soldier_id}|${b.day}`));
-  const absences = parsed.absences.filter((a) => !ak.has(`${a.soldier_id}|${a.absence_type_id}|${a.from}|${a.to}`));
-  return { blocks, absences, skipped: parsed.blocks.length - blocks.length + parsed.absences.length - absences.length };
-}
 
 // ----- automatic stages: the stage follows what was done (see migration 39) -----
 

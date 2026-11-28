@@ -627,7 +627,7 @@ export class SupabaseApi implements Api {
   }
 
   async absenceTypes(): Promise<AbsenceType[]> {
-    return check(await this.sb.from("absence_types").select("id, name").order("name"));
+    return check(await this.sb.from("absence_types").select("id, name, requires_reason").order("name"));
   }
 
   async blockQuota() {
@@ -730,7 +730,7 @@ export class SupabaseApi implements Api {
     return check(
       await this.sb
         .from("absences")
-        .select("id, soldier_id, absence_type_id, starts_at, ends_at, status, cancel_reason, received_via")
+        .select("id, soldier_id, absence_type_id, starts_at, ends_at, status, cancel_reason, reason, received_via")
         .lt("starts_at", localMidnight(addDaysIso(toIso, 1)))
         .gt("ends_at", localMidnight(fromIso))
         .order("starts_at"),
@@ -746,6 +746,7 @@ export class SupabaseApi implements Api {
           soldier_id: a.soldier_id,
           absence_type_id: a.absence_type_id,
           ...absenceSpan(a),
+          reason: a.reason?.trim() || null,
           received_via: a.received_via,
           received_at: now,
         })),
@@ -761,7 +762,7 @@ export class SupabaseApi implements Api {
     return check(
       await this.sb
         .from("date_blocks")
-        .select("id, soldier_id, cycle_id, day, status, received_via")
+        .select("id, soldier_id, cycle_id, day, status, reason, received_via")
         .gte("day", fromIso)
         .lte("day", toIso)
         .order("day"),
@@ -1278,16 +1279,16 @@ export class SupabaseApi implements Api {
     maybe(await this.sb.rpc("withdraw_my_exemption", { p_id: id }));
   }
 
-  async addMyDateBlock(day: string) {
-    maybe(await this.sb.rpc("add_my_date_block", { p_day: day }));
+  async addMyDateBlock(day: string, reason: string) {
+    maybe(await this.sb.rpc("add_my_date_block", { p_day: day, p_reason: reason }));
   }
 
   async cancelMyDateBlock(id: string) {
     maybe(await this.sb.rpc("cancel_my_date_block", { p_id: id }));
   }
 
-  async addMyAbsence(typeId: string, from: string, to: string) {
-    maybe(await this.sb.rpc("add_my_absence", { p_type: typeId, p_from: from, p_to: to }));
+  async addMyAbsence(typeId: string, from: string, to: string, reason?: string) {
+    maybe(await this.sb.rpc("add_my_absence", { p_type: typeId, p_from: from, p_to: to, p_reason: reason?.trim() || null }));
   }
 
   async cancelMyAbsence(id: string) {
