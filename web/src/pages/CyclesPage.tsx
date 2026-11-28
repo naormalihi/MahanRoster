@@ -41,6 +41,7 @@ import {
   addDaysIso,
   planningCycle,
   cycleProblems,
+  cycleProgress,
   deadlineDay,
   endOfDay,
   stageIndex,
@@ -214,6 +215,22 @@ export function StagePanel({ cycle, inWorkspace }: { cycle: Cycle; inWorkspace?:
   );
 }
 
+/** A thin bar: how much of the cycle's dates has gone by, and the days left, in words (2.74). */
+function TimeBar({ c }: { c: Cycle }) {
+  const p = cycleProgress(c.start_date, c.end_date, today());
+  const running = p.pct > 0 && p.pct < 1;
+  return (
+    <Stack component="span" direction="row" sx={{ alignItems: "center", gap: 1, mt: 0.75, minWidth: 140 }}>
+      <Box component="span" sx={{ display: "block", flex: 1, height: 6, borderRadius: 3, bgcolor: "action.selected", overflow: "hidden" }} role="img" aria-label={p.text}>
+        <Box component="span" sx={{ display: "block", height: 1, width: `${p.pct * 100}%`, bgcolor: running ? "primary.main" : "text.disabled", borderRadius: 3 }} />
+      </Box>
+      <Typography component="span" variant="caption" color={running ? "primary.main" : "text.secondary"} sx={{ whiteSpace: "nowrap", fontWeight: running ? 600 : undefined }}>
+        {p.text}
+      </Typography>
+    </Stack>
+  );
+}
+
 export function CyclesPage() {
   const live = useLiveTick();
   const { api } = useAuth();
@@ -271,7 +288,12 @@ export function CyclesPage() {
                   {c.id === shown?.id && <Chip size="small" variant="outlined" color="primary" label="בעבודה" />}
                 </>
               }
-              sub={`${fmt(c.start_date)} – ${fmt(c.end_date)}`}
+              sub={
+                <>
+                  {fmt(c.start_date)} – {fmt(c.end_date)}
+                  <TimeBar c={c} />
+                </>
+              }
               lines={[c.exemption_deadline ? `סגירת אילוצים ${fmt(deadlineDay(c.exemption_deadline))}` : "בלי מועד סגירת אילוצים"]}
               actions={
                 <Button size="small" startIcon={<EditIcon fontSize="small" />} onClick={() => setEditing(c)}>
@@ -306,6 +328,7 @@ export function CyclesPage() {
                   </TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap", display: { xs: "none", sm: "table-cell" } }}>
                     {fmt(c.start_date)} – {fmt(c.end_date)}
+                    <TimeBar c={c} />
                   </TableCell>
                   <TableCell>{c.exemption_deadline ? fmt(deadlineDay(c.exemption_deadline)) : "—"}</TableCell>
                   <TableCell>

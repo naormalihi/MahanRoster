@@ -68,6 +68,8 @@ import type { ExistingSoldier } from "../lib/roster";
 import { DeadlineEditor } from "../components/DeadlineEditor";
 import { EmptyState } from "../components/EmptyState";
 import { CardList, RowCard, useNarrow } from "../components/CardList";
+import { IconBadge } from "../components/IconBadge";
+import { KIND_LOOK } from "../components/RequestIcons";
 import { useLiveTick } from "../lib/live";
 import { readDashboardSet } from "../lib/dashboardSet";
 
@@ -1260,9 +1262,9 @@ function BlocksTab({ ctx }: { ctx: Ctx }) {
 // ---------------------------------------------------------------------------
 
 const TABS = [
-  { key: "exemptions", label: "פטורים" },
-  { key: "absences", label: "היעדרויות" },
-  { key: "blocks", label: "חסימות" },
+  { key: "exemptions", label: "פטורים", kind: "exemption" },
+  { key: "absences", label: "היעדרויות", kind: "absence" },
+  { key: "blocks", label: "חסימות", kind: "block" },
 ] as const;
 
 export function ConstraintsPage() {
@@ -1318,7 +1320,14 @@ export function ConstraintsPage() {
             sx={narrow ? { "& .MuiTab-root": { minWidth: 0, px: 0.5 } } : undefined}
           >
             {TABS.map((t) => (
-              <Tab key={t.key} value={t.key} label={t.label} />
+              <Tab
+                key={t.key}
+                value={t.key}
+                label={t.label}
+                icon={<IconBadge icon={KIND_LOOK[t.kind].icon} tone={KIND_LOOK[t.kind].tone} size={26} />}
+                iconPosition="start"
+                sx={{ minHeight: 52, gap: 0.5 }}
+              />
             ))}
           </Tabs>
           <Box key={`${ctx.cycle.id}-${version}`}>

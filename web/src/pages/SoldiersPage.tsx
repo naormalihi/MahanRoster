@@ -11,6 +11,8 @@ import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import TuneIcon from "@mui/icons-material/Tune";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { CardList, RowCard } from "../components/CardList";
+import { TONE } from "../components/IconBadge";
+import { Initials } from "../components/Initials";
 import {
   Alert,
   Box,
@@ -80,6 +82,8 @@ import { useLiveTick } from "../lib/live";
 import { readDashboardSet } from "../lib/dashboardSet";
 
 const SERVICE = { mandatory: "חובה", career: "קבע" } as const;
+/** חובה / קבע as a small chip, in the app's colors for them (2.74) */
+const ServiceChip = ({ v }: { v: keyof typeof SERVICE }) => <Chip size="small" variant="outlined" color={TONE[v]} label={SERVICE[v]} sx={{ height: 22 }} />;
 const RANGE_CHIP: Record<
   RangeState,
   { label: string; color: "default" | "error" | "warning" | "success" }
@@ -1568,9 +1572,15 @@ export function SoldiersPage() {
                     </Box>
                     )
                   }
-                  title={s.full_name}
+                  title={
+                    <Stack component="span" direction="row" sx={{ alignItems: "center", gap: 1 }}>
+                      <Initials name={s.full_name} gafId={s.gaf_id} size={28} />
+                      {s.full_name}
+                    </Stack>
+                  }
                   chips={
                     <>
+                      <ServiceChip v={effectiveService(s)} />
                       {tashBy(s) ? <Chip size="small" variant="outlined" label="ת״ש 7" /> : s.tash_level ? <Chip size="small" variant="outlined" label={`הת״ש ${s.tash_level}`} /> : null}
                       {a && a.tone !== "default" && <Chip size="small" variant="outlined" color={a.tone} label={a.text} />}
                       {newUntil(s) && <Chip size="small" variant="outlined" color="info" label={`חדש עד ${fmt(newUntil(s))}`} />}
@@ -1588,7 +1598,7 @@ export function SoldiersPage() {
                   sub={
                     <>
                       {s.rank_name}
-                      {appointed ? ` (מינוי ${rankName.get(s.appointment_rank_id!)})` : ""} · {s.gaf_name} · {SERVICE[effectiveService(s)]}
+                      {appointed ? ` (מינוי ${rankName.get(s.appointment_rank_id!)})` : ""} · {s.gaf_name}
                       {s.release_date ? ` · תום שירות ${fmt(s.release_date)}` : ""}
                       {s.unit_join_date ? ` · נקלט ${fmt(s.unit_join_date)}` : ""}
                       {s.career_start_date ? ` · קבע מ-${fmt(s.career_start_date)}` : ""}
@@ -1760,6 +1770,9 @@ export function SoldiersPage() {
                             <VisibilityIcon sx={{ fontSize: 17 }} />
                           </IconButton>
                         )}
+                        <Box component="span" sx={{ display: "inline-flex", verticalAlign: "middle", me: 1 }}>
+                          <Initials name={s.full_name} gafId={s.gaf_id} size={26} />
+                        </Box>
                         {s.full_name}
                         {fixCount.get(s.id) ? (
                           <Chip size="small" color="warning" label="בקשת תיקון" onClick={() => setFixFor(s.id)} sx={{ ml: 0.5 }} />
@@ -1782,7 +1795,7 @@ export function SoldiersPage() {
                         {s.gaf_name}
                       </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
-                        {SERVICE[effectiveService(s)]} {switchTag(s)}
+                        <ServiceChip v={effectiveService(s)} /> {switchTag(s)}
                       </TableCell>
                       <TableCell
                         sx={{

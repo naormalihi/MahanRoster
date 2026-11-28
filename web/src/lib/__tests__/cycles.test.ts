@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   absenceDays,
+  cycleProgress,
   absenceSpan,
   blockQuotaProblems,
   currentCycle,
@@ -117,5 +118,16 @@ describe("gaf template", () => {
     );
     expect(d.skipped).toBe(2);
     expect(d.blocks).toEqual([]);
+  });
+});
+
+describe("cycleProgress", () => {
+  it("tells how far into its dates a cycle is", () => {
+    expect(cycleProgress("2026-12-01", "2026-12-10", "2026-11-28")).toEqual({ pct: 0, text: "מתחיל בעוד 3 ימים" });
+    expect(cycleProgress("2026-12-01", "2026-12-10", "2026-11-30").text).toBe("מתחיל מחר");
+    expect(cycleProgress("2026-12-01", "2026-12-10", "2026-12-01")).toEqual({ pct: 0, text: "עוד 10 ימים" });
+    expect(cycleProgress("2026-12-01", "2026-12-10", "2026-12-06")).toEqual({ pct: 0.5, text: "עוד 5 ימים" });
+    expect(cycleProgress("2026-12-01", "2026-12-10", "2026-12-10").text).toBe("היום האחרון");
+    expect(cycleProgress("2026-12-01", "2026-12-10", "2026-12-11")).toEqual({ pct: 1, text: "הסתיים" });
   });
 });

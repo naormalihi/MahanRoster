@@ -479,3 +479,17 @@ export function stageStates(c: Cycle, f: StageFacts, now: Date): StageState[] {
     { stage: "closed", tone: c.status === "closed" ? "done" : "todo", note: `אחרי ${ddmm(c.end_date)}` },
   ];
 }
+
+/**
+ * How far into its dates a cycle is, for the bar on each cycle (2.74): the share of its days gone by
+ * (0 before it starts, 1 once over) and a line in words. Days are yyyy-mm-dd, the end day included.
+ */
+export function cycleProgress(start: string, end: string, today: string): { pct: number; text: string } {
+  const day = (s: string) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000;
+  const total = day(end) - day(start) + 1;
+  const gone = day(today) - day(start);
+  if (gone < 0) return { pct: 0, text: -gone === 1 ? "מתחיל מחר" : `מתחיל בעוד ${-gone} ימים` };
+  if (gone >= total) return { pct: 1, text: "הסתיים" };
+  const left = total - gone;
+  return { pct: gone / total, text: left === 1 ? "היום האחרון" : `עוד ${left} ימים` };
+}
