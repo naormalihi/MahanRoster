@@ -83,3 +83,15 @@ export const FIX_FIELDS = [
   "הניקוד",
   "אחר",
 ] as const;
+
+/** Where the score stands against the group's average, in words (2.73). */
+export function scoreWords(total: number, avg: number | null): string | null {
+  if (avg == null) return null;
+  const d = total - avg;
+  const near = Math.max(Math.abs(avg) * 0.02, 0.05);
+  if (Math.abs(d) < near) return "בדיוק בממוצע – המנוע ישבץ אותך כמו את כולם.";
+  const slight = Math.abs(d) <= Math.max(Math.abs(avg) * 0.1, 1);
+  return d > 0
+    ? `${slight ? "מעט " : ""}מעל הממוצע – המנוע ישבץ אותך ${slight ? "קצת " : ""}פחות בהמשך.`
+    : `${slight ? "מעט " : ""}מתחת לממוצע – סביר שתשובץ ${slight ? "קצת " : ""}יותר בהמשך.`;
+}

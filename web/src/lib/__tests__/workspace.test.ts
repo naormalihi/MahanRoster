@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cycle } from "../cycles";
-import { draftFacts, nextAction, stepNav, stepStates } from "../workspace";
+import { currentStep, draftFacts, nextAction, stepNav, stepStates } from "../workspace";
 import { defaultCycle } from "../cycleContext";
 
 const cycle = (o: Partial<Cycle> = {}): Cycle => ({
@@ -79,5 +79,19 @@ describe("the schedule step follows the draft as it is now", () => {
     expect(d).toEqual({ placed: 1, unfilled: 2 });
     expect(stepStates(c, { ...ran, draft: d }).schedule).toEqual({ tone: "warn", text: "2 לא מאוישות" });
     expect(nextAction(c, { ...ran, draft: d }).text).toBe("לאייש ידנית 2 משימות ולפרסם");
+  });
+});
+
+describe("currentStep", () => {
+  it("maps the stage to one of the five steps", () => {
+    expect(currentStep("draft")).toBe(0);
+    expect(currentStep("loading")).toBe(0);
+    expect(currentStep("collecting")).toBe(1);
+    expect(currentStep("approving")).toBe(1);
+    expect(currentStep("potential")).toBe(2);
+    expect(currentStep("slots")).toBe(3);
+    expect(currentStep("review")).toBe(4);
+    expect(currentStep("published")).toBe(5);
+    expect(currentStep("closed")).toBe(6);
   });
 });

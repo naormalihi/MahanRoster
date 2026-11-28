@@ -19,8 +19,10 @@ import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
 import { addDays, dayLabel, timeLabel } from "../lib/dates";
-import { nextAction, STEPS, stepStates } from "../lib/workspace";
+import { currentStep, nextAction, STEPS, stepStates } from "../lib/workspace";
 import { TONE_ICON, useCycleFacts } from "./CycleWorkspace";
+import { IconBadge } from "../components/IconBadge";
+import { STEP_LOOK } from "../components/StageIcons";
 import { ORPHAN_KIND, orphanRequests, type Orphan } from "../lib/orphans";
 import { FeedbackInbox } from "../components/FeedbackInbox";
 import { dayKey } from "../lib/dates";
@@ -112,6 +114,7 @@ export function HomePage() {
 
   const states = cycle && facts ? stepStates(cycle, facts) : null;
   const next = cycle && facts ? nextAction(cycle, facts) : null;
+  const step = cycle ? currentStep(cycle.status) : 0;
   const unstaffed = (week ?? []).filter((r) => !r.performers.length);
 
   return (
@@ -237,8 +240,20 @@ export function HomePage() {
         {cycle && (
           <Card
             title={cycle.name}
-            action={<Chip size="small" label={stageLabel(cycle.status)} color="primary" variant="outlined" />}
+            action={
+              <Chip
+                size="small"
+                label={step >= 1 && step <= 5 ? `שלב ${step} מתוך 5` : stageLabel(cycle.status)}
+                color="primary"
+                variant="outlined"
+              />
+            }
           >
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 0.5 }} role="img" aria-label={step >= 1 && step <= 5 ? `שלב ${step} מתוך 5` : stageLabel(cycle.status)}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Box key={n} sx={{ height: 6, borderRadius: 3, bgcolor: n < step ? "success.main" : n === step ? "primary.main" : "action.selected" }} />
+              ))}
+            </Box>
             {next ? (
               <Alert
                 severity="info"
@@ -260,22 +275,48 @@ export function HomePage() {
             ) : (
               <CircularProgress size={20} />
             )}
-            <Stack spacing={0.75}>
-              {STEPS.slice(1).map((s) => {
-                const st = states?.[s.key as Exclude<typeof s.key, "overview">];
+            <Stack spacing={0.5}>
+              {STEPS.slice(1).map((s, i) => {
+                const key = s.key as Exclude<typeof s.key, "overview">;
+                const st = states?.[key];
+                const at = i + 1;
+                const now = at === step;
+                // a step behind shows its state; one ahead only if something waits there (a pending exemption)
+                const mark = st && (at < step || st.tone === "warn" || st.tone === "busy") ? TONE_ICON[st.tone] : null;
                 return (
                   <Stack
                     key={s.key}
                     direction="row"
                     component={RouterLink}
                     to={s.path}
-                    sx={{ alignItems: "center", gap: 1, textDecoration: "none", color: "inherit", py: 0.5, "&:hover": { color: "primary.main" } }}
+                    sx={(t) => ({
+                      alignItems: "center",
+                      gap: 1.25,
+                      textDecoration: "none",
+                      color: "inherit",
+                      py: 0.75,
+                      px: 1,
+                      mx: -1,
+                      borderRadius: 2,
+                      opacity: at > step ? 0.6 : 1,
+                      bgcolor: now ? alpha(t.palette.primary.main, 0.1) : undefined,
+                      "&:hover": { bgcolor: alpha(t.palette.primary.main, now ? 0.16 : 0.06), opacity: 1 },
+                    })}
                   >
-                    <Box sx={{ fontSize: 18, display: "flex" }}>{st ? TONE_ICON[st.tone] : null}</Box>
-                    <Typography sx={{ fontWeight: 600, minWidth: 110 }}>{s.label}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {st?.text}
-                    </Typography>
+                    <IconBadge icon={STEP_LOOK[key].icon} tone={STEP_LOOK[key].tone} size={30} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>{s.label}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {st?.text}
+                      </Typography>
+                    </Box>
+                    {now ? (
+                      <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700 }}>
+                        עכשיו
+                      </Typography>
+                    ) : (
+                      mark && <Box sx={{ fontSize: 20, display: "flex" }}>{mark}</Box>
+                    )}
                   </Stack>
                 );
               })}
@@ -328,19 +369,7 @@ export function HomePage() {
             to={l.to}
             sx={{ p: 1.75, borderRadius: 3, textDecoration: "none", color: "inherit", display: "flex", flexDirection: "column", gap: 1, "&:hover": { borderColor: `${l.tone}.main` } }}
           >
-            <Box
-              sx={(t) => ({
-                width: 44,
-                height: 44,
-                borderRadius: 2.5,
-                display: "grid",
-                placeItems: "center",
-                color: t.palette[l.tone].main,
-                bgcolor: alpha(t.palette[l.tone].main, 0.16),
-              })}
-            >
-              {l.icon}
-            </Box>
+            <IconBadge icon={l.icon} tone={l.tone} size={44} />
             <Typography sx={{ fontWeight: 700, fontSize: 17 }}>{l.label}</Typography>
             <Typography variant="body2" color="text.secondary">
               {l.hint}

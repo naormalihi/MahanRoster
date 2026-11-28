@@ -1,5 +1,11 @@
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SwapIcon from "@mui/icons-material/SwapHoriz";
+import PlaceIcon from "@mui/icons-material/PlaceOutlined";
+import BriefingIcon from "@mui/icons-material/RecordVoiceOverOutlined";
+import EquipmentIcon from "@mui/icons-material/BackpackOutlined";
+import PhoneIcon from "@mui/icons-material/PhoneOutlined";
+import NoteIcon from "@mui/icons-material/PriorityHighOutlined";
+import WhyIcon from "@mui/icons-material/InfoOutlined";
 import {
   Accordion,
   Alert,
@@ -15,13 +21,12 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../lib/auth";
 import { EmptyState, ErrorState, greeting } from "../components/EmptyState";
 import { PushOffLine } from "../components/PushOffLine";
-import { dayLabel, spanLabel, timeLabel } from "../lib/dates";
-import { needsAck, splitDuties, type MyDuty, type MyScore } from "../lib/me";
+import { dateParts, dayLabel, spanLabel, timeLabel } from "../lib/dates";
+import { needsAck, splitDuties, type MyDuty } from "../lib/me";
 import { canAskSwap, type MySwap } from "../lib/swaps";
 import { ContactCard } from "../components/ContactCard";
 import { DutyNote } from "../components/DutyNote";
@@ -35,30 +40,158 @@ import { todayIso } from "../lib/soldiers";
 
 const ROLE: Record<MyDuty["role"], string> = { performer: "מבצע", reserve: "עתודה" };
 
-/** One duty: when, what, as what; tap to see where to report and why he got it. */
+/** One line of a duty's details, with its icon. */
+function Detail({ icon, children, strong }: { icon: ReactNode; children: ReactNode; strong?: boolean }) {
+  return (
+    <Stack direction="row" sx={{ gap: 1, alignItems: "flex-start" }}>
+      <Box sx={{ color: "text.secondary", display: "flex", pt: 0.25, "& svg": { fontSize: 18 } }}>{icon}</Box>
+      <Typography variant="body2" sx={{ fontWeight: strong ? 600 : undefined, minWidth: 0 }}>
+        {children}
+      </Typography>
+    </Stack>
+  );
+}
+
+/** Where to report, the briefing, whom to call and why he got it – each with its icon. */
+function DutyDetails({ d }: { d: MyDuty }) {
+  const tel = d.contact_phone?.replace(/[^\d+]/g, "");
+  const report = d.report_at
+    ? `${dayLabel(d.report_at)} ${timeLabel(d.report_at)}${d.report_place ? `, ${d.report_place}` : ""}`
+    : d.report_place;
+  const briefing = d.briefing_at
+    ? `${dayLabel(d.briefing_at)} ${timeLabel(d.briefing_at)}${d.briefing_place ? `, ${d.briefing_place}` : ""}`
+    : d.briefing_by_call
+      ? `לפי הזימון${d.briefing_place ? `, ${d.briefing_place}` : ""}`
+      : null;
+  return (
+    <Stack spacing={0.75}>
+      {report && <Detail icon={<PlaceIcon />}>התייצבות: {report}</Detail>}
+      {briefing && <Detail icon={<BriefingIcon />}>תדריך: {briefing}</Detail>}
+      {d.equipment && <Detail icon={<EquipmentIcon />}>ציוד: {d.equipment}</Detail>}
+      {(d.contact_name || d.contact_phone) && (
+        <Detail icon={<PhoneIcon />}>
+          איש קשר: {d.contact_name}{" "}
+          {d.contact_phone &&
+            (tel ? (
+              <Link href={`tel:${tel}`} onClick={(e) => e.stopPropagation()} dir="ltr">
+                {d.contact_phone}
+              </Link>
+            ) : (
+              d.contact_phone
+            ))}
+        </Detail>
+      )}
+      {d.briefing_note && (
+        <Detail icon={<NoteIcon />} strong>
+          {d.briefing_note}
+        </Detail>
+      )}
+      <Detail icon={<WhyIcon />}>
+        <Box component="span" sx={{ color: "text.secondary" }}>
+          <b>למה שובצתי:</b> {d.explanation ?? "שובץ ידנית על ידי אחראי השיבוצים."}
+        </Box>
+      </Detail>
+    </Stack>
+  );
+}
+
+/** The day as a block – "ש׳ / 19 / דצמ׳"; `small` without the month. */
+function DateBlock({ iso, small }: { iso: string; small?: boolean }) {
+  const p = dateParts(iso);
+  return (
+    <Box sx={{ width: small ? 36 : 52, flexShrink: 0, textAlign: "center", lineHeight: 1.1 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+        {p.weekday}
+      </Typography>
+      <Typography sx={{ fontSize: small ? 18 : 26, fontWeight: 800, lineHeight: 1.1 }}>{p.day}</Typography>
+      {!small && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+          {p.month}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+/** The duty type's color as a thin stripe; the primary color when none was chosen. */
+const Stripe = ({ d }: { d: MyDuty }) => (
+  <Box sx={{ width: 4, alignSelf: "stretch", borderRadius: 2, flexShrink: 0, bgcolor: d.task_color || (d.role === "performer" ? "primary.main" : "action.disabled") }} />
+);
+
+const RoleChip = ({ d }: { d: MyDuty }) => (
+  <Chip
+    size="small"
+    label={d.status === "reserve_activated" ? "עתודה שהופעלה" : ROLE[d.role]}
+    color={d.role === "performer" ? "primary" : "default"}
+    variant="outlined"
+  />
+);
+
+/** The next duty, open: the date block, the stripe, the details, and "ראיתי" / "בקשת החלפה" side by side. */
+function NextDuty({ d, onSwap, onAck }: { d: MyDuty; onSwap?: (d: MyDuty) => void; onAck?: (ids: string[]) => void }) {
+  const waiting = !!onAck && needsAck(d, Date.now());
+  const swap = !!onSwap && canAskSwap(d, Date.now());
+  return (
+    <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+        המשימה הבאה
+      </Typography>
+      <Stack direction="row" sx={{ gap: 1.5 }}>
+        <DateBlock iso={d.starts_at} />
+        <Stripe d={d} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 18, flex: 1, minWidth: 0 }}>{d.task_name}</Typography>
+            <RoleChip d={d} />
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {spanLabel(d.starts_at, d.ends_at)}
+            {d.role === "performer" ? ` · ${d.points.toFixed(1)} נק׳` : ""}
+          </Typography>
+          <DutyNote note={d.note} size={14} />
+          <DutyDetails d={d} />
+        </Box>
+      </Stack>
+      {(waiting || swap) && (
+        <Box sx={{ display: "grid", gridTemplateColumns: waiting && swap ? "1fr 1fr" : "1fr", gap: 1, mt: 2 }}>
+          {waiting && (
+            <Button variant="contained" color="warning" onClick={() => onAck!([d.assignment_id])}>
+              ראיתי ✓
+            </Button>
+          )}
+          {swap && (
+            <Button variant="outlined" startIcon={<SwapIcon />} onClick={() => onSwap!(d)}>
+              בקשת החלפה
+            </Button>
+          )}
+        </Box>
+      )}
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+        {d.cycle_name}
+      </Typography>
+    </Paper>
+  );
+}
+
+/** One duty in a list: the day, the stripe, what and as what; tap to see the details. */
 function DutyRow({ d, open, onToggle, onSwap, onAck }: { d: MyDuty; open: boolean; onToggle: () => void; onSwap?: (d: MyDuty) => void; onAck?: (ids: string[]) => void }) {
   const waiting = !!onAck && needsAck(d, Date.now());
-  const details = [
-    d.report_at && `התייצבות: ${dayLabel(d.report_at)} ${timeLabel(d.report_at)}${d.report_place ? `, ${d.report_place}` : ""}`,
-    !d.report_at && d.report_place && `התייצבות: ${d.report_place}`,
-    d.briefing_at && `תדריך: ${dayLabel(d.briefing_at)} ${timeLabel(d.briefing_at)}${d.briefing_place ? `, ${d.briefing_place}` : ""}`,
-    !d.briefing_at && d.briefing_by_call && `תדריך: לפי הזימון${d.briefing_place ? `, ${d.briefing_place}` : ""}`,
-    d.equipment && `ציוד: ${d.equipment}`,
-  ].filter(Boolean) as string[];
-  const tel = d.contact_phone?.replace(/[^\d+]/g, "");
   return (
     <Box
       role="button"
       tabIndex={0}
+      aria-expanded={open}
       onClick={onToggle}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onToggle())}
       sx={{ py: 1.25, px: 0.5, cursor: "pointer", borderRadius: 1, "&:hover": { bgcolor: "action.hover" } }}
     >
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1.25 }}>
+        <DateBlock iso={d.starts_at} small />
+        <Stripe d={d} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 600 }}>{d.task_name}</Typography>
           <Typography variant="body2" color="text.secondary">
-            {dayLabel(d.starts_at)} · {spanLabel(d.starts_at, d.ends_at)}
+            {spanLabel(d.starts_at, d.ends_at)}
           </Typography>
           <DutyNote note={d.note} size={14} />
         </Box>
@@ -76,44 +209,15 @@ function DutyRow({ d, open, onToggle, onSwap, onAck }: { d: MyDuty; open: boolea
             ראיתי ✓
           </Button>
         )}
-        <Chip size="small" label={d.status === "reserve_activated" ? "עתודה שהופעלה" : ROLE[d.role]} color={d.role === "performer" ? "primary" : "default"} variant="outlined" />
-        {d.role === "performer" && (
-          <Typography variant="body2" sx={{ minWidth: 52, textAlign: "end" }}>
-            {d.points.toFixed(1)} נק׳
-          </Typography>
-        )}
+        <RoleChip d={d} />
       </Stack>
       <Collapse in={open}>
-        <Stack spacing={0.5} sx={{ mt: 1 }}>
-          {details.map((t) => (
-            <Typography key={t} variant="body2">
-              {t}
-            </Typography>
-          ))}
-          {(d.contact_name || d.contact_phone) && (
-            <Typography variant="body2">
-              איש קשר: {d.contact_name}{" "}
-              {d.contact_phone &&
-                (tel ? (
-                  <Link href={`tel:${tel}`} onClick={(e) => e.stopPropagation()} dir="ltr">
-                    {d.contact_phone}
-                  </Link>
-                ) : (
-                  d.contact_phone
-                ))}
-            </Typography>
-          )}
-          {d.briefing_note && (
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {d.briefing_note}
-            </Typography>
-          )}
-          <Typography variant="body2" color="text.secondary">
-            <b>למה שובצתי:</b> {d.explanation ?? "שובץ ידנית על ידי אחראי השיבוצים."}
-          </Typography>
-          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ mt: 1, ps: 6.5 }}>
+          <DutyDetails d={d} />
+          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mt: 0.5 }}>
             <Typography variant="caption" color="text.secondary">
               {d.cycle_name}
+              {d.role === "performer" ? ` · ${d.points.toFixed(1)} נק׳` : ""}
             </Typography>
             {onSwap && canAskSwap(d, Date.now()) && (
               <Button
@@ -128,51 +232,13 @@ function DutyRow({ d, open, onToggle, onSwap, onAck }: { d: MyDuty; open: boolea
               </Button>
             )}
           </Stack>
-        </Stack>
+        </Box>
       </Collapse>
     </Box>
   );
 }
 
-/** His points in a cycle next to the mean of those he is measured against. */
-function ScoreCard({ s }: { s: MyScore }) {
-  const mean = s.group_mean ?? 0;
-  const top = Math.max(s.points, mean, 1) * 1.15;
-  const pct = (n: number) => `${(n / top) * 100}%`;
-  const diff = s.points - mean;
-  return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-        <Typography variant="subtitle2" color="text.secondary">
-          הניקוד שלי · {s.cycle_name}
-        </Typography>
-        <Link component={RouterLink} to="/scoring" variant="body2">
-          איך מחושב?
-        </Link>
-      </Stack>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mt: 0.5 }}>
-        <Typography variant="h2">{s.points.toFixed(1)}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          נק׳ ב-{s.duties} משימות
-        </Typography>
-      </Stack>
-      {s.group_mean !== null && (
-        <>
-          <Box sx={{ position: "relative", height: 14, mt: 1.5, mb: 1, bgcolor: "action.hover", borderRadius: 1 }}>
-            <Box sx={{ position: "absolute", insetInlineStart: 0, top: 3, bottom: 3, width: pct(s.points), bgcolor: "primary.main", borderRadius: 1 }} />
-            <Box sx={{ position: "absolute", insetInlineStart: pct(mean), top: -3, bottom: -3, width: 2, bgcolor: "text.primary" }} />
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            הממוצע של מי שזכאים לאותן משימות{s.group_label ? ` (${s.group_label})` : ""}: <b>{mean.toFixed(1)}</b> · {s.group_size} עובדים.{" "}
-            {Math.abs(diff) < 0.05 ? "אתה בדיוק בממוצע." : diff > 0 ? `אתה ${diff.toFixed(1)} מעל.` : `אתה ${(-diff).toFixed(1)} מתחת.`}
-          </Typography>
-        </>
-      )}
-    </Paper>
-  );
-}
-
-/** The soldier's own screen (version 2.1): his next duty, his score, and all his duties. */
+/** The employee's own screen: his next duty and all his duties (the score is in "כרטיס אישי", 2.73). */
 export function MyPage() {
   const live = useLiveTick();
   const { api, me, offline } = useAuth();
@@ -186,7 +252,6 @@ export function MyPage() {
     setDuties((ds) => ds && ds.map((d) => (ids.includes(d.assignment_id) ? { ...d, acked_at: at } : d)));
     api!.ackDuties(ids).catch((e) => setAckError((e as Error).message));
   };
-  const [scores, setScores] = useState<MyScore[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [swaps, setSwaps] = useState<MySwap[]>([]);
@@ -203,10 +268,10 @@ export function MyPage() {
       setStale(copy.savedAt);
     };
     if (offline) return fromCopy(new OfflineError());
-    Promise.all([api!.myDuties(), api!.myScores()])
-      .then(([d, s]) => {
+    api!
+      .myDuties()
+      .then((d) => {
         setDuties(d);
-        setScores(s);
         setStale(null);
         setError(null);
         if (me && !me.viewAs) saveOffline(me, d); // not while viewing as an employee
@@ -254,8 +319,8 @@ export function MyPage() {
       </Stack>
       {!me?.viewAs && <PushOffLine />}
 
-      {/* on a wide screen: the duties on the main side, the score and the settings beside them */}
-      <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 3fr) minmax(0, 2fr)" } }}>
+      {/* on a wide screen: the duties on the main side, the next cycle beside them (the score: in "כרטיס אישי") */}
+      <Box sx={{ display: "grid", gap: 2, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: nextCycle ? "minmax(0, 3fr) minmax(0, 2fr)" : "minmax(0, 1fr)" } }}>
       <Stack spacing={2} sx={{ minWidth: 0 }}>
       {stale && (
         <Alert severity="warning" icon={<CloudOffIcon />}>
@@ -285,12 +350,7 @@ export function MyPage() {
         </Alert>
       )}
       {next ? (
-        <Paper sx={{ p: 2, borderInlineStart: 4, borderColor: "primary.main" }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            המשימה הבאה · {dayLabel(next.starts_at)}
-          </Typography>
-          <DutyRow d={next} open onToggle={() => undefined} onSwap={stale ? undefined : setSwapping} onAck={stale ? undefined : ack} />
-        </Paper>
+        <NextDuty d={next} onSwap={stale ? undefined : setSwapping} onAck={stale ? undefined : ack} />
       ) : (
         <EmptyState pose="sleep" title="אין לך משימות קרובות" text="כשיתפרסם לוח חדש, המשימות שלך יופיעו כאן ותקבל התראה." />
       )}
@@ -324,27 +384,11 @@ export function MyPage() {
       )}
 
       </Stack>
-      <Stack spacing={2} sx={{ minWidth: 0 }}>
-      {nextCycle && <NextCycleCard info={nextCycle} />}
-      {scores[0] && <ScoreCard s={scores[0]} />}
-
-
-      {scores.length > 1 && (
-        <Accordion variant="outlined" disableGutters>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle2">מחזורים קודמים</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Stack spacing={1.5}>
-              {scores.slice(1).map((s) => (
-                <ScoreCard key={s.cycle_id} s={s} />
-              ))}
-            </Stack>
-          </AccordionDetails>
-        </Accordion>
+      {nextCycle && (
+        <Stack spacing={2} sx={{ minWidth: 0 }}>
+          <NextCycleCard info={nextCycle} />
+        </Stack>
       )}
-
-      </Stack>
       </Box>
 
       <Typography variant="caption" color="text.secondary">
