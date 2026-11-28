@@ -2,14 +2,14 @@ import BoardIcon from "@mui/icons-material/CalendarMonthOutlined";
 import CyclesIcon from "@mui/icons-material/AutorenewOutlined";
 import PeopleIcon from "@mui/icons-material/GroupsOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
-import { alpha } from "@mui/material/styles";
+import { alpha, type Theme } from "@mui/material/styles";
 import { FixRequestsDialog } from "../components/FixRequests";
 import type { StaffFixRequest } from "../lib/profile";
 import { MyNextDuty } from "../components/MyNextDuty";
 import { UnackedCard } from "../components/UnackedCard";
 import { SwapLogCard } from "../components/SwapDialog";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography, useMediaQuery, useTheme } from "@mui/material";
 import { EmptyState, greeting } from "../components/EmptyState";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
@@ -18,8 +18,9 @@ import { mfaResetters } from "../lib/users";
 import { useAuth } from "../lib/auth";
 import { useCycle } from "../lib/cycleContext";
 import { stageLabel } from "../lib/cycles";
-import { addDays, dayLabel, timeLabel } from "../lib/dates";
-import { currentStep, nextAction, STEPS, stepStates } from "../lib/workspace";
+import { addDays } from "../lib/dates";
+import { currentStep, nextAction, STEPS, stepStates, type StepKey } from "../lib/workspace";
+import { weekDays, type WeekDay } from "../lib/weekDays";
 import { TONE_ICON, useCycleFacts } from "./CycleWorkspace";
 import { IconBadge } from "../components/IconBadge";
 import { STEP_LOOK } from "../components/StageIcons";
@@ -32,7 +33,7 @@ const fmtDay = (iso: string) => iso.slice(0, 10).split("-").reverse().slice(0, 2
 
 function Card({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
+    <Paper variant="outlined" sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25, borderRadius: 3 }}>
       <Stack direction="row" sx={{ alignItems: "center" }}>
         <Typography variant="h3" sx={{ flex: 1 }}>
           {title}
@@ -41,6 +42,154 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
       </Stack>
       {children}
     </Paper>
+  );
+}
+
+/** "הצעד הבא" – the top of the page, wide: the step's icon, what to do, and a button to its screen (2.75). */
+function NextStepBanner({ text, path, step }: { text: string; path: string; step: StepKey }) {
+  const look = step === "overview" ? null : STEP_LOOK[step];
+  const label = STEPS.find((s) => s.key === step)?.label;
+  return (
+    <Paper
+      variant="outlined"
+      sx={(t) => ({
+        p: { xs: 1.5, sm: 2 },
+        borderRadius: 3,
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        flexWrap: { xs: "wrap", sm: "nowrap" },
+        borderColor: alpha(t.palette.primary.main, 0.5),
+        background: `linear-gradient(270deg, ${t.palette.background.paper}, ${alpha(t.palette.primary.main, 0.1)})`,
+      })}
+    >
+      {look && <IconBadge icon={look.icon} tone={look.tone} size={42} />}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700 }}>
+          הצעד הבא
+        </Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: { xs: 16, sm: 18 }, lineHeight: 1.3 }}>{text}</Typography>
+      </Box>
+      <Button variant="contained" endIcon={<ArrowBackIcon />} component={RouterLink} to={path} sx={{ whiteSpace: "nowrap", width: { xs: "100%", sm: "auto" } }}>
+        {look && label ? `מעבר ל${label}` : "מעבר"}
+      </Button>
+    </Paper>
+  );
+}
+
+/** The cycle's five steps: side by side on a wide screen, a list on a phone (2.75). */
+function StepsView({ step, states, wide }: { step: number; states: ReturnType<typeof stepStates> | null; wide: boolean }) {
+  return (
+    <Box sx={wide ? { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 1 } : { display: "flex", flexDirection: "column", gap: 0.5 }}>
+      {STEPS.slice(1).map((s, i) => {
+        const key = s.key as Exclude<StepKey, "overview">;
+        const st = states?.[key];
+        const at = i + 1;
+        const now = at === step;
+        // a step behind shows its state; one ahead only if something waits there (a pending exemption)
+        const mark = st && (at < step || st.tone === "warn" || st.tone === "busy") ? TONE_ICON[st.tone] : null;
+        const seg = at < step ? "success.main" : now ? "primary.main" : "action.selected";
+        const end = now ? (
+          <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700 }}>
+            עכשיו
+          </Typography>
+        ) : mark ? (
+          <Box sx={{ fontSize: 20, display: "flex" }}>{mark}</Box>
+        ) : wide && at > step ? (
+          <Typography variant="caption" color="text.secondary">
+            בהמשך
+          </Typography>
+        ) : null;
+        const box = (t: Theme) => ({
+          textDecoration: "none",
+          color: "inherit",
+          borderRadius: 2.5,
+          opacity: at > step ? 0.6 : 1,
+          bgcolor: now ? alpha(t.palette.primary.main, 0.1) : undefined,
+          outline: now && wide ? `1px solid ${alpha(t.palette.primary.main, 0.45)}` : undefined,
+          "&:hover": { bgcolor: alpha(t.palette.primary.main, now ? 0.16 : 0.06), opacity: 1 },
+        });
+        return wide ? (
+          <Stack key={s.key} component={RouterLink} to={s.path} sx={(t) => ({ ...box(t), p: 1.25, gap: 0.75 })}>
+            <Box sx={{ height: 5, borderRadius: 3, bgcolor: seg }} />
+            <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
+              <IconBadge icon={STEP_LOOK[key].icon} tone={STEP_LOOK[key].tone} size={30} />
+              <Typography variant="caption" color="text.secondary">
+                שלב {at}
+              </Typography>
+            </Stack>
+            <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>{s.label}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+              {st?.text}
+            </Typography>
+            <Box sx={{ minHeight: 22, display: "flex", alignItems: "center" }}>{end}</Box>
+          </Stack>
+        ) : (
+          <Stack key={s.key} direction="row" component={RouterLink} to={s.path} sx={(t) => ({ ...box(t), alignItems: "center", gap: 1.25, py: 0.75, px: 1, mx: -1 })}>
+            <IconBadge icon={STEP_LOOK[key].icon} tone={STEP_LOOK[key].tone} size={30} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>{s.label}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {st?.text}
+              </Typography>
+            </Box>
+            {end}
+          </Stack>
+        );
+      })}
+    </Box>
+  );
+}
+
+const weekdayFmt = new Intl.DateTimeFormat("he-IL", { weekday: "narrow", timeZone: "Asia/Jerusalem" });
+
+/** "השבוע הקרוב": a row per day – how busy, and the days with an unstaffed duty in red (2.75). */
+function WeekRows({ days }: { days: WeekDay[] }) {
+  const total = days.reduce((n, d) => n + d.duties, 0);
+  const missing = days.reduce((n, d) => n + d.unstaffed, 0);
+  const top = Math.max(1, ...days.map((d) => d.duties));
+  return (
+    <Stack spacing={0.25}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1, mb: 0.5 }}>
+        <Typography variant="body2" color="text.secondary">
+          {total} משימות
+        </Typography>
+        {missing > 0 ? <Chip size="small" color="error" label={`${missing} לא מאוישות`} /> : <Chip size="small" color="success" variant="outlined" label="כולן מאוישות" />}
+      </Stack>
+      {days.map((d) => (
+        <Box
+          key={d.key}
+          component={RouterLink}
+          to={`/board?day=${d.key}`}
+          sx={(t) => ({
+            display: "grid",
+            gridTemplateColumns: "64px minmax(0, 1fr) 72px",
+            alignItems: "center",
+            gap: 1,
+            px: 0.75,
+            py: 0.4,
+            borderRadius: 1.5,
+            textDecoration: "none",
+            color: "inherit",
+            bgcolor: d.unstaffed ? alpha(t.palette.error.main, 0.12) : undefined,
+            "&:hover": { bgcolor: d.unstaffed ? alpha(t.palette.error.main, 0.2) : "action.hover" },
+          })}
+        >
+          <Typography variant="body2" noWrap>
+            <b>{weekdayFmt.format(new Date(`${d.key}T12:00:00Z`))}</b>{" "}
+            <Box component="span" sx={{ color: "text.secondary" }}>
+              {Number(d.key.slice(8))}.{Number(d.key.slice(5, 7))}
+            </Box>
+          </Typography>
+          <Box sx={{ height: 6, borderRadius: 3, bgcolor: "action.selected", overflow: "hidden" }}>
+            <Box sx={{ height: 1, width: `${(d.duties / top) * 100}%`, bgcolor: d.unstaffed ? "error.main" : "success.main", borderRadius: 3 }} />
+          </Box>
+          <Typography variant="caption" sx={{ textAlign: "end", color: d.unstaffed ? "error.main" : "text.secondary", fontWeight: d.unstaffed ? 700 : undefined }}>
+            {d.unstaffed ? `${d.unstaffed} חסרים` : d.duties ? `${d.duties} משימות` : "—"}
+          </Typography>
+        </Box>
+      ))}
+    </Stack>
   );
 }
 
@@ -115,7 +264,8 @@ export function HomePage() {
   const states = cycle && facts ? stepStates(cycle, facts) : null;
   const next = cycle && facts ? nextAction(cycle, facts) : null;
   const step = cycle ? currentStep(cycle.status) : 0;
-  const unstaffed = (week ?? []).filter((r) => !r.performers.length);
+  const days = weekDays(week ?? [], new Date());
+  const wide = useMediaQuery(useTheme().breakpoints.up("md"));
 
   return (
     <Stack spacing={2}>
@@ -213,6 +363,7 @@ export function HomePage() {
           כדאי למנות אחראי שיבוצים או מ״מ נוסף: אם תחליף טלפון, הוא יוכל לאפס לך את האימות הדו-שלבי.
         </Alert>
       )}
+      {cycle && next && <NextStepBanner text={next.text} path={next.path} step={next.step} />}
       <MyNextDuty />
       <UnackedCard />
       <FeedbackInbox home />
@@ -236,91 +387,21 @@ export function HomePage() {
         </Alert>
       )}
 
-      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "3fr 2fr" }, alignItems: "start" }}>
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "minmax(0, 1fr)", md: cycle ? "minmax(0, 1fr) 300px" : "minmax(0, 1fr)" }, alignItems: "stretch" }}>
         {cycle && (
           <Card
             title={cycle.name}
             action={
-              <Chip
-                size="small"
-                label={step >= 1 && step <= 5 ? `שלב ${step} מתוך 5` : stageLabel(cycle.status)}
-                color="primary"
-                variant="outlined"
-              />
+              <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "none", sm: "block" } }}>
+                  {fmtDay(cycle.start_date)} – {fmtDay(cycle.end_date)}
+                </Typography>
+                <Chip size="small" label={step >= 1 && step <= 5 ? `שלב ${step} מתוך 5` : stageLabel(cycle.status)} color="primary" variant="outlined" />
+              </Stack>
             }
           >
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 0.5 }} role="img" aria-label={step >= 1 && step <= 5 ? `שלב ${step} מתוך 5` : stageLabel(cycle.status)}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <Box key={n} sx={{ height: 6, borderRadius: 3, bgcolor: n < step ? "success.main" : n === step ? "primary.main" : "action.selected" }} />
-              ))}
-            </Box>
-            {next ? (
-              <Alert
-                severity="info"
-                icon={false}
-                action={
-                  <Button
-                    color="inherit"
-                    size="small"
-                    endIcon={<ArrowBackIcon />}
-                    component={RouterLink}
-                    to={next.path}
-                  >
-                    מעבר
-                  </Button>
-                }
-              >
-                <b>הצעד הבא:</b> {next.text}
-              </Alert>
-            ) : (
-              <CircularProgress size={20} />
-            )}
-            <Stack spacing={0.5}>
-              {STEPS.slice(1).map((s, i) => {
-                const key = s.key as Exclude<typeof s.key, "overview">;
-                const st = states?.[key];
-                const at = i + 1;
-                const now = at === step;
-                // a step behind shows its state; one ahead only if something waits there (a pending exemption)
-                const mark = st && (at < step || st.tone === "warn" || st.tone === "busy") ? TONE_ICON[st.tone] : null;
-                return (
-                  <Stack
-                    key={s.key}
-                    direction="row"
-                    component={RouterLink}
-                    to={s.path}
-                    sx={(t) => ({
-                      alignItems: "center",
-                      gap: 1.25,
-                      textDecoration: "none",
-                      color: "inherit",
-                      py: 0.75,
-                      px: 1,
-                      mx: -1,
-                      borderRadius: 2,
-                      opacity: at > step ? 0.6 : 1,
-                      bgcolor: now ? alpha(t.palette.primary.main, 0.1) : undefined,
-                      "&:hover": { bgcolor: alpha(t.palette.primary.main, now ? 0.16 : 0.06), opacity: 1 },
-                    })}
-                  >
-                    <IconBadge icon={STEP_LOOK[key].icon} tone={STEP_LOOK[key].tone} size={30} />
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>{s.label}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {st?.text}
-                      </Typography>
-                    </Box>
-                    {now ? (
-                      <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700 }}>
-                        עכשיו
-                      </Typography>
-                    ) : (
-                      mark && <Box sx={{ fontSize: 20, display: "flex" }}>{mark}</Box>
-                    )}
-                  </Stack>
-                );
-              })}
-            </Stack>
+            {!next && <CircularProgress size={20} />}
+            <StepsView step={step} states={states} wide={wide} />
           </Card>
         )}
 
@@ -328,54 +409,52 @@ export function HomePage() {
           {!week ? (
             <CircularProgress size={20} />
           ) : week.length === 0 ? (
-            <EmptyState size="sm" pose="sleep" title="שקט השבוע" text="אין משימות מפורסמות בשבעת הימים הקרובים." />
+            <Box sx={{ flex: 1, display: "grid", placeItems: "center" }}>
+              <EmptyState size="sm" pose="sleep" title="שקט השבוע" text="אין משימות מפורסמות בשבעת הימים הקרובים." />
+            </Box>
           ) : (
-            <>
-              <Typography>
-                <b>{week.length}</b> משימות מפורסמות בשבעת הימים הקרובים
-                {unstaffed.length > 0 ? (
-                  <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
-                    {` · ${unstaffed.length} לא מאוישות`}
-                  </Box>
-                ) : (
-                  " · כולן מאוישות"
-                )}
-              </Typography>
-              {unstaffed.slice(0, 5).map((r) => (
-                <Typography key={r.slot_id} variant="body2" color="error.main">
-                  {r.task_name} – {dayLabel(r.starts_at)} {timeLabel(r.starts_at)}
-                </Typography>
-              ))}
-            </>
+            <WeekRows days={days} />
           )}
         </Card>
       </Box>
 
-      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" } }}>
+      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, minmax(0, 1fr))" } }}>
         {(
           [
-            { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינת כוח אדם" : "חיפוש ופרטי עובדים", icon: <PeopleIcon />, tone: "info" },
+            { to: "/soldiers", label: "כוח אדם", hint: staff ? "חיפוש, עריכה וטעינה" : "חיפוש ופרטי עובדים", icon: <PeopleIcon />, tone: "info" },
             { to: "/board", label: "לוח השיבוצים", hint: "מה שכל היחידה רואה", icon: <BoardIcon />, tone: "success" },
-            { to: "/cycles", label: "ניהול מחזורים", hint: "יצירה, תאריכים ומועד סגירת אילוצים", icon: <CyclesIcon />, tone: "warning" },
-            { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים, מטווחים", icon: <SettingsIcon />, tone: "primary" },
+            { to: "/cycles", label: "ניהול מחזורים", hint: "תאריכים וסגירת אילוצים", icon: <CyclesIcon />, tone: "warning" },
+            { to: "/admin", label: "הגדרות", hint: "קטלוג, משקלים, חגים", icon: <SettingsIcon />, tone: "primary" },
           ] as const
         )
           .filter((l) => staff || (l.to !== "/cycles" && l.to !== "/admin"))
           .map((l) => (
-          <Paper
-            key={l.to}
-            variant="outlined"
-            component={RouterLink}
-            to={l.to}
-            sx={{ p: 1.75, borderRadius: 3, textDecoration: "none", color: "inherit", display: "flex", flexDirection: "column", gap: 1, "&:hover": { borderColor: `${l.tone}.main` } }}
-          >
-            <IconBadge icon={l.icon} tone={l.tone} size={44} />
-            <Typography sx={{ fontWeight: 700, fontSize: 17 }}>{l.label}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {l.hint}
-            </Typography>
-          </Paper>
-        ))}
+            <Paper
+              key={l.to}
+              variant="outlined"
+              component={RouterLink}
+              to={l.to}
+              sx={{
+                p: { xs: 1.75, md: 1.5 },
+                borderRadius: 3,
+                textDecoration: "none",
+                color: "inherit",
+                display: "flex",
+                flexDirection: { xs: "column", md: "row" },
+                alignItems: { xs: "flex-start", md: "center" },
+                gap: { xs: 1, md: 1.5 },
+                "&:hover": { borderColor: `${l.tone}.main` },
+              }}
+            >
+              <IconBadge icon={l.icon} tone={l.tone} size={wide ? 40 : 44} />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: { xs: 17, md: 15 } }}>{l.label}</Typography>
+                <Typography variant="body2" color="text.secondary" noWrap={wide}>
+                  {l.hint}
+                </Typography>
+              </Box>
+            </Paper>
+          ))}
       </Box>
       <SwapLogCard />
     </Stack>
