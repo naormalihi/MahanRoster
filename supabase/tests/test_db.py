@@ -3326,12 +3326,16 @@ def test_bulk_remove_and_delete_employees(conn):
         sid_kept = c.execute(f"select {on_board} from soldiers s where s.id = %s", (sid,)).fetchone()[0]
         # "other" may have a duty on the board just published too – then it stays
         other_kept = c.execute(f"select {on_board} from soldiers s where s.id = %s", (other,)).fetchone()[0]
+        # "other" may have an account of his own, left by an earlier test – deleted with him
+        other_acct = c.execute("select count(*) from app_users u where u.soldier_id = %s and not exists "
+                               "(select 1 from user_roles r where r.user_id = u.id and r.role <> 'soldier')", (other,)).fetchone()[0]
         c.execute("set local role authenticated")
         _claims(c, COORD)
         r = c.execute("select public.delete_soldiers(%s::uuid[])", ([sid, other] + ([a[0]] if a else []),)).fetchone()[0]
         if a:
             assert str(a[0]) in [b["id"] for b in r["blocked"]]
-        assert r["deleted"] == 2 - sid_kept - other_kept and r["accounts"] == (0 if sid_kept else 1)
+        assert r["deleted"] == 2 - sid_kept - other_kept
+        assert r["accounts"] == (0 if sid_kept else 1) + (0 if other_kept else other_acct)
         c.execute("reset role")
         assert c.execute("select count(*) from soldiers where id = %s", (other,)).fetchone()[0] == (1 if other_kept else 0)
         if a:
@@ -3359,11 +3363,14 @@ def test_pgcrypto_callers_see_the_extensions_schema(conn):
     assert bad == []
 def test_score_correction_counts_now_and_later_and_undoes(conn):
     cycle = conn.cycle_id
-    sid = conn.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s limit 1", (cycle,)).fetchone()
+    # someone a rebuilt snapshot keeps: still active and serving when the cycle starts (an earlier test may release someone)
+    kept = """select cs.soldier_id from cycle_soldier_snapshot cs join soldiers s on s.id = cs.soldier_id join cycles cy on cy.id = cs.cycle_id
+              where cs.cycle_id = %s and s.is_active and (s.release_date is null or s.release_date >= cy.start_date) limit 1"""
+    sid = conn.execute(kept, (cycle,)).fetchone()
     with session_as(conn, COORD) as c:
         if sid is None:
             c.execute("select public.snapshot_cycle(%s)", (cycle,))
-            sid = c.execute("select soldier_id from cycle_soldier_snapshot where cycle_id = %s limit 1", (cycle,)).fetchone()
+            sid = c.execute(kept, (cycle,)).fetchone()
         sid = sid[0]
         base = lambda: c.execute("select baseline_score from cycle_soldier_snapshot where cycle_id = %s and soldier_id = %s", (cycle, sid)).fetchone()[0]
 
