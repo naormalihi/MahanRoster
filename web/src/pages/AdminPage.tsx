@@ -4,6 +4,7 @@ import AddIcon from "@mui/icons-material/Add";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
+import BriefingIcon from "@mui/icons-material/RecordVoiceOverOutlined";
 import {
   Alert,
   Box,
@@ -30,11 +31,12 @@ import {
   TableRow,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { NamedRef, RankItem } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -79,6 +81,7 @@ import {
   type TaskTypeInput,
   type Briefing,
   briefingLabel,
+  hoursLabel,
   cleanBriefing,
 } from "../lib/catalog";
 import { useLiveTick } from "../lib/live";
@@ -562,13 +565,10 @@ function CatalogTab() {
     if (t.gender) parts.push(t.gender === "male" ? "גברים" : "נשים");
     return parts.join(" · ") || "כולם";
   };
-  const hours = (t: TaskType) =>
-    t.weekday_hours && Object.keys(t.weekday_hours).length ? "לפי יום" : t.default_start_time ? `${t.default_start_time}–${t.default_end_time}` : "—";
   const flags = (t: TaskType) => (
     <>
       {t.is_weekend_type && <Chip size="small" label="שבת" />}
       {t.includes_holidays && <Chip size="small" label="כולל חג" />}
-      {t.briefing && <Chip size="small" variant="outlined" label={briefingLabel(t.briefing)} />}
       {t.qualifying_duty && <Chip size="small" color="primary" variant="outlined" label="מזכה" />}
       {t.requires_weapon && <Chip size="small" variant="outlined" label="נשק" />}
       {t.shachar_only ? <Chip size="small" color="primary" label='רק שח"ר' /> : t.shachar_compatible && <Chip size="small" variant="outlined" label='שח"ר' />}
@@ -577,6 +577,15 @@ function CatalogTab() {
       {!t.is_active && <Chip size="small" label="לא פעילה" />}
     </>
   );
+  // the catalog by category, each under its own heading (2.75.1)
+  const groups: { name: string; tasks: TaskType[] }[] = [];
+  for (const t of shown) {
+    const name = catName.get(t.category_id ?? "") ?? "בלי קטגוריה";
+    if (groups.at(-1)?.name !== name) groups.push({ name, tasks: [] });
+    groups.at(-1)!.tasks.push(t);
+  }
+  const dot = (t: TaskType) => <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: t.color ?? "grey.400", flexShrink: 0 }} />;
+  const weight = (t: TaskType) => <Chip size="small" color="secondary" variant="outlined" label={`משקל ${t.weight}`} />;
 
   return (
     <Stack spacing={2}>
@@ -595,73 +604,117 @@ function CatalogTab() {
         )}
       </Stack>
       {narrow ? (
-        <CardList>
-          {shown.map((t) => (
-            <RowCard
-              key={t.id}
-              dim={!t.is_active}
-              onClick={() => setEditing(t)}
-              lead={<Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: t.color ?? "grey.400", flexShrink: 0, mt: 0.9 }} />}
-              title={t.name}
-              chips={<Chip size="small" color="secondary" variant="outlined" label={`משקל ${t.weight}`} />}
-              sub={
-                <>
-                  {catName.get(t.category_id ?? "") ?? "בלי קטגוריה"} · <span dir="ltr">{hours(t)}</span>
-                </>
-              }
-              lines={[
-                `מי מבצע: ${who(t)}`,
-                <Stack key="f" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }}>
-                  {flags(t)}
-                </Stack>,
-              ]}
-            />
+        <Stack spacing={2}>
+          {groups.map((g) => (
+            <Box key={g.name}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.75, px: 0.5 }}>
+                {g.name} · {g.tasks.length}
+              </Typography>
+              <CardList>
+                {g.tasks.map((t) => (
+                  <RowCard
+                    key={t.id}
+                    dim={!t.is_active}
+                    onClick={() => setEditing(t)}
+                    lead={<Box sx={{ mt: 0.9 }}>{dot(t)}</Box>}
+                    title={t.name}
+                    chips={weight(t)}
+                    sub={
+                      <>
+                        <span dir={/^\d/.test(hoursLabel(t)) ? "ltr" : undefined}>{hoursLabel(t)}</span> · {who(t)}
+                      </>
+                    }
+                    lines={[
+                      t.briefing ? (
+                        <Stack key="b" component="span" direction="row" sx={{ gap: 0.75, alignItems: "center", color: "text.secondary" }}>
+                          <BriefingIcon sx={{ fontSize: 16 }} />
+                          {briefingLabel(t.briefing)}
+                        </Stack>
+                      ) : null,
+                      <Stack key="f" component="span" direction="row" sx={{ gap: 0.5, flexWrap: "wrap", mt: 0.25 }}>
+                        {flags(t)}
+                      </Stack>,
+                    ]}
+                  />
+                ))}
+              </CardList>
+            </Box>
           ))}
-        </CardList>
+        </Stack>
       ) : (
-      <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>משימה</TableCell>
-              <TableCell>קטגוריה</TableCell>
-              <TableCell>משקל</TableCell>
-              <TableCell>שעות</TableCell>
-              <TableCell>מי מבצע</TableCell>
-              <TableCell>סימונים</TableCell>
-              <TableCell />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {shown.map((t) => (
-              <TableRow key={t.id} hover onClick={() => setEditing(t)} sx={{ opacity: t.is_active ? 1 : 0.5, cursor: "pointer" }}>
-                <TableCell>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: t.color ?? "grey.400", flexShrink: 0 }} />
-                    <span>{t.name}</span>
-                  </Stack>
-                </TableCell>
-                <TableCell>{catName.get(t.category_id ?? "") ?? "—"}</TableCell>
-                <TableCell>{t.weight}</TableCell>
-                <TableCell sx={{ whiteSpace: "nowrap" }} dir="ltr">
-                  {hours(t)}
-                </TableCell>
-                <TableCell>{who(t)}</TableCell>
-                <TableCell>
-                  <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-                    {flags(t)}
-                  </Stack>
-                </TableCell>
-                <TableCell>
-                  <IconButton size="small" aria-label="עריכה" onClick={() => setEditing(t)}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </TableCell>
+        <Paper variant="outlined" sx={{ overflowX: "auto", borderRadius: 3 }}>
+          {/* one line per duty: long lists cut, in full on hover (2.75.1) */}
+          <Table size="small" sx={{ "& td, & th": { whiteSpace: "nowrap" } }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>משימה</TableCell>
+                <TableCell align="center">משקל</TableCell>
+                <TableCell>שעות</TableCell>
+                <TableCell>מי מבצע</TableCell>
+                <TableCell>תדריך / התייצבות</TableCell>
+                <TableCell>סימונים</TableCell>
+                <TableCell />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Paper>
+            </TableHead>
+            <TableBody>
+              {groups.map((g) => (
+                <Fragment key={g.name}>
+                  <TableRow>
+                    <TableCell colSpan={7} sx={{ bgcolor: "action.hover", py: 0.75 }}>
+                      <Typography variant="subtitle2" component="span">
+                        {g.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" component="span">
+                        {" "}
+                        · {g.tasks.length} משימות
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                  {g.tasks.map((t) => (
+                    <TableRow key={t.id} hover onClick={() => setEditing(t)} sx={{ opacity: t.is_active ? 1 : 0.5, cursor: "pointer" }}>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                          {dot(t)}
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {t.name}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="center">{t.weight}</TableCell>
+                      <TableCell>
+                        <span dir={/^\d/.test(hoursLabel(t)) ? "ltr" : undefined}>{hoursLabel(t)}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title={who(t)} enterTouchDelay={0}>
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 170 }}>
+                            {who(t)}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title={briefingLabel(t.briefing)} enterTouchDelay={0}>
+                          <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 230 }}>
+                            {t.briefing ? briefingLabel(t.briefing) : "—"}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" sx={{ gap: 0.5 }}>
+                          {flags(t)}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small" aria-label="עריכה" onClick={() => setEditing(t)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
       )}
       {editCats && (
         <CategoriesDialog
