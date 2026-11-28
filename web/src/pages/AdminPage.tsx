@@ -1,4 +1,5 @@
 import { RangesTab } from "../components/RangesTab";
+import { FrameRotasTab } from "../components/FrameRotasTab";
 import { DateTextField } from "../components/DateTextField";
 import AddIcon from "@mui/icons-material/Add";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
@@ -2026,6 +2027,7 @@ const TABS = [
   { key: "calendar", label: "לוח חגים", about: "חגים וימים מיוחדים בכל שנה" },
   { key: "users", label: "משתמשים", about: "חשבונות והרשאות" },
   { key: "ranges", label: "מטווחים", about: "מטווחים מתוכננים, תוקף ותזכורות" },
+  { key: "frame_rotas", label: "תורנויות מסגרת", about: "תורנות חודשית שעוברת בין המסגרות" },
   { key: "contacts", label: "אנשי קשר לעובדים", about: "למי עובדים פונים" },
   { key: "feedback", label: "הצעות ומשוב", about: "מה משתמשים הציעו" },
 ] as const;
@@ -2058,6 +2060,7 @@ export function AdminPage() {
       {tab === "aliases" && <AliasesTab />}
       {tab === "users" && <UsersTab />}
       {tab === "ranges" && <RangesTab />}
+      {tab === "frame_rotas" && <FrameRotasTab />}
       {tab === "contacts" && <ContactsTab />}
       {tab === "feedback" && <FeedbackInbox />}
     </Stack>

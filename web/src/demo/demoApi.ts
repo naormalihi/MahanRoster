@@ -19,6 +19,7 @@ import type { AddSoldierResult, AddSoldierRow } from "../lib/addSoldier";
 import type { DutyMessage } from "../lib/dutyMessage";
 import type { MyDuty, UnackedDuty } from "../lib/me";
 import type { MySwap, SwapLogRow, SwapOptions } from "../lib/swaps";
+import { addMonths, monthStart, rotaDays, rotaGaf, type FrameRota, type FrameRotaInput, type FrameRotaMonth, type MyFrameRota } from "../lib/frameRota";
 import type { Api, ApplyResult, BoardRow, Me, MfaState, NamedRef, NoAccountRow, RankItem, Role, ScoreCorrection, SlotPeople, SlotPerson, SpecDocument } from "../lib/api";
 import { DAY_TYPE_LABEL, HOLIDAY_KIND_NAME, HOLIDAY_NAME, israeliHolidays, type HolidayKey, type HolidayKind, type CalendarDay, type DayTypeRef, type Population, type ScoreMultiplier, type ScoreMultiplierInput, type ScoringSettings, type TaskType, type TaskTypeInput } from "../lib/catalog";
 import {
@@ -570,6 +571,98 @@ export class DemoApi implements Api {
 
   async tourDismiss() {
     this.tour.dismissed = true;
+  }
+
+  // "תורנויות מסגרת": one duty; this month it is the demo commander's frame
+  private rotas: (Omit<FrameRota, "months"> & { overrides: Record<string, string> })[] | null = null;
+  private rotaList() {
+    if (!this.rotas) {
+      const s1 = this.soldierList.find((s) => s.id === "s1");
+      const mine = this.gafList.find((x) => x.name === s1?.gaf_name)?.id;
+      const ids = this.gafList.map((g) => g.id);
+      const order = mine ? [mine, ...ids.filter((x) => x !== mine)] : ids;
+      this.rotas = [{
+        id: "fr1", name: "איסוף משיכת חלב ולוגיסטיקה", weekday: 0, at_time: "08:00", place: "רחבת המחסן",
+        details: "להגיע עם רכב המסגרת. לתאם מראש עם הלוגיסטיקה.\nלהחזיר את המפתח עד 12:00.", is_active: true,
+        gaf_order: order, start_month: monthStart(new Date().toISOString().slice(0, 10)), overrides: {},
+      }];
+    }
+    return this.rotas;
+  }
+  private rotaOff = (day: string): string | null => {
+    const c = this.calendar.find((x) => x.day === day);
+    if (c && c.day_type.includes("holiday")) return c.note || DAY_TYPE_LABEL[c.day_type] || "חג";
+    const dow = new Date(`${day}T00:00:00Z`).getUTCDay();
+    return dow === 5 || dow === 6 ? "" : null;
+  };
+  private rotaMonth(r: Omit<FrameRota, "months"> & { overrides: Record<string, string> }, month: string): FrameRotaMonth {
+    const g = rotaGaf(r.gaf_order, r.start_month, month, r.overrides);
+    const name = this.gafList.find((x) => x.id === g)?.name ?? null;
+    const cmd = name && name === this.soldierList.find((s) => s.id === "s1")?.gaf_name ? "מפקד לדוגמה" : null;
+    return { month: monthStart(month), gaf_id: g, gaf_name: name, commander: cmd, overridden: !!r.overrides[monthStart(month)] };
+  }
+
+  async frameRotasAdmin() {
+    await delay();
+    const now = monthStart(new Date().toISOString().slice(0, 10));
+    return {
+      gafs: this.gafList.map((g) => ({ ...g })),
+      rotas: this.rotaList().map(({ overrides: _o, ...r }) => ({
+        ...r, gaf_order: [...r.gaf_order],
+        months: Array.from({ length: 12 }, (_, k) => this.rotaMonth({ ...r, overrides: _o }, addMonths(now, k))),
+      })),
+    };
+  }
+
+  async saveFrameRota(r: FrameRotaInput) {
+    await delay();
+    if (!r.name.trim()) throw new Error("צריך שם");
+    if ((r.details ?? "").length > 300) throw new Error("פרטים – עד 300 תווים");
+    const list = this.rotaList();
+    const row = { ...r, start_month: monthStart(r.start_month) };
+    if (r.id) {
+      const x = list.find((y) => y.id === r.id)!;
+      Object.assign(x, row);
+      return x.id;
+    }
+    const id = this.nextId("fr");
+    list.push({ ...row, id, overrides: {} });
+    return id;
+  }
+
+  async deleteFrameRota(id: string) {
+    await delay();
+    this.rotas = this.rotaList().filter((r) => r.id !== id);
+  }
+
+  async overrideFrameRota(rotaId: string, month: string, gafId: string | null) {
+    await delay();
+    const r = this.rotaList().find((x) => x.id === rotaId)!;
+    if (gafId) r.overrides[monthStart(month)] = gafId;
+    else delete r.overrides[monthStart(month)];
+  }
+
+  async myFrameRotas(): Promise<MyFrameRota[]> {
+    await delay();
+    const now = monthStart(new Date().toISOString().slice(0, 10));
+    const mine = await this.myCommandedGafs();
+    return this.rotaList().filter((r) => r.is_active && r.gaf_order.length).map((r) => {
+      const at = (m: string) => {
+        const x = this.rotaMonth(r, m);
+        return { ...x, mine: !!x.gaf_id && mine.includes(x.gaf_id), days: rotaDays(r.weekday, m, this.rotaOff) };
+      };
+      const current = at(now);
+      const next = at(addMonths(now, 1));
+      return { id: r.id, name: r.name, weekday: r.weekday, at_time: r.at_time, place: r.place,
+        details: current.mine || next.mine ? r.details : null, current, next };
+    });
+  }
+
+  async frameRotasStatus() {
+    await delay();
+    const now = monthStart(new Date().toISOString().slice(0, 10));
+    return this.rotaList().filter((r) => r.is_active && r.gaf_order.length)
+      .map((r) => ({ id: r.id, name: r.name, current: this.rotaMonth(r, now), next: this.rotaMonth(r, addMonths(now, 1)) }));
   }
 
   async myCommandedGafs() {
