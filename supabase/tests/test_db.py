@@ -3775,6 +3775,8 @@ def test_deadline_reminders_once_per_cycle(conn):
     uid, sid = _soldier_account(conn, "deadline.rem")
     with conn.transaction():
         cy = conn.execute("select id from cycles order by start_date desc limit 1").fetchone()[0]
+        # whatever cycle an earlier test left last, he is still serving when it starts
+        conn.execute("update soldiers set is_active = true, release_date = null where id = %s", (sid,))
         conn.execute("update cycles set status = 'collecting', exemption_deadline = now() + interval '2 days 1 hour', "
                      "deadline_reminded_3d = null, deadline_reminded_day = null where id = %s", (cy,))
         hour = conn.execute("select extract(hour from now() at time zone app.tz())::int").fetchone()[0]
