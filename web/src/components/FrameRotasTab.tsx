@@ -2,6 +2,8 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowDownward from "@mui/icons-material/ArrowDownward";
 import ArrowUpward from "@mui/icons-material/ArrowUpward";
 import Close from "@mui/icons-material/Close";
+import SwapHoriz from "@mui/icons-material/SwapHoriz";
+import Undo from "@mui/icons-material/Undo";
 import {
   Alert,
   Box,
@@ -17,11 +19,6 @@ import {
   Paper,
   Stack,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography,
@@ -29,7 +26,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
 import { dayKey } from "../lib/dates";
-import { addMonths, monthLabel, monthStart, rotaGaf, WEEKDAYS, MONTH_NAMES, type FrameRota, type FrameRotaInput, type FrameRotasAdmin } from "../lib/frameRota";
+import { addMonths, monthLabel, monthName, monthStart, rotaGaf, WEEKDAYS, MONTH_NAMES, type FrameRota, type FrameRotaInput, type FrameRotasAdmin } from "../lib/frameRota";
 import { useLiveTick } from "../lib/live";
 
 const thisMonth = () => monthStart(dayKey(new Date()));
@@ -167,63 +164,78 @@ function RotaEditor({ rota, gafs, onSaved, onError }: { rota: FrameRota; gafs: F
             הלוח מתעדכן אחרי השמירה.
           </Alert>
         )}
-        <Box sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>חודש</TableCell>
-                <TableCell>מסגרת</TableCell>
-                <TableCell>מפקד המסגרת</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rota.months.map((m, k) => (
-                <TableRow key={m.month} selected={k === 0}>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>
-                    {monthLabel(m.month)}
-                    {k === 0 && <Chip size="small" label="החודש" sx={{ mr: 1 }} />}
-                  </TableCell>
-                  <TableCell>
-                    {changing === m.month ? (
-                      <TextField select size="small" value={m.gaf_id ?? ""} onChange={(e) => void override(m.month, e.target.value)} sx={{ minWidth: 140 }}>
-                        {gafs.map((g) => (
-                          <MenuItem key={g.id} value={g.id}>
-                            {g.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    ) : (
-                      <>
+        {/* a list, not a table: on a phone each month is one row – month, frame and its commander, the action */}
+        <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+          {rota.months.map((m, k) => (
+            <Stack
+              key={m.month}
+              direction="row"
+              spacing={1.5}
+              sx={{ alignItems: "center", py: 1, px: 1, borderRadius: 1, bgcolor: k === 0 ? "action.selected" : undefined }}
+            >
+              <Box sx={{ width: { xs: 76, sm: 130 }, flexShrink: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: k === 0 ? 700 : 400 }}>
+                  {monthName(m.month)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {k === 0 ? "החודש" : m.month.slice(0, 4)}
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                {changing === m.month ? (
+                  <TextField
+                    select
+                    size="small"
+                    fullWidth
+                    label="מסגרת לחודש"
+                    value={m.gaf_id ?? ""}
+                    onChange={(e) => void override(m.month, e.target.value)}
+                  >
+                    {gafs.map((g) => (
+                      <MenuItem key={g.id} value={g.id}>
+                        {g.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                ) : (
+                  <>
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {m.gaf_name ?? "—"}
-                        {m.overridden && <Chip size="small" color="warning" variant="outlined" label="הוחלף ידנית" sx={{ mr: 1 }} />}
-                      </>
+                      </Typography>
+                      {m.overridden && <Chip size="small" color="warning" variant="outlined" label="הוחלף ידנית" />}
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary" component="div" noWrap>
+                      {m.commander ?? "אין מפקד מסגרת"}
+                    </Typography>
+                  </>
+                )}
+              </Box>
+              <Stack direction="row" sx={{ flexShrink: 0 }}>
+                {changing === m.month ? (
+                  <Button size="small" onClick={() => setChanging(null)}>
+                    ביטול
+                  </Button>
+                ) : (
+                  <>
+                    {m.overridden && (
+                      <Tooltip title="החזרה לסבב">
+                        <IconButton size="small" aria-label="החזרה לסבב" onClick={() => void override(m.month, null)}>
+                          <Undo fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     )}
-                  </TableCell>
-                  <TableCell>{m.commander ?? "—"}</TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>
-                    {changing === m.month ? (
-                      <Button size="small" onClick={() => setChanging(null)}>
-                        ביטול
-                      </Button>
-                    ) : (
-                      <>
-                        <Button size="small" onClick={() => setChanging(m.month)}>
-                          החלף
-                        </Button>
-                        {m.overridden && (
-                          <Button size="small" onClick={() => void override(m.month, null)}>
-                            החזר לסבב
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Box>
+                    <Tooltip title="החלפת המסגרת לחודש הזה">
+                      <IconButton size="small" color="primary" aria-label="החלפה" onClick={() => setChanging(m.month)}>
+                        <SwapHoriz fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )}
+              </Stack>
+            </Stack>
+          ))}
+        </Stack>
       </Paper>
       <Dialog open={deleting} onClose={() => setDeleting(false)}>
         <DialogTitle>למחוק את "{rota.name}"?</DialogTitle>
