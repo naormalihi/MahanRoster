@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { briefingLabel, briefingProblems, cleanBriefing, EMPTY_MULTIPLIER, describeMultiplier, israeliHolidays, mergeHolidays, multiplierProblems, scoringProblems, taskTypeProblems, type TaskTypeInput } from "../catalog";
+import { briefingLabel, hoursLabel, briefingProblems, cleanBriefing, EMPTY_MULTIPLIER, describeMultiplier, israeliHolidays, mergeHolidays, multiplierProblems, scoringProblems, taskTypeProblems, type TaskTypeInput } from "../catalog";
 
 const base: TaskTypeInput = {
   code: "new_duty",
@@ -138,5 +138,14 @@ describe("multiplier values", () => {
     const weekend = { ...EMPTY_MULTIPLIER, weekdays: [5, 6], value: 3 };
     expect(multiplierValueLabel(eve)).toBe("+6");
     expect(multiplierValueLabel(weekend)).toBe("+3");
+  });
+});
+
+describe("hoursLabel", () => {
+  it("says a duty type's hours in short", () => {
+    expect(hoursLabel({ default_start_time: "08:00", default_end_time: "17:00", weekday_hours: null })).toBe("08:00–17:00");
+    expect(hoursLabel({ default_start_time: "08:00:00", default_end_time: "08:00:00", weekday_hours: null })).toBe("יממה מ-08:00");
+    expect(hoursLabel({ default_start_time: "08:00", default_end_time: "17:00", weekday_hours: { "5": "08-13" } })).toBe("לפי יום");
+    expect(hoursLabel({ default_start_time: null, default_end_time: null, weekday_hours: null })).toBe("—");
   });
 });

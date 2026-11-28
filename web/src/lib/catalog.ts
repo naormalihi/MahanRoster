@@ -447,3 +447,12 @@ export function mergeHolidays(existing: CalendarDay[], generated: CalendarDay[])
   }
   return { toWrite, keptManual };
 }
+
+/** A duty type's hours in short (2.75.1): "08:00–17:00", "יממה מ-08:00" when it ends when it began, "לפי יום". */
+export function hoursLabel(t: Pick<TaskType, "default_start_time" | "default_end_time" | "weekday_hours">): string {
+  if (t.weekday_hours && Object.keys(t.weekday_hours).length) return "לפי יום";
+  if (!t.default_start_time) return "—";
+  const a = t.default_start_time.slice(0, 5);
+  const b = (t.default_end_time ?? t.default_start_time).slice(0, 5);
+  return a === b ? `יממה מ-${a}` : `${a}–${b}`;
+}
